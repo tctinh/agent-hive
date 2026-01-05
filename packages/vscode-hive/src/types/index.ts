@@ -4,6 +4,15 @@ export interface Feature {
   steps: Step[]
   stepsCount: number
   doneCount: number
+  status: 'active' | 'completed' | 'archived'
+  createdAt?: string
+  completedAt?: string
+}
+
+export interface Decision {
+  filename: string
+  title: string
+  filePath: string
 }
 
 export interface Step {

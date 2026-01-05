@@ -102,7 +102,7 @@ export class ReportViewProvider {
     
     if (confirm === 'Revert') {
       const terminal = vscode.window.createTerminal('Hive - Revert')
-      terminal.sendText(`opencode --command "hive_step_revert({ stepFolder: '${stepFolder}' })"`)
+      terminal.sendText(`opencode --command "hive_exec_revert stepFolder=${stepFolder}"`)
       terminal.show()
     }
   }

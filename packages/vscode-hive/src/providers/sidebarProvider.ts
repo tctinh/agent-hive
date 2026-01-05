@@ -6,9 +6,10 @@ import { Feature, Step } from '../types'
 
 type FeatureStatus = 'in_progress' | 'completed' | 'pending'
 
-type HiveItem = FeatureItem | FolderItem | FileItem | ExecutionItem | StepItem | SpecFileItem | ReportFileItem | DiffFileItem | SessionTreeItem | FeatureStatusGroupItem
+type HiveItem = FeatureItem | FolderItem | FileItem | ExecutionItem | StepItem | SpecFileItem | ReportFileItem | DiffFileItem | SessionTreeItem | FeatureStatusGroupItem | DecisionItem
 
 function classifyFeatureStatus(feature: Feature): FeatureStatus {
+  if (feature.status === 'completed' || feature.status === 'archived') return 'completed'
   if (feature.stepsCount === 0) return 'pending'
   if (feature.doneCount === 0) return 'pending'
   if (feature.doneCount === feature.stepsCount) return 'completed'
@@ -31,13 +32,22 @@ class FeatureStatusGroupItem extends vscode.TreeItem {
 
 class FeatureItem extends vscode.TreeItem {
   public readonly featureName: string
+  public readonly isCompleted: boolean
 
   constructor(public readonly feature: Feature) {
     super(feature.name, vscode.TreeItemCollapsibleState.Expanded)
     this.featureName = feature.name
-    this.description = `${feature.progress}% (${feature.doneCount}/${feature.stepsCount})`
-    this.contextValue = 'feature'
-    this.iconPath = new vscode.ThemeIcon('package')
+    this.isCompleted = feature.status === 'completed' || feature.status === 'archived'
+    
+    if (this.isCompleted && feature.completedAt) {
+      const date = new Date(feature.completedAt).toLocaleDateString()
+      this.description = `✓ ${date}`
+    } else {
+      this.description = `${feature.progress}% (${feature.doneCount}/${feature.stepsCount})`
+    }
+    
+    this.contextValue = this.isCompleted ? 'featureCompleted' : 'feature'
+    this.iconPath = new vscode.ThemeIcon(this.isCompleted ? 'pass-filled' : 'package')
     this.command = {
       command: 'hive.showFeature',
       title: 'Show Feature Details',
@@ -224,6 +234,24 @@ class SessionTreeItem extends vscode.TreeItem {
   }
 }
 
+class DecisionItem extends vscode.TreeItem {
+  constructor(
+    public readonly featureName: string,
+    public readonly decision: { filename: string; title: string; filePath: string }
+  ) {
+    super(decision.title, vscode.TreeItemCollapsibleState.None)
+    this.contextValue = 'decision'
+    this.iconPath = new vscode.ThemeIcon('lightbulb')
+    this.description = decision.filename
+    this.command = {
+      command: 'vscode.open',
+      title: 'Open Decision',
+      arguments: [vscode.Uri.file(decision.filePath)]
+    }
+    this.resourceUri = vscode.Uri.file(decision.filePath)
+  }
+}
+
 export class HiveSidebarProvider implements vscode.TreeDataProvider<HiveItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<HiveItem | undefined>()
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event
@@ -276,6 +304,10 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<HiveItem> {
     }
 
     if (element instanceof FolderItem) {
+      if (element.folder === 'context') {
+        const decisions = this.hiveService.getDecisions(element.featureName)
+        return decisions.map(d => new DecisionItem(element.featureName, d))
+      }
       const files = this.hiveService.getFilesInFolder(element.featureName, element.folder)
       return files.map(f => new FileItem(
         f,

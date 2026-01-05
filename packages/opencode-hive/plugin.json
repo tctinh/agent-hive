@@ -1,27 +1,32 @@
 {
   "name": "hive",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Context-Driven Development",
   "dataPath": "../../.hive",
   "commands": [
-    { "name": "/hive new", "description": "Create feature" },
-    { "name": "/hive list", "description": "List features" },
-    { "name": "/hive status", "description": "Show progress" },
-    { "name": "/plan", "description": "Generate steps" },
-    { "name": "/done", "description": "Mark step complete" },
-    { "name": "/report", "description": "Generate summary" },
-    { "name": "/decision", "description": "Log decision" }
+    {"name": "/hive new", "description": "Create feature"},
+    {"name": "/hive list", "description": "List features"},
+    {"name": "/hive status", "description": "Show progress"},
+    {"name": "/plan", "description": "Generate steps"},
+    {"name": "/decision", "description": "Log decision"}
   ],
+  "skills": ["plan", "decision"],
   "tools": [
     "hive_feature_create",
+    "hive_feature_list",
+    "hive_feature_switch",
+    "hive_feature_complete",
+    "hive_status",
     "hive_step_create",
+    "hive_step_read",
     "hive_step_update",
-    "hive_doc_save",
-    "hive_report_generate"
-  ],
-  "skills": ["plan", "report", "decision", "step-log"],
-  "hooks": {
-    "onTodoComplete": "step-log",
-    "onAllTodosComplete": "report"
-  }
+    "hive_step_delete",
+    "hive_step_list",
+    "hive_decision_log",
+    "hive_decision_list",
+    "hive_exec_start",
+    "hive_exec_complete",
+    "hive_exec_abort",
+    "hive_exec_revert"
+  ]
 }

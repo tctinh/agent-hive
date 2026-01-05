@@ -38,7 +38,32 @@ export class HiveService {
     const stepsCount = activeSteps.length
     const progress = stepsCount > 0 ? Math.round((doneCount / stepsCount) * 100) : 0
 
-    return { name, progress, steps, stepsCount, doneCount }
+    const featureJsonPath = path.join(this.basePath, 'features', name, 'feature.json')
+    const featureJson = this.readJson<{ status?: string; createdAt?: string; completedAt?: string }>(featureJsonPath)
+    const status = (featureJson?.status as Feature['status']) || 'active'
+    const createdAt = featureJson?.createdAt
+    const completedAt = featureJson?.completedAt
+
+    return { name, progress, steps, stepsCount, doneCount, status, createdAt, completedAt }
+  }
+
+  getDecisions(feature: string): { filename: string; title: string; filePath: string }[] {
+    const contextPath = path.join(this.basePath, 'features', feature, 'context')
+    if (!fs.existsSync(contextPath)) return []
+
+    return fs.readdirSync(contextPath)
+      .filter(f => f.endsWith('.md'))
+      .map(filename => {
+        const filePath = path.join(contextPath, filename)
+        const content = this.readFile(filePath)
+        let title = filename.replace(/\.md$/, '')
+        if (content) {
+          const h1Match = content.match(/^#\s+(.+)$/m)
+          if (h1Match) title = h1Match[1]
+        }
+        return { filename, title, filePath }
+      })
+      .sort((a, b) => a.filename.localeCompare(b.filename))
   }
 
   getSteps(feature: string): Step[] {

@@ -83,28 +83,21 @@ export class HivePanelProvider implements vscode.WebviewViewProvider {
     )
     if (confirm === 'Revert') {
       const terminal = vscode.window.createTerminal('Hive - Revert')
-      terminal.sendText(`opencode --command "hive_step_revert stepFolder=${stepFolder}"`)
+      terminal.sendText(`opencode --command "hive_exec_revert stepFolder=${stepFolder}"`)
       terminal.show()
     }
   }
 
   private async revertBatch(featureName: string, order: number): Promise<void> {
-    const confirm = await vscode.window.showWarningMessage(
-      `Revert all steps in batch ${order}?`,
-      { modal: true },
-      'Revert Batch'
+    vscode.window.showInformationMessage(
+      'Batch revert removed. Use hive_exec_revert on individual steps.'
     )
-    if (confirm === 'Revert Batch') {
-      const terminal = vscode.window.createTerminal('Hive - Revert Batch')
-      terminal.sendText(`opencode --command "hive_batch_revert batchOrder=${order}"`)
-      terminal.show()
-    }
   }
 
   private executeBatch(featureName: string, order: number): void {
-    const terminal = vscode.window.createTerminal('Hive - Execute')
-    terminal.sendText(`opencode --command "hive execute batch ${order}"`)
-    terminal.show()
+    vscode.window.showInformationMessage(
+      'Batch execute removed. Use hive_exec_start on individual steps.'
+    )
   }
 
   showFeature(featureName: string): void {

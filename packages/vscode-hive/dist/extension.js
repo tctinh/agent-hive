@@ -2280,6 +2280,133 @@ var require_browser = __commonJS({
   }
 });
 
+// ../../../node_modules/has-flag/index.js
+var require_has_flag = __commonJS({
+  "../../../node_modules/has-flag/index.js"(exports2, module2) {
+    "use strict";
+    module2.exports = (flag, argv = process.argv) => {
+      const prefix = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
+      const position = argv.indexOf(prefix + flag);
+      const terminatorPosition = argv.indexOf("--");
+      return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+    };
+  }
+});
+
+// ../../../node_modules/supports-color/index.js
+var require_supports_color = __commonJS({
+  "../../../node_modules/supports-color/index.js"(exports2, module2) {
+    "use strict";
+    var os = require("os");
+    var tty = require("tty");
+    var hasFlag = require_has_flag();
+    var { env } = process;
+    var flagForceColor;
+    if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
+      flagForceColor = 0;
+    } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
+      flagForceColor = 1;
+    }
+    function envForceColor() {
+      if ("FORCE_COLOR" in env) {
+        if (env.FORCE_COLOR === "true") {
+          return 1;
+        }
+        if (env.FORCE_COLOR === "false") {
+          return 0;
+        }
+        return env.FORCE_COLOR.length === 0 ? 1 : Math.min(Number.parseInt(env.FORCE_COLOR, 10), 3);
+      }
+    }
+    function translateLevel(level) {
+      if (level === 0) {
+        return false;
+      }
+      return {
+        level,
+        hasBasic: true,
+        has256: level >= 2,
+        has16m: level >= 3
+      };
+    }
+    function supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
+      const noFlagForceColor = envForceColor();
+      if (noFlagForceColor !== void 0) {
+        flagForceColor = noFlagForceColor;
+      }
+      const forceColor = sniffFlags ? flagForceColor : noFlagForceColor;
+      if (forceColor === 0) {
+        return 0;
+      }
+      if (sniffFlags) {
+        if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
+          return 3;
+        }
+        if (hasFlag("color=256")) {
+          return 2;
+        }
+      }
+      if (haveStream && !streamIsTTY && forceColor === void 0) {
+        return 0;
+      }
+      const min = forceColor || 0;
+      if (env.TERM === "dumb") {
+        return min;
+      }
+      if (process.platform === "win32") {
+        const osRelease = os.release().split(".");
+        if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
+          return Number(osRelease[2]) >= 14931 ? 3 : 2;
+        }
+        return 1;
+      }
+      if ("CI" in env) {
+        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE", "DRONE"].some((sign) => sign in env) || env.CI_NAME === "codeship") {
+          return 1;
+        }
+        return min;
+      }
+      if ("TEAMCITY_VERSION" in env) {
+        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+      }
+      if (env.COLORTERM === "truecolor") {
+        return 3;
+      }
+      if ("TERM_PROGRAM" in env) {
+        const version = Number.parseInt((env.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+        switch (env.TERM_PROGRAM) {
+          case "iTerm.app":
+            return version >= 3 ? 3 : 2;
+          case "Apple_Terminal":
+            return 2;
+        }
+      }
+      if (/-256(color)?$/i.test(env.TERM)) {
+        return 2;
+      }
+      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+        return 1;
+      }
+      if ("COLORTERM" in env) {
+        return 1;
+      }
+      return min;
+    }
+    function getSupportLevel(stream, options = {}) {
+      const level = supportsColor(stream, {
+        streamIsTTY: stream && stream.isTTY,
+        ...options
+      });
+      return translateLevel(level);
+    }
+    module2.exports = {
+      supportsColor: getSupportLevel,
+      stdout: getSupportLevel({ isTTY: tty.isatty(1) }),
+      stderr: getSupportLevel({ isTTY: tty.isatty(2) })
+    };
+  }
+});
+
 // ../../node_modules/debug/src/node.js
 var require_node = __commonJS({
   "../../node_modules/debug/src/node.js"(exports2, module2) {
@@ -2298,7 +2425,7 @@ var require_node = __commonJS({
     );
     exports2.colors = [6, 2, 3, 4, 5, 1];
     try {
-      const supportsColor = require("supports-color");
+      const supportsColor = require_supports_color();
       if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
         exports2.colors = [
           20,
@@ -2595,7 +2722,26 @@ var HiveService = class {
     const doneCount = activeSteps.filter((s) => s.status === "done").length;
     const stepsCount = activeSteps.length;
     const progress = stepsCount > 0 ? Math.round(doneCount / stepsCount * 100) : 0;
-    return { name, progress, steps, stepsCount, doneCount };
+    const featureJsonPath = path.join(this.basePath, "features", name, "feature.json");
+    const featureJson = this.readJson(featureJsonPath);
+    const status = featureJson?.status || "active";
+    const createdAt = featureJson?.createdAt;
+    const completedAt = featureJson?.completedAt;
+    return { name, progress, steps, stepsCount, doneCount, status, createdAt, completedAt };
+  }
+  getDecisions(feature) {
+    const contextPath = path.join(this.basePath, "features", feature, "context");
+    if (!fs.existsSync(contextPath)) return [];
+    return fs.readdirSync(contextPath).filter((f) => f.endsWith(".md")).map((filename) => {
+      const filePath = path.join(contextPath, filename);
+      const content = this.readFile(filePath);
+      let title = filename.replace(/\.md$/, "");
+      if (content) {
+        const h1Match = content.match(/^#\s+(.+)$/m);
+        if (h1Match) title = h1Match[1];
+      }
+      return { filename, title, filePath };
+    }).sort((a, b) => a.filename.localeCompare(b.filename));
   }
   getSteps(feature) {
     const execPath = path.join(this.basePath, "features", feature, "execution");
@@ -7799,6 +7945,7 @@ var vscode3 = __toESM(require("vscode"));
 var fs4 = __toESM(require("fs"));
 var path4 = __toESM(require("path"));
 function classifyFeatureStatus(feature) {
+  if (feature.status === "completed" || feature.status === "archived") return "completed";
   if (feature.stepsCount === 0) return "pending";
   if (feature.doneCount === 0) return "pending";
   if (feature.doneCount === feature.stepsCount) return "completed";
@@ -7821,9 +7968,15 @@ var FeatureItem = class extends vscode3.TreeItem {
     super(feature.name, vscode3.TreeItemCollapsibleState.Expanded);
     this.feature = feature;
     this.featureName = feature.name;
-    this.description = `${feature.progress}% (${feature.doneCount}/${feature.stepsCount})`;
-    this.contextValue = "feature";
-    this.iconPath = new vscode3.ThemeIcon("package");
+    this.isCompleted = feature.status === "completed" || feature.status === "archived";
+    if (this.isCompleted && feature.completedAt) {
+      const date = new Date(feature.completedAt).toLocaleDateString();
+      this.description = `\u2713 ${date}`;
+    } else {
+      this.description = `${feature.progress}% (${feature.doneCount}/${feature.stepsCount})`;
+    }
+    this.contextValue = this.isCompleted ? "featureCompleted" : "feature";
+    this.iconPath = new vscode3.ThemeIcon(this.isCompleted ? "pass-filled" : "package");
     this.command = {
       command: "hive.showFeature",
       title: "Show Feature Details",
@@ -7987,6 +8140,22 @@ var SessionTreeItem = class extends vscode3.TreeItem {
     }
   }
 };
+var DecisionItem = class extends vscode3.TreeItem {
+  constructor(featureName, decision) {
+    super(decision.title, vscode3.TreeItemCollapsibleState.None);
+    this.featureName = featureName;
+    this.decision = decision;
+    this.contextValue = "decision";
+    this.iconPath = new vscode3.ThemeIcon("lightbulb");
+    this.description = decision.filename;
+    this.command = {
+      command: "vscode.open",
+      title: "Open Decision",
+      arguments: [vscode3.Uri.file(decision.filePath)]
+    };
+    this.resourceUri = vscode3.Uri.file(decision.filePath);
+  }
+};
 var HiveSidebarProvider = class {
   constructor(hiveService) {
     this.hiveService = hiveService;
@@ -8028,6 +8197,10 @@ var HiveSidebarProvider = class {
       ];
     }
     if (element instanceof FolderItem) {
+      if (element.folder === "context") {
+        const decisions = this.hiveService.getDecisions(element.featureName);
+        return decisions.map((d) => new DecisionItem(element.featureName, d));
+      }
       const files = this.hiveService.getFilesInFolder(element.featureName, element.folder);
       return files.map((f) => new FileItem(
         f,
@@ -8153,26 +8326,19 @@ var HivePanelProvider = class {
     );
     if (confirm === "Revert") {
       const terminal = vscode4.window.createTerminal("Hive - Revert");
-      terminal.sendText(`opencode --command "hive_step_revert stepFolder=${stepFolder}"`);
+      terminal.sendText(`opencode --command "hive_exec_revert stepFolder=${stepFolder}"`);
       terminal.show();
     }
   }
   async revertBatch(featureName, order) {
-    const confirm = await vscode4.window.showWarningMessage(
-      `Revert all steps in batch ${order}?`,
-      { modal: true },
-      "Revert Batch"
+    vscode4.window.showInformationMessage(
+      "Batch revert removed. Use hive_exec_revert on individual steps."
     );
-    if (confirm === "Revert Batch") {
-      const terminal = vscode4.window.createTerminal("Hive - Revert Batch");
-      terminal.sendText(`opencode --command "hive_batch_revert batchOrder=${order}"`);
-      terminal.show();
-    }
   }
   executeBatch(featureName, order) {
-    const terminal = vscode4.window.createTerminal("Hive - Execute");
-    terminal.sendText(`opencode --command "hive execute batch ${order}"`);
-    terminal.show();
+    vscode4.window.showInformationMessage(
+      "Batch execute removed. Use hive_exec_start on individual steps."
+    );
   }
   showFeature(featureName) {
     if (!this._view) return;
@@ -8554,7 +8720,7 @@ var ReportViewProvider = class _ReportViewProvider {
     );
     if (confirm === "Revert") {
       const terminal = vscode5.window.createTerminal("Hive - Revert");
-      terminal.sendText(`opencode --command "hive_step_revert({ stepFolder: '${stepFolder}' })"`);
+      terminal.sendText(`opencode --command "hive_exec_revert stepFolder=${stepFolder}"`);
       terminal.show();
     }
   }
