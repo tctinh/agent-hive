@@ -10,6 +10,8 @@ import { createStepCreateTool, createStepReadTool, createStepUpdateTool, createS
 import { createDecisionLogTool, createDecisionListTool } from "./tools/decisionTools.js";
 import { createExecStartTool, createExecCompleteTool, createExecAbortTool, createExecRevertTool } from "./tools/execTools.js";
 import { createStatusTool } from "./tools/queryTools.js";
+import { PlanService } from "./services/planService.js";
+import { createPlanGenerateTool } from "./tools/planTools.js";
 
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development & Execution System
@@ -96,6 +98,7 @@ const plugin: Plugin = async (ctx) => {
   (featureService as any).decisionService = decisionService;
 
   const statusService = new StatusService(featureService, stepService, decisionService);
+  const planService = new PlanService(directory, featureService);
 
   return {
     "experimental.chat.system.transform": async (_input: unknown, output: { system: string[] }) => {
@@ -123,6 +126,8 @@ const plugin: Plugin = async (ctx) => {
       hive_exec_revert: createExecRevertTool(worktreeService, stepService, featureService, directory),
 
       hive_status: createStatusTool(featureService, stepService, decisionService),
+
+      hive_plan_generate: createPlanGenerateTool(planService, featureService, stepService, decisionService),
     },
 
     command: {
