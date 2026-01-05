@@ -1,6 +1,15 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { Feature, Step, StepStatus, ProblemDocs, ContextDocs } from '../types'
+import { Feature, Step, StepStatus, RequirementsDocs, ContextDocs, Batch, StepReport, ExecutionInfo } from '../types'
+
+export interface SessionItem {
+  id: string
+  title?: string
+  summary?: string
+  isParent: boolean
+  createdAt: number
+  updatedAt: number
+}
 
 export class HiveService {
   private basePath: string
@@ -24,10 +33,12 @@ export class HiveService {
 
   getFeature(name: string): Feature {
     const steps = this.getSteps(name)
-    const doneCount = steps.filter(s => s.status === 'done').length
-    const progress = steps.length > 0 ? Math.round((doneCount / steps.length) * 100) : 0
+    const activeSteps = steps.filter(s => s.status !== 'cancelled')
+    const doneCount = activeSteps.filter(s => s.status === 'done').length
+    const stepsCount = activeSteps.length
+    const progress = stepsCount > 0 ? Math.round((doneCount / stepsCount) * 100) : 0
 
-    return { name, progress, steps }
+    return { name, progress, steps, stepsCount, doneCount }
   }
 
   getSteps(feature: string): Step[] {
@@ -56,11 +67,88 @@ export class HiveService {
           folderPath: folder,
           specFiles,
           sessionId: status.sessionId,
-          summary: status.summary
+          summary: status.summary,
+          startedAt: status.startedAt,
+          completedAt: status.completedAt,
+          execution: status.execution
         } as Step
       })
       .filter((s): s is Step => s !== null)
       .sort((a, b) => a.order - b.order)
+  }
+
+  getBatches(feature: string): Batch[] {
+    const steps = this.getSteps(feature)
+    const stepsByOrder: Map<number, Step[]> = new Map()
+    
+    for (const step of steps) {
+      if (!stepsByOrder.has(step.order)) {
+        stepsByOrder.set(step.order, [])
+      }
+      stepsByOrder.get(step.order)!.push(step)
+    }
+    
+    const sortedOrders = Array.from(stepsByOrder.keys()).sort((a, b) => a - b)
+    const result: Batch[] = []
+    
+    let highestCompletedOrder = -1
+    for (const order of sortedOrders) {
+      const batchSteps = stepsByOrder.get(order)!
+      const allDone = batchSteps.every(s => s.status === 'done')
+      if (allDone) {
+        highestCompletedOrder = order
+      }
+    }
+    
+    let firstPendingOrder = -1
+    for (const order of sortedOrders) {
+      const batchSteps = stepsByOrder.get(order)!
+      const allDone = batchSteps.every(s => s.status === 'done')
+      if (!allDone && firstPendingOrder === -1) {
+        firstPendingOrder = order
+        break
+      }
+    }
+    
+    for (const order of sortedOrders) {
+      const batchSteps = stepsByOrder.get(order)!
+      result.push({
+        order,
+        steps: batchSteps,
+        isLatestDone: order === highestCompletedOrder,
+        canExecute: order === firstPendingOrder
+      })
+    }
+    
+    return result
+  }
+
+  getStepReport(feature: string, stepFolder: string): StepReport | null {
+    const reportPath = path.join(this.basePath, 'features', feature, 'execution', stepFolder, 'report.json')
+    const report = this.readJson<{ diffStats?: StepReport }>(reportPath)
+    if (!report?.diffStats) return null
+    return report.diffStats
+  }
+
+  getStepDiffPath(feature: string, stepFolder: string): string | null {
+    const diffPath = path.join(this.basePath, 'features', feature, 'execution', stepFolder, 'output.diff')
+    if (!fs.existsSync(diffPath)) return null
+    return diffPath
+  }
+
+  formatDuration(startedAt?: string, completedAt?: string): string {
+    if (!startedAt || !completedAt) return ''
+    const start = new Date(startedAt).getTime()
+    const end = new Date(completedAt).getTime()
+    const seconds = Math.floor((end - start) / 1000)
+    
+    if (seconds < 60) return `${seconds}s`
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    if (minutes < 60) return `${minutes}m ${remainingSeconds}s`
+    const hours = Math.floor(minutes / 60)
+    const remainingMinutes = minutes % 60
+    return `${hours}h ${remainingMinutes}m`
   }
 
   getStepSpec(feature: string, stepFolder: string, specFile: string): string | null {
@@ -73,12 +161,15 @@ export class HiveService {
     return this.readJson<StepStatus>(statusPath)
   }
 
-  getProblem(feature: string): ProblemDocs {
-    const problemPath = path.join(this.basePath, 'features', feature, 'problem')
+  getRequirements(feature: string): RequirementsDocs {
+    let folderPath = path.join(this.basePath, 'features', feature, 'requirements')
+    if (!fs.existsSync(folderPath)) {
+      folderPath = path.join(this.basePath, 'features', feature, 'problem')
+    }
     return {
-      ticket: this.readFile(path.join(problemPath, 'ticket.md')) ?? undefined,
-      requirements: this.readFile(path.join(problemPath, 'requirements.md')) ?? undefined,
-      notes: this.readFile(path.join(problemPath, 'notes.md')) ?? undefined
+      ticket: this.readFile(path.join(folderPath, 'ticket.md')) ?? undefined,
+      requirements: this.readFile(path.join(folderPath, 'requirements.md')) ?? undefined,
+      notes: this.readFile(path.join(folderPath, 'notes.md')) ?? undefined
     }
   }
 
@@ -91,8 +182,15 @@ export class HiveService {
     }
   }
 
-  getFilesInFolder(feature: string, folder: 'problem' | 'context'): string[] {
-    const folderPath = path.join(this.basePath, 'features', feature, folder)
+  getFilesInFolder(feature: string, folder: 'requirements' | 'context'): string[] {
+    let folderPath = path.join(this.basePath, 'features', feature, folder)
+    if (!fs.existsSync(folderPath)) {
+      if (folder === 'requirements') {
+        folderPath = path.join(this.basePath, 'features', feature, 'problem')
+      } else {
+        return []
+      }
+    }
     if (!fs.existsSync(folderPath)) return []
     return fs.readdirSync(folderPath).filter(f => {
       const stat = fs.statSync(path.join(folderPath, f))
@@ -100,7 +198,15 @@ export class HiveService {
     })
   }
 
-  getFilePath(feature: string, folder: 'problem' | 'context' | 'execution', filename: string): string {
+  getFilePath(feature: string, folder: 'requirements' | 'context' | 'execution', filename: string): string {
+    if (folder === 'requirements') {
+      const requirementsPath = path.join(this.basePath, 'features', feature, 'requirements')
+      if (fs.existsSync(requirementsPath)) {
+        return path.join(requirementsPath, filename)
+      } else {
+        return path.join(this.basePath, 'features', feature, 'problem', filename)
+      }
+    }
     return path.join(this.basePath, 'features', feature, folder, filename)
   }
 
@@ -114,11 +220,11 @@ export class HiveService {
 
   getReport(feature: string): string {
     const feat = this.getFeature(feature)
-    const problem = this.getProblem(feature)
+    const requirements = this.getRequirements(feature)
     const context = this.getContext(feature)
     
     let report = `# Feature: ${feature}\n\n`
-    report += `## PROBLEM\n${problem.ticket || '(no ticket)'}\n\n`
+    report += `## REQUIREMENTS\n${requirements.ticket || '(no ticket)'}\n\n`
     
     report += `## CONTEXT\n`
     if (context.decisions) report += context.decisions + '\n'
@@ -149,6 +255,54 @@ export class HiveService {
       return true
     } catch {
       return false
+    }
+  }
+
+  async getStepSessions(feature: string, stepFolder: string): Promise<SessionItem[]> {
+    const status = this.getStepStatus(feature, stepFolder)
+    if (!status?.sessionId) return []
+
+    const workspaceRoot = path.dirname(this.basePath)
+    
+    try {
+      const { createOpencodeClient } = await import('@opencode-ai/sdk')
+      const client = createOpencodeClient({ directory: workspaceRoot })
+      const response = await client.session.list({ query: { directory: workspaceRoot } })
+      
+      if (response.error || !response.data) return []
+      const sessions = response.data
+      
+      const parentSession = sessions.find((s: { id: string }) => s.id === status.sessionId)
+      if (!parentSession) return []
+
+      const result: SessionItem[] = [{
+        id: parentSession.id,
+        title: parentSession.title,
+        summary: parentSession.summary ? `+${parentSession.summary.additions}/-${parentSession.summary.deletions} in ${parentSession.summary.files} files` : undefined,
+        isParent: true,
+        createdAt: parentSession.time.created,
+        updatedAt: parentSession.time.updated
+      }]
+
+      const childSessions = sessions
+        .filter((s: { parentID?: string }) => s.parentID === status.sessionId)
+        .sort((a: { time: { created: number } }, b: { time: { created: number } }) => 
+          a.time.created - b.time.created)
+
+      for (const child of childSessions) {
+        result.push({
+          id: child.id,
+          title: child.title,
+          summary: child.summary ? `+${child.summary.additions}/-${child.summary.deletions} in ${child.summary.files} files` : undefined,
+          isParent: false,
+          createdAt: child.time.created,
+          updatedAt: child.time.updated
+        })
+      }
+
+      return result
+    } catch {
+      return []
     }
   }
 

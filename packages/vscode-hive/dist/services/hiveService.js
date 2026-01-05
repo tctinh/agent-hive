@@ -53,9 +53,11 @@ class HiveService {
     }
     getFeature(name) {
         const steps = this.getSteps(name);
-        const doneCount = steps.filter(s => s.status === 'done').length;
-        const progress = steps.length > 0 ? Math.round((doneCount / steps.length) * 100) : 0;
-        return { name, progress, steps };
+        const activeSteps = steps.filter(s => s.status !== 'cancelled');
+        const doneCount = activeSteps.filter(s => s.status === 'done').length;
+        const stepsCount = activeSteps.length;
+        const progress = stepsCount > 0 ? Math.round((doneCount / stepsCount) * 100) : 0;
+        return { name, progress, steps, stepsCount, doneCount };
     }
     getSteps(feature) {
         const execPath = path.join(this.basePath, 'features', feature, 'execution');
@@ -81,11 +83,82 @@ class HiveService {
                 folderPath: folder,
                 specFiles,
                 sessionId: status.sessionId,
-                summary: status.summary
+                summary: status.summary,
+                startedAt: status.startedAt,
+                completedAt: status.completedAt,
+                execution: status.execution
             };
         })
             .filter((s) => s !== null)
             .sort((a, b) => a.order - b.order);
+    }
+    getBatches(feature) {
+        const steps = this.getSteps(feature);
+        const stepsByOrder = new Map();
+        for (const step of steps) {
+            if (!stepsByOrder.has(step.order)) {
+                stepsByOrder.set(step.order, []);
+            }
+            stepsByOrder.get(step.order).push(step);
+        }
+        const sortedOrders = Array.from(stepsByOrder.keys()).sort((a, b) => a - b);
+        const result = [];
+        let highestCompletedOrder = -1;
+        for (const order of sortedOrders) {
+            const batchSteps = stepsByOrder.get(order);
+            const allDone = batchSteps.every(s => s.status === 'done');
+            if (allDone) {
+                highestCompletedOrder = order;
+            }
+        }
+        let firstPendingOrder = -1;
+        for (const order of sortedOrders) {
+            const batchSteps = stepsByOrder.get(order);
+            const allDone = batchSteps.every(s => s.status === 'done');
+            if (!allDone && firstPendingOrder === -1) {
+                firstPendingOrder = order;
+                break;
+            }
+        }
+        for (const order of sortedOrders) {
+            const batchSteps = stepsByOrder.get(order);
+            result.push({
+                order,
+                steps: batchSteps,
+                isLatestDone: order === highestCompletedOrder,
+                canExecute: order === firstPendingOrder
+            });
+        }
+        return result;
+    }
+    getStepReport(feature, stepFolder) {
+        const reportPath = path.join(this.basePath, 'features', feature, 'execution', stepFolder, 'report.json');
+        const report = this.readJson(reportPath);
+        if (!report?.diffStats)
+            return null;
+        return report.diffStats;
+    }
+    getStepDiffPath(feature, stepFolder) {
+        const diffPath = path.join(this.basePath, 'features', feature, 'execution', stepFolder, 'output.diff');
+        if (!fs.existsSync(diffPath))
+            return null;
+        return diffPath;
+    }
+    formatDuration(startedAt, completedAt) {
+        if (!startedAt || !completedAt)
+            return '';
+        const start = new Date(startedAt).getTime();
+        const end = new Date(completedAt).getTime();
+        const seconds = Math.floor((end - start) / 1000);
+        if (seconds < 60)
+            return `${seconds}s`;
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        if (minutes < 60)
+            return `${minutes}m ${remainingSeconds}s`;
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+        return `${hours}h ${remainingMinutes}m`;
     }
     getStepSpec(feature, stepFolder, specFile) {
         const specPath = path.join(this.basePath, 'features', feature, 'execution', stepFolder, specFile);
@@ -95,12 +168,15 @@ class HiveService {
         const statusPath = path.join(this.basePath, 'features', feature, 'execution', stepFolder, 'status.json');
         return this.readJson(statusPath);
     }
-    getProblem(feature) {
-        const problemPath = path.join(this.basePath, 'features', feature, 'problem');
+    getRequirements(feature) {
+        let folderPath = path.join(this.basePath, 'features', feature, 'requirements');
+        if (!fs.existsSync(folderPath)) {
+            folderPath = path.join(this.basePath, 'features', feature, 'problem');
+        }
         return {
-            ticket: this.readFile(path.join(problemPath, 'ticket.md')) ?? undefined,
-            requirements: this.readFile(path.join(problemPath, 'requirements.md')) ?? undefined,
-            notes: this.readFile(path.join(problemPath, 'notes.md')) ?? undefined
+            ticket: this.readFile(path.join(folderPath, 'ticket.md')) ?? undefined,
+            requirements: this.readFile(path.join(folderPath, 'requirements.md')) ?? undefined,
+            notes: this.readFile(path.join(folderPath, 'notes.md')) ?? undefined
         };
     }
     getContext(feature) {
@@ -112,7 +188,15 @@ class HiveService {
         };
     }
     getFilesInFolder(feature, folder) {
-        const folderPath = path.join(this.basePath, 'features', feature, folder);
+        let folderPath = path.join(this.basePath, 'features', feature, folder);
+        if (!fs.existsSync(folderPath)) {
+            if (folder === 'requirements') {
+                folderPath = path.join(this.basePath, 'features', feature, 'problem');
+            }
+            else {
+                return [];
+            }
+        }
         if (!fs.existsSync(folderPath))
             return [];
         return fs.readdirSync(folderPath).filter(f => {
@@ -121,6 +205,15 @@ class HiveService {
         });
     }
     getFilePath(feature, folder, filename) {
+        if (folder === 'requirements') {
+            const requirementsPath = path.join(this.basePath, 'features', feature, 'requirements');
+            if (fs.existsSync(requirementsPath)) {
+                return path.join(requirementsPath, filename);
+            }
+            else {
+                return path.join(this.basePath, 'features', feature, 'problem', filename);
+            }
+        }
         return path.join(this.basePath, 'features', feature, folder, filename);
     }
     getStepFilePath(feature, stepFolder, filename) {
@@ -131,10 +224,10 @@ class HiveService {
     }
     getReport(feature) {
         const feat = this.getFeature(feature);
-        const problem = this.getProblem(feature);
+        const requirements = this.getRequirements(feature);
         const context = this.getContext(feature);
         let report = `# Feature: ${feature}\n\n`;
-        report += `## PROBLEM\n${problem.ticket || '(no ticket)'}\n\n`;
+        report += `## REQUIREMENTS\n${requirements.ticket || '(no ticket)'}\n\n`;
         report += `## CONTEXT\n`;
         if (context.decisions)
             report += context.decisions + '\n';
@@ -167,6 +260,48 @@ class HiveService {
         }
         catch {
             return false;
+        }
+    }
+    async getStepSessions(feature, stepFolder) {
+        const status = this.getStepStatus(feature, stepFolder);
+        if (!status?.sessionId)
+            return [];
+        const workspaceRoot = path.dirname(this.basePath);
+        try {
+            const { createOpencodeClient } = await import('@opencode-ai/sdk');
+            const client = createOpencodeClient({ directory: workspaceRoot });
+            const response = await client.session.list({ query: { directory: workspaceRoot } });
+            if (response.error || !response.data)
+                return [];
+            const sessions = response.data;
+            const parentSession = sessions.find((s) => s.id === status.sessionId);
+            if (!parentSession)
+                return [];
+            const result = [{
+                    id: parentSession.id,
+                    title: parentSession.title,
+                    summary: parentSession.summary ? `+${parentSession.summary.additions}/-${parentSession.summary.deletions} in ${parentSession.summary.files} files` : undefined,
+                    isParent: true,
+                    createdAt: parentSession.time.created,
+                    updatedAt: parentSession.time.updated
+                }];
+            const childSessions = sessions
+                .filter((s) => s.parentID === status.sessionId)
+                .sort((a, b) => a.time.created - b.time.created);
+            for (const child of childSessions) {
+                result.push({
+                    id: child.id,
+                    title: child.title,
+                    summary: child.summary ? `+${child.summary.additions}/-${child.summary.deletions} in ${child.summary.files} files` : undefined,
+                    isParent: false,
+                    createdAt: child.time.created,
+                    updatedAt: child.time.updated
+                });
+            }
+            return result;
+        }
+        catch {
+            return [];
         }
     }
     readFile(filePath) {

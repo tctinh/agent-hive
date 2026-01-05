@@ -17,12 +17,12 @@ export async function hive_feature_create(
   const hivePath = path.resolve(process.cwd(), '.hive')
   const featurePath = path.join(hivePath, 'features', params.name)
 
-  fs.mkdirSync(path.join(featurePath, 'problem'), { recursive: true })
+  fs.mkdirSync(path.join(featurePath, 'requirements'), { recursive: true })
   fs.mkdirSync(path.join(featurePath, 'context'), { recursive: true })
   fs.mkdirSync(path.join(featurePath, 'execution'), { recursive: true })
   fs.mkdirSync(path.join(featurePath, 'master'), { recursive: true })
 
-  fs.writeFileSync(path.join(featurePath, 'problem', 'ticket.md'), '')
+  fs.writeFileSync(path.join(featurePath, 'requirements', 'ticket.md'), '')
   fs.writeFileSync(path.join(featurePath, 'context', 'decisions.md'), '')
 
   const sessions = {

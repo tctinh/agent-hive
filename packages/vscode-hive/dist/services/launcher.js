@@ -70,6 +70,14 @@ class Launcher {
     async openFeature(client, feature) {
         return this.openInOpenCode(feature);
     }
+    openSession(sessionId) {
+        const terminal = vscode.window.createTerminal({
+            name: `OpenCode - ${sessionId.slice(0, 8)}`,
+            cwd: this.workspaceRoot
+        });
+        terminal.sendText(`opencode -s ${sessionId}`);
+        terminal.show();
+    }
     async openInOpenCode(feature, step, sessionId) {
         const terminalName = `OpenCode: ${feature}${step ? '/' + step : ''}`;
         if (sessionId) {

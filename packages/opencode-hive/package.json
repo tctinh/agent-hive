@@ -8,13 +8,18 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc",
-    "dev": "opencode plugin dev"
+    "dev": "opencode plugin dev",
+    "test": "bun test"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": ">=0.13.7"
   },
+  "dependencies": {
+    "simple-git": "^3.27.0"
+  },
   "devDependencies": {
     "@opencode-ai/plugin": "^1.0.143",
+    "@types/bun": "^1.2.0",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   },

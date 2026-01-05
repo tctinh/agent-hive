@@ -7,8 +7,14 @@ Tools to be implemented based on OpenCode plugin API.
 | Tool | Purpose |
 |------|---------|
 | hive_feature_create | Create feature folder structure |
+| hive_feature_list | List all features with status |
+| hive_feature_switch | Switch active feature |
 | hive_step_create | Create execution step |
 | hive_step_update | Update step status + log |
+| hive_step_edit | Edit step spec or task (revision) |
+| hive_step_delete | Delete a step entirely |
+| hive_step_reorder | Change step order number |
+| hive_step_reset | Reset step to pending (redo) |
 | hive_doc_save | Save to problem/ or context/ |
 | hive_report_generate | Generate and save report |
 

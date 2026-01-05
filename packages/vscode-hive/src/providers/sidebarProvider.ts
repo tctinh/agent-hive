@@ -1,8 +1,33 @@
 import * as vscode from 'vscode'
+import * as fs from 'fs'
+import * as path from 'path'
 import { HiveService } from '../services/hiveService'
 import { Feature, Step } from '../types'
 
-type HiveItem = FeatureItem | FolderItem | FileItem | ExecutionItem | StepItem | SpecFileItem
+type FeatureStatus = 'in_progress' | 'completed' | 'pending'
+
+type HiveItem = FeatureItem | FolderItem | FileItem | ExecutionItem | StepItem | SpecFileItem | ReportFileItem | DiffFileItem | SessionTreeItem | FeatureStatusGroupItem
+
+function classifyFeatureStatus(feature: Feature): FeatureStatus {
+  if (feature.stepsCount === 0) return 'pending'
+  if (feature.doneCount === 0) return 'pending'
+  if (feature.doneCount === feature.stepsCount) return 'completed'
+  return 'in_progress'
+}
+
+class FeatureStatusGroupItem extends vscode.TreeItem {
+  constructor(
+    public readonly status: FeatureStatus,
+    public readonly features: Feature[]
+  ) {
+    const labels: Record<FeatureStatus, string> = { completed: 'COMPLETED', in_progress: 'IN-PROGRESS', pending: 'PENDING' }
+    const icons: Record<FeatureStatus, string> = { completed: 'pass-filled', in_progress: 'sync~spin', pending: 'circle-outline' }
+    super(labels[status], features.length > 0 ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None)
+    this.contextValue = 'featureStatusGroup'
+    this.iconPath = new vscode.ThemeIcon(icons[status])
+    this.description = `${features.length}`
+  }
+}
 
 class FeatureItem extends vscode.TreeItem {
   public readonly featureName: string
@@ -10,7 +35,7 @@ class FeatureItem extends vscode.TreeItem {
   constructor(public readonly feature: Feature) {
     super(feature.name, vscode.TreeItemCollapsibleState.Expanded)
     this.featureName = feature.name
-    this.description = `${feature.progress}%`
+    this.description = `${feature.progress}% (${feature.doneCount}/${feature.stepsCount})`
     this.contextValue = 'feature'
     this.iconPath = new vscode.ThemeIcon('package')
     this.command = {
@@ -25,7 +50,7 @@ class FolderItem extends vscode.TreeItem {
   constructor(
     label: string,
     public readonly featureName: string,
-    public readonly folder: 'problem' | 'context',
+    public readonly folder: 'requirements' | 'context',
     icon: string,
     hasChildren: boolean
   ) {
@@ -39,7 +64,7 @@ class FileItem extends vscode.TreeItem {
   constructor(
     public readonly filename: string,
     public readonly featureName: string,
-    public readonly folder: 'problem' | 'context',
+    public readonly folder: 'requirements' | 'context',
     public readonly filePath: string
   ) {
     super(filename, vscode.TreeItemCollapsibleState.None)
@@ -73,20 +98,25 @@ class StepItem extends vscode.TreeItem {
   public readonly stepName: string
   public readonly stepFolder: string
   public readonly sessionId?: string
+  public readonly canRevert: boolean
 
   constructor(
     public readonly featureName: string,
     public readonly step: Step,
     hasSpecFiles: boolean
   ) {
+    const canRevert = step.status === 'done' && step.execution?.canRevert === true
+    const label = `${String(step.order).padStart(2, '0')}-${step.name}${canRevert ? ' ⟲' : ''}`
+    
     super(
-      `${String(step.order).padStart(2, '0')}-${step.name}`,
-      hasSpecFiles ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
+      label,
+      (hasSpecFiles || step.sessionId || step.status === 'done') ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
     )
     this.stepName = step.name
     this.stepFolder = step.folderPath
     this.sessionId = step.sessionId
-    this.contextValue = step.sessionId ? 'step' : 'stepNoSession'
+    this.canRevert = canRevert
+    this.contextValue = canRevert ? 'stepWithRevert' : 'step'
     this.iconPath = new vscode.ThemeIcon(StepItem.statusIcons[step.status] || 'circle-outline')
     
     if (step.summary) {
@@ -95,6 +125,8 @@ class StepItem extends vscode.TreeItem {
 
     if (step.sessionId) {
       this.tooltip = `Session: ${step.sessionId}`
+    } else if (canRevert) {
+      this.tooltip = 'Can be reverted'
     }
   }
 }
@@ -118,6 +150,75 @@ class SpecFileItem extends vscode.TreeItem {
   }
 }
 
+class ReportFileItem extends vscode.TreeItem {
+  constructor(
+    public readonly featureName: string,
+    public readonly stepFolder: string,
+    public readonly filePath: string
+  ) {
+    super('report.json', vscode.TreeItemCollapsibleState.None)
+    this.contextValue = 'reportFile'
+    this.iconPath = new vscode.ThemeIcon('file-json')
+    this.command = {
+      command: 'vscode.open',
+      title: 'Open Report',
+      arguments: [vscode.Uri.file(filePath)]
+    }
+    this.resourceUri = vscode.Uri.file(filePath)
+  }
+}
+
+class DiffFileItem extends vscode.TreeItem {
+  constructor(
+    public readonly featureName: string,
+    public readonly stepFolder: string,
+    public readonly filePath: string
+  ) {
+    super('output.diff', vscode.TreeItemCollapsibleState.None)
+    this.contextValue = 'diffFile'
+    this.iconPath = new vscode.ThemeIcon('file-code')
+    this.command = {
+      command: 'hive.viewDiff',
+      title: 'View Diff',
+      arguments: [vscode.Uri.file(filePath)]
+    }
+    this.resourceUri = vscode.Uri.file(filePath)
+  }
+}
+
+class SessionTreeItem extends vscode.TreeItem {
+  constructor(
+    public readonly featureName: string,
+    public readonly stepFolder: string,
+    public readonly session: { id: string; title?: string; isParent: boolean; summary?: string }
+  ) {
+    super(session.title || session.id, vscode.TreeItemCollapsibleState.None)
+    this.contextValue = 'session'
+    this.iconPath = this.getIcon()
+    this.description = session.isParent ? 'main' : this.parseAgentType()
+    if (session.summary) {
+      this.tooltip = session.summary
+    }
+  }
+
+  private parseAgentType(): string | undefined {
+    const match = this.session.title?.match(/@(\w+)\s+subagent/)
+    return match?.[1]
+  }
+
+  private getIcon(): vscode.ThemeIcon {
+    if (this.session.isParent) return new vscode.ThemeIcon('circle-filled')
+    const agent = this.parseAgentType()
+    switch (agent) {
+      case 'explore': return new vscode.ThemeIcon('search')
+      case 'librarian': return new vscode.ThemeIcon('book')
+      case 'general': return new vscode.ThemeIcon('hubot')
+      case 'oracle': return new vscode.ThemeIcon('lightbulb')
+      default: return new vscode.ThemeIcon('terminal')
+    }
+  }
+}
+
 export class HiveSidebarProvider implements vscode.TreeDataProvider<HiveItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<HiveItem | undefined>()
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event
@@ -132,16 +233,38 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<HiveItem> {
     return element
   }
 
-  getChildren(element?: HiveItem): HiveItem[] {
+  async getChildren(element?: HiveItem): Promise<HiveItem[]> {
     if (!element) {
-      return this.hiveService.getFeatures().map(f => new FeatureItem(f))
+      const features = this.hiveService.getFeatures()
+      const grouped: Record<FeatureStatus, Feature[]> = { in_progress: [], pending: [], completed: [] }
+      
+      for (const f of features) {
+        grouped[classifyFeatureStatus(f)].push(f)
+      }
+      
+      // Sort by completion % (descending for in_progress, ascending for pending)
+      grouped.in_progress.sort((a, b) => b.progress - a.progress)
+      grouped.pending.sort((a, b) => a.progress - b.progress)
+      grouped.completed.sort((a, b) => b.progress - a.progress)
+      
+      const result: HiveItem[] = []
+      // Order: IN-PROGRESS, PENDING, COMPLETED
+      if (grouped.in_progress.length > 0) result.push(new FeatureStatusGroupItem('in_progress', grouped.in_progress))
+      if (grouped.pending.length > 0) result.push(new FeatureStatusGroupItem('pending', grouped.pending))
+      if (grouped.completed.length > 0) result.push(new FeatureStatusGroupItem('completed', grouped.completed))
+      
+      return result
+    }
+
+    if (element instanceof FeatureStatusGroupItem) {
+      return element.features.map(f => new FeatureItem(f))
     }
 
     if (element instanceof FeatureItem) {
-      const problemFiles = this.hiveService.getFilesInFolder(element.feature.name, 'problem')
+      const requirementsFiles = this.hiveService.getFilesInFolder(element.feature.name, 'requirements')
       const contextFiles = this.hiveService.getFilesInFolder(element.feature.name, 'context')
       return [
-        new FolderItem('Problem', element.feature.name, 'problem', 'question', problemFiles.length > 0),
+        new FolderItem('Requirements', element.feature.name, 'requirements', 'question', requirementsFiles.length > 0),
         new FolderItem('Context', element.feature.name, 'context', 'lightbulb', contextFiles.length > 0),
         new ExecutionItem(element.feature)
       ]
@@ -168,12 +291,41 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<HiveItem> {
     if (element instanceof StepItem) {
       const step = this.hiveService.getFeature(element.featureName).steps.find(s => s.folderPath === element.stepFolder)
       if (!step) return []
-      return step.specFiles.map(f => new SpecFileItem(
+
+      const children: HiveItem[] = []
+      const stepPath = path.join(this.hiveService['basePath'], 'features', element.featureName, 'execution', element.stepFolder)
+
+      children.push(...step.specFiles.map(f => new SpecFileItem(
         f,
         element.featureName,
         element.stepFolder,
         this.hiveService.getStepFilePath(element.featureName, element.stepFolder, f)
-      ))
+      )))
+
+      const reportPath = path.join(stepPath, 'report.json')
+      if (fs.existsSync(reportPath)) {
+        children.push(new ReportFileItem(
+          element.featureName,
+          element.stepFolder,
+          reportPath
+        ))
+      }
+
+      const diffPath = path.join(stepPath, 'output.diff')
+      if (fs.existsSync(diffPath)) {
+        children.push(new DiffFileItem(
+          element.featureName,
+          element.stepFolder,
+          diffPath
+        ))
+      }
+
+      if (element.sessionId) {
+        const sessions = await this.hiveService.getStepSessions(element.featureName, element.stepFolder)
+        children.push(...sessions.map(s => new SessionTreeItem(element.featureName, element.stepFolder, s)))
+      }
+
+      return children
     }
 
     return []
