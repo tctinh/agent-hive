@@ -2,6 +2,8 @@ import { tool } from "@opencode-ai/plugin";
 import type { WorktreeService, DiffResult } from "../services/worktreeService.js";
 import { StepService } from "../services/stepService.js";
 import { FeatureService } from "../services/featureService.js";
+import { PlanService } from "../services/planService.js";
+import { CommentService } from "../services/commentService.js";
 import { readFile, writeFile } from "../utils/json.js";
 import { getFeaturePath, getStepPath } from "../utils/paths.js";
 import { assertFeatureMutable, assertStepMutable } from "../utils/immutability.js";
@@ -11,14 +13,17 @@ export function createExecStartTool(
   worktreeService: WorktreeService,
   stepService: StepService,
   featureService: FeatureService,
-  directory: string
+  directory: string,
+  planService?: PlanService,
+  commentService?: CommentService
 ) {
   return tool({
     description: "Create worktree and begin work on a step",
     args: {
       stepFolder: tool.schema.string().describe("Step folder name (e.g., 01-setup)"),
+      skipPlanCheck: tool.schema.boolean().optional().describe("Skip plan approval check (default: false)"),
     },
-    async execute({ stepFolder }) {
+    async execute({ stepFolder, skipPlanCheck }) {
       const featureName = await featureService.getActive();
       if (!featureName) {
         return "Error: No active feature.";
@@ -32,6 +37,43 @@ export function createExecStartTool(
         await assertFeatureMutable(feature, featureName);
       } catch (e) {
         return `Error: ${(e as Error).message}`;
+      }
+
+      if (!skipPlanCheck && planService) {
+        const plan = await planService.getPlan(featureName);
+        
+        if (!plan) {
+          return JSON.stringify({
+            blocked: true,
+            reason: "no-plan",
+            message: "No plan generated. Run hive_plan_generate first, or use skipPlanCheck=true to bypass.",
+            action: "generate-plan",
+          }, null, 2);
+        }
+
+        if (plan.status === "draft") {
+          const unresolvedComments = commentService 
+            ? await commentService.getUnresolvedComments(featureName)
+            : [];
+          
+          return JSON.stringify({
+            blocked: true,
+            reason: "not-approved",
+            message: "Plan not approved. Review and approve the plan before execution, or use skipPlanCheck=true to bypass.",
+            planPath: planService.getPlanPath(featureName),
+            unresolvedComments: unresolvedComments.length,
+            action: "open-plan-review",
+          }, null, 2);
+        }
+
+        if (plan.status === "locked") {
+          // Already locked - this is fine, execution is in progress
+        }
+
+        // Lock the plan on first step execution
+        if (plan.status === "approved") {
+          await planService.lock(featureName);
+        }
       }
 
       const step = await stepService.read(featureName, stepFolder);
