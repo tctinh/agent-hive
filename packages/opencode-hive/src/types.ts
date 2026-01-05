@@ -28,10 +28,22 @@ export interface StepStatus {
   };
 }
 
+export type PlanStatusType = "draft" | "approved" | "locked";
+
+export interface PlanMetadata {
+  version: number;
+  status: PlanStatusType;
+  generatedAt: string;
+  lastUpdatedAt: string;
+  approvedAt: string | null;
+  approvedBy: "user" | null;
+}
+
 export interface FeatureStatus {
   name: string;
   createdAt: string;
   status: "active" | "completed" | "archived";
+  plan?: PlanMetadata;
 }
 
 export interface ReportJson {
