@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { Feature, Step, StepStatus, RequirementsDocs, ContextDocs, Batch, StepReport, ExecutionInfo, PlanJson } from '../types'
+import { Feature, Step, StepStatus, RequirementsDocs, ContextDocs, Batch, StepReport, ExecutionInfo, PlanJson, PlanComment } from '../types'
 
 export interface SessionItem {
   id: string
@@ -314,6 +314,18 @@ export class HiveService {
     }
     
     return lines.join('\n')
+  }
+
+  getPlanComments(feature: string): PlanComment[] {
+    const commentsPath = path.join(this.basePath, 'features', feature, 'comments.json')
+    if (!fs.existsSync(commentsPath)) return []
+    
+    try {
+      const data = JSON.parse(fs.readFileSync(commentsPath, 'utf-8'))
+      return data.comments || []
+    } catch {
+      return []
+    }
   }
 
   getFilesInFolder(feature: string, folder: 'requirements' | 'context'): string[] {

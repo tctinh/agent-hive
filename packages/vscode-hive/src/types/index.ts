@@ -98,3 +98,14 @@ export interface PlanJson {
   tasks: PlanTask[]
   decisions: PlanDecision[]
 }
+
+export interface PlanComment {
+  id: string
+  author: string
+  content: string
+  createdAt: string
+  citations?: string[]
+  taskId?: string
+  status?: 'unresolved' | 'addressed' | 'rejected' | 'deferred'
+  response?: string
+}

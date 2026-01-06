@@ -2943,6 +2943,16 @@ var HiveService = class {
     }
     return lines.join("\n");
   }
+  getPlanComments(feature) {
+    const commentsPath = path.join(this.basePath, "features", feature, "comments.json");
+    if (!fs.existsSync(commentsPath)) return [];
+    try {
+      const data = JSON.parse(fs.readFileSync(commentsPath, "utf-8"));
+      return data.comments || [];
+    } catch {
+      return [];
+    }
+  }
   getFilesInFolder(feature, folder) {
     const featurePath = path.join(this.basePath, "features", feature);
     if (folder === "context") {
