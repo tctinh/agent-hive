@@ -8,13 +8,12 @@ export function createPlanTools(projectRoot: string) {
 
   return {
     hive_plan_write: {
-      description: 'Create or update the plan.md for the active feature. Clears any existing comments (new plan = fresh review).',
+      description: 'Write plan.md (clears existing comments)',
       parameters: z.object({
         content: z.string().describe('The markdown content for the plan'),
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
       }),
-      execute: async ({ content, featureName }: { content: string; featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      execute: async ({ content }: { content: string }) => {
+        const feature = featureService.getActive();
         if (!feature) {
           return { error: 'No active feature. Create one with hive_feature_create first.' };
         }
@@ -25,12 +24,10 @@ export function createPlanTools(projectRoot: string) {
     },
 
     hive_plan_read: {
-      description: 'Read the plan.md and any user comments for the active feature.',
-      parameters: z.object({
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
-      }),
-      execute: async ({ featureName }: { featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      description: 'Read plan.md and user comments',
+      parameters: z.object({}),
+      execute: async () => {
+        const feature = featureService.getActive();
         if (!feature) {
           return { error: 'No active feature.' };
         }
@@ -45,12 +42,10 @@ export function createPlanTools(projectRoot: string) {
     },
 
     hive_plan_approve: {
-      description: 'Approve the plan for execution. After approval, run hive_tasks_sync to generate tasks.',
-      parameters: z.object({
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
-      }),
-      execute: async ({ featureName }: { featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      description: 'Approve plan for execution',
+      parameters: z.object({}),
+      execute: async () => {
+        const feature = featureService.getActive();
         if (!feature) {
           return { error: 'No active feature.' };
         }

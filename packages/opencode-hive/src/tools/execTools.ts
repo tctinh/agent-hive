@@ -14,13 +14,12 @@ export function createExecTools(projectRoot: string) {
 
   return {
     hive_exec_start: {
-      description: 'Create a git worktree and begin work on a task. Sets task status to in_progress.',
+      description: 'Create worktree and begin work on task',
       parameters: z.object({
         task: z.string().describe('Task folder name (e.g., "01-auth-service")'),
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
       }),
-      execute: async ({ task, featureName }: { task: string; featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      execute: async ({ task }: { task: string }) => {
+        const feature = featureService.getActive();
         if (!feature) {
           return { error: 'No active feature.' };
         }
@@ -62,15 +61,14 @@ export function createExecTools(projectRoot: string) {
     },
 
     hive_exec_complete: {
-      description: 'Complete a task: commit changes, apply to main branch, write report, cleanup worktree.',
+      description: 'Complete task: apply changes, write report',
       parameters: z.object({
         task: z.string().describe('Task folder name'),
         summary: z.string().describe('Summary of what was done'),
         report: z.string().optional().describe('Detailed report (markdown). If not provided, summary is used.'),
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
       }),
-      execute: async ({ task, summary, report, featureName }: { task: string; summary: string; report?: string; featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      execute: async ({ task, summary, report }: { task: string; summary: string; report?: string }) => {
+        const feature = featureService.getActive();
         if (!feature) {
           return { error: 'No active feature.' };
         }
@@ -110,13 +108,12 @@ export function createExecTools(projectRoot: string) {
     },
 
     hive_exec_abort: {
-      description: 'Abort work on a task: discard changes, cleanup worktree, reset status to pending.',
+      description: 'Abort task: discard changes, reset status',
       parameters: z.object({
         task: z.string().describe('Task folder name'),
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
       }),
-      execute: async ({ task, featureName }: { task: string; featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      execute: async ({ task }: { task: string }) => {
+        const feature = featureService.getActive();
         if (!feature) {
           return { error: 'No active feature.' };
         }

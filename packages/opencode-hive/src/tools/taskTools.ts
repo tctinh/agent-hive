@@ -8,12 +8,10 @@ export function createTaskTools(projectRoot: string) {
 
   return {
     hive_tasks_sync: {
-      description: 'Parse the approved plan.md and sync task folders. Creates new tasks, removes obsolete pending tasks, keeps completed/in-progress tasks.',
-      parameters: z.object({
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
-      }),
-      execute: async ({ featureName }: { featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      description: 'Generate tasks from approved plan',
+      parameters: z.object({}),
+      execute: async () => {
+        const feature = featureService.getActive();
         if (!feature) {
           return { error: 'No active feature.' };
         }
@@ -41,14 +39,13 @@ export function createTaskTools(projectRoot: string) {
     },
 
     hive_task_create: {
-      description: 'Create a manual task (not from plan). Use for hotfixes or ad-hoc work during execution.',
+      description: 'Create manual task (not from plan)',
       parameters: z.object({
         name: z.string().describe('Task name (will be slugified)'),
         order: z.number().optional().describe('Task order number (defaults to next available)'),
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
       }),
-      execute: async ({ name, order, featureName }: { name: string; order?: number; featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      execute: async ({ name, order }: { name: string; order?: number }) => {
+        const feature = featureService.getActive();
         if (!feature) {
           return { error: 'No active feature.' };
         }
@@ -63,15 +60,14 @@ export function createTaskTools(projectRoot: string) {
     },
 
     hive_task_update: {
-      description: 'Update a task status or summary.',
+      description: 'Update task status or summary',
       parameters: z.object({
         task: z.string().describe('Task folder name (e.g., "01-auth-service")'),
         status: z.enum(['pending', 'in_progress', 'done', 'cancelled']).optional(),
         summary: z.string().optional().describe('Summary of work done'),
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
       }),
-      execute: async ({ task, status, summary, featureName }: { task: string; status?: 'pending' | 'in_progress' | 'done' | 'cancelled'; summary?: string; featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      execute: async ({ task, status, summary }: { task: string; status?: 'pending' | 'in_progress' | 'done' | 'cancelled'; summary?: string }) => {
+        const feature = featureService.getActive();
         if (!feature) {
           return { error: 'No active feature.' };
         }
@@ -83,11 +79,9 @@ export function createTaskTools(projectRoot: string) {
 
     hive_task_list: {
       description: 'List all tasks for the active feature.',
-      parameters: z.object({
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
-      }),
-      execute: async ({ featureName }: { featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      parameters: z.object({}),
+      execute: async () => {
+        const feature = featureService.getActive();
         if (!feature) {
           return { error: 'No active feature.' };
         }

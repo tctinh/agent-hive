@@ -62,12 +62,13 @@ export function createFeatureTools(projectRoot: string) {
     },
 
     hive_feature_complete: {
-      description: 'Mark a feature as completed. This is irreversible.',
+      description: 'Mark feature as completed (irreversible)',
       parameters: z.object({
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
+        _placeholder: z.boolean().describe('Placeholder. Always pass true.'),
+        name: z.string().optional(),
       }),
-      execute: async ({ featureName }: { featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      execute: async ({ name }: { name?: string }) => {
+        const feature = name || featureService.getActive();
         if (!feature) {
           return { error: 'No active feature.' };
         }
@@ -92,19 +93,19 @@ export function createFeatureTools(projectRoot: string) {
     },
 
     hive_status: {
-      description: 'Get overview of the active feature: status, plan, tasks.',
+      description: 'Get overview of active feature',
       parameters: z.object({
-        featureName: z.string().optional().describe('Feature name (defaults to active feature)'),
+        _placeholder: z.boolean().describe('Placeholder. Always pass true.'),
+        name: z.string().optional(),
       }),
-      execute: async ({ featureName }: { featureName?: string }) => {
-        const feature = featureName || featureService.getActive();
+      execute: async ({ name }: { name?: string }) => {
+        const feature = name || featureService.getActive();
         if (!feature) {
           return { error: 'No active feature. Create one with hive_feature_create.' };
         }
-
         const info = featureService.getInfo(feature);
         if (!info) {
-          return { error: `Feature '${feature}' not found` };
+          return { error: `Feature '${name}' not found` };
         }
 
         const tasksByStatus = {
