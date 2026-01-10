@@ -34,6 +34,57 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "languageModelTools": [
+      {
+        "name": "hive_feature_create",
+        "displayName": "Create Hive Feature",
+        "modelDescription": "Create a new Hive feature for plan-first development. Use at the start of any new work to establish a planning workspace with context, plan, and task tracking.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveFeatureCreate",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Feature name (kebab-case recommended)"
+            },
+            "ticket": {
+              "type": "string",
+              "description": "Optional ticket/issue reference"
+            }
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "hive_feature_list",
+        "displayName": "List Hive Features",
+        "modelDescription": "List all Hive features in the workspace with their status. Use to see available features before switching context or checking progress.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveFeatureList",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "hive_feature_complete",
+        "displayName": "Complete Hive Feature",
+        "modelDescription": "Mark a feature as completed. Use when all tasks are done and the feature is ready for final integration. This is irreversible.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveFeatureComplete",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Feature name to mark as completed"
+            }
+          },
+          "required": ["name"]
+        }
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
