@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
+import { FeatureService, PlanService, TaskService, WorktreeService } from 'hive-core'
 import { HiveWatcher, Launcher } from './services'
 import { HiveSidebarProvider, PlanCommentController } from './providers'
 import {
@@ -109,7 +110,7 @@ class HiveExtension {
             this.workspaceRoot = newRoot
             this.initializeWithHive(newRoot)
           } else {
-            vscode.window.showWarningMessage('Hive: No .hive directory found. Create a feature with OpenCode first.')
+            vscode.window.showWarningMessage('Hive: No .hive directory found. Use @Hive in Copilot Chat to create a feature.')
             return
           }
         }
@@ -121,51 +122,112 @@ class HiveExtension {
           prompt: 'Feature name',
           placeHolder: 'my-feature'
         })
-        if (name) {
-          const terminal = vscode.window.createTerminal('OpenCode - Hive')
-          terminal.sendText(`opencode --command "/hive ${name}"`)
-          terminal.show()
+        if (name && this.workspaceRoot) {
+          const featureService = new FeatureService(this.workspaceRoot)
+          try {
+            featureService.create(name)
+            this.sidebarProvider?.refresh()
+            vscode.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`)
+          } catch (error) {
+            vscode.window.showErrorMessage(`Hive: Failed to create feature - ${error}`)
+          }
+        } else if (name) {
+          // No workspace root, create .hive directory first
+          const hiveDir = path.join(workspaceFolder, '.hive')
+          fs.mkdirSync(hiveDir, { recursive: true })
+          this.workspaceRoot = workspaceFolder
+          this.initializeWithHive(workspaceFolder)
+          const featureService = new FeatureService(workspaceFolder)
+          featureService.create(name)
+          this.sidebarProvider?.refresh()
+          vscode.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`)
         }
       }),
 
-      vscode.commands.registerCommand('hive.openFeatureInOpenCode', (featureName: string) => {
-        this.launcher?.openFeature('opencode', featureName)
+      vscode.commands.registerCommand('hive.openFeature', (featureName: string) => {
+        this.launcher?.openFeature(featureName)
       }),
 
-      vscode.commands.registerCommand('hive.openTaskInOpenCode', (item: { featureName?: string; folder?: string }) => {
+      vscode.commands.registerCommand('hive.openTask', (item: { featureName?: string; folder?: string }) => {
         if (item?.featureName && item?.folder) {
-          this.launcher?.openStep('opencode', item.featureName, item.folder)
+          this.launcher?.openTask(item.featureName, item.folder)
         }
       }),
 
       vscode.commands.registerCommand('hive.openFile', (filePath: string) => {
         if (filePath) {
-          vscode.workspace.openTextDocument(filePath)
-            .then(doc => vscode.window.showTextDocument(doc))
+          this.launcher?.openFile(filePath)
         }
       }),
 
       vscode.commands.registerCommand('hive.approvePlan', async (item: { featureName?: string }) => {
-        if (item?.featureName) {
-          const terminal = vscode.window.createTerminal('OpenCode - Hive')
-          terminal.sendText(`opencode --command "hive_plan_approve"`)
-          terminal.show()
+        if (item?.featureName && this.workspaceRoot) {
+          const planService = new PlanService(this.workspaceRoot)
+          const comments = planService.getComments(item.featureName)
+          
+          if (comments.length > 0) {
+            vscode.window.showWarningMessage(`Hive: Cannot approve - ${comments.length} unresolved comment(s). Address them first.`)
+            return
+          }
+          
+          try {
+            planService.approve(item.featureName)
+            this.sidebarProvider?.refresh()
+            vscode.window.showInformationMessage(`Hive: Plan approved for "${item.featureName}". Use @Hive to sync tasks.`)
+          } catch (error) {
+            vscode.window.showErrorMessage(`Hive: Failed to approve plan - ${error}`)
+          }
         }
       }),
 
       vscode.commands.registerCommand('hive.syncTasks', async (item: { featureName?: string }) => {
-        if (item?.featureName) {
-          const terminal = vscode.window.createTerminal('OpenCode - Hive')
-          terminal.sendText(`opencode --command "hive_tasks_sync"`)
-          terminal.show()
+        if (item?.featureName && this.workspaceRoot) {
+          const featureService = new FeatureService(this.workspaceRoot)
+          const taskService = new TaskService(this.workspaceRoot)
+          
+          const featureData = featureService.get(item.featureName)
+          if (!featureData || featureData.status === 'planning') {
+            vscode.window.showWarningMessage('Hive: Plan must be approved before syncing tasks.')
+            return
+          }
+          
+          try {
+            const result = taskService.sync(item.featureName)
+            if (featureData.status === 'approved') {
+              featureService.updateStatus(item.featureName, 'executing')
+            }
+            this.sidebarProvider?.refresh()
+            vscode.window.showInformationMessage(`Hive: ${result.created.length} tasks created for "${item.featureName}".`)
+          } catch (error) {
+            vscode.window.showErrorMessage(`Hive: Failed to sync tasks - ${error}`)
+          }
         }
       }),
 
       vscode.commands.registerCommand('hive.startTask', async (item: { featureName?: string; folder?: string }) => {
-        if (item?.featureName && item?.folder) {
-          const terminal = vscode.window.createTerminal('OpenCode - Hive')
-          terminal.sendText(`opencode --command "hive_exec_start task=${item.folder}"`)
-          terminal.show()
+        if (item?.featureName && item?.folder && this.workspaceRoot) {
+          const worktreeService = new WorktreeService({
+            baseDir: this.workspaceRoot,
+            hiveDir: path.join(this.workspaceRoot, '.hive'),
+          })
+          const taskService = new TaskService(this.workspaceRoot)
+          
+          try {
+            const worktree = await worktreeService.create(item.featureName, item.folder)
+            taskService.update(item.featureName, item.folder, { status: 'in_progress' })
+            this.sidebarProvider?.refresh()
+            
+            const openWorktree = await vscode.window.showInformationMessage(
+              `Hive: Worktree created at ${worktree.path}`,
+              'Open in New Window'
+            )
+            
+            if (openWorktree === 'Open in New Window') {
+              this.launcher?.openTask(item.featureName, item.folder)
+            }
+          } catch (error) {
+            vscode.window.showErrorMessage(`Hive: Failed to start task - ${error}`)
+          }
         }
       }),
 
@@ -186,24 +248,15 @@ class HiveExtension {
         }
 
         const featureName = featureMatch[1]
-        const featureJsonPath = path.join(this.workspaceRoot, '.hive', 'features', featureName, 'feature.json')
         const commentsPath = path.join(this.workspaceRoot, '.hive', 'features', featureName, 'comments.json')
 
-        let sessionId: string | undefined
         let comments: Array<{ body: string; line?: number }> = []
-
-        try {
-          const featureData = JSON.parse(fs.readFileSync(featureJsonPath, 'utf-8'))
-          sessionId = featureData.sessionId
-        } catch (error) {
-          console.warn(`Hive: failed to read sessionId for feature '${featureName}'`, error)
-        }
 
         try {
           const commentsData = JSON.parse(fs.readFileSync(commentsPath, 'utf-8'))
           comments = commentsData.threads || []
         } catch (error) {
-          console.warn(`Hive: failed to read comments for feature '${featureName}'`, error)
+          // No comments file is fine
         }
 
         const hasComments = comments.length > 0
@@ -218,37 +271,27 @@ class HiveExtension {
         
         if (userInput === undefined) return
 
-        let prompt: string
+        // Build feedback message for Copilot Chat
+        let feedback: string
         if (hasComments) {
           const allComments = comments.map(c => `Line ${c.line}: ${c.body}`).join('\n')
-          if (userInput === '') {
-            prompt = `User review comments:\n${allComments}`
-          } else {
-            prompt = `User review comments:\n${allComments}\n\nAdditional feedback: ${userInput}`
-          }
+          feedback = userInput === '' 
+            ? `Review comments:\n${allComments}`
+            : `Review comments:\n${allComments}\n\nAdditional feedback: ${userInput}`
         } else {
-          if (userInput === '') {
-            prompt = 'User reviewed the plan and approved. Run hive_plan_approve and then hive_tasks_sync.'
-          } else {
-            prompt = `User review feedback: "${userInput}"`
-          }
+          feedback = userInput === ''
+            ? 'Plan approved'
+            : `Review feedback: ${userInput}`
         }
 
-        const shellEscapeSingleQuotes = (value: string): string => {
-          return `'${value.replace(/'/g, `'\"'\"'`)}'`
-        }
-
-        const terminal = vscode.window.createTerminal('OpenCode - Hive')
-        const escapedPrompt = shellEscapeSingleQuotes(prompt)
-
-        if (sessionId) {
-          const escapedSessionId = shellEscapeSingleQuotes(sessionId)
-          terminal.sendText(`opencode run --session ${escapedSessionId} ${escapedPrompt}`)
-        } else {
-          terminal.sendText(`opencode run ${escapedPrompt}`)
-        }
-
-        terminal.show()
+        // Show the feedback and guide user to Copilot Chat
+        vscode.window.showInformationMessage(
+          `Hive: ${hasComments ? 'Comments submitted' : 'Review submitted'}. Use @Hive in Copilot Chat to continue.`
+        )
+        
+        // Copy feedback to clipboard for easy pasting
+        await vscode.env.clipboard.writeText(`@Hive ${feedback}`)
+        vscode.window.showInformationMessage('Hive: Feedback copied to clipboard. Paste in Copilot Chat.')
       })
     )
   }

@@ -1,51 +1,52 @@
 import * as vscode from 'vscode'
+import * as path from 'path'
 
-export type Client = 'opencode'
-
+/**
+ * Launcher for Hive features - works with GitHub Copilot Chat
+ * Replaces the OpenCode-specific launcher
+ */
 export class Launcher {
   constructor(private workspaceRoot: string) {}
 
-  async openStep(
-    client: Client,
-    feature: string,
-    task: string,
-    sessionId?: string
-  ): Promise<void> {
-    const terminalName = `OpenCode: ${feature}/${task}`
-
-    if (sessionId) {
-      const terminal = vscode.window.createTerminal({
-        name: terminalName,
-        cwd: this.workspaceRoot
-      })
-      terminal.sendText(`opencode -s ${sessionId}`)
-      terminal.show()
-      return
+  /**
+   * Open a feature's plan in VS Code and show instructions
+   */
+  async openFeature(feature: string): Promise<void> {
+    const planPath = path.join(this.workspaceRoot, '.hive', 'features', feature, 'plan.md')
+    try {
+      const doc = await vscode.workspace.openTextDocument(planPath)
+      await vscode.window.showTextDocument(doc)
+      vscode.window.showInformationMessage(
+        `Hive: Opened ${feature} plan. Use @Hive in Copilot Chat to continue.`
+      )
+    } catch {
+      vscode.window.showWarningMessage(`Hive: No plan found for feature "${feature}"`)
     }
-
-    const terminal = vscode.window.createTerminal({
-      name: terminalName,
-      cwd: this.workspaceRoot
-    })
-    terminal.sendText('opencode')
-    terminal.show()
   }
 
-  async openFeature(client: Client, feature: string): Promise<void> {
-    const terminal = vscode.window.createTerminal({
-      name: `OpenCode: ${feature}`,
-      cwd: this.workspaceRoot
-    })
-    terminal.sendText('opencode')
-    terminal.show()
+  /**
+   * Open a task's worktree folder in a new VS Code window
+   */
+  async openTask(feature: string, task: string): Promise<void> {
+    const worktreePath = path.join(this.workspaceRoot, '.hive', '.worktrees', feature, task)
+    const uri = vscode.Uri.file(worktreePath)
+    
+    try {
+      await vscode.commands.executeCommand('vscode.openFolder', uri, { forceNewWindow: true })
+    } catch {
+      vscode.window.showErrorMessage(`Hive: Worktree not found for ${feature}/${task}`)
+    }
   }
 
-  openSession(sessionId: string): void {
-    const terminal = vscode.window.createTerminal({
-      name: `OpenCode - ${sessionId.slice(0, 8)}`,
-      cwd: this.workspaceRoot
-    })
-    terminal.sendText(`opencode -s ${sessionId}`)
-    terminal.show()
+  /**
+   * Open a file in VS Code
+   */
+  async openFile(filePath: string): Promise<void> {
+    try {
+      const doc = await vscode.workspace.openTextDocument(filePath)
+      await vscode.window.showTextDocument(doc)
+    } catch {
+      vscode.window.showErrorMessage(`Hive: Could not open file "${filePath}"`)
+    }
   }
 }
