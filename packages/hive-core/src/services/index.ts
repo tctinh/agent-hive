@@ -6,4 +6,3 @@ export { WorktreeService, createWorktreeService } from './worktreeService.js';
 export type { WorktreeInfo, DiffResult, ApplyResult, CommitResult, MergeResult, WorktreeConfig } from './worktreeService.js';
 export { ContextService } from './contextService.js';
 export { SessionService } from './sessionService.js';
-

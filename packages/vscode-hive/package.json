@@ -210,6 +210,89 @@
           },
           "required": ["feature", "task"]
         }
+      },
+      {
+        "name": "hive_subtask_create",
+        "displayName": "Create Subtask",
+        "modelDescription": "Create a subtask within a task. Use for TDD workflows: test -> implement -> verify. Types: test, implement, review, verify, research, debug, custom.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSubtaskCreate",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "name": { "type": "string", "description": "Subtask name" },
+            "type": { "type": "string", "enum": ["test", "implement", "review", "verify", "research", "debug", "custom"], "description": "Subtask type" }
+          },
+          "required": ["feature", "task", "name"]
+        }
+      },
+      {
+        "name": "hive_subtask_update",
+        "displayName": "Update Subtask",
+        "modelDescription": "Update subtask status. Track progress through TDD cycle: pending -> in_progress -> done.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSubtaskUpdate",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "subtask": { "type": "string", "description": "Subtask ID (e.g., 1.1)" },
+            "status": { "type": "string", "enum": ["pending", "in_progress", "done", "cancelled"], "description": "New status" }
+          },
+          "required": ["feature", "task", "subtask", "status"]
+        }
+      },
+      {
+        "name": "hive_subtask_list",
+        "displayName": "List Subtasks",
+        "modelDescription": "List all subtasks for a task. Check TDD progress or see what work remains.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSubtaskList",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" }
+          },
+          "required": ["feature", "task"]
+        }
+      },
+      {
+        "name": "hive_subtask_spec_write",
+        "displayName": "Write Subtask Spec",
+        "modelDescription": "Write detailed instructions for a subtask in spec.md. Define what the subtask should accomplish.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSubtaskSpecWrite",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "subtask": { "type": "string", "description": "Subtask ID (e.g., 1.1)" },
+            "content": { "type": "string", "description": "Spec content in markdown" }
+          },
+          "required": ["feature", "task", "subtask", "content"]
+        }
+      },
+      {
+        "name": "hive_subtask_report_write",
+        "displayName": "Write Subtask Report",
+        "modelDescription": "Write completion report for a subtask in report.md. Document what was done and any findings.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSubtaskReportWrite",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "subtask": { "type": "string", "description": "Subtask ID (e.g., 1.1)" },
+            "content": { "type": "string", "description": "Report content in markdown" }
+          },
+          "required": ["feature", "task", "subtask", "content"]
+        }
       }
     ],
     "viewsContainers": {
