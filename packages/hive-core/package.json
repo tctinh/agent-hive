@@ -1,0 +1,46 @@
+{
+  "name": "hive-core",
+  "version": "0.8.0",
+  "type": "module",
+  "description": "Core services and types for Agent Hive - shared by opencode-hive, hive-mcp, and vscode-hive",
+  "license": "MIT WITH Commons-Clause",
+  "author": "tctinh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tctinh/agent-hive.git",
+    "directory": "packages/hive-core"
+  },
+  "homepage": "https://github.com/tctinh/agent-hive#readme",
+  "bugs": {
+    "url": "https://github.com/tctinh/agent-hive/issues"
+  },
+  "keywords": [
+    "hive",
+    "agent",
+    "workflow",
+    "planning",
+    "core"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && tsc",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "simple-git": "^3.27.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": ["dist/", "README.md"]
+}

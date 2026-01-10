@@ -1,0 +1,9 @@
+export { FeatureService } from './featureService.js';
+export { PlanService } from './planService.js';
+export { TaskService } from './taskService.js';
+export { SubtaskService } from './subtaskService.js';
+export { WorktreeService, createWorktreeService } from './worktreeService.js';
+export type { WorktreeInfo, DiffResult, ApplyResult, CommitResult, MergeResult, WorktreeConfig } from './worktreeService.js';
+export { ContextService } from './contextService.js';
+export type { ContextFile } from './contextService.js';
+export { SessionService } from './sessionService.js';
