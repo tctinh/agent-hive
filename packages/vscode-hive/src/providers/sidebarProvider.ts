@@ -1,42 +1,7 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
-
-interface FeatureJson {
-  name: string
-  status: 'planning' | 'approved' | 'executing' | 'completed'
-  createdAt: string
-  approvedAt?: string
-}
-
-interface TaskStatus {
-  status: 'pending' | 'in_progress' | 'done' | 'cancelled'
-  origin: 'plan' | 'manual'
-  summary?: string
-  subtasks?: Subtask[]
-}
-
-interface Subtask {
-  id: string
-  name: string
-  folder: string
-  status: 'pending' | 'in_progress' | 'done' | 'cancelled'
-  type?: 'test' | 'implement' | 'review' | 'verify' | 'research' | 'debug' | 'custom'
-  createdAt?: string
-  completedAt?: string
-}
-
-interface SessionInfo {
-  sessionId: string
-  taskFolder?: string
-  startedAt: string
-  lastActiveAt: string
-}
-
-interface SessionsJson {
-  master?: string
-  sessions: SessionInfo[]
-}
+import type { FeatureJson, TaskStatus, Subtask, SessionInfo, SessionsJson } from 'hive-core'
 
 type SidebarItem = StatusGroupItem | FeatureItem | PlanItem | ContextFolderItem | ContextFileItem | TasksGroupItem | TaskItem | TaskFileItem | SubtaskItem | SessionsGroupItem | SessionItem
 

@@ -264,6 +264,6 @@
   },
   "dependencies": {
     "@opencode-ai/sdk": "^1.1.1",
-    "simple-git": "^3.27.0"
+    "hive-core": "workspace:*"
   }
 }
