@@ -3,6 +3,17 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { HiveWatcher, Launcher } from './services'
 import { HiveSidebarProvider, PlanCommentController } from './providers'
+import {
+  registerAllTools,
+  getFeatureTools,
+  getPlanTools,
+  getTaskTools,
+  getSubtaskTools,
+  getExecTools,
+  getMergeTools,
+  getContextTools,
+  getSessionTools
+} from './tools'
 
 function findHiveRoot(startPath: string): string | null {
   let current = startPath
@@ -49,6 +60,17 @@ class HiveExtension {
 
     vscode.window.registerTreeDataProvider('hive.features', this.sidebarProvider)
     this.commentController.registerCommands(this.context)
+
+    registerAllTools(this.context, [
+      ...getFeatureTools(workspaceRoot),
+      ...getPlanTools(workspaceRoot),
+      ...getTaskTools(workspaceRoot),
+      ...getSubtaskTools(workspaceRoot),
+      ...getExecTools(workspaceRoot),
+      ...getMergeTools(workspaceRoot),
+      ...getContextTools(workspaceRoot),
+      ...getSessionTools(workspaceRoot)
+    ])
 
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => this.sidebarProvider?.refresh())
     this.context.subscriptions.push({ dispose: () => this.hiveWatcher?.dispose() })
