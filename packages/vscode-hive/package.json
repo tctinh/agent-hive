@@ -339,6 +339,36 @@
           },
           "required": ["feature", "task"]
         }
+      },
+      {
+        "name": "hive_merge",
+        "displayName": "Merge Task Branch",
+        "modelDescription": "Merge a completed task branch into current branch. Supports merge, squash, or rebase strategies. Use after hive_exec_complete to integrate changes.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveMerge",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "strategy": { "type": "string", "enum": ["merge", "squash", "rebase"], "description": "Merge strategy (default: merge)" }
+          },
+          "required": ["feature", "task"]
+        }
+      },
+      {
+        "name": "hive_worktree_list",
+        "displayName": "List Worktrees",
+        "modelDescription": "List all worktrees for a feature. Shows which tasks have active worktrees for concurrent work.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveWorktreeList",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" }
+          },
+          "required": ["feature"]
+        }
       }
     ],
     "viewsContainers": {
