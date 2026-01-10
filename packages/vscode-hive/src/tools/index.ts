@@ -6,3 +6,4 @@ export { getTaskTools } from './task';
 export { getSubtaskTools } from './subtask';
 export { getExecTools } from './exec';
 export { getMergeTools } from './merge';
+export { getContextTools } from './context';

@@ -369,8 +369,146 @@
           },
           "required": ["feature"]
         }
+<<<<<<< HEAD
+=======
+      },
+      {
+        "name": "hive_context_write",
+        "displayName": "Write Context File",
+        "modelDescription": "Write a context file to store research findings, decisions, or reference material. Context persists across sessions.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveContextWrite",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "name": { "type": "string", "description": "Context file name (without .md)" },
+            "content": { "type": "string", "description": "Context content in markdown" }
+          },
+          "required": ["feature", "name", "content"]
+        }
+      },
+      {
+        "name": "hive_context_read",
+        "displayName": "Read Context",
+        "modelDescription": "Read a specific context file or all context for a feature. Use to understand background before starting work.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveContextRead",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "name": { "type": "string", "description": "Context file name (optional)" }
+          },
+          "required": ["feature"]
+        }
+      },
+      {
+        "name": "hive_worktree_list",
+        "displayName": "List Worktrees",
+        "modelDescription": "List all worktrees for a feature. Shows which tasks have active worktrees for concurrent work.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveWorktreeList",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" }
+          },
+          "required": ["feature"]
+        }
+      },
+      {
+        "name": "hive_context_write",
+        "displayName": "Write Context File",
+        "modelDescription": "Write a context file to store research findings, decisions, or reference material. Context persists across sessions.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveContextWrite",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "name": { "type": "string", "description": "Context file name (without .md)" },
+            "content": { "type": "string", "description": "Context content in markdown" }
+          },
+          "required": ["feature", "name", "content"]
+        }
+      },
+      {
+        "name": "hive_context_read",
+        "displayName": "Read Context",
+        "modelDescription": "Read a specific context file or all context for a feature. Use to understand background before starting work.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveContextRead",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "name": { "type": "string", "description": "Context file name (optional)" }
+          },
+          "required": ["feature"]
+        }
+      },
+      {
+        "name": "hive_worktree_list",
+        "displayName": "List Worktrees",
+        "modelDescription": "List all worktrees for a feature. Shows which tasks have active worktrees for concurrent work.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveWorktreeList",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" }
+          },
+          "required": ["feature"]
+        }
+      },
+      {
+        "name": "hive_context_write",
+        "displayName": "Write Context File",
+        "modelDescription": "Write a context file to store research findings, decisions, or reference material. Context persists across sessions.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveContextWrite",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "name": { "type": "string", "description": "Context file name (without .md)" },
+            "content": { "type": "string", "description": "Context content in markdown" }
+          },
+          "required": ["feature", "name", "content"]
+        }
+      },
+      {
+        "name": "hive_context_read",
+        "displayName": "Read Context",
+        "modelDescription": "Read a specific context file or all context for a feature. Use to understand background before starting work.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveContextRead",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "name": { "type": "string", "description": "Context file name (optional)" }
+          },
+          "required": ["feature"]
+        }
+      },
+      {
+        "name": "hive_context_list",
+        "displayName": "List Context Files",
+        "modelDescription": "List all context files for a feature. Shows what background information is available.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveContextList",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" }
+          },
+          "required": ["feature"]
+        }
       }
     ],
+
     "viewsContainers": {
       "activitybar": [
         {
