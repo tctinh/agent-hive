@@ -49,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: npm-package
-          path: packages/opencode-hive/dist/
+          path: packages/opencode-hive/
 
   publish-npm:
     needs: build
@@ -60,36 +60,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Download npm package artifact
+        uses: actions/download-artifact@v4
         with:
-          bun-version: latest
+          name: npm-package
+          path: packages/opencode-hive
 
-      - name: Install dependencies
-        run: bun install
-
-      - name: Build hive-core
-        working-directory: packages/hive-core
-        run: bun run build
-
-      - name: Reinstall to link workspace packages
-        run: bun install
-
-      - name: Build opencode-hive
-        working-directory: packages/opencode-hive
-        run: bun run build
-
-      - name: Configure npm registry
-        working-directory: packages/opencode-hive
-        run: echo "//registry.npmjs.org/:_authToken=$NPM_KEY" > .npmrc
-        env:
-          NPM_KEY: ${{ secrets.NPM_KEY }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Publish to npm
-        run: bun publish --access public --provenance
         working-directory: packages/opencode-hive
+        run: npm publish --access public --provenance
         env:
-          NPM_KEY: ${{ secrets.NPM_KEY }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
 
   publish-vscode:
     needs: build
