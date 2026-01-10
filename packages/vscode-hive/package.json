@@ -34,6 +34,388 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "languageModelTools": [
+      {
+        "name": "hive_feature_create",
+        "displayName": "Create Hive Feature",
+        "modelDescription": "Create a new Hive feature for plan-first development. Use at the start of any new work to establish a planning workspace with context, plan, and task tracking.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveFeatureCreate",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Feature name (kebab-case recommended)"
+            },
+            "ticket": {
+              "type": "string",
+              "description": "Optional ticket/issue reference"
+            }
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "hive_feature_list",
+        "displayName": "List Hive Features",
+        "modelDescription": "List all Hive features in the workspace with their status. Use to see available features before switching context or checking progress.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveFeatureList",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "hive_feature_complete",
+        "displayName": "Complete Hive Feature",
+        "modelDescription": "Mark a feature as completed. Use when all tasks are done and the feature is ready for final integration. This is irreversible.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveFeatureComplete",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Feature name to mark as completed"
+            }
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "hive_plan_write",
+        "displayName": "Write Hive Plan",
+        "modelDescription": "Write or update the plan.md for a feature. The plan defines tasks to execute. Use markdown with ### numbered headers for tasks. Clears existing comments when plan is rewritten.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hivePlanWrite",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": {
+              "type": "string",
+              "description": "Feature name"
+            },
+            "content": {
+              "type": "string",
+              "description": "Plan content in markdown. Use ### 1. Task Name format for tasks."
+            }
+          },
+          "required": ["feature", "content"]
+        }
+      },
+      {
+        "name": "hive_plan_read",
+        "displayName": "Read Hive Plan",
+        "modelDescription": "Read the plan.md and any user comments for a feature. Use to check plan content, status, and user feedback before making changes.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hivePlanRead",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": {
+              "type": "string",
+              "description": "Feature name"
+            }
+          },
+          "required": ["feature"]
+        }
+      },
+      {
+        "name": "hive_plan_approve",
+        "displayName": "Approve Hive Plan",
+        "modelDescription": "Approve a plan for execution. Use after user has reviewed the plan and resolved any comments. Changes feature status to approved.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hivePlanApprove",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": {
+              "type": "string",
+              "description": "Feature name"
+            }
+          },
+          "required": ["feature"]
+        }
+      },
+      {
+        "name": "hive_tasks_sync",
+        "displayName": "Sync Hive Tasks",
+        "modelDescription": "Generate tasks from an approved plan. Parses ### numbered headers and creates task folders. Use after hive_plan_approve to create executable tasks.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveTasksSync",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": {
+              "type": "string",
+              "description": "Feature name"
+            }
+          },
+          "required": ["feature"]
+        }
+      },
+      {
+        "name": "hive_task_create",
+        "displayName": "Create Manual Task",
+        "modelDescription": "Create a task manually, not from the plan. Use for ad-hoc work or tasks discovered during execution.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveTaskCreate",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": {
+              "type": "string",
+              "description": "Feature name"
+            },
+            "name": {
+              "type": "string",
+              "description": "Task name"
+            },
+            "order": {
+              "type": "number",
+              "description": "Optional order number for the task"
+            }
+          },
+          "required": ["feature", "name"]
+        }
+      },
+      {
+        "name": "hive_task_update",
+        "displayName": "Update Hive Task",
+        "modelDescription": "Update a task status or summary. Use to track progress or add notes about completed work.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveTaskUpdate",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": {
+              "type": "string",
+              "description": "Feature name"
+            },
+            "task": {
+              "type": "string",
+              "description": "Task folder name"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "in_progress", "done", "cancelled"],
+              "description": "New status"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Summary of what was done"
+            }
+          },
+          "required": ["feature", "task"]
+        }
+      },
+      {
+        "name": "hive_subtask_create",
+        "displayName": "Create Subtask",
+        "modelDescription": "Create a subtask within a task. Use for TDD workflows: test -> implement -> verify. Types: test, implement, review, verify, research, debug, custom.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSubtaskCreate",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "name": { "type": "string", "description": "Subtask name" },
+            "type": { "type": "string", "enum": ["test", "implement", "review", "verify", "research", "debug", "custom"], "description": "Subtask type" }
+          },
+          "required": ["feature", "task", "name"]
+        }
+      },
+      {
+        "name": "hive_subtask_update",
+        "displayName": "Update Subtask",
+        "modelDescription": "Update subtask status. Track progress through TDD cycle: pending -> in_progress -> done.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSubtaskUpdate",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "subtask": { "type": "string", "description": "Subtask ID (e.g., 1.1)" },
+            "status": { "type": "string", "enum": ["pending", "in_progress", "done", "cancelled"], "description": "New status" }
+          },
+          "required": ["feature", "task", "subtask", "status"]
+        }
+      },
+      {
+        "name": "hive_subtask_list",
+        "displayName": "List Subtasks",
+        "modelDescription": "List all subtasks for a task. Check TDD progress or see what work remains.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSubtaskList",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" }
+          },
+          "required": ["feature", "task"]
+        }
+      },
+      {
+        "name": "hive_subtask_spec_write",
+        "displayName": "Write Subtask Spec",
+        "modelDescription": "Write detailed instructions for a subtask in spec.md. Define what the subtask should accomplish.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSubtaskSpecWrite",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "subtask": { "type": "string", "description": "Subtask ID (e.g., 1.1)" },
+            "content": { "type": "string", "description": "Spec content in markdown" }
+          },
+          "required": ["feature", "task", "subtask", "content"]
+        }
+      },
+      {
+        "name": "hive_subtask_report_write",
+        "displayName": "Write Subtask Report",
+        "modelDescription": "Write completion report for a subtask in report.md. Document what was done and any findings.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSubtaskReportWrite",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "subtask": { "type": "string", "description": "Subtask ID (e.g., 1.1)" },
+            "content": { "type": "string", "description": "Report content in markdown" }
+          },
+          "required": ["feature", "task", "subtask", "content"]
+        }
+      },
+      {
+        "name": "hive_exec_start",
+        "displayName": "Start Task Execution",
+        "modelDescription": "Create a git worktree and begin work on a task. Isolates changes in a separate directory. Use when ready to implement a task.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveExecStart",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" }
+          },
+          "required": ["feature", "task"]
+        }
+      },
+      {
+        "name": "hive_exec_complete",
+        "displayName": "Complete Task Execution",
+        "modelDescription": "Commit changes in worktree and mark task done. Does NOT merge - use hive_merge for that. Use when task implementation is finished.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveExecComplete",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "summary": { "type": "string", "description": "Summary of what was done" }
+          },
+          "required": ["feature", "task", "summary"]
+        }
+      },
+      {
+        "name": "hive_exec_abort",
+        "displayName": "Abort Task Execution",
+        "modelDescription": "Discard all changes and remove worktree. Use when task approach is wrong and needs restart. This is destructive and irreversible.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveExecAbort",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" }
+          },
+          "required": ["feature", "task"]
+        }
+      },
+      {
+        "name": "hive_merge",
+        "displayName": "Merge Task Branch",
+        "modelDescription": "Merge a completed task branch into current branch. Supports merge, squash, or rebase strategies. Use after hive_exec_complete to integrate changes.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveMerge",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "task": { "type": "string", "description": "Task folder name" },
+            "strategy": { "type": "string", "enum": ["merge", "squash", "rebase"], "description": "Merge strategy (default: merge)" }
+          },
+          "required": ["feature", "task"]
+        }
+      },
+      {
+        "name": "hive_worktree_list",
+        "displayName": "List Worktrees",
+        "modelDescription": "List all worktrees for a feature. Shows which tasks have active worktrees for concurrent work.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveWorktreeList",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" }
+          },
+          "required": ["feature"]
+        }
+      },
+      {
+        "name": "hive_context_write",
+        "displayName": "Write Context File",
+        "modelDescription": "Write a context file to store research findings, decisions, or reference material. Context persists across sessions.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveContextWrite",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "name": { "type": "string", "description": "Context file name (without .md)" },
+            "content": { "type": "string", "description": "Context content in markdown" }
+          },
+          "required": ["feature", "name", "content"]
+        }
+      },
+      {
+        "name": "hive_context_read",
+        "displayName": "Read Context",
+        "modelDescription": "Read a specific context file or all context for a feature. Use to understand background before starting work.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveContextRead",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" },
+            "name": { "type": "string", "description": "Context file name (optional)" }
+          },
+          "required": ["feature"]
+        }
+      },
+      {
+        "name": "hive_context_list",
+        "displayName": "List Context Files",
+        "modelDescription": "List all context files for a feature. Shows what background information is available.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveContextList",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": { "type": "string", "description": "Feature name" }
+          },
+          "required": ["feature"]
+        }
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
