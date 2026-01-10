@@ -13,7 +13,7 @@ import {
   writeText,
   fileExists,
 } from '../utils/paths.js';
-import { TaskStatus, TaskStatusType, TaskOrigin, TasksSyncResult, TaskInfo } from '../types.js';
+import { TaskStatus, TaskStatusType, TaskOrigin, TasksSyncResult, TaskInfo, Subtask, SubtaskType } from '../types.js';
 
 interface ParsedTask {
   folder: string;
@@ -286,5 +286,86 @@ export class TaskService {
     }
 
     return tasks;
+  }
+
+  createSubtask(featureName: string, taskFolder: string, name: string, type?: SubtaskType): Subtask {
+    const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);
+    const current = readJson<TaskStatus>(statusPath);
+    
+    if (!current) {
+      throw new Error(`Task '${taskFolder}' not found`);
+    }
+
+    const subtasks = current.subtasks || [];
+    const taskOrder = parseInt(taskFolder.split('-')[0], 10);
+    const nextSubtaskOrder = subtasks.length + 1;
+    const subtaskId = `${taskOrder}.${nextSubtaskOrder}`;
+
+    const subtask: Subtask = {
+      id: subtaskId,
+      name,
+      status: 'pending',
+      type,
+      createdAt: new Date().toISOString(),
+    };
+
+    subtasks.push(subtask);
+    writeJson(statusPath, { ...current, subtasks });
+
+    return subtask;
+  }
+
+  updateSubtask(featureName: string, taskFolder: string, subtaskId: string, status: TaskStatusType): Subtask {
+    const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);
+    const current = readJson<TaskStatus>(statusPath);
+    
+    if (!current) {
+      throw new Error(`Task '${taskFolder}' not found`);
+    }
+
+    const subtasks = current.subtasks || [];
+    const subtask = subtasks.find(s => s.id === subtaskId);
+    
+    if (!subtask) {
+      throw new Error(`Subtask '${subtaskId}' not found in task '${taskFolder}'`);
+    }
+
+    subtask.status = status;
+    if (status === 'done' && !subtask.completedAt) {
+      subtask.completedAt = new Date().toISOString();
+    }
+
+    writeJson(statusPath, { ...current, subtasks });
+    return subtask;
+  }
+
+  listSubtasks(featureName: string, taskFolder: string): Subtask[] {
+    const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);
+    const current = readJson<TaskStatus>(statusPath);
+    
+    if (!current) {
+      throw new Error(`Task '${taskFolder}' not found`);
+    }
+
+    return current.subtasks || [];
+  }
+
+  deleteSubtask(featureName: string, taskFolder: string, subtaskId: string): void {
+    const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);
+    const current = readJson<TaskStatus>(statusPath);
+    
+    if (!current) {
+      throw new Error(`Task '${taskFolder}' not found`);
+    }
+
+    const subtasks = current.subtasks || [];
+    const index = subtasks.findIndex(s => s.id === subtaskId);
+    
+    if (index === -1) {
+      throw new Error(`Subtask '${subtaskId}' not found in task '${taskFolder}'`);
+    }
+
+    subtasks.splice(index, 1);
+    writeJson(statusPath, { ...current, subtasks });
   }
 }

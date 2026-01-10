@@ -13,13 +13,14 @@ const HIVE_SYSTEM_PROMPT = `
 
 Plan-first development: Write plan → User reviews → Approve → Execute tasks
 
-### Tools (17 total)
+### Tools (20 total)
 
 | Domain | Tools |
 |--------|-------|
 | Feature | hive_feature_create, hive_feature_list, hive_feature_complete |
 | Plan | hive_plan_write, hive_plan_read, hive_plan_approve |
 | Task | hive_tasks_sync, hive_task_create, hive_task_update |
+| Subtask | hive_subtask_create, hive_subtask_update, hive_subtask_list |
 | Exec | hive_exec_start, hive_exec_complete, hive_exec_abort |
 | Merge | hive_merge, hive_worktree_list |
 | Context | hive_context_write, hive_context_read, hive_context_list |
@@ -37,6 +38,21 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 
 **Important:** \`hive_exec_complete\` commits changes to task branch but does NOT merge.
 Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manually removed.
+
+### Subtasks & TDD
+
+For complex tasks, break work into subtasks:
+
+\`\`\`
+hive_subtask_create(task, "Write failing tests", "test")
+hive_subtask_create(task, "Implement until green", "implement")
+hive_subtask_create(task, "Run test suite", "verify")
+\`\`\`
+
+Subtask types: test, implement, review, verify, research, debug, custom
+
+**Test-Driven Development**: For implementation tasks, consider writing tests first.
+Tests define "done" and provide feedback loops that improve quality.
 
 ### Plan Format
 
@@ -581,6 +597,73 @@ const plugin: Plugin = async (ctx) => {
             const masterMark = s.sessionId === master ? ' (master)' : '';
             return `${s.sessionId}${masterMark} - ${s.taskFolder || 'no task'} - ${s.lastActiveAt}`;
           }).join('\n');
+        },
+      }),
+
+      hive_subtask_create: tool({
+        description: 'Create a subtask within a task. Use for TDD: create test/implement/verify subtasks.',
+        args: {
+          task: tool.schema.string().describe('Task folder name'),
+          name: tool.schema.string().describe('Subtask description'),
+          type: tool.schema.enum(['test', 'implement', 'review', 'verify', 'research', 'debug', 'custom']).optional().describe('Subtask type'),
+          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
+        },
+        async execute({ task, name, type, feature: explicitFeature }) {
+          const feature = resolveFeature(explicitFeature);
+          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+
+          try {
+            const subtask = taskService.createSubtask(feature, task, name, type as any);
+            return `Subtask created: ${subtask.id} - ${subtask.name} [${subtask.type || 'custom'}]`;
+          } catch (e: any) {
+            return `Error: ${e.message}`;
+          }
+        },
+      }),
+
+      hive_subtask_update: tool({
+        description: 'Update subtask status',
+        args: {
+          task: tool.schema.string().describe('Task folder name'),
+          subtask: tool.schema.string().describe('Subtask ID (e.g., "1.1")'),
+          status: tool.schema.enum(['pending', 'in_progress', 'done', 'cancelled']).describe('New status'),
+          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
+        },
+        async execute({ task, subtask, status, feature: explicitFeature }) {
+          const feature = resolveFeature(explicitFeature);
+          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+
+          try {
+            const updated = taskService.updateSubtask(feature, task, subtask, status as any);
+            return `Subtask ${updated.id} updated: ${updated.status}`;
+          } catch (e: any) {
+            return `Error: ${e.message}`;
+          }
+        },
+      }),
+
+      hive_subtask_list: tool({
+        description: 'List all subtasks for a task',
+        args: {
+          task: tool.schema.string().describe('Task folder name'),
+          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
+        },
+        async execute({ task, feature: explicitFeature }) {
+          const feature = resolveFeature(explicitFeature);
+          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+
+          try {
+            const subtasks = taskService.listSubtasks(feature, task);
+            if (subtasks.length === 0) return "No subtasks for this task.";
+
+            return subtasks.map(s => {
+              const typeTag = s.type ? ` [${s.type}]` : '';
+              const statusIcon = s.status === 'done' ? '✓' : s.status === 'in_progress' ? '→' : '○';
+              return `${statusIcon} ${s.id}: ${s.name}${typeTag}`;
+            }).join('\n');
+          } catch (e: any) {
+            return `Error: ${e.message}`;
+          }
         },
       }),
     },

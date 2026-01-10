@@ -12,6 +12,16 @@ export interface FeatureJson {
 
 export type TaskStatusType = 'pending' | 'in_progress' | 'done' | 'cancelled';
 export type TaskOrigin = 'plan' | 'manual';
+export type SubtaskType = 'test' | 'implement' | 'review' | 'verify' | 'research' | 'debug' | 'custom';
+
+export interface Subtask {
+  id: string; // e.g., "1.1", "1.2" (taskOrder.subtaskOrder)
+  name: string;
+  status: TaskStatusType;
+  type?: SubtaskType;
+  createdAt?: string;
+  completedAt?: string;
+}
 
 export interface TaskStatus {
   status: TaskStatusType;
@@ -19,7 +29,8 @@ export interface TaskStatus {
   summary?: string;
   startedAt?: string;
   completedAt?: string;
-  baseCommit?: string;  // Base commit when worktree was created
+  baseCommit?: string;
+  subtasks?: Subtask[];
 }
 
 export interface PlanComment {

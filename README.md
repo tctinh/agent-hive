@@ -314,13 +314,14 @@ Clean git history (worktree merges), full documentation (generated as you work),
 
 ## Philosophy
 
-Hive is built on 5 core principles:
+Hive is built on 6 core principles:
 
 1. **Context Persists** — Calibration survives sessions. The "3 months later" problem solved.
 2. **Plan → Approve → Execute** — Dialogue until approved, then trust. Two phases with a clear gate.
 3. **Human Shapes, Agent Builds** — Human owns the why. Agent owns the how.
 4. **Good Enough Wins** — Capture what works for this context. Reject over-engineering.
 5. **Batched Parallelism** — Parallel tasks in batches. Sequential batches share context.
+6. **Tests Define Done** — For implementation tasks, tests provide the feedback loop. TDD for agents.
 
 See [PHILOSOPHY.md](PHILOSOPHY.md) for the full framework.
 
