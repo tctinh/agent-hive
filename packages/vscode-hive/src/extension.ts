@@ -11,8 +11,7 @@ import {
   getSubtaskTools,
   getExecTools,
   getMergeTools,
-  getContextTools,
-  getSessionTools
+  getContextTools
 } from './tools'
 
 function findHiveRoot(startPath: string): string | null {
@@ -68,8 +67,8 @@ class HiveExtension {
       ...getSubtaskTools(workspaceRoot),
       ...getExecTools(workspaceRoot),
       ...getMergeTools(workspaceRoot),
-      ...getContextTools(workspaceRoot),
-      ...getSessionTools(workspaceRoot)
+      ...getContextTools(workspaceRoot)
+      // Session tools removed - GitHub Copilot handles sessions natively
     ])
 
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => this.sidebarProvider?.refresh())
@@ -166,14 +165,6 @@ class HiveExtension {
         if (item?.featureName && item?.folder) {
           const terminal = vscode.window.createTerminal('OpenCode - Hive')
           terminal.sendText(`opencode --command "hive_exec_start task=${item.folder}"`)
-          terminal.show()
-        }
-      }),
-
-      vscode.commands.registerCommand('hive.openSession', async (item: { session?: { sessionId: string } }) => {
-        if (item?.session?.sessionId) {
-          const terminal = vscode.window.createTerminal('OpenCode - Hive')
-          terminal.sendText(`opencode --session "${item.session.sessionId}"`)
           terminal.show()
         }
       }),
