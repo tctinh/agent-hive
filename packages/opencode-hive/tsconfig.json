@@ -1,15 +1,17 @@
 {
   "compilerOptions": {
-    "module": "Node16",
-    "target": "ES2020",
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "emitDeclarationOnly": true,
     "outDir": "dist",
-    "lib": ["ES2020"],
-    "sourceMap": true,
+    "lib": ["ES2022"],
+    "sourceMap": false,
     "strict": false,
     "noImplicitAny": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "moduleResolution": "bundler",
     "skipDefaultLibCheck": true,
     "allowSyntheticDefaultImports": true
   },

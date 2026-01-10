@@ -6186,6 +6186,7 @@ ${f.content}`);
 // src/services/watcher.ts
 var vscode = __toESM(require("vscode"));
 var HiveWatcher = class {
+  watcher;
   constructor(workspaceRoot, onChange) {
     const pattern = new vscode.RelativePattern(
       workspaceRoot,
@@ -6479,9 +6480,9 @@ var SessionItem = class extends vscode3.TreeItem {
 var HiveSidebarProvider = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
-    this._onDidChangeTreeData = new vscode3.EventEmitter();
-    this.onDidChangeTreeData = this._onDidChangeTreeData.event;
   }
+  _onDidChangeTreeData = new vscode3.EventEmitter();
+  onDidChangeTreeData = this._onDidChangeTreeData.event;
   refresh() {
     this._onDidChangeTreeData.fire(void 0);
   }
@@ -6708,7 +6709,6 @@ var path6 = __toESM(require("path"));
 var PlanCommentController = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
-    this.threads = /* @__PURE__ */ new Map();
     this.controller = vscode4.comments.createCommentController(
       "hive-plan-review",
       "Plan Review"
@@ -6727,6 +6727,9 @@ var PlanCommentController = class {
     this.commentsWatcher.onDidChange((uri) => this.onCommentsFileChanged(uri));
     this.commentsWatcher.onDidDelete((uri) => this.onCommentsFileChanged(uri));
   }
+  controller;
+  threads = /* @__PURE__ */ new Map();
+  commentsWatcher;
   onCommentsFileChanged(commentsUri) {
     const featureDir = path6.dirname(commentsUri.fsPath);
     const planPath = path6.join(featureDir, "plan.md");
@@ -7535,14 +7538,14 @@ var HiveExtension = class {
   constructor(context, workspaceFolder) {
     this.context = context;
     this.workspaceFolder = workspaceFolder;
-    this.sidebarProvider = null;
-    this.launcher = null;
-    this.commentController = null;
-    this.hiveWatcher = null;
-    this.creationWatcher = null;
-    this.workspaceRoot = null;
-    this.initialized = false;
   }
+  sidebarProvider = null;
+  launcher = null;
+  commentController = null;
+  hiveWatcher = null;
+  creationWatcher = null;
+  workspaceRoot = null;
+  initialized = false;
   initialize() {
     this.workspaceRoot = findHiveRoot(this.workspaceFolder);
     if (this.workspaceRoot) {

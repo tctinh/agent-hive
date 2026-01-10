@@ -25,6 +25,9 @@ jobs:
         working-directory: packages/hive-core
         run: bun run build
 
+      - name: Reinstall to link workspace packages
+        run: bun install
+
       - name: Build opencode-hive
         working-directory: packages/opencode-hive
         run: bun run build
