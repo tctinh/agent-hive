@@ -51,7 +51,7 @@ export function getTaskTools(workspaceRoot: string): ToolRegistration[] {
       invoke: async (input, _token) => {
         const { feature, name, order } = input as { feature: string; name: string; order?: number };
         const folder = taskService.create(feature, name, order);
-        return `Created task "${folder}" with status: pending`;
+        return `Created task "${folder}" with status: pending\nReminder: run hive_exec_start to work in its worktree, and ensure any subagents work in that worktree too.`;
       },
     },
     {

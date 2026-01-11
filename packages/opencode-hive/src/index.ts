@@ -273,7 +273,7 @@ const plugin: Plugin = async (ctx) => {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
           const folder = taskService.create(feature, name, order);
-          return `Manual task created: ${folder}`;
+          return `Manual task created: ${folder}\nReminder: start work with hive_exec_start to use its worktree, and ensure any subagents work in that worktree too.`;
         },
       }),
 
@@ -344,7 +344,7 @@ const plugin: Plugin = async (ctx) => {
 
           taskService.writeSpec(feature, task, specContent);
 
-          return `Worktree created at ${worktree.path}\nBranch: ${worktree.branch}\nBase commit: ${worktree.commit}\nSpec: ${task}/spec.md generated`;
+          return `Worktree created at ${worktree.path}\nBranch: ${worktree.branch}\nBase commit: ${worktree.commit}\nSpec: ${task}/spec.md generated\nReminder: do all work inside this worktree and ensure any subagents do the same.`;
         },
       }),
 

@@ -29,7 +29,7 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
           success: true,
           worktreePath: worktree.path,
           branch: worktree.branch,
-          message: `Worktree created. Work in ${worktree.path}. When done, use hive_exec_complete.`,
+          message: `Worktree created. Work in ${worktree.path}. When done, use hive_exec_complete. Reminder: do all work inside this worktree and ensure any subagents do the same.`,
         });
       },
     },
