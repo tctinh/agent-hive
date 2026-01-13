@@ -86,4 +86,5 @@ export interface HiveQueenOptions {
   existingComments?: PlanComment[];
   featureName?: string;
   featurePath?: string;
+  projectRoot?: string;
 }

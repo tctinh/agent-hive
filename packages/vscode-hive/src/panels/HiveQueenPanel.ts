@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { TaskService } from 'hive-core';
 import type {
   HiveQueenResult,
   HiveQueenOptions,
@@ -36,6 +37,8 @@ export class HiveQueenPanel {
   private _closedByAgent: boolean = false;
   private _panelId: string;
   private _featurePath?: string;
+  private _featureName?: string;
+  private _projectRoot?: string;
   private _taskWatcher?: vscode.FileSystemWatcher;
 
   private constructor(
@@ -54,6 +57,8 @@ export class HiveQueenPanel {
     this._planTitle = options.title || 'Hive Queen';
     this._panelId = panelId;
     this._featurePath = options.featurePath;
+    this._featureName = options.featureName;
+    this._projectRoot = options.projectRoot;
 
     this._panel.webview.html = this._getHtmlContent();
 
@@ -235,43 +240,35 @@ export class HiveQueenPanel {
   }
 
   private async _refreshTaskProgress(): Promise<void> {
-    if (!this._featurePath) return;
+    if (!this._featureName || !this._projectRoot) return;
 
     try {
-      const tasksDir = path.join(this._featurePath, 'tasks');
-      if (!fs.existsSync(tasksDir)) {
-        this.updateProgress([]);
-        return;
-      }
+      const taskService = new TaskService(this._projectRoot);
+      const taskInfos = taskService.list(this._featureName);
 
-      const taskDirs = fs.readdirSync(tasksDir, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => d.name)
-        .sort();
-
-      const tasks: TaskProgress[] = [];
-      for (const taskName of taskDirs) {
-        const statusPath = path.join(tasksDir, taskName, 'status.json');
-        let status: 'pending' | 'in_progress' | 'done' | 'blocked' = 'pending';
-
-        if (fs.existsSync(statusPath)) {
-          try {
-            const statusData = JSON.parse(fs.readFileSync(statusPath, 'utf-8'));
-            status = statusData.status || 'pending';
-          } catch { /* ignore parse errors */ }
-        }
-
-        tasks.push({
-          id: taskName,
-          name: taskName.replace(/^\d+-/, '').replace(/-/g, ' '),
-          status
-        });
-      }
+      const tasks: TaskProgress[] = taskInfos.map(info => ({
+        id: info.folder,
+        name: info.name || info.folder.replace(/^\d+-/, '').replace(/-/g, ' '),
+        status: this._mapTaskStatus(info.status)
+      }));
 
       this.updateProgress(tasks);
     } catch (error) {
       console.error('Failed to refresh task progress:', error);
+      this.updateProgress([]);
     }
+  }
+
+  private _mapTaskStatus(status: string): 'pending' | 'in_progress' | 'done' | 'blocked' {
+    const statusMap: Record<string, 'pending' | 'in_progress' | 'done' | 'blocked'> = {
+      pending: 'pending',
+      in_progress: 'in_progress',
+      executing: 'in_progress',
+      done: 'done',
+      completed: 'done',
+      blocked: 'blocked'
+    };
+    return statusMap[status] || 'pending';
   }
 
   private _handleMessage(message: FromWebviewMessage): void {
