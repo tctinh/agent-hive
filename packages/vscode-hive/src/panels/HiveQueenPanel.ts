@@ -8,6 +8,7 @@ import type {
   PlanComment,
   FileSearchResult,
   FileAttachment,
+  TaskProgress,
   HiveQueenToWebviewMessage as ToWebviewMessage,
   HiveQueenFromWebviewMessage as FromWebviewMessage
 } from './types';
@@ -34,6 +35,8 @@ export class HiveQueenPanel {
   private _planTitle: string;
   private _closedByAgent: boolean = false;
   private _panelId: string;
+  private _featurePath?: string;
+  private _taskWatcher?: vscode.FileSystemWatcher;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -50,21 +53,22 @@ export class HiveQueenPanel {
     this._planContent = options.plan;
     this._planTitle = options.title || 'Hive Queen';
     this._panelId = panelId;
+    this._featurePath = options.featurePath;
 
-    // Set panel HTML
     this._panel.webview.html = this._getHtmlContent();
 
-    // Listen for panel disposal
     this._panel.onDidDispose(() => this._dispose(), null, this._disposables);
 
-    // Handle messages from webview
     this._panel.webview.onDidReceiveMessage(
       (message: FromWebviewMessage) => this._handleMessage(message),
       null,
       this._disposables
     );
 
-    // Send initial content after a short delay to ensure webview is ready
+    if (this._mode === 'execution' && this._featurePath) {
+      this._startTaskWatcher();
+    }
+
     setTimeout(() => {
       this._panel.webview.postMessage({
         type: 'showPlan',
@@ -192,6 +196,82 @@ export class HiveQueenPanel {
       type: 'showAsk',
       ask
     } as ToWebviewMessage);
+  }
+
+  public setMode(mode: PanelMode): void {
+    this._mode = mode;
+    this._panel.webview.postMessage({
+      type: 'setMode',
+      mode
+    } as ToWebviewMessage);
+
+    if (mode === 'execution' && this._featurePath && !this._taskWatcher) {
+      this._startTaskWatcher();
+    } else if (mode === 'planning' && this._taskWatcher) {
+      this._taskWatcher.dispose();
+      this._taskWatcher = undefined;
+    }
+  }
+
+  public get mode(): PanelMode {
+    return this._mode;
+  }
+
+  private _startTaskWatcher(): void {
+    if (!this._featurePath || this._taskWatcher) return;
+
+    const tasksPattern = new vscode.RelativePattern(
+      vscode.Uri.file(this._featurePath),
+      'tasks/**/status.json'
+    );
+    this._taskWatcher = vscode.workspace.createFileSystemWatcher(tasksPattern);
+
+    const refreshTasks = () => this._refreshTaskProgress();
+    this._taskWatcher.onDidCreate(refreshTasks, null, this._disposables);
+    this._taskWatcher.onDidChange(refreshTasks, null, this._disposables);
+    this._taskWatcher.onDidDelete(refreshTasks, null, this._disposables);
+
+    this._refreshTaskProgress();
+  }
+
+  private async _refreshTaskProgress(): Promise<void> {
+    if (!this._featurePath) return;
+
+    try {
+      const tasksDir = path.join(this._featurePath, 'tasks');
+      if (!fs.existsSync(tasksDir)) {
+        this.updateProgress([]);
+        return;
+      }
+
+      const taskDirs = fs.readdirSync(tasksDir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => d.name)
+        .sort();
+
+      const tasks: TaskProgress[] = [];
+      for (const taskName of taskDirs) {
+        const statusPath = path.join(tasksDir, taskName, 'status.json');
+        let status: 'pending' | 'in_progress' | 'done' | 'blocked' = 'pending';
+
+        if (fs.existsSync(statusPath)) {
+          try {
+            const statusData = JSON.parse(fs.readFileSync(statusPath, 'utf-8'));
+            status = statusData.status || 'pending';
+          } catch { /* ignore parse errors */ }
+        }
+
+        tasks.push({
+          id: taskName,
+          name: taskName.replace(/^\d+-/, '').replace(/-/g, ' '),
+          status
+        });
+      }
+
+      this.updateProgress(tasks);
+    } catch (error) {
+      console.error('Failed to refresh task progress:', error);
+    }
   }
 
   private _handleMessage(message: FromWebviewMessage): void {

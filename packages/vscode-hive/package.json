@@ -664,7 +664,7 @@
     }
   },
   "scripts": {
-    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --define:import.meta.url=__importMetaUrl --banner:js=\"const __importMetaUrl = require('url').pathToFileURL(__filename).href;\" && vsce package --no-dependencies -o vscode-hive.vsix",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --define:import.meta.url=__importMetaUrl --banner:js=\"const __importMetaUrl = require('url').pathToFileURL(__filename).href;\" && esbuild src/webview/hiveQueen.ts --bundle --outfile=dist/hiveQueen.js --format=iife --platform=browser --sourcemap && vsce package --no-dependencies -o vscode-hive.vsix",
     "watch": "npm run build -- --watch",
     "build:types": "tsc --emitDeclarationOnly"
   },

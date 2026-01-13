@@ -55,7 +55,8 @@ export type HiveQueenToWebviewMessage =
   | { type: 'showAsk'; ask: PendingAsk }
   | { type: 'updateComments'; comments: PlanComment[] }
   | { type: 'fileSearchResults'; files: FileSearchResult[] }
-  | { type: 'updateAttachments'; attachments: FileAttachment[] };
+  | { type: 'updateAttachments'; attachments: FileAttachment[] }
+  | { type: 'setMode'; mode: PanelMode };
 
 // Messages FROM webview
 export type HiveQueenFromWebviewMessage =
@@ -84,4 +85,5 @@ export interface HiveQueenOptions {
   mode?: PanelMode;
   existingComments?: PlanComment[];
   featureName?: string;
+  featurePath?: string;
 }
