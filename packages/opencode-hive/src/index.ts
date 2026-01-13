@@ -28,7 +28,8 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Exec | hive_exec_start, hive_exec_complete, hive_exec_abort |
 | Merge | hive_merge, hive_worktree_list |
 | Context | hive_context_write, hive_context_read, hive_context_list |
-| Session | hive_session_open, hive_session_list |
+| Session | hive_session_open, hive_session_list, hive_session_refresh |
+| Ask | hive_ask, hive_ask_list_pending |
 
 ### Workflow
 
@@ -89,6 +90,16 @@ Workers depend on context for background. Without it, they work blind.
 Save context BEFORE writing the plan, and UPDATE it as planning iterates.
 
 \`hive_tasks_sync\` parses \`### N. Task Name\` headers.
+
+### Execution Phase - Stay Aligned
+
+During execution, call \`hive_session_refresh\` periodically to:
+- Check for user steering comments
+- See current progress and pending work
+- Get reminded of context files to read
+- Notice if user has pending questions for you
+
+Use \`hive_ask\` when you need user input to proceed. It blocks until the user answers.
 `;
 
 type ToolContext = {
