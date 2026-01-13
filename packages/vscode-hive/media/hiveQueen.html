@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; font-src {{cspSource}}; script-src 'nonce-{{nonce}}';"
+    />
+    <link href="{{styleUri}}" rel="stylesheet" />
+    <link href="{{codiconsUri}}" rel="stylesheet" />
+    <title>Hive Queen</title>
+  </head>
+  <body>
+    <div class="hive-queen-container">
+      <!-- Header with title and actions -->
+      <div class="header">
+        <h1 id="plan-title">{{paneTitle}}</h1>
+        <div class="header-actions">
+          <!-- Export button -->
+          <button id="export-btn" class="btn btn-icon" title="{{export}}">
+            <span class="codicon codicon-cloud-download"></span>
+          </button>
+
+          <!-- Primary action button -->
+          <button id="primary-btn" class="btn btn-primary">
+            <span id="primary-icon" class="codicon codicon-check"></span>
+            <span id="primary-text">{{approve}}</span>
+          </button>
+
+          <!-- Secondary action button -->
+          <button id="secondary-btn" class="btn btn-secondary">
+            <span id="secondary-icon" class="codicon codicon-edit"></span>
+            <span id="secondary-text">{{reject}}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main content area -->
+      <div class="content-wrapper">
+        <!-- Markdown content with hoverable lines -->
+        <div class="plan-content" id="plan-content">
+          <!-- Content will be rendered here -->
+        </div>
+
+        <!-- Comments sidebar -->
+        <div class="comments-sidebar" id="comments-sidebar">
+          <h3 class="sidebar-title">
+            <span class="codicon codicon-comment-discussion"></span>
+            {{comments}}
+          </h3>
+          <div id="comments-list" class="comments-list">
+            <p class="no-comments">{{noComments}}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comment dialog (modal) -->
+      <div id="comment-dialog" class="dialog-overlay hidden">
+        <div class="dialog">
+          <div class="dialog-header">
+            <h3 id="dialog-title">{{addComment}}</h3>
+            <button id="dialog-close" class="btn-icon" title="Close">
+              <span class="codicon codicon-close"></span>
+            </button>
+          </div>
+          <div class="dialog-content">
+            <div class="citation-preview" id="citation-preview"></div>
+            <textarea
+              id="comment-input"
+              class="comment-textarea"
+              placeholder="{{commentPlaceholder}}"
+              rows="4"
+            ></textarea>
+          </div>
+          <div class="dialog-actions">
+            <button id="dialog-save" class="btn btn-primary">{{save}}</button>
+            <button id="dialog-cancel" class="btn btn-secondary">
+              {{cancel}}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ask dialog (for pending questions) -->
+      <div id="ask-dialog" class="dialog-overlay hidden">
+        <div class="dialog">
+          <div class="dialog-header">
+            <h3 id="ask-title">Agent Question</h3>
+          </div>
+          <div class="dialog-content">
+            <p id="ask-question" class="ask-question"></p>
+            <textarea
+              id="ask-answer"
+              class="comment-textarea"
+              placeholder="Enter your answer..."
+              rows="4"
+            ></textarea>
+          </div>
+          <div class="dialog-actions">
+            <button id="ask-submit" class="btn btn-primary">Submit Answer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Store strings for JS -->
+    <script nonce="{{nonce}}">
+      window.__HIVE_QUEEN_STRINGS__ = {
+        addComment: "{{addComment}}",
+        editComment: "{{editComment}}",
+        removeComment: "{{removeComment}}",
+        noComments: "{{noComments}}",
+        approve: "{{approve}}",
+        reject: "{{reject}}",
+      };
+    </script>
+    <script nonce="{{nonce}}" src="{{scriptUri}}"></script>
+  </body>
+</html>

@@ -1,0 +1,519 @@
+/* Hive Queen Panel Styles */
+/* Adapted from seamless-agent planReview.css */
+
+/* Base styles - inherit from VS Code theme */
+:root {
+    --container-padding: 20px;
+    --line-hover-bg: var(--vscode-list-hoverBackground);
+    --comment-btn-bg: var(--vscode-button-secondaryBackground);
+    --comment-btn-fg: var(--vscode-button-secondaryForeground);
+    --dialog-bg: var(--vscode-editor-background);
+    --dialog-border: var(--vscode-panel-border);
+    --comment-card-bg: var(--vscode-editorWidget-background);
+    --comment-card-border: var(--vscode-editorWidget-border);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-foreground);
+    background-color: var(--vscode-editor-background);
+    line-height: 1.6;
+}
+
+.hive-queen-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px var(--container-padding);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background-color: var(--vscode-sideBar-background);
+    flex-shrink: 0;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 1.3em;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.btn-primary {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.btn-primary:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+.btn-secondary {
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+}
+
+.btn-secondary:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.btn-secondary:disabled,
+.btn-secondary.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: auto;
+}
+
+.btn-secondary:disabled:hover,
+.btn-secondary.disabled:hover {
+    background-color: var(--vscode-button-secondaryBackground);
+}
+
+.btn-icon {
+    background: transparent;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--vscode-foreground);
+    border-radius: 4px;
+}
+
+.btn-icon:hover {
+    background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+/* Content wrapper - side by side layout */
+.content-wrapper {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Plan content area */
+.plan-content {
+    flex: 1;
+    padding: var(--container-padding);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Markdown content styling */
+.plan-content h1,
+.plan-content h2,
+.plan-content h3,
+.plan-content h4 {
+    color: var(--vscode-foreground);
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+}
+
+.plan-content h1 {
+    font-size: 1.5em;
+}
+
+.plan-content h2 {
+    font-size: 1.3em;
+}
+
+.plan-content h3 {
+    font-size: 1.15em;
+}
+
+.plan-content h4 {
+    font-size: 1.05em;
+}
+
+.plan-content p {
+    margin: 0.8em 0;
+}
+
+.plan-content ul,
+.plan-content ol {
+    margin: 0.8em 0;
+    padding-left: 2em;
+}
+
+.plan-content li {
+    margin: 0.3em 0;
+}
+
+.plan-content code {
+    font-family: var(--vscode-editor-font-family);
+    background-color: var(--vscode-textCodeBlock-background);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.plan-content pre {
+    background-color: var(--vscode-textCodeBlock-background);
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 1em 0;
+}
+
+.plan-content pre code {
+    background: transparent;
+    padding: 0;
+}
+
+.plan-content hr {
+    border: none;
+    border-top: 1px solid var(--vscode-panel-border);
+    margin: 1.5em 0;
+}
+
+.plan-content a {
+    color: var(--vscode-textLink-foreground);
+}
+
+.plan-content a:hover {
+    color: var(--vscode-textLink-activeForeground);
+    text-decoration: underline;
+}
+
+/* Hoverable line wrapper */
+.line-wrapper {
+    position: relative;
+    padding: 4px 8px;
+    margin: 0 -8px;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+}
+
+.line-wrapper:hover {
+    background-color: var(--line-hover-bg);
+}
+
+/* Comment button that appears on hover */
+.add-comment-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    visibility: hidden;
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    z-index: 10;
+}
+
+.line-wrapper:hover .add-comment-btn {
+    opacity: 1;
+    visibility: visible;
+}
+
+.add-comment-btn:hover {
+    background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+/* Line with comment indicator */
+.line-wrapper.has-comment {
+    background-color: var(--vscode-diffEditor-insertedTextBackground);
+    border-left: 3px solid var(--vscode-editorInfo-foreground);
+    padding-left: 12px;
+    margin-left: -11px;
+}
+
+/* Comments sidebar */
+.comments-sidebar {
+    width: 320px;
+    min-width: 280px;
+    border-left: 1px solid var(--vscode-panel-border);
+    background-color: var(--vscode-sideBar-background);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.comments-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.no-comments {
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+    margin: 0;
+}
+
+/* Comment card */
+.comment-card {
+    background-color: var(--comment-card-bg);
+    border: 1px solid var(--comment-card-border);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.comment-citation {
+    font-family: var(--vscode-editor-font-family);
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    padding: 4px 8px;
+    background-color: var(--vscode-textCodeBlock-background);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.comment-text {
+    color: var(--vscode-foreground);
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.comment-actions button {
+    background: transparent;
+    border: none;
+    color: var(--vscode-textLink-foreground);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.comment-actions button:hover {
+    background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+/* Dialog overlay */
+.dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.dialog-overlay.hidden {
+    display: none;
+}
+
+.dialog {
+    background-color: var(--dialog-bg);
+    border: 1px solid var(--dialog-border);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--dialog-border);
+}
+
+.dialog-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.dialog-content {
+    padding: 16px;
+}
+
+.citation-preview {
+    font-family: var(--vscode-editor-font-family);
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    padding: 8px 12px;
+    background-color: var(--vscode-textCodeBlock-background);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.comment-textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    font-family: var(--vscode-font-family);
+    font-size: 13px;
+    resize: vertical;
+    min-height: 80px;
+}
+
+.comment-textarea:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--dialog-border);
+}
+
+/* Ask dialog specific styles */
+.ask-question {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 16px;
+    padding: 12px;
+    background-color: var(--vscode-textCodeBlock-background);
+    border-radius: 4px;
+    border-left: 3px solid var(--vscode-editorInfo-foreground);
+}
+
+/* Responsive adjustments */
+@media (max-width: 800px) {
+    .content-wrapper {
+        flex-direction: column;
+    }
+
+    .comments-sidebar {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid var(--vscode-panel-border);
+        max-height: 40vh;
+    }
+}
+
+/* Hidden elements */
+.hidden {
+    display: none !important;
+}
+
+/* Execution mode styles */
+.execution-mode .plan-content {
+    /* Task progress view styling */
+}
+
+.task-item {
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 6px;
+    background-color: var(--vscode-editorWidget-background);
+    border: 1px solid var(--vscode-editorWidget-border);
+}
+
+.task-item.pending {
+    border-left: 3px solid var(--vscode-descriptionForeground);
+}
+
+.task-item.in_progress {
+    border-left: 3px solid var(--vscode-editorInfo-foreground);
+    background-color: var(--vscode-editor-inactiveSelectionBackground);
+}
+
+.task-item.done {
+    border-left: 3px solid var(--vscode-testing-iconPassed);
+}
+
+.task-item.blocked {
+    border-left: 3px solid var(--vscode-editorError-foreground);
+}
+
+.task-name {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.task-status {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.subtask-list {
+    margin-top: 8px;
+    padding-left: 16px;
+}
+
+.subtask-item {
+    padding: 4px 8px;
+    margin: 4px 0;
+    font-size: 13px;
+    border-radius: 4px;
+}
+
+.subtask-item.done {
+    color: var(--vscode-testing-iconPassed);
+}
+
+.subtask-item.in_progress {
+    color: var(--vscode-editorInfo-foreground);
+}

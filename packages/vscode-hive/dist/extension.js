@@ -7158,7 +7158,8 @@ function getTaskTools(workspaceRoot) {
       invoke: async (input, _token) => {
         const { feature, name, order } = input;
         const folder = taskService.create(feature, name, order);
-        return `Created task "${folder}" with status: pending`;
+        return `Created task "${folder}" with status: pending
+Reminder: run hive_exec_start to work in its worktree, and ensure any subagents work in that worktree too.`;
       }
     },
     {
@@ -7343,7 +7344,7 @@ function getExecTools(workspaceRoot) {
           success: true,
           worktreePath: worktree.path,
           branch: worktree.branch,
-          message: `Worktree created. Work in ${worktree.path}. When done, use hive_exec_complete.`
+          message: `Worktree created. Work in ${worktree.path}. When done, use hive_exec_complete. Reminder: do all work inside this worktree and ensure any subagents do the same.`
         });
       }
     },
