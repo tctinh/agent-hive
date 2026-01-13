@@ -13,7 +13,8 @@ import {
   getExecTools,
   getMergeTools,
   getContextTools,
-  getAskTools
+  getAskTools,
+  getSessionTools
 } from './tools'
 
 function findHiveRoot(startPath: string): string | null {
@@ -70,7 +71,8 @@ class HiveExtension {
       ...getExecTools(workspaceRoot),
       ...getMergeTools(workspaceRoot),
       ...getContextTools(workspaceRoot),
-      ...getAskTools()
+      ...getAskTools(),
+      ...getSessionTools()
     ])
 
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => this.sidebarProvider?.refresh())
