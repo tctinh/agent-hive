@@ -7,4 +7,4 @@ export { getSubtaskTools } from './subtask';
 export { getExecTools } from './exec';
 export { getMergeTools } from './merge';
 export { getContextTools } from './context';
-// Session tools removed - GitHub Copilot handles sessions natively
+export { getAskTools } from './ask';

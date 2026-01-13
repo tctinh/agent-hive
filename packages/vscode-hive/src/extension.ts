@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
-import { FeatureService, PlanService, TaskService, WorktreeService } from 'hive-core'
+import { FeatureService, PlanService, TaskService, WorktreeService, AskService } from 'hive-core'
 import { HiveWatcher, Launcher } from './services'
 import { HiveSidebarProvider, PlanCommentController } from './providers'
 import {
@@ -12,7 +12,8 @@ import {
   getSubtaskTools,
   getExecTools,
   getMergeTools,
-  getContextTools
+  getContextTools,
+  getAskTools
 } from './tools'
 
 function findHiveRoot(startPath: string): string | null {
@@ -68,8 +69,8 @@ class HiveExtension {
       ...getSubtaskTools(workspaceRoot),
       ...getExecTools(workspaceRoot),
       ...getMergeTools(workspaceRoot),
-      ...getContextTools(workspaceRoot)
-      // Session tools removed - GitHub Copilot handles sessions natively
+      ...getContextTools(workspaceRoot),
+      ...getAskTools()
     ])
 
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => this.sidebarProvider?.refresh())
@@ -292,6 +293,28 @@ class HiveExtension {
         // Copy feedback to clipboard for easy pasting
         await vscode.env.clipboard.writeText(`@Hive ${feedback}`)
         vscode.window.showInformationMessage('Hive: Feedback copied to clipboard. Paste in Copilot Chat.')
+      }),
+
+      vscode.commands.registerCommand('hive.showAsk', (ask: { id: string; question: string; feature: string; timestamp: string }) => {
+        if (!this.workspaceRoot) return
+        
+        const askService = new AskService(this.workspaceRoot)
+        
+        vscode.window.showInformationMessage(
+          `Agent Question: ${ask.question}`,
+          'Answer'
+        ).then(async (selection) => {
+          if (selection === 'Answer') {
+            const answer = await vscode.window.showInputBox({
+              prompt: ask.question,
+              placeHolder: 'Enter your answer...'
+            })
+            if (answer) {
+              askService.submitAnswer(ask.feature, ask.id, answer)
+              vscode.window.showInformationMessage('Hive: Answer submitted to agent.')
+            }
+          }
+        })
       })
     )
   }

@@ -34,9 +34,9 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode6 = __toESM(require("vscode"));
-var fs9 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var vscode7 = __toESM(require("vscode"));
+var fs10 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
 
 // ../hive-core/dist/index.js
 var import_node_module = require("node:module");
@@ -53,6 +53,8 @@ var import_node_path = require("node:path");
 var import_node_events = require("node:events");
 var fs7 = __toESM(require("fs"), 1);
 var path4 = __toESM(require("path"), 1);
+var fs9 = __toESM(require("fs"), 1);
+var path6 = __toESM(require("path"), 1);
 var __create2 = Object.create;
 var __getProtoOf2 = Object.getPrototypeOf;
 var __defProp2 = Object.defineProperty;
@@ -2015,9 +2017,9 @@ var init_simple_git_options = __esm({
     };
   }
 });
-function appendTaskOptions(options, commands4 = []) {
+function appendTaskOptions(options, commands5 = []) {
   if (!filterPlainObject(options)) {
-    return commands4;
+    return commands5;
   }
   return Object.keys(options).reduce((commands22, key) => {
     const value = options[key];
@@ -2035,7 +2037,7 @@ function appendTaskOptions(options, commands4 = []) {
       commands22.push(key);
     }
     return commands22;
-  }, commands4);
+  }, commands5);
 }
 function getTrailingOptions(args, initialPrimitive = 0, objectOnly = false) {
   const command = [];
@@ -2163,18 +2165,18 @@ function checkIsRepoTask(action) {
     case "root":
       return checkIsRepoRootTask();
   }
-  const commands4 = ["rev-parse", "--is-inside-work-tree"];
+  const commands5 = ["rev-parse", "--is-inside-work-tree"];
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     onError,
     parser
   };
 }
 function checkIsRepoRootTask() {
-  const commands4 = ["rev-parse", "--git-dir"];
+  const commands5 = ["rev-parse", "--git-dir"];
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     onError,
     parser(path32) {
@@ -2183,9 +2185,9 @@ function checkIsRepoRootTask() {
   };
 }
 function checkIsBareRepoTask() {
-  const commands4 = ["rev-parse", "--is-bare-repository"];
+  const commands5 = ["rev-parse", "--is-bare-repository"];
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     onError,
     parser
@@ -2273,18 +2275,18 @@ function configurationErrorTask(error) {
     }
   };
 }
-function straightThroughStringTask(commands4, trimmed2 = false) {
+function straightThroughStringTask(commands5, trimmed2 = false) {
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser(text) {
       return trimmed2 ? String(text).trim() : text;
     }
   };
 }
-function straightThroughBufferTask(commands4) {
+function straightThroughBufferTask(commands5) {
   return {
-    commands: commands4,
+    commands: commands5,
     format: "buffer",
     parser(buffer) {
       return buffer;
@@ -2329,9 +2331,9 @@ function cleanWithOptionsTask(mode, customArgs) {
   return cleanTask(cleanMode, options);
 }
 function cleanTask(mode, customArgs) {
-  const commands4 = ["clean", `-${mode}`, ...customArgs];
+  const commands5 = ["clean", `-${mode}`, ...customArgs];
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser(text) {
       return cleanSummaryParser(mode === "n", text);
@@ -2494,13 +2496,13 @@ function asConfigScope(scope, fallback) {
   return fallback;
 }
 function addConfigTask(key, value, append2, scope) {
-  const commands4 = ["config", `--${scope}`];
+  const commands5 = ["config", `--${scope}`];
   if (append2) {
-    commands4.push("--add");
+    commands5.push("--add");
   }
-  commands4.push(key, value);
+  commands5.push(key, value);
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser(text) {
       return text;
@@ -2508,12 +2510,12 @@ function addConfigTask(key, value, append2, scope) {
   };
 }
 function getConfigTask(key, scope) {
-  const commands4 = ["config", "--null", "--show-origin", "--get-all", key];
+  const commands5 = ["config", "--null", "--show-origin", "--get-all", key];
   if (scope) {
-    commands4.splice(1, 0, `--${scope}`);
+    commands5.splice(1, 0, `--${scope}`);
   }
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser(text) {
       return configGetParser(text, key);
@@ -2521,12 +2523,12 @@ function getConfigTask(key, scope) {
   };
 }
 function listConfigTask(scope) {
-  const commands4 = ["config", "--list", "--show-origin", "--null"];
+  const commands5 = ["config", "--list", "--show-origin", "--null"];
   if (scope) {
-    commands4.push(`--${scope}`);
+    commands5.push(`--${scope}`);
   }
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser(text) {
       return configListParser(text);
@@ -2615,9 +2617,9 @@ function grep_default() {
       if (typeof searchTerm === "string") {
         searchTerm = grepQueryBuilder().param(searchTerm);
       }
-      const commands4 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
+      const commands5 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
       return this._runTask({
-        commands: commands4,
+        commands: commands5,
         format: "utf-8",
         parser(stdOut) {
           return parseGrep(stdOut);
@@ -2663,12 +2665,12 @@ __export2(reset_exports, {
   resetTask: () => resetTask
 });
 function resetTask(mode, customArgs) {
-  const commands4 = ["reset"];
+  const commands5 = ["reset"];
   if (isValidResetMode(mode)) {
-    commands4.push(`--${mode}`);
+    commands5.push(`--${mode}`);
   }
-  commands4.push(...customArgs);
-  return straightThroughStringTask(commands4);
+  commands5.push(...customArgs);
+  return straightThroughStringTask(commands5);
 }
 function getResetMode(mode) {
   if (isValidResetMode(mode)) {
@@ -2826,10 +2828,10 @@ var init_tasks_pending_queue = __esm({
     };
   }
 });
-function pluginContext(task, commands4) {
+function pluginContext(task, commands5) {
   return {
     method: first(task.commands) || "",
-    commands: commands4
+    commands: commands5
   };
 }
 function onErrorReceived(target, logger) {
@@ -3083,11 +3085,11 @@ var init_change_working_directory = __esm({
   }
 });
 function checkoutTask(args) {
-  const commands4 = ["checkout", ...args];
-  if (commands4[1] === "-b" && commands4.includes("-B")) {
-    commands4[1] = remove(commands4, "-B");
+  const commands5 = ["checkout", ...args];
+  if (commands5[1] === "-b" && commands5.includes("-B")) {
+    commands5[1] = remove(commands5, "-B");
   }
-  return straightThroughStringTask(commands4);
+  return straightThroughStringTask(commands5);
 }
 function checkout_default() {
   return {
@@ -3198,7 +3200,7 @@ var init_parse_commit = __esm({
   }
 });
 function commitTask(message, files, customArgs) {
-  const commands4 = [
+  const commands5 = [
     "-c",
     "core.abbrev=40",
     "commit",
@@ -3207,7 +3209,7 @@ function commitTask(message, files, customArgs) {
     ...customArgs
   ];
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser: parseCommitResult
   };
@@ -3248,11 +3250,11 @@ var init_first_commit = __esm({
   }
 });
 function hashObjectTask(filePath, write) {
-  const commands4 = ["hash-object", filePath];
+  const commands5 = ["hash-object", filePath];
   if (write) {
-    commands4.push("-w");
+    commands5.push("-w");
   }
-  return straightThroughStringTask(commands4, true);
+  return straightThroughStringTask(commands5, true);
 }
 var init_hash_object = __esm({
   "src/lib/tasks/hash-object.ts"() {
@@ -3300,15 +3302,15 @@ function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
 function initTask(bare = false, path32, customArgs) {
-  const commands4 = ["init", ...customArgs];
-  if (bare && !hasBareCommand(commands4)) {
-    commands4.splice(1, 0, bareCommand);
+  const commands5 = ["init", ...customArgs];
+  if (bare && !hasBareCommand(commands5)) {
+    commands5.splice(1, 0, bareCommand);
   }
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands4.includes("--bare"), path32, text);
+      return parseInit(commands5.includes("--bare"), path32, text);
     }
   };
 }
@@ -3498,14 +3500,14 @@ __export2(diff_exports, {
 });
 function diffSummaryTask(customArgs) {
   let logFormat = logFormatFromCommand(customArgs);
-  const commands4 = ["diff"];
+  const commands5 = ["diff"];
   if (logFormat === "") {
     logFormat = "--stat";
-    commands4.push("--stat=4096");
+    commands5.push("--stat=4096");
   }
-  commands4.push(...customArgs);
-  return validateLogFormatConfig(commands4) || {
-    commands: commands4,
+  commands5.push(...customArgs);
+  return validateLogFormatConfig(commands5) || {
+    commands: commands5,
     format: "utf-8",
     parser: getDiffParser(logFormat)
   };
@@ -3974,18 +3976,18 @@ function pushTagsTask(ref = {}, customArgs) {
   return pushTask(ref, customArgs);
 }
 function pushTask(ref = {}, customArgs) {
-  const commands4 = ["push", ...customArgs];
+  const commands5 = ["push", ...customArgs];
   if (ref.branch) {
-    commands4.splice(1, 0, ref.branch);
+    commands5.splice(1, 0, ref.branch);
   }
   if (ref.remote) {
-    commands4.splice(1, 0, ref.remote);
+    commands5.splice(1, 0, ref.remote);
   }
-  remove(commands4, "-v");
-  append(commands4, "--verbose");
-  append(commands4, "--porcelain");
+  remove(commands5, "-v");
+  append(commands5, "--verbose");
+  append(commands5, "--porcelain");
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser: parsePushResult
   };
@@ -3999,15 +4001,15 @@ var init_push = __esm({
 function show_default() {
   return {
     showBuffer() {
-      const commands4 = ["show", ...getTrailingOptions(arguments, 1)];
-      if (!commands4.includes("--binary")) {
-        commands4.splice(1, 0, "--binary");
+      const commands5 = ["show", ...getTrailingOptions(arguments, 1)];
+      if (!commands5.includes("--binary")) {
+        commands5.splice(1, 0, "--binary");
       }
-      return this._runTask(straightThroughBufferTask(commands4), trailingFunctionArgument(arguments));
+      return this._runTask(straightThroughBufferTask(commands5), trailingFunctionArgument(arguments));
     },
     show() {
-      const commands4 = ["show", ...getTrailingOptions(arguments, 1)];
-      return this._runTask(straightThroughStringTask(commands4), trailingFunctionArgument(arguments));
+      const commands5 = ["show", ...getTrailingOptions(arguments, 1)];
+      return this._runTask(straightThroughStringTask(commands5), trailingFunctionArgument(arguments));
     }
   };
 }
@@ -4164,7 +4166,7 @@ var init_StatusSummary = __esm({
   }
 });
 function statusTask(customArgs) {
-  const commands4 = [
+  const commands5 = [
     "status",
     "--porcelain",
     "-b",
@@ -4174,7 +4176,7 @@ function statusTask(customArgs) {
   ];
   return {
     format: "utf-8",
-    commands: commands4,
+    commands: commands5,
     parser(text) {
       return parseStatusSummary(text);
     }
@@ -4518,23 +4520,23 @@ __export2(branch_exports, {
   deleteBranchTask: () => deleteBranchTask,
   deleteBranchesTask: () => deleteBranchesTask
 });
-function containsDeleteBranchCommand(commands4) {
+function containsDeleteBranchCommand(commands5) {
   const deleteCommands = ["-d", "-D", "--delete"];
-  return commands4.some((command) => deleteCommands.includes(command));
+  return commands5.some((command) => deleteCommands.includes(command));
 }
 function branchTask(customArgs) {
   const isDelete = containsDeleteBranchCommand(customArgs);
   const isCurrentOnly = customArgs.includes("--show-current");
-  const commands4 = ["branch", ...customArgs];
-  if (commands4.length === 1) {
-    commands4.push("-a");
+  const commands5 = ["branch", ...customArgs];
+  if (commands5.length === 1) {
+    commands5.push("-a");
   }
-  if (!commands4.includes("-v")) {
-    commands4.splice(1, 0, "-v");
+  if (!commands5.includes("-v")) {
+    commands5.splice(1, 0, "-v");
   }
   return {
     format: "utf-8",
-    commands: commands4,
+    commands: commands5,
     parser(stdOut, stdErr) {
       if (isDelete) {
         return parseBranchDeletions(stdOut, stdErr).all[0];
@@ -4628,14 +4630,14 @@ function disallowedCommand(command) {
   return /^--upload-pack(=|$)/.test(command);
 }
 function cloneTask(repo, directory, customArgs) {
-  const commands4 = ["clone", ...customArgs];
-  filterString(repo) && commands4.push(repo);
-  filterString(directory) && commands4.push(directory);
-  const banned = commands4.find(disallowedCommand);
+  const commands5 = ["clone", ...customArgs];
+  filterString(repo) && commands5.push(repo);
+  filterString(directory) && commands5.push(directory);
+  const banned = commands5.find(disallowedCommand);
   if (banned) {
     return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
   }
-  return straightThroughStringTask(commands4);
+  return straightThroughStringTask(commands5);
 }
 function cloneMirrorTask(repo, directory, customArgs) {
   append(customArgs, "--mirror");
@@ -4702,16 +4704,16 @@ function disallowedCommand2(command) {
   return /^--upload-pack(=|$)/.test(command);
 }
 function fetchTask(remote, branch, customArgs) {
-  const commands4 = ["fetch", ...customArgs];
+  const commands5 = ["fetch", ...customArgs];
   if (remote && branch) {
-    commands4.push(remote, branch);
+    commands5.push(remote, branch);
   }
-  const banned = commands4.find(disallowedCommand2);
+  const banned = commands5.find(disallowedCommand2);
   if (banned) {
     return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
   }
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser: parseFetchResult
   };
@@ -4758,12 +4760,12 @@ __export2(pull_exports, {
   pullTask: () => pullTask
 });
 function pullTask(remote, branch, customArgs) {
-  const commands4 = ["pull", ...customArgs];
+  const commands5 = ["pull", ...customArgs];
   if (remote && branch) {
-    commands4.splice(1, 0, remote, branch);
+    commands5.splice(1, 0, remote, branch);
   }
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser(stdOut, stdErr) {
       return parsePullResult(stdOut, stdErr);
@@ -4824,29 +4826,29 @@ function addRemoteTask(remoteName, remoteRepo, customArgs) {
   return straightThroughStringTask(["remote", "add", ...customArgs, remoteName, remoteRepo]);
 }
 function getRemotesTask(verbose) {
-  const commands4 = ["remote"];
+  const commands5 = ["remote"];
   if (verbose) {
-    commands4.push("-v");
+    commands5.push("-v");
   }
   return {
-    commands: commands4,
+    commands: commands5,
     format: "utf-8",
     parser: verbose ? parseGetRemotesVerbose : parseGetRemotes
   };
 }
 function listRemotesTask(customArgs) {
-  const commands4 = [...customArgs];
-  if (commands4[0] !== "ls-remote") {
-    commands4.unshift("ls-remote");
+  const commands5 = [...customArgs];
+  if (commands5[0] !== "ls-remote") {
+    commands5.unshift("ls-remote");
   }
-  return straightThroughStringTask(commands4);
+  return straightThroughStringTask(commands5);
 }
 function remoteTask(customArgs) {
-  const commands4 = [...customArgs];
-  if (commands4[0] !== "remote") {
-    commands4.unshift("remote");
+  const commands5 = [...customArgs];
+  if (commands5[0] !== "remote") {
+    commands5.unshift("remote");
   }
-  return straightThroughStringTask(commands4);
+  return straightThroughStringTask(commands5);
 }
 function removeRemoteTask(remoteName) {
   return straightThroughStringTask(["remote", "remove", remoteName]);
@@ -4863,10 +4865,10 @@ __export2(stash_list_exports, {
 });
 function stashListTask(opt = {}, customArgs) {
   const options = parseLogOptions(opt);
-  const commands4 = ["stash", "list", ...options.commands, ...customArgs];
-  const parser4 = createListLogSummaryParser(options.splitter, options.fields, logFormatFromCommand(commands4));
-  return validateLogFormatConfig(commands4) || {
-    commands: commands4,
+  const commands5 = ["stash", "list", ...options.commands, ...customArgs];
+  const parser4 = createListLogSummaryParser(options.splitter, options.fields, logFormatFromCommand(commands5));
+  return validateLogFormatConfig(commands5) || {
+    commands: commands5,
     format: "utf-8",
     parser: parser4
   };
@@ -4893,11 +4895,11 @@ function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
 }
 function subModuleTask(customArgs) {
-  const commands4 = [...customArgs];
-  if (commands4[0] !== "submodule") {
-    commands4.unshift("submodule");
+  const commands5 = [...customArgs];
+  if (commands5[0] !== "submodule") {
+    commands5.unshift("submodule");
   }
-  return straightThroughStringTask(commands4);
+  return straightThroughStringTask(commands5);
 }
 function updateSubModuleTask(customArgs) {
   return subModuleTask(["update", ...customArgs]);
@@ -5139,9 +5141,9 @@ var require_git = __commonJS2({
     Git2.prototype.branchLocal = function(then) {
       return this._runTask(branchLocalTask2(), trailingFunctionArgument2(arguments));
     };
-    Git2.prototype.raw = function(commands4) {
-      const createRestCommands = !Array.isArray(commands4);
-      const command = [].slice.call(createRestCommands ? arguments : commands4, 0);
+    Git2.prototype.raw = function(commands5) {
+      const createRestCommands = !Array.isArray(commands5);
+      const command = [].slice.call(createRestCommands ? arguments : commands5, 0);
       for (let i = 0; i < command.length && createRestCommands; i++) {
         if (!filterPrimitives2(command[i])) {
           command.splice(i, command.length - i);
@@ -5233,8 +5235,8 @@ var require_git = __commonJS2({
       return this._runTask(task, trailingFunctionArgument2(arguments));
     };
     Git2.prototype.revparse = function() {
-      const commands4 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
-      return this._runTask(straightThroughStringTask2(commands4, true), trailingFunctionArgument2(arguments));
+      const commands5 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
+      return this._runTask(straightThroughStringTask2(commands5, true), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.clean = function(mode, options, then) {
       const usingCleanOptionsArray = isCleanOptionsArray2(mode);
@@ -6182,6 +6184,101 @@ ${f.content}`);
     return `${normalized}.md`;
   }
 };
+var AskService = class {
+  projectRoot;
+  constructor(projectRoot) {
+    this.projectRoot = projectRoot;
+  }
+  getAsksDir(feature) {
+    return path6.join(this.projectRoot, ".hive", "features", feature, "asks");
+  }
+  ensureAsksDir(feature) {
+    const dir = this.getAsksDir(feature);
+    if (!fs9.existsSync(dir)) {
+      fs9.mkdirSync(dir, { recursive: true });
+    }
+  }
+  createAsk(feature, question) {
+    this.ensureAsksDir(feature);
+    const id = `ask_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const ask = {
+      id,
+      question,
+      feature,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      answered: false
+    };
+    const asksDir = this.getAsksDir(feature);
+    const askPath = path6.join(asksDir, `${id}.json`);
+    const lockPath = path6.join(asksDir, `${id}.lock`);
+    fs9.writeFileSync(askPath, JSON.stringify(ask, null, 2));
+    fs9.writeFileSync(lockPath, "");
+    return ask;
+  }
+  isLocked(feature, askId) {
+    const lockPath = path6.join(this.getAsksDir(feature), `${askId}.lock`);
+    return fs9.existsSync(lockPath);
+  }
+  getAnswer(feature, askId) {
+    const answerPath = path6.join(this.getAsksDir(feature), `${askId}-answer.json`);
+    if (!fs9.existsSync(answerPath)) {
+      return null;
+    }
+    try {
+      return JSON.parse(fs9.readFileSync(answerPath, "utf-8"));
+    } catch {
+      return null;
+    }
+  }
+  submitAnswer(feature, askId, answer) {
+    const asksDir = this.getAsksDir(feature);
+    const answerPath = path6.join(asksDir, `${askId}-answer.json`);
+    const lockPath = path6.join(asksDir, `${askId}.lock`);
+    const answerData = {
+      id: askId,
+      answer,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    fs9.writeFileSync(answerPath, JSON.stringify(answerData, null, 2));
+    if (fs9.existsSync(lockPath)) {
+      fs9.unlinkSync(lockPath);
+    }
+  }
+  listPending(feature) {
+    const asksDir = this.getAsksDir(feature);
+    if (!fs9.existsSync(asksDir)) {
+      return [];
+    }
+    const files = fs9.readdirSync(asksDir);
+    const pending = [];
+    for (const file of files) {
+      if (file.endsWith(".json") && !file.includes("-answer")) {
+        const askPath = path6.join(asksDir, file);
+        const askId = file.replace(".json", "");
+        const lockPath = path6.join(asksDir, `${askId}.lock`);
+        if (fs9.existsSync(lockPath)) {
+          try {
+            const ask = JSON.parse(fs9.readFileSync(askPath, "utf-8"));
+            pending.push(ask);
+          } catch {
+          }
+        }
+      }
+    }
+    return pending.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }
+  cleanup(feature, askId) {
+    const asksDir = this.getAsksDir(feature);
+    const askPath = path6.join(asksDir, `${askId}.json`);
+    const answerPath = path6.join(asksDir, `${askId}-answer.json`);
+    const lockPath = path6.join(asksDir, `${askId}.lock`);
+    for (const p of [askPath, answerPath, lockPath]) {
+      if (fs9.existsSync(p)) {
+        fs9.unlinkSync(p);
+      }
+    }
+  }
+};
 
 // src/services/watcher.ts
 var vscode = __toESM(require("vscode"));
@@ -6719,7 +6816,7 @@ var HiveSidebarProvider = class {
 // src/providers/planCommentController.ts
 var vscode4 = __toESM(require("vscode"));
 var fs8 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var path7 = __toESM(require("path"));
 var PlanCommentController = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
@@ -6745,8 +6842,8 @@ var PlanCommentController = class {
   threads = /* @__PURE__ */ new Map();
   commentsWatcher;
   onCommentsFileChanged(commentsUri) {
-    const featureDir = path6.dirname(commentsUri.fsPath);
-    const planPath = path6.join(featureDir, "plan.md");
+    const featureDir = path7.dirname(commentsUri.fsPath);
+    const planPath = path7.join(featureDir, "plan.md");
     const planUri = vscode4.Uri.file(planPath);
     this.loadComments(planUri);
   }
@@ -6824,7 +6921,7 @@ var PlanCommentController = class {
   getCommentsPath(uri) {
     const match = uri.fsPath.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
     if (!match) return null;
-    return path6.join(this.workspaceRoot, ".hive", "features", match[1], "comments.json");
+    return path7.join(this.workspaceRoot, ".hive", "features", match[1], "comments.json");
   }
   loadComments(uri) {
     const commentsPath = this.getCommentsPath(uri);
@@ -6882,7 +6979,7 @@ var PlanCommentController = class {
     });
     const data = { threads };
     try {
-      fs8.mkdirSync(path6.dirname(commentsPath), { recursive: true });
+      fs8.mkdirSync(path7.dirname(commentsPath), { recursive: true });
       fs8.writeFileSync(commentsPath, JSON.stringify(data, null, 2));
     } catch (error) {
       console.error("Failed to save comments:", error);
@@ -7289,8 +7386,8 @@ function getSubtaskTools(workspaceRoot) {
       },
       invoke: async (input, _token) => {
         const { feature, task, subtask, content } = input;
-        const path10 = subtaskService.writeSpec(feature, task, subtask, content);
-        return `Spec written to ${path10}`;
+        const path11 = subtaskService.writeSpec(feature, task, subtask, content);
+        return `Spec written to ${path11}`;
       }
     },
     {
@@ -7309,19 +7406,19 @@ function getSubtaskTools(workspaceRoot) {
       },
       invoke: async (input, _token) => {
         const { feature, task, subtask, content } = input;
-        const path10 = subtaskService.writeReport(feature, task, subtask, content);
-        return `Report written to ${path10}`;
+        const path11 = subtaskService.writeReport(feature, task, subtask, content);
+        return `Report written to ${path11}`;
       }
     }
   ];
 }
 
 // src/tools/exec.ts
-var path7 = __toESM(require("path"));
+var path8 = __toESM(require("path"));
 function getExecTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
-    hiveDir: path7.join(workspaceRoot, ".hive")
+    hiveDir: path8.join(workspaceRoot, ".hive")
   });
   const taskService = new TaskService(workspaceRoot);
   return [
@@ -7414,11 +7511,11 @@ ${summary}
 }
 
 // src/tools/merge.ts
-var path8 = __toESM(require("path"));
+var path9 = __toESM(require("path"));
 function getMergeTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
-    hiveDir: path8.join(workspaceRoot, ".hive")
+    hiveDir: path9.join(workspaceRoot, ".hive")
   });
   return [
     {
@@ -7488,8 +7585,8 @@ function getContextTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature, name, content } = input;
-        const path10 = contextService.write(feature, name, content);
-        return JSON.stringify({ success: true, path: path10 });
+        const path11 = contextService.write(feature, name, content);
+        return JSON.stringify({ success: true, path: path11 });
       }
     },
     {
@@ -7538,14 +7635,118 @@ function getContextTools(workspaceRoot) {
   ];
 }
 
+// src/tools/ask.ts
+var vscode6 = __toESM(require("vscode"));
+function getProjectRoot() {
+  const workspaceFolders = vscode6.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+    throw new Error("No workspace folder open");
+  }
+  return workspaceFolders[0].uri.fsPath;
+}
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function getAskTools() {
+  return [
+    {
+      name: "hiveAsk",
+      displayName: "Hive Ask",
+      modelDescription: "Ask the user a question and wait for their response. Creates a blocking question that appears in the Hive Queen Panel. The agent will wait until the user answers or timeout is reached.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          feature: {
+            type: "string",
+            description: "The feature name"
+          },
+          question: {
+            type: "string",
+            description: "The question to ask the user"
+          },
+          timeout: {
+            type: "number",
+            description: "Optional timeout in seconds (default: 300, max: 600)"
+          }
+        },
+        required: ["feature", "question"]
+      },
+      destructive: false,
+      readOnly: true,
+      invoke: async (input, token) => {
+        const projectRoot = getProjectRoot();
+        const askService = new AskService(projectRoot);
+        const ask = askService.createAsk(input.feature, input.question);
+        vscode6.commands.executeCommand("hive.showAsk", {
+          id: ask.id,
+          question: ask.question,
+          feature: input.feature,
+          timestamp: ask.timestamp
+        });
+        const timeoutMs = Math.min((input.timeout || 300) * 1e3, 6e5);
+        const pollInterval = 1e3;
+        const startTime = Date.now();
+        while (askService.isLocked(input.feature, ask.id)) {
+          if (token.isCancellationRequested) {
+            askService.cleanup(input.feature, ask.id);
+            return "Question cancelled by user.";
+          }
+          if (Date.now() - startTime > timeoutMs) {
+            askService.cleanup(input.feature, ask.id);
+            return `Question timed out after ${input.timeout || 300} seconds. No answer received.`;
+          }
+          await sleep(pollInterval);
+        }
+        const answer = askService.getAnswer(input.feature, ask.id);
+        if (answer) {
+          askService.cleanup(input.feature, ask.id);
+          return `User answered: ${answer.answer}`;
+        }
+        askService.cleanup(input.feature, ask.id);
+        return "No answer received (lock removed without answer).";
+      }
+    },
+    {
+      name: "hiveAskListPending",
+      displayName: "Hive List Pending Asks",
+      modelDescription: "List all pending questions that are waiting for user answers.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          feature: {
+            type: "string",
+            description: "The feature name"
+          }
+        },
+        required: ["feature"]
+      },
+      destructive: false,
+      readOnly: true,
+      invoke: async (input) => {
+        const projectRoot = getProjectRoot();
+        const askService = new AskService(projectRoot);
+        const pending = askService.listPending(input.feature);
+        if (pending.length === 0) {
+          return "No pending questions.";
+        }
+        const lines = pending.map(
+          (ask) => `- [${ask.id}] ${ask.question} (asked at ${ask.timestamp})`
+        );
+        return `Pending questions (${pending.length}):
+${lines.join("\n")}`;
+      }
+    }
+  ];
+}
+
 // src/extension.ts
 function findHiveRoot(startPath) {
   let current = startPath;
-  while (current !== path9.dirname(current)) {
-    if (fs9.existsSync(path9.join(current, ".hive"))) {
+  while (current !== path10.dirname(current)) {
+    if (fs10.existsSync(path10.join(current, ".hive"))) {
       return current;
     }
-    current = path9.dirname(current);
+    current = path10.dirname(current);
   }
   return null;
 }
@@ -7575,7 +7776,7 @@ var HiveExtension = class {
     this.sidebarProvider = new HiveSidebarProvider(workspaceRoot);
     this.launcher = new Launcher(workspaceRoot);
     this.commentController = new PlanCommentController(workspaceRoot);
-    vscode6.window.registerTreeDataProvider("hive.features", this.sidebarProvider);
+    vscode7.window.registerTreeDataProvider("hive.features", this.sidebarProvider);
     this.commentController.registerCommands(this.context);
     registerAllTools(this.context, [
       ...getFeatureTools(workspaceRoot),
@@ -7584,8 +7785,8 @@ var HiveExtension = class {
       ...getSubtaskTools(workspaceRoot),
       ...getExecTools(workspaceRoot),
       ...getMergeTools(workspaceRoot),
-      ...getContextTools(workspaceRoot)
-      // Session tools removed - GitHub Copilot handles sessions natively
+      ...getContextTools(workspaceRoot),
+      ...getAskTools()
     ]);
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => this.sidebarProvider?.refresh());
     this.context.subscriptions.push({ dispose: () => this.hiveWatcher?.dispose() });
@@ -7595,15 +7796,15 @@ var HiveExtension = class {
     }
   }
   initializeWithoutHive() {
-    this.creationWatcher = vscode6.workspace.createFileSystemWatcher(
-      new vscode6.RelativePattern(this.workspaceFolder, ".hive/**")
+    this.creationWatcher = vscode7.workspace.createFileSystemWatcher(
+      new vscode7.RelativePattern(this.workspaceFolder, ".hive/**")
     );
     const onHiveCreated = () => {
       const newRoot = findHiveRoot(this.workspaceFolder);
       if (newRoot && !this.initialized) {
         this.workspaceRoot = newRoot;
         this.initializeWithHive(newRoot);
-        vscode6.window.showInformationMessage("Hive: .hive directory detected, extension activated");
+        vscode7.window.showInformationMessage("Hive: .hive directory detected, extension activated");
       }
     };
     this.creationWatcher.onDidCreate(onHiveCreated);
@@ -7612,21 +7813,21 @@ var HiveExtension = class {
   registerCommands() {
     const workspaceFolder = this.workspaceFolder;
     this.context.subscriptions.push(
-      vscode6.commands.registerCommand("hive.refresh", () => {
+      vscode7.commands.registerCommand("hive.refresh", () => {
         if (!this.initialized) {
           const newRoot = findHiveRoot(workspaceFolder);
           if (newRoot) {
             this.workspaceRoot = newRoot;
             this.initializeWithHive(newRoot);
           } else {
-            vscode6.window.showWarningMessage("Hive: No .hive directory found. Use @Hive in Copilot Chat to create a feature.");
+            vscode7.window.showWarningMessage("Hive: No .hive directory found. Use @Hive in Copilot Chat to create a feature.");
             return;
           }
         }
         this.sidebarProvider?.refresh();
       }),
-      vscode6.commands.registerCommand("hive.newFeature", async () => {
-        const name = await vscode6.window.showInputBox({
+      vscode7.commands.registerCommand("hive.newFeature", async () => {
+        const name = await vscode7.window.showInputBox({
           prompt: "Feature name",
           placeHolder: "my-feature"
         });
@@ -7635,58 +7836,58 @@ var HiveExtension = class {
           try {
             featureService.create(name);
             this.sidebarProvider?.refresh();
-            vscode6.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
+            vscode7.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
           } catch (error) {
-            vscode6.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
+            vscode7.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
           }
         } else if (name) {
-          const hiveDir = path9.join(workspaceFolder, ".hive");
-          fs9.mkdirSync(hiveDir, { recursive: true });
+          const hiveDir = path10.join(workspaceFolder, ".hive");
+          fs10.mkdirSync(hiveDir, { recursive: true });
           this.workspaceRoot = workspaceFolder;
           this.initializeWithHive(workspaceFolder);
           const featureService = new FeatureService(workspaceFolder);
           featureService.create(name);
           this.sidebarProvider?.refresh();
-          vscode6.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
+          vscode7.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
         }
       }),
-      vscode6.commands.registerCommand("hive.openFeature", (featureName) => {
+      vscode7.commands.registerCommand("hive.openFeature", (featureName) => {
         this.launcher?.openFeature(featureName);
       }),
-      vscode6.commands.registerCommand("hive.openTask", (item) => {
+      vscode7.commands.registerCommand("hive.openTask", (item) => {
         if (item?.featureName && item?.folder) {
           this.launcher?.openTask(item.featureName, item.folder);
         }
       }),
-      vscode6.commands.registerCommand("hive.openFile", (filePath) => {
+      vscode7.commands.registerCommand("hive.openFile", (filePath) => {
         if (filePath) {
           this.launcher?.openFile(filePath);
         }
       }),
-      vscode6.commands.registerCommand("hive.approvePlan", async (item) => {
+      vscode7.commands.registerCommand("hive.approvePlan", async (item) => {
         if (item?.featureName && this.workspaceRoot) {
           const planService = new PlanService(this.workspaceRoot);
           const comments2 = planService.getComments(item.featureName);
           if (comments2.length > 0) {
-            vscode6.window.showWarningMessage(`Hive: Cannot approve - ${comments2.length} unresolved comment(s). Address them first.`);
+            vscode7.window.showWarningMessage(`Hive: Cannot approve - ${comments2.length} unresolved comment(s). Address them first.`);
             return;
           }
           try {
             planService.approve(item.featureName);
             this.sidebarProvider?.refresh();
-            vscode6.window.showInformationMessage(`Hive: Plan approved for "${item.featureName}". Use @Hive to sync tasks.`);
+            vscode7.window.showInformationMessage(`Hive: Plan approved for "${item.featureName}". Use @Hive to sync tasks.`);
           } catch (error) {
-            vscode6.window.showErrorMessage(`Hive: Failed to approve plan - ${error}`);
+            vscode7.window.showErrorMessage(`Hive: Failed to approve plan - ${error}`);
           }
         }
       }),
-      vscode6.commands.registerCommand("hive.syncTasks", async (item) => {
+      vscode7.commands.registerCommand("hive.syncTasks", async (item) => {
         if (item?.featureName && this.workspaceRoot) {
           const featureService = new FeatureService(this.workspaceRoot);
           const taskService = new TaskService(this.workspaceRoot);
           const featureData = featureService.get(item.featureName);
           if (!featureData || featureData.status === "planning") {
-            vscode6.window.showWarningMessage("Hive: Plan must be approved before syncing tasks.");
+            vscode7.window.showWarningMessage("Hive: Plan must be approved before syncing tasks.");
             return;
           }
           try {
@@ -7695,24 +7896,24 @@ var HiveExtension = class {
               featureService.updateStatus(item.featureName, "executing");
             }
             this.sidebarProvider?.refresh();
-            vscode6.window.showInformationMessage(`Hive: ${result.created.length} tasks created for "${item.featureName}".`);
+            vscode7.window.showInformationMessage(`Hive: ${result.created.length} tasks created for "${item.featureName}".`);
           } catch (error) {
-            vscode6.window.showErrorMessage(`Hive: Failed to sync tasks - ${error}`);
+            vscode7.window.showErrorMessage(`Hive: Failed to sync tasks - ${error}`);
           }
         }
       }),
-      vscode6.commands.registerCommand("hive.startTask", async (item) => {
+      vscode7.commands.registerCommand("hive.startTask", async (item) => {
         if (item?.featureName && item?.folder && this.workspaceRoot) {
           const worktreeService = new WorktreeService({
             baseDir: this.workspaceRoot,
-            hiveDir: path9.join(this.workspaceRoot, ".hive")
+            hiveDir: path10.join(this.workspaceRoot, ".hive")
           });
           const taskService = new TaskService(this.workspaceRoot);
           try {
             const worktree = await worktreeService.create(item.featureName, item.folder);
             taskService.update(item.featureName, item.folder, { status: "in_progress" });
             this.sidebarProvider?.refresh();
-            const openWorktree = await vscode6.window.showInformationMessage(
+            const openWorktree = await vscode7.window.showInformationMessage(
               `Hive: Worktree created at ${worktree.path}`,
               "Open in New Window"
             );
@@ -7720,34 +7921,34 @@ var HiveExtension = class {
               this.launcher?.openTask(item.featureName, item.folder);
             }
           } catch (error) {
-            vscode6.window.showErrorMessage(`Hive: Failed to start task - ${error}`);
+            vscode7.window.showErrorMessage(`Hive: Failed to start task - ${error}`);
           }
         }
       }),
-      vscode6.commands.registerCommand("hive.plan.doneReview", async () => {
-        const editor = vscode6.window.activeTextEditor;
+      vscode7.commands.registerCommand("hive.plan.doneReview", async () => {
+        const editor = vscode7.window.activeTextEditor;
         if (!editor) return;
         if (!this.workspaceRoot) {
-          vscode6.window.showErrorMessage("Hive: No .hive directory found");
+          vscode7.window.showErrorMessage("Hive: No .hive directory found");
           return;
         }
         const filePath = editor.document.uri.fsPath;
         const featureMatch = filePath.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
         if (!featureMatch) {
-          vscode6.window.showErrorMessage("Not a plan.md file");
+          vscode7.window.showErrorMessage("Not a plan.md file");
           return;
         }
         const featureName = featureMatch[1];
-        const commentsPath = path9.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
+        const commentsPath = path10.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
         let comments2 = [];
         try {
-          const commentsData = JSON.parse(fs9.readFileSync(commentsPath, "utf-8"));
+          const commentsData = JSON.parse(fs10.readFileSync(commentsPath, "utf-8"));
           comments2 = commentsData.threads || [];
         } catch (error) {
         }
         const hasComments = comments2.length > 0;
         const inputPrompt = hasComments ? `${comments2.length} comment(s) found. Add feedback or leave empty to submit comments only` : "Enter your review feedback (or leave empty to approve)";
-        const userInput = await vscode6.window.showInputBox({
+        const userInput = await vscode7.window.showInputBox({
           prompt: inputPrompt,
           placeHolder: hasComments ? "Additional feedback (optional)" : 'e.g., "looks good" to approve, or describe changes needed'
         });
@@ -7763,17 +7964,36 @@ Additional feedback: ${userInput}`;
         } else {
           feedback = userInput === "" ? "Plan approved" : `Review feedback: ${userInput}`;
         }
-        vscode6.window.showInformationMessage(
+        vscode7.window.showInformationMessage(
           `Hive: ${hasComments ? "Comments submitted" : "Review submitted"}. Use @Hive in Copilot Chat to continue.`
         );
-        await vscode6.env.clipboard.writeText(`@Hive ${feedback}`);
-        vscode6.window.showInformationMessage("Hive: Feedback copied to clipboard. Paste in Copilot Chat.");
+        await vscode7.env.clipboard.writeText(`@Hive ${feedback}`);
+        vscode7.window.showInformationMessage("Hive: Feedback copied to clipboard. Paste in Copilot Chat.");
+      }),
+      vscode7.commands.registerCommand("hive.showAsk", (ask) => {
+        if (!this.workspaceRoot) return;
+        const askService = new AskService(this.workspaceRoot);
+        vscode7.window.showInformationMessage(
+          `Agent Question: ${ask.question}`,
+          "Answer"
+        ).then(async (selection) => {
+          if (selection === "Answer") {
+            const answer = await vscode7.window.showInputBox({
+              prompt: ask.question,
+              placeHolder: "Enter your answer..."
+            });
+            if (answer) {
+              askService.submitAnswer(ask.feature, ask.id, answer);
+              vscode7.window.showInformationMessage("Hive: Answer submitted to agent.");
+            }
+          }
+        });
       })
     );
   }
 };
 function activate(context) {
-  const workspaceFolder = vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const workspaceFolder = vscode7.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!workspaceFolder) return;
   const extension = new HiveExtension(context, workspaceFolder);
   extension.registerCommands();
