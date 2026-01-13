@@ -1,4 +1,3 @@
-const __importMetaUrl = require('url').pathToFileURL(__filename).href;
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -34,9 +33,9 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode8 = __toESM(require("vscode"));
-var fs10 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
+var vscode9 = __toESM(require("vscode"));
+var fs11 = __toESM(require("fs"));
+var path11 = __toESM(require("path"));
 
 // ../hive-core/dist/index.js
 var import_node_module = require("node:module");
@@ -55,6 +54,7 @@ var fs7 = __toESM(require("fs"), 1);
 var path4 = __toESM(require("path"), 1);
 var fs9 = __toESM(require("fs"), 1);
 var path6 = __toESM(require("path"), 1);
+var import_meta = {};
 var __create2 = Object.create;
 var __getProtoOf2 = Object.getPrototypeOf;
 var __defProp2 = Object.defineProperty;
@@ -72,7 +72,7 @@ var __toESM2 = (mod, isNodeMode, target) => {
   return to;
 };
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
-var __require = /* @__PURE__ */ (0, import_node_module.createRequire)(__importMetaUrl);
+var __require = /* @__PURE__ */ (0, import_node_module.createRequire)(import_meta.url);
 var require_ms = __commonJS((exports2, module2) => {
   var s = 1e3;
   var m = s * 60;
@@ -6991,11 +6991,484 @@ var PlanCommentController = class {
   }
 };
 
-// src/tools/base.ts
+// src/panels/HiveQueenPanel.ts
 var vscode5 = __toESM(require("vscode"));
+var fs10 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
+var HiveQueenPanel = class _HiveQueenPanel {
+  static viewType = "hive.queenPanel";
+  static _panels = /* @__PURE__ */ new Map();
+  static _pendingResolvers = /* @__PURE__ */ new Map();
+  _panel;
+  _extensionUri;
+  _disposables = [];
+  _comments = [];
+  _attachments = [];
+  _resolvePromise;
+  _mode;
+  _planContent;
+  _planTitle;
+  _closedByAgent = false;
+  _panelId;
+  _featurePath;
+  _featureName;
+  _projectRoot;
+  _taskWatcher;
+  constructor(panel, extensionUri, options, resolve, panelId) {
+    this._panel = panel;
+    this._extensionUri = extensionUri;
+    this._resolvePromise = resolve;
+    this._mode = options.mode || "planning";
+    this._comments = options.existingComments || [];
+    this._planContent = options.plan;
+    this._planTitle = options.title || "Hive Queen";
+    this._panelId = panelId;
+    this._featurePath = options.featurePath;
+    this._featureName = options.featureName;
+    this._projectRoot = options.projectRoot;
+    this._panel.webview.html = this._getHtmlContent();
+    this._panel.onDidDispose(() => this._dispose(), null, this._disposables);
+    this._panel.webview.onDidReceiveMessage(
+      (message) => this._handleMessage(message),
+      null,
+      this._disposables
+    );
+    if (this._mode === "execution" && this._featurePath) {
+      this._startTaskWatcher();
+    }
+    setTimeout(() => {
+      this._panel.webview.postMessage({
+        type: "showPlan",
+        content: options.plan,
+        title: this._planTitle,
+        mode: this._mode,
+        comments: this._comments
+      });
+    }, 100);
+  }
+  /**
+   * Show plan for review (planning mode)
+   */
+  static async showPlan(extensionUri, content, title = "Review Plan") {
+    return _HiveQueenPanel.showWithOptions(extensionUri, {
+      plan: content,
+      title,
+      mode: "planning"
+    });
+  }
+  /**
+   * Show panel with full options
+   */
+  static async showWithOptions(extensionUri, options) {
+    const column = vscode5.window.activeTextEditor ? vscode5.window.activeTextEditor.viewColumn : void 0;
+    const title = options.title || "Hive Queen";
+    const panelId = options.featureName || `hive_${Date.now()}`;
+    const existingPanel = _HiveQueenPanel._panels.get(panelId);
+    if (existingPanel && existingPanel._panel) {
+      existingPanel._panel.reveal(column);
+      const existingResolver = _HiveQueenPanel._pendingResolvers.get(panelId);
+      if (existingResolver) {
+        return new Promise((resolve) => {
+          _HiveQueenPanel._pendingResolvers.set(panelId, resolve);
+        });
+      }
+    }
+    return new Promise((resolve) => {
+      _HiveQueenPanel._pendingResolvers.set(panelId, resolve);
+      const panel = vscode5.window.createWebviewPanel(
+        _HiveQueenPanel.viewType,
+        title,
+        column || vscode5.ViewColumn.One,
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
+          localResourceRoots: [
+            vscode5.Uri.joinPath(extensionUri, "media"),
+            vscode5.Uri.joinPath(extensionUri, "dist"),
+            vscode5.Uri.joinPath(extensionUri, "node_modules", "@vscode", "codicons", "dist")
+          ]
+        }
+      );
+      const queenPanel = new _HiveQueenPanel(panel, extensionUri, options, resolve, panelId);
+      _HiveQueenPanel._panels.set(panelId, queenPanel);
+      panel.onDidDispose(() => {
+        _HiveQueenPanel._panels.delete(panelId);
+      });
+    });
+  }
+  /**
+   * Get a panel by ID
+   */
+  static getPanel(panelId) {
+    return _HiveQueenPanel._panels.get(panelId);
+  }
+  /**
+   * Close a panel if it's open (used when agent cancels)
+   */
+  static closeIfOpen(panelId) {
+    const panel = _HiveQueenPanel._panels.get(panelId);
+    if (panel) {
+      panel._closedByAgent = true;
+      panel._panel.dispose();
+      return true;
+    } else {
+      const pendingResolver = _HiveQueenPanel._pendingResolvers.get(panelId);
+      if (pendingResolver) {
+        pendingResolver({ approved: false, comments: [], action: "closed" });
+        _HiveQueenPanel._pendingResolvers.delete(panelId);
+        return true;
+      }
+    }
+    return false;
+  }
+  /**
+   * Update panel with new progress (execution mode)
+   */
+  updateProgress(tasks) {
+    this._panel.webview.postMessage({
+      type: "updateProgress",
+      tasks
+    });
+  }
+  /**
+   * Show a pending ask in the panel
+   */
+  showAsk(ask) {
+    this._panel.webview.postMessage({
+      type: "showAsk",
+      ask
+    });
+  }
+  setMode(mode) {
+    this._mode = mode;
+    this._panel.webview.postMessage({
+      type: "setMode",
+      mode
+    });
+    if (mode === "execution" && this._featurePath && !this._taskWatcher) {
+      this._startTaskWatcher();
+    } else if (mode === "planning" && this._taskWatcher) {
+      this._taskWatcher.dispose();
+      this._taskWatcher = void 0;
+    }
+  }
+  get mode() {
+    return this._mode;
+  }
+  _startTaskWatcher() {
+    if (!this._featurePath || this._taskWatcher) return;
+    const tasksPattern = new vscode5.RelativePattern(
+      vscode5.Uri.file(this._featurePath),
+      "tasks/**/status.json"
+    );
+    this._taskWatcher = vscode5.workspace.createFileSystemWatcher(tasksPattern);
+    const refreshTasks = () => this._refreshTaskProgress();
+    this._taskWatcher.onDidCreate(refreshTasks, null, this._disposables);
+    this._taskWatcher.onDidChange(refreshTasks, null, this._disposables);
+    this._taskWatcher.onDidDelete(refreshTasks, null, this._disposables);
+    this._refreshTaskProgress();
+  }
+  async _refreshTaskProgress() {
+    if (!this._featureName || !this._projectRoot) return;
+    try {
+      const taskService = new TaskService(this._projectRoot);
+      const taskInfos = taskService.list(this._featureName);
+      const tasks = taskInfos.map((info) => ({
+        id: info.folder,
+        name: info.name || info.folder.replace(/^\d+-/, "").replace(/-/g, " "),
+        status: this._mapTaskStatus(info.status)
+      }));
+      this.updateProgress(tasks);
+    } catch (error) {
+      console.error("Failed to refresh task progress:", error);
+      this.updateProgress([]);
+    }
+  }
+  _mapTaskStatus(status) {
+    const statusMap = {
+      pending: "pending",
+      in_progress: "in_progress",
+      executing: "in_progress",
+      done: "done",
+      completed: "done",
+      blocked: "blocked"
+    };
+    return statusMap[status] || "pending";
+  }
+  _handleMessage(message) {
+    switch (message.type) {
+      case "approve":
+        this._resolve({ approved: true, comments: message.comments, action: "approved" });
+        break;
+      case "reject":
+        this._resolve({ approved: false, comments: message.comments, action: "rejected", reason: message.reason });
+        break;
+      case "addComment":
+        this._comments.push({
+          id: `comment_${Date.now()}`,
+          lineNumber: message.lineNumber,
+          text: message.text,
+          resolved: false
+        });
+        this._updateComments();
+        break;
+      case "editComment":
+        if (message.index >= 0 && message.index < this._comments.length) {
+          this._comments[message.index].text = message.text;
+          this._updateComments();
+        }
+        break;
+      case "removeComment":
+        if (message.index >= 0 && message.index < this._comments.length) {
+          this._comments.splice(message.index, 1);
+          this._updateComments();
+        }
+        break;
+      case "exportPlan":
+        this._exportPlan();
+        break;
+      case "searchFiles":
+        this._handleSearchFiles(message.query);
+        break;
+      case "addFileReference":
+        this._handleAddFileReference(message.file);
+        break;
+      case "removeAttachment":
+        this._handleRemoveAttachment(message.attachmentId);
+        break;
+    }
+  }
+  async _exportPlan() {
+    const workspaceFolders = vscode5.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      vscode5.window.showErrorMessage("No workspace folder open");
+      return;
+    }
+    let content = `# ${this._planTitle}
+
+`;
+    content += `**Mode:** ${this._mode}
+`;
+    content += `**Date:** ${(/* @__PURE__ */ new Date()).toLocaleString()}
+
+`;
+    content += `---
+
+`;
+    content += this._planContent;
+    if (this._comments.length > 0) {
+      content += `
+
+---
+
+## Comments
+
+`;
+      for (const comment of this._comments) {
+        content += `> Line ${comment.lineNumber}
+
+`;
+        content += `${comment.text}
+
+`;
+      }
+    }
+    const uri = await vscode5.window.showSaveDialog({
+      defaultUri: vscode5.Uri.joinPath(workspaceFolders[0].uri, `plan-export-${Date.now()}.md`),
+      filters: { "Markdown": ["md"] }
+    });
+    if (uri) {
+      try {
+        await vscode5.workspace.fs.writeFile(uri, Buffer.from(content, "utf-8"));
+        vscode5.window.showInformationMessage(`Plan exported to ${uri.fsPath}`);
+      } catch (error) {
+        vscode5.window.showErrorMessage(`Failed to export plan: ${error}`);
+      }
+    }
+  }
+  _updateComments() {
+    this._panel.webview.postMessage({
+      type: "updateComments",
+      comments: this._comments
+    });
+  }
+  async _handleSearchFiles(query) {
+    try {
+      const sanitizedQuery = this._sanitizeSearchQuery(query);
+      const allFiles = await vscode5.workspace.findFiles("**/*", "**/node_modules/**", 2e3);
+      const queryLower = sanitizedQuery.toLowerCase();
+      const seenFolders = /* @__PURE__ */ new Set();
+      const folderResults = [];
+      for (const uri of allFiles) {
+        const relativePath = vscode5.workspace.asRelativePath(uri);
+        const dirPath = path8.dirname(relativePath);
+        if (dirPath && dirPath !== "." && !seenFolders.has(dirPath)) {
+          seenFolders.add(dirPath);
+          const parts = dirPath.split(/[\\/]/);
+          const folderName = parts[parts.length - 1];
+          if (!queryLower || folderName.toLowerCase().includes(queryLower) || dirPath.toLowerCase().includes(queryLower)) {
+            const workspaceFolder = vscode5.workspace.getWorkspaceFolder(uri)?.uri ?? vscode5.workspace.workspaceFolders[0].uri;
+            folderResults.push({
+              name: folderName,
+              path: dirPath,
+              uri: vscode5.Uri.joinPath(workspaceFolder, dirPath).toString(),
+              icon: "folder",
+              isFolder: true
+            });
+          }
+        }
+      }
+      const fileResults = allFiles.map((uri) => {
+        const relativePath = vscode5.workspace.asRelativePath(uri);
+        const fileName = uri.fsPath.split(/[\\/]/).pop() || "file";
+        return {
+          name: fileName,
+          path: relativePath,
+          uri: uri.toString(),
+          icon: this._getFileIcon(fileName),
+          isFolder: false
+        };
+      }).filter((file) => !queryLower || file.name.toLowerCase().includes(queryLower) || file.path.toLowerCase().includes(queryLower));
+      const allResults = [...folderResults, ...fileResults].sort((a, b) => {
+        if (a.isFolder && !b.isFolder) return -1;
+        if (!a.isFolder && b.isFolder) return 1;
+        const aExact = a.name.toLowerCase().startsWith(queryLower);
+        const bExact = b.name.toLowerCase().startsWith(queryLower);
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        return a.name.localeCompare(b.name);
+      }).slice(0, 50);
+      this._panel.webview.postMessage({
+        type: "fileSearchResults",
+        files: allResults
+      });
+    } catch (error) {
+      console.error("File search error:", error);
+      this._panel.webview.postMessage({
+        type: "fileSearchResults",
+        files: []
+      });
+    }
+  }
+  _handleAddFileReference(file) {
+    if (!file) return;
+    const attachment = {
+      id: `${file.isFolder ? "folder" : "file"}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      name: file.name,
+      uri: file.uri,
+      isFolder: file.isFolder,
+      folderPath: file.isFolder ? file.path : void 0
+    };
+    this._attachments.push(attachment);
+    this._panel.webview.postMessage({
+      type: "updateAttachments",
+      attachments: this._attachments
+    });
+  }
+  _handleRemoveAttachment(attachmentId) {
+    this._attachments = this._attachments.filter((a) => a.id !== attachmentId);
+    this._panel.webview.postMessage({
+      type: "updateAttachments",
+      attachments: this._attachments
+    });
+  }
+  _sanitizeSearchQuery(query) {
+    return query.replace(/\.\./g, "").replace(/[<>:"|?*]/g, "").trim().substring(0, 100);
+  }
+  _getFileIcon(fileName) {
+    const ext = fileName.split(".").pop()?.toLowerCase() || "";
+    const iconMap = {
+      ts: "symbol-method",
+      tsx: "symbol-method",
+      js: "symbol-variable",
+      jsx: "symbol-variable",
+      json: "json",
+      md: "markdown",
+      html: "code",
+      css: "symbol-color",
+      py: "symbol-misc",
+      rs: "symbol-structure",
+      go: "symbol-event",
+      java: "symbol-class",
+      yml: "settings-gear",
+      yaml: "settings-gear"
+    };
+    return iconMap[ext] || "file";
+  }
+  _resolve(result) {
+    if (this._resolvePromise) {
+      this._resolvePromise(result);
+      this._resolvePromise = void 0;
+      _HiveQueenPanel._pendingResolvers.delete(this._panelId);
+    }
+    this._panel.dispose();
+  }
+  _dispose() {
+    if (this._resolvePromise && this._closedByAgent) {
+      this._resolvePromise({ approved: false, comments: this._comments, action: "closed" });
+      this._resolvePromise = void 0;
+      _HiveQueenPanel._pendingResolvers.delete(this._panelId);
+    }
+    while (this._disposables.length) {
+      const disposable = this._disposables.pop();
+      if (disposable) {
+        disposable.dispose();
+      }
+    }
+  }
+  _getHtmlContent() {
+    const webview = this._panel.webview;
+    const styleUri = webview.asWebviewUri(
+      vscode5.Uri.joinPath(this._extensionUri, "media", "hiveQueen.css")
+    );
+    const codiconsUri = webview.asWebviewUri(
+      vscode5.Uri.joinPath(this._extensionUri, "node_modules", "@vscode", "codicons", "dist", "codicon.css")
+    );
+    const scriptUri = webview.asWebviewUri(
+      vscode5.Uri.joinPath(this._extensionUri, "dist", "hiveQueen.js")
+    );
+    const nonce = this._getNonce();
+    const templatePath = path8.join(this._extensionUri.fsPath, "media", "hiveQueen.html");
+    let template = fs10.readFileSync(templatePath, "utf8");
+    const replacements = {
+      "{{cspSource}}": webview.cspSource,
+      "{{nonce}}": nonce,
+      "{{styleUri}}": styleUri.toString(),
+      "{{codiconsUri}}": codiconsUri.toString(),
+      "{{scriptUri}}": scriptUri.toString(),
+      "{{approve}}": "Approve Plan",
+      "{{reject}}": "Request Changes",
+      "{{export}}": "Export",
+      "{{addComment}}": "Add Comment",
+      "{{editComment}}": "Edit",
+      "{{removeComment}}": "Remove",
+      "{{commentPlaceholder}}": "Enter your feedback...",
+      "{{save}}": "Save",
+      "{{cancel}}": "Cancel",
+      "{{comments}}": "Comments",
+      "{{noComments}}": "No comments yet. Hover over a line to add feedback.",
+      "{{paneTitle}}": "Hive Queen"
+    };
+    for (const [placeholder, value] of Object.entries(replacements)) {
+      template = template.split(placeholder).join(value);
+    }
+    return template;
+  }
+  _getNonce() {
+    let text = "";
+    const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    for (let i = 0; i < 32; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+  }
+};
+
+// src/tools/base.ts
+var vscode6 = __toESM(require("vscode"));
 function createToolResult(content) {
-  return new vscode5.LanguageModelToolResult([
-    new vscode5.LanguageModelTextPart(content)
+  return new vscode6.LanguageModelToolResult([
+    new vscode6.LanguageModelTextPart(content)
   ]);
 }
 function registerTool(context, registration) {
@@ -7007,7 +7480,7 @@ function registerTool(context, registration) {
           invocationMessage,
           confirmationMessages: {
             title: registration.displayName,
-            message: new vscode5.MarkdownString(
+            message: new vscode6.MarkdownString(
               `This action will modify your project. Continue?`
             )
           }
@@ -7025,7 +7498,7 @@ function registerTool(context, registration) {
       }
     }
   };
-  return vscode5.lm.registerTool(registration.name, tool);
+  return vscode6.lm.registerTool(registration.name, tool);
 }
 function registerAllTools(context, registrations) {
   for (const reg of registrations) {
@@ -7416,8 +7889,8 @@ function getSubtaskTools(workspaceRoot) {
       },
       invoke: async (input, _token) => {
         const { feature, task, subtask, content } = input;
-        const path11 = subtaskService.writeSpec(feature, task, subtask, content);
-        return `Spec written to ${path11}`;
+        const path12 = subtaskService.writeSpec(feature, task, subtask, content);
+        return `Spec written to ${path12}`;
       }
     },
     {
@@ -7436,19 +7909,19 @@ function getSubtaskTools(workspaceRoot) {
       },
       invoke: async (input, _token) => {
         const { feature, task, subtask, content } = input;
-        const path11 = subtaskService.writeReport(feature, task, subtask, content);
-        return `Report written to ${path11}`;
+        const path12 = subtaskService.writeReport(feature, task, subtask, content);
+        return `Report written to ${path12}`;
       }
     }
   ];
 }
 
 // src/tools/exec.ts
-var path8 = __toESM(require("path"));
+var path9 = __toESM(require("path"));
 function getExecTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
-    hiveDir: path8.join(workspaceRoot, ".hive")
+    hiveDir: path9.join(workspaceRoot, ".hive")
   });
   const taskService = new TaskService(workspaceRoot);
   return [
@@ -7551,11 +8024,11 @@ ${summary}
 }
 
 // src/tools/merge.ts
-var path9 = __toESM(require("path"));
+var path10 = __toESM(require("path"));
 function getMergeTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
-    hiveDir: path9.join(workspaceRoot, ".hive")
+    hiveDir: path10.join(workspaceRoot, ".hive")
   });
   return [
     {
@@ -7625,8 +8098,8 @@ function getContextTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature, name, content } = input;
-        const path11 = contextService.write(feature, name, content);
-        return JSON.stringify({ success: true, path: path11 });
+        const path12 = contextService.write(feature, name, content);
+        return JSON.stringify({ success: true, path: path12 });
       }
     },
     {
@@ -7676,9 +8149,9 @@ function getContextTools(workspaceRoot) {
 }
 
 // src/tools/ask.ts
-var vscode6 = __toESM(require("vscode"));
+var vscode7 = __toESM(require("vscode"));
 function getProjectRoot() {
-  const workspaceFolders = vscode6.workspace.workspaceFolders;
+  const workspaceFolders = vscode7.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
     throw new Error("No workspace folder open");
   }
@@ -7717,7 +8190,7 @@ function getAskTools() {
         const projectRoot = getProjectRoot();
         const askService = new AskService(projectRoot);
         const ask = askService.createAsk(input.feature, input.question);
-        vscode6.commands.executeCommand("hive.showAsk", {
+        vscode7.commands.executeCommand("hive.showAsk", {
           id: ask.id,
           question: ask.question,
           feature: input.feature,
@@ -7780,9 +8253,9 @@ ${lines.join("\n")}`;
 }
 
 // src/tools/session.ts
-var vscode7 = __toESM(require("vscode"));
+var vscode8 = __toESM(require("vscode"));
 function getProjectRoot2() {
-  const workspaceFolders = vscode7.workspace.workspaceFolders;
+  const workspaceFolders = vscode8.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
     throw new Error("No workspace folder open");
   }
@@ -7956,11 +8429,11 @@ ${result.planSummary}
 // src/extension.ts
 function findHiveRoot(startPath) {
   let current = startPath;
-  while (current !== path10.dirname(current)) {
-    if (fs10.existsSync(path10.join(current, ".hive"))) {
+  while (current !== path11.dirname(current)) {
+    if (fs11.existsSync(path11.join(current, ".hive"))) {
       return current;
     }
-    current = path10.dirname(current);
+    current = path11.dirname(current);
   }
   return null;
 }
@@ -7976,6 +8449,7 @@ var HiveExtension = class {
   creationWatcher = null;
   workspaceRoot = null;
   initialized = false;
+  statusBarItem = null;
   initialize() {
     this.workspaceRoot = findHiveRoot(this.workspaceFolder);
     if (this.workspaceRoot) {
@@ -7990,7 +8464,7 @@ var HiveExtension = class {
     this.sidebarProvider = new HiveSidebarProvider(workspaceRoot);
     this.launcher = new Launcher(workspaceRoot);
     this.commentController = new PlanCommentController(workspaceRoot);
-    vscode8.window.registerTreeDataProvider("hive.features", this.sidebarProvider);
+    vscode9.window.registerTreeDataProvider("hive.features", this.sidebarProvider);
     this.commentController.registerCommands(this.context);
     registerAllTools(this.context, [
       ...getFeatureTools(workspaceRoot),
@@ -8003,46 +8477,68 @@ var HiveExtension = class {
       ...getAskTools(),
       ...getSessionTools()
     ]);
-    this.hiveWatcher = new HiveWatcher(workspaceRoot, () => this.sidebarProvider?.refresh());
+    this.hiveWatcher = new HiveWatcher(workspaceRoot, () => {
+      this.sidebarProvider?.refresh();
+      this.updateStatusBar(workspaceRoot);
+    });
     this.context.subscriptions.push({ dispose: () => this.hiveWatcher?.dispose() });
+    this.statusBarItem = vscode9.window.createStatusBarItem(vscode9.StatusBarAlignment.Left, 100);
+    this.statusBarItem.command = "hive.openQueenPanel";
+    this.context.subscriptions.push(this.statusBarItem);
+    this.updateStatusBar(workspaceRoot);
     if (this.creationWatcher) {
       this.creationWatcher.dispose();
       this.creationWatcher = null;
     }
   }
   initializeWithoutHive() {
-    this.creationWatcher = vscode8.workspace.createFileSystemWatcher(
-      new vscode8.RelativePattern(this.workspaceFolder, ".hive/**")
+    this.creationWatcher = vscode9.workspace.createFileSystemWatcher(
+      new vscode9.RelativePattern(this.workspaceFolder, ".hive/**")
     );
     const onHiveCreated = () => {
       const newRoot = findHiveRoot(this.workspaceFolder);
       if (newRoot && !this.initialized) {
         this.workspaceRoot = newRoot;
         this.initializeWithHive(newRoot);
-        vscode8.window.showInformationMessage("Hive: .hive directory detected, extension activated");
+        vscode9.window.showInformationMessage("Hive: .hive directory detected, extension activated");
       }
     };
     this.creationWatcher.onDidCreate(onHiveCreated);
     this.context.subscriptions.push(this.creationWatcher);
   }
+  updateStatusBar(workspaceRoot) {
+    if (!this.statusBarItem) return;
+    const askService = new AskService(workspaceRoot);
+    const featureService = new FeatureService(workspaceRoot);
+    const activeFeature = featureService.getActive();
+    if (!activeFeature) {
+      this.statusBarItem.hide();
+      return;
+    }
+    const pendingAsks = askService.listPending(activeFeature.name);
+    const askCount = pendingAsks.length;
+    this.statusBarItem.text = askCount > 0 ? `$(bee) ${askCount}` : "$(bee)";
+    this.statusBarItem.tooltip = askCount > 0 ? `Hive: ${askCount} pending question(s) - Click to open Queen Panel` : `Hive: ${activeFeature.name} - Click to open Queen Panel`;
+    this.statusBarItem.show();
+  }
   registerCommands() {
     const workspaceFolder = this.workspaceFolder;
     this.context.subscriptions.push(
-      vscode8.commands.registerCommand("hive.refresh", () => {
+      vscode9.commands.registerCommand("hive.refresh", () => {
         if (!this.initialized) {
           const newRoot = findHiveRoot(workspaceFolder);
           if (newRoot) {
             this.workspaceRoot = newRoot;
             this.initializeWithHive(newRoot);
           } else {
-            vscode8.window.showWarningMessage("Hive: No .hive directory found. Use @Hive in Copilot Chat to create a feature.");
+            vscode9.window.showWarningMessage("Hive: No .hive directory found. Use @Hive in Copilot Chat to create a feature.");
             return;
           }
         }
         this.sidebarProvider?.refresh();
       }),
-      vscode8.commands.registerCommand("hive.newFeature", async () => {
-        const name = await vscode8.window.showInputBox({
+      vscode9.commands.registerCommand("hive.newFeature", async () => {
+        const name = await vscode9.window.showInputBox({
           prompt: "Feature name",
           placeHolder: "my-feature"
         });
@@ -8051,58 +8547,58 @@ var HiveExtension = class {
           try {
             featureService.create(name);
             this.sidebarProvider?.refresh();
-            vscode8.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
+            vscode9.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
           } catch (error) {
-            vscode8.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
+            vscode9.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
           }
         } else if (name) {
-          const hiveDir = path10.join(workspaceFolder, ".hive");
-          fs10.mkdirSync(hiveDir, { recursive: true });
+          const hiveDir = path11.join(workspaceFolder, ".hive");
+          fs11.mkdirSync(hiveDir, { recursive: true });
           this.workspaceRoot = workspaceFolder;
           this.initializeWithHive(workspaceFolder);
           const featureService = new FeatureService(workspaceFolder);
           featureService.create(name);
           this.sidebarProvider?.refresh();
-          vscode8.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
+          vscode9.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
         }
       }),
-      vscode8.commands.registerCommand("hive.openFeature", (featureName) => {
+      vscode9.commands.registerCommand("hive.openFeature", (featureName) => {
         this.launcher?.openFeature(featureName);
       }),
-      vscode8.commands.registerCommand("hive.openTask", (item) => {
+      vscode9.commands.registerCommand("hive.openTask", (item) => {
         if (item?.featureName && item?.folder) {
           this.launcher?.openTask(item.featureName, item.folder);
         }
       }),
-      vscode8.commands.registerCommand("hive.openFile", (filePath) => {
+      vscode9.commands.registerCommand("hive.openFile", (filePath) => {
         if (filePath) {
           this.launcher?.openFile(filePath);
         }
       }),
-      vscode8.commands.registerCommand("hive.approvePlan", async (item) => {
+      vscode9.commands.registerCommand("hive.approvePlan", async (item) => {
         if (item?.featureName && this.workspaceRoot) {
           const planService = new PlanService(this.workspaceRoot);
           const comments2 = planService.getComments(item.featureName);
           if (comments2.length > 0) {
-            vscode8.window.showWarningMessage(`Hive: Cannot approve - ${comments2.length} unresolved comment(s). Address them first.`);
+            vscode9.window.showWarningMessage(`Hive: Cannot approve - ${comments2.length} unresolved comment(s). Address them first.`);
             return;
           }
           try {
             planService.approve(item.featureName);
             this.sidebarProvider?.refresh();
-            vscode8.window.showInformationMessage(`Hive: Plan approved for "${item.featureName}". Use @Hive to sync tasks.`);
+            vscode9.window.showInformationMessage(`Hive: Plan approved for "${item.featureName}". Use @Hive to sync tasks.`);
           } catch (error) {
-            vscode8.window.showErrorMessage(`Hive: Failed to approve plan - ${error}`);
+            vscode9.window.showErrorMessage(`Hive: Failed to approve plan - ${error}`);
           }
         }
       }),
-      vscode8.commands.registerCommand("hive.syncTasks", async (item) => {
+      vscode9.commands.registerCommand("hive.syncTasks", async (item) => {
         if (item?.featureName && this.workspaceRoot) {
           const featureService = new FeatureService(this.workspaceRoot);
           const taskService = new TaskService(this.workspaceRoot);
           const featureData = featureService.get(item.featureName);
           if (!featureData || featureData.status === "planning") {
-            vscode8.window.showWarningMessage("Hive: Plan must be approved before syncing tasks.");
+            vscode9.window.showWarningMessage("Hive: Plan must be approved before syncing tasks.");
             return;
           }
           try {
@@ -8111,24 +8607,24 @@ var HiveExtension = class {
               featureService.updateStatus(item.featureName, "executing");
             }
             this.sidebarProvider?.refresh();
-            vscode8.window.showInformationMessage(`Hive: ${result.created.length} tasks created for "${item.featureName}".`);
+            vscode9.window.showInformationMessage(`Hive: ${result.created.length} tasks created for "${item.featureName}".`);
           } catch (error) {
-            vscode8.window.showErrorMessage(`Hive: Failed to sync tasks - ${error}`);
+            vscode9.window.showErrorMessage(`Hive: Failed to sync tasks - ${error}`);
           }
         }
       }),
-      vscode8.commands.registerCommand("hive.startTask", async (item) => {
+      vscode9.commands.registerCommand("hive.startTask", async (item) => {
         if (item?.featureName && item?.folder && this.workspaceRoot) {
           const worktreeService = new WorktreeService({
             baseDir: this.workspaceRoot,
-            hiveDir: path10.join(this.workspaceRoot, ".hive")
+            hiveDir: path11.join(this.workspaceRoot, ".hive")
           });
           const taskService = new TaskService(this.workspaceRoot);
           try {
             const worktree = await worktreeService.create(item.featureName, item.folder);
             taskService.update(item.featureName, item.folder, { status: "in_progress" });
             this.sidebarProvider?.refresh();
-            const openWorktree = await vscode8.window.showInformationMessage(
+            const openWorktree = await vscode9.window.showInformationMessage(
               `Hive: Worktree created at ${worktree.path}`,
               "Open in New Window"
             );
@@ -8136,34 +8632,34 @@ var HiveExtension = class {
               this.launcher?.openTask(item.featureName, item.folder);
             }
           } catch (error) {
-            vscode8.window.showErrorMessage(`Hive: Failed to start task - ${error}`);
+            vscode9.window.showErrorMessage(`Hive: Failed to start task - ${error}`);
           }
         }
       }),
-      vscode8.commands.registerCommand("hive.plan.doneReview", async () => {
-        const editor = vscode8.window.activeTextEditor;
+      vscode9.commands.registerCommand("hive.plan.doneReview", async () => {
+        const editor = vscode9.window.activeTextEditor;
         if (!editor) return;
         if (!this.workspaceRoot) {
-          vscode8.window.showErrorMessage("Hive: No .hive directory found");
+          vscode9.window.showErrorMessage("Hive: No .hive directory found");
           return;
         }
         const filePath = editor.document.uri.fsPath;
         const featureMatch = filePath.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
         if (!featureMatch) {
-          vscode8.window.showErrorMessage("Not a plan.md file");
+          vscode9.window.showErrorMessage("Not a plan.md file");
           return;
         }
         const featureName = featureMatch[1];
-        const commentsPath = path10.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
+        const commentsPath = path11.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
         let comments2 = [];
         try {
-          const commentsData = JSON.parse(fs10.readFileSync(commentsPath, "utf-8"));
+          const commentsData = JSON.parse(fs11.readFileSync(commentsPath, "utf-8"));
           comments2 = commentsData.threads || [];
         } catch (error) {
         }
         const hasComments = comments2.length > 0;
         const inputPrompt = hasComments ? `${comments2.length} comment(s) found. Add feedback or leave empty to submit comments only` : "Enter your review feedback (or leave empty to approve)";
-        const userInput = await vscode8.window.showInputBox({
+        const userInput = await vscode9.window.showInputBox({
           prompt: inputPrompt,
           placeHolder: hasComments ? "Additional feedback (optional)" : 'e.g., "looks good" to approve, or describe changes needed'
         });
@@ -8179,36 +8675,61 @@ Additional feedback: ${userInput}`;
         } else {
           feedback = userInput === "" ? "Plan approved" : `Review feedback: ${userInput}`;
         }
-        vscode8.window.showInformationMessage(
+        vscode9.window.showInformationMessage(
           `Hive: ${hasComments ? "Comments submitted" : "Review submitted"}. Use @Hive in Copilot Chat to continue.`
         );
-        await vscode8.env.clipboard.writeText(`@Hive ${feedback}`);
-        vscode8.window.showInformationMessage("Hive: Feedback copied to clipboard. Paste in Copilot Chat.");
+        await vscode9.env.clipboard.writeText(`@Hive ${feedback}`);
+        vscode9.window.showInformationMessage("Hive: Feedback copied to clipboard. Paste in Copilot Chat.");
       }),
-      vscode8.commands.registerCommand("hive.showAsk", (ask) => {
+      vscode9.commands.registerCommand("hive.showAsk", (ask) => {
         if (!this.workspaceRoot) return;
         const askService = new AskService(this.workspaceRoot);
-        vscode8.window.showInformationMessage(
+        vscode9.window.showInformationMessage(
           `Agent Question: ${ask.question}`,
           "Answer"
         ).then(async (selection) => {
           if (selection === "Answer") {
-            const answer = await vscode8.window.showInputBox({
+            const answer = await vscode9.window.showInputBox({
               prompt: ask.question,
               placeHolder: "Enter your answer..."
             });
             if (answer) {
               askService.submitAnswer(ask.feature, ask.id, answer);
-              vscode8.window.showInformationMessage("Hive: Answer submitted to agent.");
+              vscode9.window.showInformationMessage("Hive: Answer submitted to agent.");
             }
           }
+        });
+      }),
+      vscode9.commands.registerCommand("hive.openQueenPanel", async () => {
+        if (!this.workspaceRoot) {
+          vscode9.window.showWarningMessage("Hive: No .hive directory found.");
+          return;
+        }
+        const featureService = new FeatureService(this.workspaceRoot);
+        const planService = new PlanService(this.workspaceRoot);
+        const activeFeature = featureService.getActive();
+        if (!activeFeature) {
+          vscode9.window.showWarningMessage("Hive: No active feature. Create one first.");
+          return;
+        }
+        const plan = planService.read(activeFeature.name);
+        const comments2 = planService.getComments(activeFeature.name);
+        const mode = activeFeature.status === "planning" ? "planning" : "execution";
+        await HiveQueenPanel.showWithOptions(this.context.extensionUri, {
+          plan: plan || "",
+          title: `Hive Queen: ${activeFeature.name}`,
+          mode,
+          featureName: activeFeature.name,
+          featurePath: path11.join(this.workspaceRoot, ".hive", "features", activeFeature.name),
+          projectRoot: this.workspaceRoot,
+          existingComments: comments2
         });
       })
     );
   }
 };
 function activate(context) {
-  const workspaceFolder = vscode8.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const workspaceFolder = vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!workspaceFolder) return;
   const extension = new HiveExtension(context, workspaceFolder);
   extension.registerCommands();
@@ -8221,4 +8742,3 @@ function deactivate() {
   activate,
   deactivate
 });
-//# sourceMappingURL=extension.js.map
