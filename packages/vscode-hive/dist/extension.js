@@ -7122,6 +7122,7 @@ function getFeatureTools(workspaceRoot) {
 // src/tools/plan.ts
 function getPlanTools(workspaceRoot) {
   const planService = new PlanService(workspaceRoot);
+  const contextService = new ContextService(workspaceRoot);
   return [
     {
       name: "hive_plan_write",
@@ -7144,10 +7145,19 @@ function getPlanTools(workspaceRoot) {
       invoke: async (input) => {
         const { feature, content } = input;
         const planPath = planService.write(feature, content);
+        let contextWarning = "";
+        try {
+          const contexts = contextService.list(feature);
+          if (contexts.length === 0) {
+            contextWarning = "\n\n\u26A0\uFE0F WARNING: No context files created yet! Workers need context to execute well. Use hive_context_write to document:\n- Research findings and patterns\n- User preferences and decisions\n- Architecture constraints\n- References to existing code";
+          }
+        } catch {
+          contextWarning = "\n\n\u26A0\uFE0F WARNING: Could not check context files. Consider using hive_context_write to document findings for workers.";
+        }
         return JSON.stringify({
           success: true,
           path: planPath,
-          message: `Plan written. User can review and add comments. When ready, use hive_plan_approve.`
+          message: `Plan written. User can review and add comments. When ready, use hive_plan_approve.${contextWarning}`
         });
       }
     },
@@ -7196,10 +7206,18 @@ function getPlanTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature } = input;
+        let contextWarning = "";
+        try {
+          const contexts = contextService.list(feature);
+          if (contexts.length === 0) {
+            contextWarning = "\n\n\u26A0\uFE0F Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.";
+          }
+        } catch {
+        }
         planService.approve(feature);
         return JSON.stringify({
           success: true,
-          message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan.`
+          message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan.${contextWarning}`
         });
       }
     }

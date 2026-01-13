@@ -1,8 +1,9 @@
-import { PlanService } from 'hive-core';
+import { PlanService, ContextService } from 'hive-core';
 import type { ToolRegistration } from './base';
 
 export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
   const planService = new PlanService(workspaceRoot);
+  const contextService = new ContextService(workspaceRoot);
 
   return [
     {
@@ -26,10 +27,21 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
       invoke: async (input) => {
         const { feature, content } = input as { feature: string; content: string };
         const planPath = planService.write(feature, content);
+        
+        let contextWarning = '';
+        try {
+          const contexts = contextService.list(feature);
+          if (contexts.length === 0) {
+            contextWarning = '\n\n⚠️ WARNING: No context files created yet! Workers need context to execute well. Use hive_context_write to document:\n- Research findings and patterns\n- User preferences and decisions\n- Architecture constraints\n- References to existing code';
+          }
+        } catch {
+          contextWarning = '\n\n⚠️ WARNING: Could not check context files. Consider using hive_context_write to document findings for workers.';
+        }
+        
         return JSON.stringify({
           success: true,
           path: planPath,
-          message: `Plan written. User can review and add comments. When ready, use hive_plan_approve.`,
+          message: `Plan written. User can review and add comments. When ready, use hive_plan_approve.${contextWarning}`,
         });
       },
     },
@@ -78,10 +90,19 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
       },
       invoke: async (input) => {
         const { feature } = input as { feature: string };
+        
+        let contextWarning = '';
+        try {
+          const contexts = contextService.list(feature);
+          if (contexts.length === 0) {
+            contextWarning = '\n\n⚠️ Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.';
+          }
+        } catch { /* continue without warning */ }
+        
         planService.approve(feature);
         return JSON.stringify({
           success: true,
-          message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan.`,
+          message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan.${contextWarning}`,
         });
       },
     },
