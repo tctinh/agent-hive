@@ -6,6 +6,8 @@ import type {
   HiveQueenOptions,
   PanelMode,
   PlanComment,
+  FileSearchResult,
+  FileAttachment,
   HiveQueenToWebviewMessage as ToWebviewMessage,
   HiveQueenFromWebviewMessage as FromWebviewMessage
 } from './types';
@@ -25,6 +27,7 @@ export class HiveQueenPanel {
   private _disposables: vscode.Disposable[] = [];
 
   private _comments: PlanComment[] = [];
+  private _attachments: FileAttachment[] = [];
   private _resolvePromise?: (result: HiveQueenResult) => void;
   private _mode: PanelMode;
   private _planContent: string;
@@ -223,6 +226,15 @@ export class HiveQueenPanel {
       case 'exportPlan':
         this._exportPlan();
         break;
+      case 'searchFiles':
+        this._handleSearchFiles(message.query);
+        break;
+      case 'addFileReference':
+        this._handleAddFileReference(message.file);
+        break;
+      case 'removeAttachment':
+        this._handleRemoveAttachment(message.attachmentId);
+        break;
     }
   }
 
@@ -267,6 +279,122 @@ export class HiveQueenPanel {
       type: 'updateComments',
       comments: this._comments
     } as ToWebviewMessage);
+  }
+
+  private async _handleSearchFiles(query: string): Promise<void> {
+    try {
+      const sanitizedQuery = this._sanitizeSearchQuery(query);
+      const allFiles = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 2000);
+      const queryLower = sanitizedQuery.toLowerCase();
+
+      const seenFolders = new Set<string>();
+      const folderResults: FileSearchResult[] = [];
+
+      for (const uri of allFiles) {
+        const relativePath = vscode.workspace.asRelativePath(uri);
+        const dirPath = path.dirname(relativePath);
+
+        if (dirPath && dirPath !== '.' && !seenFolders.has(dirPath)) {
+          seenFolders.add(dirPath);
+          const parts = dirPath.split(/[\\/]/);
+          const folderName = parts[parts.length - 1];
+
+          if (!queryLower || folderName.toLowerCase().includes(queryLower) || dirPath.toLowerCase().includes(queryLower)) {
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri)?.uri ?? vscode.workspace.workspaceFolders![0].uri;
+            folderResults.push({
+              name: folderName,
+              path: dirPath,
+              uri: vscode.Uri.joinPath(workspaceFolder, dirPath).toString(),
+              icon: 'folder',
+              isFolder: true
+            });
+          }
+        }
+      }
+
+      const fileResults: FileSearchResult[] = allFiles
+        .map(uri => {
+          const relativePath = vscode.workspace.asRelativePath(uri);
+          const fileName = uri.fsPath.split(/[\\/]/).pop() || 'file';
+          return {
+            name: fileName,
+            path: relativePath,
+            uri: uri.toString(),
+            icon: this._getFileIcon(fileName),
+            isFolder: false
+          };
+        })
+        .filter(file => !queryLower || file.name.toLowerCase().includes(queryLower) || file.path.toLowerCase().includes(queryLower));
+
+      const allResults = [...folderResults, ...fileResults]
+        .sort((a, b) => {
+          if (a.isFolder && !b.isFolder) return -1;
+          if (!a.isFolder && b.isFolder) return 1;
+          const aExact = a.name.toLowerCase().startsWith(queryLower);
+          const bExact = b.name.toLowerCase().startsWith(queryLower);
+          if (aExact && !bExact) return -1;
+          if (!aExact && bExact) return 1;
+          return a.name.localeCompare(b.name);
+        })
+        .slice(0, 50);
+
+      this._panel.webview.postMessage({
+        type: 'fileSearchResults',
+        files: allResults
+      } as ToWebviewMessage);
+    } catch (error) {
+      console.error('File search error:', error);
+      this._panel.webview.postMessage({
+        type: 'fileSearchResults',
+        files: []
+      } as ToWebviewMessage);
+    }
+  }
+
+  private _handleAddFileReference(file: FileSearchResult): void {
+    if (!file) return;
+    const attachment: FileAttachment = {
+      id: `${file.isFolder ? 'folder' : 'file'}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      name: file.name,
+      uri: file.uri,
+      isFolder: file.isFolder,
+      folderPath: file.isFolder ? file.path : undefined
+    };
+    this._attachments.push(attachment);
+    this._panel.webview.postMessage({
+      type: 'updateAttachments',
+      attachments: this._attachments
+    } as ToWebviewMessage);
+  }
+
+  private _handleRemoveAttachment(attachmentId: string): void {
+    this._attachments = this._attachments.filter(a => a.id !== attachmentId);
+    this._panel.webview.postMessage({
+      type: 'updateAttachments',
+      attachments: this._attachments
+    } as ToWebviewMessage);
+  }
+
+  private _sanitizeSearchQuery(query: string): string {
+    return query
+      .replace(/\.\./g, '')
+      .replace(/[<>:"|?*]/g, '')
+      .trim()
+      .substring(0, 100);
+  }
+
+  private _getFileIcon(fileName: string): string {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const iconMap: Record<string, string> = {
+      ts: 'symbol-method', tsx: 'symbol-method',
+      js: 'symbol-variable', jsx: 'symbol-variable',
+      json: 'json', md: 'markdown',
+      html: 'code', css: 'symbol-color',
+      py: 'symbol-misc', rs: 'symbol-structure',
+      go: 'symbol-event', java: 'symbol-class',
+      yml: 'settings-gear', yaml: 'settings-gear'
+    };
+    return iconMap[ext] || 'file';
   }
 
   private _resolve(result: HiveQueenResult): void {

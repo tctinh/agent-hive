@@ -32,12 +32,30 @@ export interface PlanComment {
   resolved: boolean;
 }
 
+export interface FileSearchResult {
+  name: string;
+  path: string;
+  uri: string;
+  icon: string;
+  isFolder?: boolean;
+}
+
+export interface FileAttachment {
+  id: string;
+  name: string;
+  uri: string;
+  isFolder?: boolean;
+  folderPath?: string;
+}
+
 // Messages TO webview
 export type HiveQueenToWebviewMessage =
   | { type: 'showPlan'; content: string; title: string; mode: PanelMode; comments?: PlanComment[] }
   | { type: 'updateProgress'; tasks: TaskProgress[] }
   | { type: 'showAsk'; ask: PendingAsk }
-  | { type: 'updateComments'; comments: PlanComment[] };
+  | { type: 'updateComments'; comments: PlanComment[] }
+  | { type: 'fileSearchResults'; files: FileSearchResult[] }
+  | { type: 'updateAttachments'; attachments: FileAttachment[] };
 
 // Messages FROM webview
 export type HiveQueenFromWebviewMessage =
@@ -48,6 +66,9 @@ export type HiveQueenFromWebviewMessage =
   | { type: 'editComment'; index: number; text: string }
   | { type: 'removeComment'; index: number }
   | { type: 'exportPlan' }
+  | { type: 'searchFiles'; query: string }
+  | { type: 'addFileReference'; file: FileSearchResult }
+  | { type: 'removeAttachment'; attachmentId: string }
   | { type: 'ready' };
 
 export interface HiveQueenResult {
