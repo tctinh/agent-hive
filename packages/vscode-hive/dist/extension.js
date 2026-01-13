@@ -7245,7 +7245,19 @@ function getTaskTools(workspaceRoot) {
       invoke: async (input, _token) => {
         const { feature } = input;
         const result = taskService.sync(feature);
-        return `${result.created.length} tasks created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`;
+        return JSON.stringify({
+          created: result.created.length,
+          removed: result.removed.length,
+          kept: result.kept.length,
+          manual: result.manual.length,
+          message: `${result.created.length} tasks created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`,
+          hints: [
+            "Use hive_exec_start to begin work on a task.",
+            "Tasks should be executed in order unless explicitly parallelizable.",
+            "Read context files before starting implementation.",
+            "Call hive_session_refresh periodically to check for user steering."
+          ]
+        });
       }
     },
     {
@@ -7459,7 +7471,13 @@ function getExecTools(workspaceRoot) {
           success: true,
           worktreePath: worktree.path,
           branch: worktree.branch,
-          message: `Worktree created. Work in ${worktree.path}. When done, use hive_exec_complete. Reminder: do all work inside this worktree and ensure any subagents do the same.`
+          message: `Worktree created. Work in ${worktree.path}. When done, use hive_exec_complete.`,
+          hints: [
+            "Do all work inside this worktree. Ensure any subagents do the same.",
+            "Call hive_session_refresh periodically to check for user steering comments.",
+            "Use hive_ask if you need user input to proceed.",
+            "Read context files (hive_context_read) before starting implementation."
+          ]
         });
       }
     },
@@ -7498,7 +7516,11 @@ ${summary}
           success: true,
           commitHash: result.sha,
           committed: result.committed,
-          message: result.committed ? `Changes committed. Use hive_merge to integrate into main branch.` : result.message || "No changes to commit"
+          message: result.committed ? `Changes committed. Use hive_merge to integrate into main branch.` : result.message || "No changes to commit",
+          hints: result.committed ? [
+            "Call hive_session_refresh to check progress and pending user questions.",
+            "Proceed to next task or use hive_merge to integrate changes."
+          ] : []
         });
       }
     },

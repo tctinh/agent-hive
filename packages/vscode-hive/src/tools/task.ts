@@ -23,7 +23,19 @@ export function getTaskTools(workspaceRoot: string): ToolRegistration[] {
       invoke: async (input, _token) => {
         const { feature } = input as { feature: string };
         const result = taskService.sync(feature);
-        return `${result.created.length} tasks created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`;
+        return JSON.stringify({
+          created: result.created.length,
+          removed: result.removed.length,
+          kept: result.kept.length,
+          manual: result.manual.length,
+          message: `${result.created.length} tasks created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`,
+          hints: [
+            'Use hive_exec_start to begin work on a task.',
+            'Tasks should be executed in order unless explicitly parallelizable.',
+            'Read context files before starting implementation.',
+            'Call hive_session_refresh periodically to check for user steering.'
+          ]
+        });
       },
     },
     {
