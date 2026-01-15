@@ -1,6 +1,6 @@
 ---
 name: step-log
-trigger: on todo complete
+description: Log progress for current Hive step. Use on todo complete.
 ---
 
 Log progress for current step.

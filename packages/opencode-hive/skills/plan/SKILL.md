@@ -1,6 +1,6 @@
 ---
 name: plan
-trigger: /plan
+description: Create execution steps for a Hive feature based on discussion.
 ---
 
 Based on our discussion, create execution steps for this feature.

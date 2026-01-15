@@ -1,6 +1,6 @@
 ---
 name: decision
-trigger: /decision OR when user makes decision
+description: Save user decisions to context. Use when user makes a decision.
 ---
 
 User made a decision. Save it.
