@@ -31,6 +31,7 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Context | hive_context_write, hive_context_read, hive_context_list |
 | Session | hive_session_open, hive_session_list, hive_session_refresh |
 | Ask | hive_ask, hive_ask_list_pending |
+| Skill | hive_skill |
 
 ### Workflow
 
@@ -839,6 +840,61 @@ Make the requested changes, then call hive_request_review again.`;
           } catch (e: any) {
             return `Error: ${e.message}`;
           }
+        },
+      }),
+
+      hive_skill: tool({
+        description: `Load a Hive skill for detailed workflow instructions.
+
+Available skills:
+- hive-workflow: Core lifecycle (plan -> review -> execute -> merge)
+- hive-execution: Task execution with worktrees
+- hive-planning: Writing effective plans
+
+Skills are discovered from:
+- .hive/skills/<name>/SKILL.md
+- .opencode/skill/<name>/SKILL.md
+- .claude/skills/<name>/SKILL.md`,
+        args: {
+          name: tool.schema.string().describe('Skill name to load (e.g., "hive-workflow")'),
+        },
+        async execute({ name }) {
+          const skillLocations = [
+            path.join(directory, '.hive', 'skills'),
+            path.join(directory, '.opencode', 'skill'),
+            path.join(directory, '.claude', 'skills'),
+          ];
+
+          for (const skillsDir of skillLocations) {
+            const skillPath = path.join(skillsDir, name, 'SKILL.md');
+            if (fs.existsSync(skillPath)) {
+              const content = fs.readFileSync(skillPath, 'utf-8');
+              const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+              const body = match ? match[1].trim() : content;
+              return body;
+            }
+          }
+
+          const available: string[] = [];
+          for (const skillsDir of skillLocations) {
+            if (fs.existsSync(skillsDir)) {
+              const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+              for (const entry of entries) {
+                if (entry.isDirectory()) {
+                  const skillMd = path.join(skillsDir, entry.name, 'SKILL.md');
+                  if (fs.existsSync(skillMd)) {
+                    available.push(entry.name);
+                  }
+                }
+              }
+            }
+          }
+
+          if (available.length === 0) {
+            return `No skills found. Run "Init Hive Nest" in VS Code to create skills, or create .opencode/skill/${name}/SKILL.md manually.`;
+          }
+
+          return `Skill "${name}" not found. Available: ${[...new Set(available)].join(', ')}`;
         },
       }),
     },
