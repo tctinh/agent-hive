@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 import { tool, type Plugin } from "@opencode-ai/plugin";
 import {
   WorktreeService,
@@ -642,6 +643,93 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
             const masterMark = s.sessionId === master ? ' (master)' : '';
             return `${s.sessionId}${masterMark} - ${s.taskFolder || 'no task'} - ${s.lastActiveAt}`;
           }).join('\n');
+        },
+      }),
+
+      hive_request_review: tool({
+        description: 'Request human review of completed task. BLOCKS until human approves or requests changes. Call after completing work, before merging.',
+        args: {
+          task: tool.schema.string().describe('Task folder name'),
+          summary: tool.schema.string().describe('Summary of what you did for human to review'),
+          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
+        },
+        async execute({ task, summary, feature: explicitFeature }) {
+          const feature = resolveFeature(explicitFeature);
+          if (!feature) return "Error: No feature specified.";
+
+          const taskDir = path.join(directory, '.hive', 'features', feature, 'tasks', task);
+          if (!fs.existsSync(taskDir)) {
+            return `Error: Task '${task}' not found in feature '${feature}'`;
+          }
+
+          const reportPath = path.join(taskDir, 'report.md');
+          const existingReport = fs.existsSync(reportPath) 
+            ? fs.readFileSync(reportPath, 'utf-8') 
+            : '# Task Report\n';
+          
+          const attemptCount = (existingReport.match(/## Attempt \d+/g) || []).length + 1;
+          const timestamp = new Date().toISOString();
+          
+          const newContent = existingReport + `
+## Attempt ${attemptCount}
+
+**Requested**: ${timestamp}
+
+### Summary
+
+${summary}
+
+`;
+          fs.writeFileSync(reportPath, newContent);
+
+          const pendingPath = path.join(taskDir, 'PENDING_REVIEW');
+          fs.writeFileSync(pendingPath, JSON.stringify({
+            attempt: attemptCount,
+            requestedAt: timestamp,
+            summary: summary.substring(0, 200) + (summary.length > 200 ? '...' : ''),
+          }, null, 2));
+
+          const pollInterval = 2000;
+          const maxWait = 30 * 60 * 1000;
+          const startTime = Date.now();
+
+          while (fs.existsSync(pendingPath)) {
+            if (Date.now() - startTime > maxWait) {
+              return 'Review timed out after 30 minutes. Human did not respond.';
+            }
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+          }
+
+          const resultPath = path.join(taskDir, 'REVIEW_RESULT');
+          if (!fs.existsSync(resultPath)) {
+            return 'Review cancelled (PENDING_REVIEW removed but no REVIEW_RESULT).';
+          }
+
+          const result = fs.readFileSync(resultPath, 'utf-8').trim();
+
+          fs.appendFileSync(reportPath, `### Review Result
+
+${result}
+
+---
+
+`);
+
+          if (result.toUpperCase() === 'APPROVED') {
+            return `✅ APPROVED
+
+Your work has been approved. You may now merge:
+
+  hive_merge(task="${task}")
+
+After merging, proceed to the next task.`;
+          } else {
+            return `🔄 Changes Requested
+
+${result}
+
+Make the requested changes, then call hive_request_review again.`;
+          }
         },
       }),
 
