@@ -463,6 +463,13 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "hive.features",
+        "contents": "No Hive nest found in this workspace.\n\n[Init Hive Nest](command:hive.initNest)\n\nThis will create AI skill files for:\n- OpenCode (.opencode/skill/)\n- Claude (.claude/skills/)\n- GitHub Copilot (.github/agents/)",
+        "when": "!hive.hasHiveRoot"
+      }
+    ],
     "commands": [
       {
         "command": "hive.initNest",

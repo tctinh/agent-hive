@@ -9102,6 +9102,7 @@ var HiveExtension = class {
     this.commentController = new PlanCommentController(workspaceRoot);
     vscode10.window.registerTreeDataProvider("hive.features", this.sidebarProvider);
     this.commentController.registerCommands(this.context);
+    vscode10.commands.executeCommand("setContext", "hive.hasHiveRoot", true);
     registerAllTools(this.context, [
       ...getFeatureTools(workspaceRoot),
       ...getPlanTools(workspaceRoot),
@@ -9128,6 +9129,7 @@ var HiveExtension = class {
     }
   }
   initializeWithoutHive() {
+    vscode10.commands.executeCommand("setContext", "hive.hasHiveRoot", false);
     this.creationWatcher = vscode10.workspace.createFileSystemWatcher(
       new vscode10.RelativePattern(this.workspaceFolder, ".hive/**")
     );

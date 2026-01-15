@@ -65,6 +65,7 @@ class HiveExtension {
 
     vscode.window.registerTreeDataProvider('hive.features', this.sidebarProvider)
     this.commentController.registerCommands(this.context)
+    vscode.commands.executeCommand('setContext', 'hive.hasHiveRoot', true)
 
     registerAllTools(this.context, [
       ...getFeatureTools(workspaceRoot),
@@ -96,6 +97,8 @@ class HiveExtension {
   }
 
   private initializeWithoutHive(): void {
+    vscode.commands.executeCommand('setContext', 'hive.hasHiveRoot', false)
+    
     this.creationWatcher = vscode.workspace.createFileSystemWatcher(
       new vscode.RelativePattern(this.workspaceFolder, '.hive/**')
     )
