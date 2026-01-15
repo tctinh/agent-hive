@@ -5,6 +5,14 @@
 
 export type PanelMode = 'planning' | 'execution' | 'dashboard' | 'review';
 
+export interface ReviewRequest {
+  feature: string;
+  task: string;
+  summary: string;
+  attempt: number;
+  requestedAt: string;
+}
+
 export interface TaskProgress {
   id: string;
   name: string;
@@ -76,7 +84,8 @@ export type HiveQueenToWebviewMessage =
   | { type: 'setMode'; mode: PanelMode }
   | { type: 'dashboard'; features: FeatureCard[] }
   | { type: 'featureDetail'; feature: string; plan: string; tasks: TaskReviewInfo[] }
-  | { type: 'review'; feature: string; task: string; summary: string; attempt: number };
+  | { type: 'review'; feature: string; task: string; summary: string; attempt: number }
+  | { type: 'showReview'; review: ReviewRequest };
 
 // Messages FROM webview
 export type HiveQueenFromWebviewMessage =
@@ -97,7 +106,9 @@ export type HiveQueenFromWebviewMessage =
   | { type: 'openReview'; feature: string; task: string }
   | { type: 'reviewResult'; feature: string; task: string; result: string }
   | { type: 'block'; feature: string }
-  | { type: 'unblock'; feature: string };
+  | { type: 'unblock'; feature: string }
+  | { type: 'approveTask'; feature: string; task: string }
+  | { type: 'requestChanges'; feature: string; task: string; feedback: string };
 
 export interface HiveQueenResult {
   approved: boolean;

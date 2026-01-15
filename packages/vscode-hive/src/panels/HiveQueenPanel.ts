@@ -466,6 +466,12 @@ export class HiveQueenPanel {
       case 'unblock':
         this._handleUnblock(message.feature);
         break;
+      case 'approveTask':
+        this._handleApproveTask(message.feature, message.task);
+        break;
+      case 'requestChanges':
+        this._handleRequestChanges(message.feature, message.task, message.feedback);
+        break;
     }
   }
 
@@ -490,6 +496,163 @@ export class HiveQueenPanel {
       vscode.window.showInformationMessage(`🟢 Feature ${featureName} unblocked`);
       this._updateDashboard();
     }
+  }
+    }
+  }
+
+  private async _handleApproveTask(feature: string, task: string): Promise<void> {
+    if (!this._projectRoot) return;
+    const taskDir = path.join(this._projectRoot, '.hive', 'features', feature, 'tasks', task);
+    const pendingPath = path.join(taskDir, 'PENDING_REVIEW');
+    const resultPath = path.join(taskDir, 'REVIEW_RESULT');
+
+    fs.writeFileSync(resultPath, 'APPROVED');
+    if (fs.existsSync(pendingPath)) {
+      fs.unlinkSync(pendingPath);
+    }
+    vscode.window.showInformationMessage(`✅ Task ${task} approved`);
+  }
+
+  private async _handleRequestChanges(feature: string, task: string, feedback: string): Promise<void> {
+    if (!this._projectRoot) return;
+    const taskDir = path.join(this._projectRoot, '.hive', 'features', feature, 'tasks', task);
+    const pendingPath = path.join(taskDir, 'PENDING_REVIEW');
+    const resultPath = path.join(taskDir, 'REVIEW_RESULT');
+
+    fs.writeFileSync(resultPath, feedback);
+    if (fs.existsSync(pendingPath)) {
+      fs.unlinkSync(pendingPath);
+    }
+    vscode.window.showInformationMessage(`🔄 Changes requested for ${task}`);
+  }
+
+  public static showReview(
+    extensionUri: vscode.Uri,
+    projectRoot: string,
+    feature: string,
+    task: string
+  ): void {
+    const taskDir = path.join(projectRoot, '.hive', 'features', feature, 'tasks', task);
+    const pendingPath = path.join(taskDir, 'PENDING_REVIEW');
+
+    if (!fs.existsSync(pendingPath)) {
+      vscode.window.showWarningMessage(`No pending review for task ${task}`);
+      return;
+    }
+
+    let reviewData: { summary?: string; attempt?: number; requestedAt?: string } = {};
+    try {
+      reviewData = JSON.parse(fs.readFileSync(pendingPath, 'utf-8'));
+    } catch {}
+
+    const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
+    const panelId = `review_${feature}_${task}`;
+
+    const existingPanel = HiveQueenPanel._panels.get(panelId);
+    if (existingPanel) {
+      existingPanel._panel.reveal(column);
+      return;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+      HiveQueenPanel.viewType,
+      `📋 Review: ${task}`,
+      column,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode.Uri.joinPath(extensionUri, 'media'),
+          vscode.Uri.joinPath(extensionUri, 'dist'),
+        ]
+      }
+    );
+
+    const queenPanel = new HiveQueenPanel(
+      panel,
+      extensionUri,
+      { plan: '', mode: 'review', projectRoot },
+      () => {},
+      panelId
+    );
+    queenPanel._projectRoot = projectRoot;
+    queenPanel._mode = 'review';
+    HiveQueenPanel._panels.set(panelId, queenPanel);
+
+    panel.onDidDispose(() => {
+      HiveQueenPanel._panels.delete(panelId);
+    });
+
+    panel.webview.html = queenPanel._getReviewHtml(feature, task, reviewData);
+  }
+
+  private _getReviewHtml(
+    feature: string,
+    task: string,
+    review: { summary?: string; attempt?: number; requestedAt?: string }
+  ): string {
+    const nonce = this._getNonce();
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <title>Review: ${task}</title>
+  <style>
+    body { font-family: var(--vscode-font-family); padding: 20px; color: var(--vscode-foreground); background: var(--vscode-editor-background); max-width: 700px; margin: 0 auto; }
+    h1 { margin-bottom: 8px; }
+    .meta { color: var(--vscode-descriptionForeground); margin-bottom: 24px; }
+    .summary { background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 8px; padding: 16px; margin: 16px 0; white-space: pre-wrap; }
+    h2 { font-size: 14px; margin-bottom: 8px; color: var(--vscode-descriptionForeground); }
+    textarea { width: 100%; height: 120px; padding: 12px; border: 1px solid var(--vscode-input-border); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 4px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; }
+    .actions { display: flex; gap: 12px; margin-top: 20px; }
+    button { padding: 10px 24px; font-size: 14px; cursor: pointer; border-radius: 4px; border: none; }
+    .approve { background: #28a745; color: white; }
+    .approve:hover { background: #22863a; }
+    .changes { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: 1px solid var(--vscode-button-border); }
+    .changes:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    .error { color: var(--vscode-errorForeground); font-size: 13px; margin-top: 8px; display: none; }
+  </style>
+</head>
+<body>
+  <h1>📋 Review: ${task}</h1>
+  <p class="meta">Attempt #${review.attempt || 1} • Feature: ${feature}</p>
+  
+  <h2>SUMMARY FROM AGENT</h2>
+  <div class="summary">${review.summary || 'No summary provided'}</div>
+  
+  <h2>YOUR FEEDBACK (for changes)</h2>
+  <textarea id="feedback" placeholder="Describe what changes are needed..."></textarea>
+  <p class="error" id="error">Please provide feedback when requesting changes.</p>
+  
+  <div class="actions">
+    <button class="approve" onclick="approve()">✅ Approve</button>
+    <button class="changes" onclick="requestChanges()">🔄 Request Changes</button>
+  </div>
+  
+  <script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    const feature = '${feature}';
+    const task = '${task}';
+    
+    function approve() {
+      vscode.postMessage({ type: 'approveTask', feature, task });
+      document.body.innerHTML = '<h1>✅ Approved</h1><p>You can close this panel.</p>';
+    }
+    
+    function requestChanges() {
+      const feedback = document.getElementById('feedback').value.trim();
+      if (!feedback) {
+        document.getElementById('error').style.display = 'block';
+        return;
+      }
+      vscode.postMessage({ type: 'requestChanges', feature, task, feedback });
+      document.body.innerHTML = '<h1>🔄 Changes Requested</h1><p>You can close this panel.</p>';
+    }
+  </script>
+</body>
+</html>`;
   }
 
   private async _exportPlan(): Promise<void> {
