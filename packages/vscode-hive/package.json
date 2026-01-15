@@ -465,6 +465,11 @@
     },
     "commands": [
       {
+        "command": "hive.initNest",
+        "title": "Hive: Init Nest",
+        "icon": "$(home)"
+      },
+      {
         "command": "hive.newFeature",
         "title": "Hive: New Feature",
         "icon": "$(add)"

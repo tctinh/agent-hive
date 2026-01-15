@@ -17,6 +17,7 @@ import {
   getAskTools,
   getSessionTools
 } from './tools'
+import { initNest } from './commands/initNest'
 
 function findHiveRoot(startPath: string): string | null {
   let current = startPath
@@ -138,6 +139,15 @@ class HiveExtension {
     const workspaceFolder = this.workspaceFolder
 
     this.context.subscriptions.push(
+      vscode.commands.registerCommand('hive.initNest', async () => {
+        await initNest(workspaceFolder)
+        const newRoot = findHiveRoot(workspaceFolder)
+        if (newRoot && !this.initialized) {
+          this.workspaceRoot = newRoot
+          this.initializeWithHive(newRoot)
+        }
+      }),
+
       vscode.commands.registerCommand('hive.refresh', () => {
         if (!this.initialized) {
           const newRoot = findHiveRoot(workspaceFolder)

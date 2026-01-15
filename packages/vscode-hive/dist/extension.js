@@ -34,9 +34,9 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode9 = __toESM(require("vscode"));
-var fs11 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
+var vscode10 = __toESM(require("vscode"));
+var fs12 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
 
 // ../hive-core/dist/index.js
 var import_node_module = require("node:module");
@@ -7373,6 +7373,12 @@ var HiveQueenPanel = class _HiveQueenPanel {
       case "unblock":
         this._handleUnblock(message.feature);
         break;
+      case "approveTask":
+        this._handleApproveTask(message.feature, message.task);
+        break;
+      case "requestChanges":
+        this._handleRequestChanges(message.feature, message.task, message.feedback);
+        break;
     }
   }
   async _handleBlock(featureName) {
@@ -7395,6 +7401,140 @@ var HiveQueenPanel = class _HiveQueenPanel {
       vscode5.window.showInformationMessage(`\u{1F7E2} Feature ${featureName} unblocked`);
       this._updateDashboard();
     }
+  }
+  async _handleApproveTask(feature, task) {
+    if (!this._projectRoot) return;
+    const taskDir = path8.join(this._projectRoot, ".hive", "features", feature, "tasks", task);
+    const pendingPath = path8.join(taskDir, "PENDING_REVIEW");
+    const resultPath = path8.join(taskDir, "REVIEW_RESULT");
+    fs10.writeFileSync(resultPath, "APPROVED");
+    if (fs10.existsSync(pendingPath)) {
+      fs10.unlinkSync(pendingPath);
+    }
+    vscode5.window.showInformationMessage(`\u2705 Task ${task} approved`);
+  }
+  async _handleRequestChanges(feature, task, feedback) {
+    if (!this._projectRoot) return;
+    const taskDir = path8.join(this._projectRoot, ".hive", "features", feature, "tasks", task);
+    const pendingPath = path8.join(taskDir, "PENDING_REVIEW");
+    const resultPath = path8.join(taskDir, "REVIEW_RESULT");
+    fs10.writeFileSync(resultPath, feedback);
+    if (fs10.existsSync(pendingPath)) {
+      fs10.unlinkSync(pendingPath);
+    }
+    vscode5.window.showInformationMessage(`\u{1F504} Changes requested for ${task}`);
+  }
+  static showReview(extensionUri, projectRoot, feature, task) {
+    const taskDir = path8.join(projectRoot, ".hive", "features", feature, "tasks", task);
+    const pendingPath = path8.join(taskDir, "PENDING_REVIEW");
+    if (!fs10.existsSync(pendingPath)) {
+      vscode5.window.showWarningMessage(`No pending review for task ${task}`);
+      return;
+    }
+    let reviewData = {};
+    try {
+      reviewData = JSON.parse(fs10.readFileSync(pendingPath, "utf-8"));
+    } catch {
+    }
+    const column = vscode5.window.activeTextEditor?.viewColumn || vscode5.ViewColumn.One;
+    const panelId = `review_${feature}_${task}`;
+    const existingPanel = _HiveQueenPanel._panels.get(panelId);
+    if (existingPanel) {
+      existingPanel._panel.reveal(column);
+      return;
+    }
+    const panel = vscode5.window.createWebviewPanel(
+      _HiveQueenPanel.viewType,
+      `\u{1F4CB} Review: ${task}`,
+      column,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode5.Uri.joinPath(extensionUri, "media"),
+          vscode5.Uri.joinPath(extensionUri, "dist")
+        ]
+      }
+    );
+    const queenPanel = new _HiveQueenPanel(
+      panel,
+      extensionUri,
+      { plan: "", mode: "review", projectRoot },
+      () => {
+      },
+      panelId
+    );
+    queenPanel._projectRoot = projectRoot;
+    queenPanel._mode = "review";
+    _HiveQueenPanel._panels.set(panelId, queenPanel);
+    panel.onDidDispose(() => {
+      _HiveQueenPanel._panels.delete(panelId);
+    });
+    panel.webview.html = queenPanel._getReviewHtml(feature, task, reviewData);
+  }
+  _getReviewHtml(feature, task, review) {
+    const nonce = this._getNonce();
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <title>Review: ${task}</title>
+  <style>
+    body { font-family: var(--vscode-font-family); padding: 20px; color: var(--vscode-foreground); background: var(--vscode-editor-background); max-width: 700px; margin: 0 auto; }
+    h1 { margin-bottom: 8px; }
+    .meta { color: var(--vscode-descriptionForeground); margin-bottom: 24px; }
+    .summary { background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 8px; padding: 16px; margin: 16px 0; white-space: pre-wrap; }
+    h2 { font-size: 14px; margin-bottom: 8px; color: var(--vscode-descriptionForeground); }
+    textarea { width: 100%; height: 120px; padding: 12px; border: 1px solid var(--vscode-input-border); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-radius: 4px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; }
+    .actions { display: flex; gap: 12px; margin-top: 20px; }
+    button { padding: 10px 24px; font-size: 14px; cursor: pointer; border-radius: 4px; border: none; }
+    .approve { background: #28a745; color: white; }
+    .approve:hover { background: #22863a; }
+    .changes { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: 1px solid var(--vscode-button-border); }
+    .changes:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    .error { color: var(--vscode-errorForeground); font-size: 13px; margin-top: 8px; display: none; }
+  </style>
+</head>
+<body>
+  <h1>\u{1F4CB} Review: ${task}</h1>
+  <p class="meta">Attempt #${review.attempt || 1} \u2022 Feature: ${feature}</p>
+  
+  <h2>SUMMARY FROM AGENT</h2>
+  <div class="summary">${review.summary || "No summary provided"}</div>
+  
+  <h2>YOUR FEEDBACK (for changes)</h2>
+  <textarea id="feedback" placeholder="Describe what changes are needed..."></textarea>
+  <p class="error" id="error">Please provide feedback when requesting changes.</p>
+  
+  <div class="actions">
+    <button class="approve" onclick="approve()">\u2705 Approve</button>
+    <button class="changes" onclick="requestChanges()">\u{1F504} Request Changes</button>
+  </div>
+  
+  <script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    const feature = '${feature}';
+    const task = '${task}';
+    
+    function approve() {
+      vscode.postMessage({ type: 'approveTask', feature, task });
+      document.body.innerHTML = '<h1>\u2705 Approved</h1><p>You can close this panel.</p>';
+    }
+    
+    function requestChanges() {
+      const feedback = document.getElementById('feedback').value.trim();
+      if (!feedback) {
+        document.getElementById('error').style.display = 'block';
+        return;
+      }
+      vscode.postMessage({ type: 'requestChanges', feature, task, feedback });
+      document.body.innerHTML = '<h1>\u{1F504} Changes Requested</h1><p>You can close this panel.</p>';
+    }
+  </script>
+</body>
+</html>`;
   }
   async _exportPlan() {
     const workspaceFolders = vscode5.workspace.workspaceFolders;
@@ -8140,8 +8280,8 @@ function getSubtaskTools(workspaceRoot) {
       },
       invoke: async (input, _token) => {
         const { feature, task, subtask, content } = input;
-        const path12 = subtaskService.writeSpec(feature, task, subtask, content);
-        return `Spec written to ${path12}`;
+        const path13 = subtaskService.writeSpec(feature, task, subtask, content);
+        return `Spec written to ${path13}`;
       }
     },
     {
@@ -8160,8 +8300,8 @@ function getSubtaskTools(workspaceRoot) {
       },
       invoke: async (input, _token) => {
         const { feature, task, subtask, content } = input;
-        const path12 = subtaskService.writeReport(feature, task, subtask, content);
-        return `Report written to ${path12}`;
+        const path13 = subtaskService.writeReport(feature, task, subtask, content);
+        return `Report written to ${path13}`;
       }
     }
   ];
@@ -8349,8 +8489,8 @@ function getContextTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature, name, content } = input;
-        const path12 = contextService.write(feature, name, content);
-        return JSON.stringify({ success: true, path: path12 });
+        const path13 = contextService.write(feature, name, content);
+        return JSON.stringify({ success: true, path: path13 });
       }
     },
     {
@@ -8677,14 +8817,259 @@ ${result.planSummary}
   ];
 }
 
+// src/commands/initNest.ts
+var vscode9 = __toESM(require("vscode"));
+var fs11 = __toESM(require("fs"));
+var path11 = __toESM(require("path"));
+var SKILL_TEMPLATES = {
+  "hive-workflow": `---
+name: hive-workflow
+description: Plan-first AI development with isolated git worktrees and human review. Use for any feature development.
+---
+
+# Hive Workflow
+
+You are working in a Hive-enabled repository. Follow this plan-first workflow.
+
+## Lifecycle
+
+\`\`\`
+Feature -> Plan -> Review -> Approve -> Execute -> Merge -> Complete
+\`\`\`
+
+## Phase 1: Planning
+
+1. \`hive_feature_create({ name: "feature-name" })\` - Creates feature directory
+2. Research the codebase, understand what needs to change
+3. Save findings with \`hive_context_write({ name: "research", content: "..." })\`
+4. Write the plan with \`hive_plan_write({ content: "# Feature\\n\\n## Tasks\\n\\n### 1. First task..." })\`
+5. **STOP** and tell user: "Plan written. Please review in VS Code."
+
+## Phase 2: Review (Human)
+
+- User reviews plan.md in VS Code
+- User can add comments
+- Use \`hive_plan_read()\` to see user comments
+- Revise plan based on feedback
+- User clicks "Approve" when ready
+
+## Phase 3: Execution
+
+After user approves:
+
+1. \`hive_tasks_sync()\` - Generates tasks from plan
+2. For each task in order:
+   - \`hive_exec_start({ task: "01-task-name" })\` - Creates worktree
+   - Implement in isolated worktree
+   - \`hive_exec_complete({ task: "01-task-name", summary: "What was done" })\`
+   - \`hive_merge({ task: "01-task-name", strategy: "squash" })\`
+
+## Phase 4: Completion
+
+After all tasks merged:
+\`hive_feature_complete({ name: "feature-name" })\`
+
+## Rules
+
+1. **Never skip planning** - Always write plan first
+2. **Context is critical** - Save all research with \`hive_context_write\`
+3. **Wait for approval** - Don't execute until user approves
+4. **One task at a time** - Complete and merge before starting next
+5. **Squash merges** - Keep history clean with single commit per task
+
+## Tool Reference
+
+| Phase | Tool | Purpose |
+|-------|------|---------|
+| Plan | \`hive_feature_create\` | Start new feature |
+| Plan | \`hive_plan_write\` | Write the plan |
+| Plan | \`hive_plan_read\` | Check for user comments |
+| Plan | \`hive_context_write\` | Save research findings |
+| Execute | \`hive_tasks_sync\` | Generate tasks from plan |
+| Execute | \`hive_exec_start\` | Start task (creates worktree) |
+| Execute | \`hive_exec_complete\` | Finish task (commits changes) |
+| Execute | \`hive_merge\` | Integrate task to main |
+| Complete | \`hive_feature_complete\` | Mark feature done |
+`,
+  "hive-execution": `---
+name: hive-execution
+description: Execute Hive feature tasks with worktree isolation, parallel orchestration, and clean git history.
+---
+
+# Hive Execution Orchestration
+
+Execute Hive feature tasks with worktree isolation and clean git history.
+
+## Task Execution Lifecycle
+
+For EACH task, follow this exact sequence:
+
+### 1. Start Task
+\`\`\`
+hive_exec_start(task="<task-folder-name>")
+\`\`\`
+Creates a git worktree from current base branch.
+
+### 2. Implement in Worktree
+Work ONLY within the task's worktree directory.
+
+### 3. Complete Task
+\`\`\`
+hive_exec_complete(task="<task-folder-name>", summary="<what-was-done>")
+\`\`\`
+Commits all changes to the task branch. Does NOT merge.
+
+### 4. Merge to Main
+\`\`\`
+hive_merge(task="<task-folder-name>", strategy="squash")
+\`\`\`
+Results in exactly ONE commit per task on main.
+
+## Tool Quick Reference
+
+| Phase | Tool | Purpose |
+|-------|------|---------|
+| Start | \`hive_exec_start(task)\` | Create worktree, begin work |
+| Complete | \`hive_exec_complete(task, summary)\` | Commit changes to branch |
+| Integrate | \`hive_merge(task, strategy="squash")\` | Merge to main |
+| Abort | \`hive_exec_abort(task)\` | Discard changes, reset status |
+
+## Error Recovery
+
+### Task Failed Mid-Execution
+\`\`\`
+hive_exec_abort(task="<task>")  # Discards changes
+hive_exec_start(task="<task>")  # Fresh start
+\`\`\`
+`,
+  "hive-planning": `---
+name: hive-planning
+description: Write effective Hive plans with proper task breakdown and context gathering.
+---
+
+# Hive Planning
+
+Write effective plans that humans can review and agents can execute.
+
+## Planning Process
+
+### Step 1: Understand the Request
+Parse what the user explicitly asked for and identify implicit requirements.
+
+### Step 2: Research the Codebase
+Search for relevant files, patterns, and conventions. Save findings:
+\`\`\`
+hive_context_write({
+  name: "research",
+  content: "# Research Findings\\n\\n## Existing Patterns\\n..."
+})
+\`\`\`
+
+### Step 3: Write the Plan
+\`\`\`markdown
+# Feature Name
+
+## Overview
+What we're building and why.
+
+## Tasks
+
+### 1. First Task Name
+Description of what to do.
+
+### 2. Second Task Name
+Description of what to do.
+\`\`\`
+
+## Task Design Guidelines
+
+| Characteristic | Example |
+|---------------|---------|
+| **Atomic** | "Add ThemeContext provider" not "Add theming" |
+| **Testable** | "Toggle switches between light/dark" |
+| **Independent** | Can be completed without other tasks |
+| **Ordered** | Dependencies come first |
+
+## Plan Format
+
+\`hive_tasks_sync\` parses \`### N. Task Name\` headers.
+`
+};
+var COPILOT_AGENT_TEMPLATE = `---
+description: 'Plan-first feature development with isolated worktrees and persistent context.'
+tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureList', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveSubtaskCreate', 'tctinh.vscode-hive/hiveSubtaskUpdate', 'tctinh.vscode-hive/hiveSubtaskList', 'tctinh.vscode-hive/hiveSubtaskSpecWrite', 'tctinh.vscode-hive/hiveSubtaskReportWrite', 'tctinh.vscode-hive/hiveExecStart', 'tctinh.vscode-hive/hiveExecComplete', 'tctinh.vscode-hive/hiveExecAbort', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveWorktreeList', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveContextRead', 'tctinh.vscode-hive/hiveContextList', 'tctinh.vscode-hive/hiveSessionOpen', 'tctinh.vscode-hive/hiveSessionList']
+---
+
+# Hive Agent
+
+You are a plan-first development orchestrator. Follow this workflow: Plan -> Review -> Approve -> Execute -> Merge.
+
+## Core Workflow
+
+### Phase 1: Planning
+1. \`featureCreate({ name: "feature-name" })\` - Create feature
+2. Research codebase, save with \`contextWrite\`
+3. \`planWrite({ content: "# Feature\\n\\n## Tasks\\n\\n### 1. First task..." })\`
+4. **STOP** - Tell user: "Plan ready. Please review and approve."
+
+### Phase 2: User Review
+User reviews in VS Code, adds comments, approves when ready.
+
+### Phase 3: Execution
+1. \`tasksSync()\` - Generate tasks from plan
+2. For each task:
+   - \`execStart({ task: "task-name" })\`
+   - Implement
+   - \`execComplete({ task: "task-name", summary: "..." })\`
+   - \`merge({ task: "task-name", strategy: "squash" })\`
+
+### Phase 4: Completion
+\`featureComplete({ name: "feature-name" })\`
+
+## Rules
+1. Never skip planning
+2. Save context with \`contextWrite\`
+3. Wait for approval before execution
+4. One task at a time
+5. Squash merges for clean history
+`;
+function createSkill(basePath, skillName) {
+  const content = SKILL_TEMPLATES[skillName];
+  if (!content) {
+    console.warn(`Unknown skill: ${skillName}`);
+    return;
+  }
+  const skillPath = path11.join(basePath, skillName);
+  fs11.mkdirSync(skillPath, { recursive: true });
+  fs11.writeFileSync(path11.join(skillPath, "SKILL.md"), content);
+}
+async function initNest(projectRoot) {
+  const skillNames = ["hive-workflow", "hive-execution", "hive-planning"];
+  const hivePath = path11.join(projectRoot, ".hive");
+  fs11.mkdirSync(path11.join(hivePath, "features"), { recursive: true });
+  fs11.mkdirSync(path11.join(hivePath, "skills"), { recursive: true });
+  const opencodePath = path11.join(projectRoot, ".opencode", "skill");
+  for (const name of skillNames) {
+    createSkill(opencodePath, name);
+  }
+  const claudePath = path11.join(projectRoot, ".claude", "skills");
+  for (const name of skillNames) {
+    createSkill(claudePath, name);
+  }
+  const agentPath = path11.join(projectRoot, ".github", "agents");
+  fs11.mkdirSync(agentPath, { recursive: true });
+  fs11.writeFileSync(path11.join(agentPath, "Hive.agent.md"), COPILOT_AGENT_TEMPLATE);
+  vscode9.window.showInformationMessage("\u{1F41D} Hive Nest initialized! Skills created for OpenCode, Claude, and GitHub Copilot.");
+}
+
 // src/extension.ts
 function findHiveRoot(startPath) {
   let current = startPath;
-  while (current !== path11.dirname(current)) {
-    if (fs11.existsSync(path11.join(current, ".hive"))) {
+  while (current !== path12.dirname(current)) {
+    if (fs12.existsSync(path12.join(current, ".hive"))) {
       return current;
     }
-    current = path11.dirname(current);
+    current = path12.dirname(current);
   }
   return null;
 }
@@ -8715,7 +9100,7 @@ var HiveExtension = class {
     this.sidebarProvider = new HiveSidebarProvider(workspaceRoot);
     this.launcher = new Launcher(workspaceRoot);
     this.commentController = new PlanCommentController(workspaceRoot);
-    vscode9.window.registerTreeDataProvider("hive.features", this.sidebarProvider);
+    vscode10.window.registerTreeDataProvider("hive.features", this.sidebarProvider);
     this.commentController.registerCommands(this.context);
     registerAllTools(this.context, [
       ...getFeatureTools(workspaceRoot),
@@ -8733,7 +9118,7 @@ var HiveExtension = class {
       this.updateStatusBar(workspaceRoot);
     });
     this.context.subscriptions.push({ dispose: () => this.hiveWatcher?.dispose() });
-    this.statusBarItem = vscode9.window.createStatusBarItem(vscode9.StatusBarAlignment.Left, 100);
+    this.statusBarItem = vscode10.window.createStatusBarItem(vscode10.StatusBarAlignment.Left, 100);
     this.statusBarItem.command = "hive.openQueenPanel";
     this.context.subscriptions.push(this.statusBarItem);
     this.updateStatusBar(workspaceRoot);
@@ -8743,15 +9128,15 @@ var HiveExtension = class {
     }
   }
   initializeWithoutHive() {
-    this.creationWatcher = vscode9.workspace.createFileSystemWatcher(
-      new vscode9.RelativePattern(this.workspaceFolder, ".hive/**")
+    this.creationWatcher = vscode10.workspace.createFileSystemWatcher(
+      new vscode10.RelativePattern(this.workspaceFolder, ".hive/**")
     );
     const onHiveCreated = () => {
       const newRoot = findHiveRoot(this.workspaceFolder);
       if (newRoot && !this.initialized) {
         this.workspaceRoot = newRoot;
         this.initializeWithHive(newRoot);
-        vscode9.window.showInformationMessage("Hive: .hive directory detected, extension activated");
+        vscode10.window.showInformationMessage("Hive: .hive directory detected, extension activated");
       }
     };
     this.creationWatcher.onDidCreate(onHiveCreated);
@@ -8775,21 +9160,29 @@ var HiveExtension = class {
   registerCommands() {
     const workspaceFolder = this.workspaceFolder;
     this.context.subscriptions.push(
-      vscode9.commands.registerCommand("hive.refresh", () => {
+      vscode10.commands.registerCommand("hive.initNest", async () => {
+        await initNest(workspaceFolder);
+        const newRoot = findHiveRoot(workspaceFolder);
+        if (newRoot && !this.initialized) {
+          this.workspaceRoot = newRoot;
+          this.initializeWithHive(newRoot);
+        }
+      }),
+      vscode10.commands.registerCommand("hive.refresh", () => {
         if (!this.initialized) {
           const newRoot = findHiveRoot(workspaceFolder);
           if (newRoot) {
             this.workspaceRoot = newRoot;
             this.initializeWithHive(newRoot);
           } else {
-            vscode9.window.showWarningMessage("Hive: No .hive directory found. Use @Hive in Copilot Chat to create a feature.");
+            vscode10.window.showWarningMessage("Hive: No .hive directory found. Use @Hive in Copilot Chat to create a feature.");
             return;
           }
         }
         this.sidebarProvider?.refresh();
       }),
-      vscode9.commands.registerCommand("hive.newFeature", async () => {
-        const name = await vscode9.window.showInputBox({
+      vscode10.commands.registerCommand("hive.newFeature", async () => {
+        const name = await vscode10.window.showInputBox({
           prompt: "Feature name",
           placeHolder: "my-feature"
         });
@@ -8798,58 +9191,58 @@ var HiveExtension = class {
           try {
             featureService.create(name);
             this.sidebarProvider?.refresh();
-            vscode9.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
+            vscode10.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
           } catch (error) {
-            vscode9.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
+            vscode10.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
           }
         } else if (name) {
-          const hiveDir = path11.join(workspaceFolder, ".hive");
-          fs11.mkdirSync(hiveDir, { recursive: true });
+          const hiveDir = path12.join(workspaceFolder, ".hive");
+          fs12.mkdirSync(hiveDir, { recursive: true });
           this.workspaceRoot = workspaceFolder;
           this.initializeWithHive(workspaceFolder);
           const featureService = new FeatureService(workspaceFolder);
           featureService.create(name);
           this.sidebarProvider?.refresh();
-          vscode9.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
+          vscode10.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
         }
       }),
-      vscode9.commands.registerCommand("hive.openFeature", (featureName) => {
+      vscode10.commands.registerCommand("hive.openFeature", (featureName) => {
         this.launcher?.openFeature(featureName);
       }),
-      vscode9.commands.registerCommand("hive.openTask", (item) => {
+      vscode10.commands.registerCommand("hive.openTask", (item) => {
         if (item?.featureName && item?.folder) {
           this.launcher?.openTask(item.featureName, item.folder);
         }
       }),
-      vscode9.commands.registerCommand("hive.openFile", (filePath) => {
+      vscode10.commands.registerCommand("hive.openFile", (filePath) => {
         if (filePath) {
           this.launcher?.openFile(filePath);
         }
       }),
-      vscode9.commands.registerCommand("hive.approvePlan", async (item) => {
+      vscode10.commands.registerCommand("hive.approvePlan", async (item) => {
         if (item?.featureName && this.workspaceRoot) {
           const planService = new PlanService(this.workspaceRoot);
           const comments2 = planService.getComments(item.featureName);
           if (comments2.length > 0) {
-            vscode9.window.showWarningMessage(`Hive: Cannot approve - ${comments2.length} unresolved comment(s). Address them first.`);
+            vscode10.window.showWarningMessage(`Hive: Cannot approve - ${comments2.length} unresolved comment(s). Address them first.`);
             return;
           }
           try {
             planService.approve(item.featureName);
             this.sidebarProvider?.refresh();
-            vscode9.window.showInformationMessage(`Hive: Plan approved for "${item.featureName}". Use @Hive to sync tasks.`);
+            vscode10.window.showInformationMessage(`Hive: Plan approved for "${item.featureName}". Use @Hive to sync tasks.`);
           } catch (error) {
-            vscode9.window.showErrorMessage(`Hive: Failed to approve plan - ${error}`);
+            vscode10.window.showErrorMessage(`Hive: Failed to approve plan - ${error}`);
           }
         }
       }),
-      vscode9.commands.registerCommand("hive.syncTasks", async (item) => {
+      vscode10.commands.registerCommand("hive.syncTasks", async (item) => {
         if (item?.featureName && this.workspaceRoot) {
           const featureService = new FeatureService(this.workspaceRoot);
           const taskService = new TaskService(this.workspaceRoot);
           const featureData = featureService.get(item.featureName);
           if (!featureData || featureData.status === "planning") {
-            vscode9.window.showWarningMessage("Hive: Plan must be approved before syncing tasks.");
+            vscode10.window.showWarningMessage("Hive: Plan must be approved before syncing tasks.");
             return;
           }
           try {
@@ -8858,24 +9251,24 @@ var HiveExtension = class {
               featureService.updateStatus(item.featureName, "executing");
             }
             this.sidebarProvider?.refresh();
-            vscode9.window.showInformationMessage(`Hive: ${result.created.length} tasks created for "${item.featureName}".`);
+            vscode10.window.showInformationMessage(`Hive: ${result.created.length} tasks created for "${item.featureName}".`);
           } catch (error) {
-            vscode9.window.showErrorMessage(`Hive: Failed to sync tasks - ${error}`);
+            vscode10.window.showErrorMessage(`Hive: Failed to sync tasks - ${error}`);
           }
         }
       }),
-      vscode9.commands.registerCommand("hive.startTask", async (item) => {
+      vscode10.commands.registerCommand("hive.startTask", async (item) => {
         if (item?.featureName && item?.folder && this.workspaceRoot) {
           const worktreeService = new WorktreeService({
             baseDir: this.workspaceRoot,
-            hiveDir: path11.join(this.workspaceRoot, ".hive")
+            hiveDir: path12.join(this.workspaceRoot, ".hive")
           });
           const taskService = new TaskService(this.workspaceRoot);
           try {
             const worktree = await worktreeService.create(item.featureName, item.folder);
             taskService.update(item.featureName, item.folder, { status: "in_progress" });
             this.sidebarProvider?.refresh();
-            const openWorktree = await vscode9.window.showInformationMessage(
+            const openWorktree = await vscode10.window.showInformationMessage(
               `Hive: Worktree created at ${worktree.path}`,
               "Open in New Window"
             );
@@ -8883,34 +9276,34 @@ var HiveExtension = class {
               this.launcher?.openTask(item.featureName, item.folder);
             }
           } catch (error) {
-            vscode9.window.showErrorMessage(`Hive: Failed to start task - ${error}`);
+            vscode10.window.showErrorMessage(`Hive: Failed to start task - ${error}`);
           }
         }
       }),
-      vscode9.commands.registerCommand("hive.plan.doneReview", async () => {
-        const editor = vscode9.window.activeTextEditor;
+      vscode10.commands.registerCommand("hive.plan.doneReview", async () => {
+        const editor = vscode10.window.activeTextEditor;
         if (!editor) return;
         if (!this.workspaceRoot) {
-          vscode9.window.showErrorMessage("Hive: No .hive directory found");
+          vscode10.window.showErrorMessage("Hive: No .hive directory found");
           return;
         }
         const filePath = editor.document.uri.fsPath;
         const featureMatch = filePath.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
         if (!featureMatch) {
-          vscode9.window.showErrorMessage("Not a plan.md file");
+          vscode10.window.showErrorMessage("Not a plan.md file");
           return;
         }
         const featureName = featureMatch[1];
-        const commentsPath = path11.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
+        const commentsPath = path12.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
         let comments2 = [];
         try {
-          const commentsData = JSON.parse(fs11.readFileSync(commentsPath, "utf-8"));
+          const commentsData = JSON.parse(fs12.readFileSync(commentsPath, "utf-8"));
           comments2 = commentsData.threads || [];
         } catch (error) {
         }
         const hasComments = comments2.length > 0;
         const inputPrompt = hasComments ? `${comments2.length} comment(s) found. Add feedback or leave empty to submit comments only` : "Enter your review feedback (or leave empty to approve)";
-        const userInput = await vscode9.window.showInputBox({
+        const userInput = await vscode10.window.showInputBox({
           prompt: inputPrompt,
           placeHolder: hasComments ? "Additional feedback (optional)" : 'e.g., "looks good" to approve, or describe changes needed'
         });
@@ -8926,41 +9319,41 @@ Additional feedback: ${userInput}`;
         } else {
           feedback = userInput === "" ? "Plan approved" : `Review feedback: ${userInput}`;
         }
-        vscode9.window.showInformationMessage(
+        vscode10.window.showInformationMessage(
           `Hive: ${hasComments ? "Comments submitted" : "Review submitted"}. Use @Hive in Copilot Chat to continue.`
         );
-        await vscode9.env.clipboard.writeText(`@Hive ${feedback}`);
-        vscode9.window.showInformationMessage("Hive: Feedback copied to clipboard. Paste in Copilot Chat.");
+        await vscode10.env.clipboard.writeText(`@Hive ${feedback}`);
+        vscode10.window.showInformationMessage("Hive: Feedback copied to clipboard. Paste in Copilot Chat.");
       }),
-      vscode9.commands.registerCommand("hive.showAsk", (ask) => {
+      vscode10.commands.registerCommand("hive.showAsk", (ask) => {
         if (!this.workspaceRoot) return;
         const askService = new AskService(this.workspaceRoot);
-        vscode9.window.showInformationMessage(
+        vscode10.window.showInformationMessage(
           `Agent Question: ${ask.question}`,
           "Answer"
         ).then(async (selection) => {
           if (selection === "Answer") {
-            const answer = await vscode9.window.showInputBox({
+            const answer = await vscode10.window.showInputBox({
               prompt: ask.question,
               placeHolder: "Enter your answer..."
             });
             if (answer) {
               askService.submitAnswer(ask.feature, ask.id, answer);
-              vscode9.window.showInformationMessage("Hive: Answer submitted to agent.");
+              vscode10.window.showInformationMessage("Hive: Answer submitted to agent.");
             }
           }
         });
       }),
-      vscode9.commands.registerCommand("hive.openQueenPanel", async () => {
+      vscode10.commands.registerCommand("hive.openQueenPanel", async () => {
         if (!this.workspaceRoot) {
-          vscode9.window.showWarningMessage("Hive: No .hive directory found.");
+          vscode10.window.showWarningMessage("Hive: No .hive directory found.");
           return;
         }
         const featureService = new FeatureService(this.workspaceRoot);
         const planService = new PlanService(this.workspaceRoot);
         const activeFeature = featureService.getActive();
         if (!activeFeature) {
-          vscode9.window.showWarningMessage("Hive: No active feature. Create one first.");
+          vscode10.window.showWarningMessage("Hive: No active feature. Create one first.");
           return;
         }
         const plan = planService.read(activeFeature.name);
@@ -8971,7 +9364,7 @@ Additional feedback: ${userInput}`;
           title: `Hive Queen: ${activeFeature.name}`,
           mode,
           featureName: activeFeature.name,
-          featurePath: path11.join(this.workspaceRoot, ".hive", "features", activeFeature.name),
+          featurePath: path12.join(this.workspaceRoot, ".hive", "features", activeFeature.name),
           projectRoot: this.workspaceRoot,
           existingComments: comments2
         });
@@ -8980,7 +9373,7 @@ Additional feedback: ${userInput}`;
   }
 };
 function activate(context) {
-  const workspaceFolder = vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const workspaceFolder = vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!workspaceFolder) return;
   const extension = new HiveExtension(context, workspaceFolder);
   extension.registerCommands();
