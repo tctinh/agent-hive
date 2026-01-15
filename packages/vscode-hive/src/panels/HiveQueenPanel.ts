@@ -497,8 +497,6 @@ export class HiveQueenPanel {
       this._updateDashboard();
     }
   }
-    }
-  }
 
   private async _handleApproveTask(feature: string, task: string): Promise<void> {
     if (!this._projectRoot) return;
