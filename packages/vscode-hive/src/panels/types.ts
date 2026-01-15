@@ -3,7 +3,7 @@
  * Message protocol between extension and webview
  */
 
-export type PanelMode = 'planning' | 'execution';
+export type PanelMode = 'planning' | 'execution' | 'dashboard' | 'review';
 
 export interface TaskProgress {
   id: string;
@@ -48,6 +48,23 @@ export interface FileAttachment {
   folderPath?: string;
 }
 
+export interface FeatureCard {
+  name: string;
+  status: string;
+  blocked: boolean;
+  pendingReviews: number;
+  stale: boolean;
+  taskCount: number;
+  completedTasks: number;
+}
+
+export interface TaskReviewInfo {
+  name: string;
+  status: string;
+  pendingReview: boolean;
+  summary?: string;
+}
+
 // Messages TO webview
 export type HiveQueenToWebviewMessage =
   | { type: 'showPlan'; content: string; title: string; mode: PanelMode; comments?: PlanComment[] }
@@ -56,7 +73,10 @@ export type HiveQueenToWebviewMessage =
   | { type: 'updateComments'; comments: PlanComment[] }
   | { type: 'fileSearchResults'; files: FileSearchResult[] }
   | { type: 'updateAttachments'; attachments: FileAttachment[] }
-  | { type: 'setMode'; mode: PanelMode };
+  | { type: 'setMode'; mode: PanelMode }
+  | { type: 'dashboard'; features: FeatureCard[] }
+  | { type: 'featureDetail'; feature: string; plan: string; tasks: TaskReviewInfo[] }
+  | { type: 'review'; feature: string; task: string; summary: string; attempt: number };
 
 // Messages FROM webview
 export type HiveQueenFromWebviewMessage =
@@ -70,7 +90,14 @@ export type HiveQueenFromWebviewMessage =
   | { type: 'searchFiles'; query: string }
   | { type: 'addFileReference'; file: FileSearchResult }
   | { type: 'removeAttachment'; attachmentId: string }
-  | { type: 'ready' };
+  | { type: 'ready' }
+  | { type: 'openFeature'; name: string }
+  | { type: 'backToDashboard' }
+  | { type: 'viewDiff'; feature: string; task: string }
+  | { type: 'openReview'; feature: string; task: string }
+  | { type: 'reviewResult'; feature: string; task: string; result: string }
+  | { type: 'block'; feature: string }
+  | { type: 'unblock'; feature: string };
 
 export interface HiveQueenResult {
   approved: boolean;

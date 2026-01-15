@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { TaskService } from 'hive-core';
+import { TaskService, FeatureService, PlanService } from 'hive-core';
 import type {
   HiveQueenResult,
   HiveQueenOptions,
@@ -10,6 +10,8 @@ import type {
   FileSearchResult,
   FileAttachment,
   TaskProgress,
+  FeatureCard,
+  TaskReviewInfo,
   HiveQueenToWebviewMessage as ToWebviewMessage,
   HiveQueenFromWebviewMessage as FromWebviewMessage
 } from './types';
@@ -163,6 +165,145 @@ export class HiveQueenPanel {
     return HiveQueenPanel._panels.get(panelId);
   }
 
+  public static showDashboard(extensionUri: vscode.Uri, projectRoot: string): void {
+    const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
+    const panelId = 'hive_dashboard';
+
+    const existingPanel = HiveQueenPanel._panels.get(panelId);
+    if (existingPanel) {
+      existingPanel._panel.reveal(column);
+      existingPanel._mode = 'dashboard';
+      existingPanel._projectRoot = projectRoot;
+      existingPanel._updateDashboard();
+      return;
+    }
+
+    const panel = vscode.window.createWebviewPanel(
+      HiveQueenPanel.viewType,
+      '🐝 Hive Dashboard',
+      column,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode.Uri.joinPath(extensionUri, 'media'),
+          vscode.Uri.joinPath(extensionUri, 'dist'),
+          vscode.Uri.joinPath(extensionUri, 'node_modules', '@vscode', 'codicons', 'dist')
+        ]
+      }
+    );
+
+    const queenPanel = new HiveQueenPanel(
+      panel,
+      extensionUri,
+      { plan: '', mode: 'dashboard', projectRoot },
+      () => {},
+      panelId
+    );
+    queenPanel._projectRoot = projectRoot;
+    HiveQueenPanel._panels.set(panelId, queenPanel);
+
+    panel.onDidDispose(() => {
+      HiveQueenPanel._panels.delete(panelId);
+    });
+
+    setTimeout(() => queenPanel._updateDashboard(), 100);
+  }
+
+  private async _updateDashboard(): Promise<void> {
+    if (!this._projectRoot) return;
+
+    const featureService = new FeatureService(this._projectRoot);
+    const features = featureService.list();
+    const hiveDir = path.join(this._projectRoot, '.hive');
+
+    const featureCards: FeatureCard[] = features.map(name => {
+      const featureDir = path.join(hiveDir, 'features', name);
+      const featureJsonPath = path.join(featureDir, 'feature.json');
+
+      let status = 'unknown';
+      try {
+        const info = JSON.parse(fs.readFileSync(featureJsonPath, 'utf-8'));
+        status = info.status || 'planning';
+      } catch {}
+
+      const blocked = fs.existsSync(path.join(featureDir, 'BLOCKED'));
+
+      let pendingReviews = 0;
+      let taskCount = 0;
+      let completedTasks = 0;
+      const tasksDir = path.join(featureDir, 'tasks');
+      if (fs.existsSync(tasksDir)) {
+        const taskFolders = fs.readdirSync(tasksDir).filter(f => 
+          fs.statSync(path.join(tasksDir, f)).isDirectory()
+        );
+        taskCount = taskFolders.length;
+        for (const task of taskFolders) {
+          if (fs.existsSync(path.join(tasksDir, task, 'PENDING_REVIEW'))) {
+            pendingReviews++;
+          }
+          try {
+            const statusJson = JSON.parse(fs.readFileSync(path.join(tasksDir, task, 'status.json'), 'utf-8'));
+            if (statusJson.status === 'done' || statusJson.status === 'completed') {
+              completedTasks++;
+            }
+          } catch {}
+        }
+      }
+
+      let stale = false;
+      try {
+        const mtime = fs.statSync(featureJsonPath).mtime;
+        stale = Date.now() - mtime.getTime() > 2 * 60 * 60 * 1000;
+      } catch {}
+
+      return { name, status, blocked, pendingReviews, stale, taskCount, completedTasks };
+    });
+
+    this._panel.webview.postMessage({
+      type: 'dashboard',
+      features: featureCards
+    } as ToWebviewMessage);
+  }
+
+  private async _showFeatureDetail(featureName: string): Promise<void> {
+    if (!this._projectRoot) return;
+
+    this._mode = 'execution';
+    this._featureName = featureName;
+    this._featurePath = path.join(this._projectRoot, '.hive', 'features', featureName);
+
+    const planService = new PlanService(this._projectRoot);
+    const plan = planService.read(featureName);
+    const taskService = new TaskService(this._projectRoot);
+    const taskInfos = taskService.list(featureName);
+
+    const tasks: TaskReviewInfo[] = taskInfos.map(info => {
+      const taskDir = path.join(this._featurePath!, 'tasks', info.folder);
+      const pendingReview = fs.existsSync(path.join(taskDir, 'PENDING_REVIEW'));
+      let summary = '';
+      if (pendingReview) {
+        try {
+          const pending = JSON.parse(fs.readFileSync(path.join(taskDir, 'PENDING_REVIEW'), 'utf-8'));
+          summary = pending.summary || '';
+        } catch {}
+      }
+      return {
+        name: info.folder,
+        status: info.status,
+        pendingReview,
+        summary
+      };
+    });
+
+    this._panel.webview.postMessage({
+      type: 'featureDetail',
+      feature: featureName,
+      plan: plan.content,
+      tasks
+    } as ToWebviewMessage);
+  }
+
   /**
    * Close a panel if it's open (used when agent cancels)
    */
@@ -312,6 +453,42 @@ export class HiveQueenPanel {
       case 'removeAttachment':
         this._handleRemoveAttachment(message.attachmentId);
         break;
+      case 'openFeature':
+        this._showFeatureDetail(message.name);
+        break;
+      case 'backToDashboard':
+        this._mode = 'dashboard';
+        this._updateDashboard();
+        break;
+      case 'block':
+        this._handleBlock(message.feature);
+        break;
+      case 'unblock':
+        this._handleUnblock(message.feature);
+        break;
+    }
+  }
+
+  private async _handleBlock(featureName: string): Promise<void> {
+    const reason = await vscode.window.showInputBox({
+      prompt: 'Why are you blocking this feature?',
+      placeHolder: 'Enter reason for blocking'
+    });
+    if (reason && this._projectRoot) {
+      const blockedPath = path.join(this._projectRoot, '.hive', 'features', featureName, 'BLOCKED');
+      fs.writeFileSync(blockedPath, reason);
+      vscode.window.showInformationMessage(`⛔ Feature ${featureName} blocked`);
+      this._updateDashboard();
+    }
+  }
+
+  private async _handleUnblock(featureName: string): Promise<void> {
+    if (!this._projectRoot) return;
+    const blockedPath = path.join(this._projectRoot, '.hive', 'features', featureName, 'BLOCKED');
+    if (fs.existsSync(blockedPath)) {
+      fs.unlinkSync(blockedPath);
+      vscode.window.showInformationMessage(`🟢 Feature ${featureName} unblocked`);
+      this._updateDashboard();
     }
   }
 
@@ -499,6 +676,10 @@ export class HiveQueenPanel {
   }
 
   private _getHtmlContent(): string {
+    if (this._mode === 'dashboard') {
+      return this._getDashboardHtml();
+    }
+
     const webview = this._panel.webview;
 
     const styleUri = webview.asWebviewUri(
@@ -552,5 +733,96 @@ export class HiveQueenPanel {
       text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
+  }
+
+  private _getDashboardHtml(): string {
+    const nonce = this._getNonce();
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <title>Hive Dashboard</title>
+  <style>
+    body { font-family: var(--vscode-font-family); padding: 16px; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+    h1 { margin-bottom: 24px; }
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .feature-card { background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 8px; padding: 16px; cursor: pointer; transition: border-color 0.2s; }
+    .feature-card:hover { border-color: var(--vscode-focusBorder); }
+    .feature-card.blocked { border-left: 4px solid var(--vscode-errorForeground); }
+    .feature-card.pending { border-left: 4px solid var(--vscode-warningForeground); }
+    .feature-card.stale { opacity: 0.7; }
+    .feature-name { font-size: 16px; font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: normal; }
+    .badge.blocked { background: var(--vscode-errorForeground); color: white; }
+    .badge.pending { background: var(--vscode-warningForeground); color: black; }
+    .badge.stale { background: var(--vscode-descriptionForeground); color: white; }
+    .feature-stats { font-size: 13px; color: var(--vscode-descriptionForeground); }
+    .feature-actions { margin-top: 12px; display: flex; gap: 8px; }
+    .feature-actions button { padding: 4px 12px; font-size: 12px; cursor: pointer; border: 1px solid var(--vscode-button-border); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border-radius: 4px; }
+    .feature-actions button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    .empty-state { text-align: center; padding: 48px; color: var(--vscode-descriptionForeground); }
+  </style>
+</head>
+<body>
+  <h1>🐝 Hive Dashboard</h1>
+  <div id="content" class="feature-grid"></div>
+  
+  <script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    
+    window.addEventListener('message', event => {
+      const msg = event.data;
+      if (msg.type === 'dashboard') {
+        renderDashboard(msg.features);
+      }
+    });
+    
+    function renderDashboard(features) {
+      const container = document.getElementById('content');
+      
+      if (features.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No features yet.</p><p>Create one with hive_feature_create</p></div>';
+        return;
+      }
+      
+      container.innerHTML = features.map(f => {
+        const classes = ['feature-card'];
+        if (f.blocked) classes.push('blocked');
+        else if (f.pendingReviews > 0) classes.push('pending');
+        if (f.stale) classes.push('stale');
+        
+        let badges = '';
+        if (f.blocked) badges += '<span class="badge blocked">⛔ BLOCKED</span>';
+        if (f.pendingReviews > 0) badges += '<span class="badge pending">🟡 ' + f.pendingReviews + ' review</span>';
+        if (f.stale && !f.blocked) badges += '<span class="badge stale">⚪ stale</span>';
+        
+        return '<div class="' + classes.join(' ') + '" onclick="openFeature(\\'' + f.name + '\\')">' +
+          '<div class="feature-name">' + f.name + badges + '</div>' +
+          '<div class="feature-stats">' + f.completedTasks + '/' + f.taskCount + ' tasks • ' + f.status + '</div>' +
+          '<div class="feature-actions">' +
+            (f.blocked 
+              ? '<button onclick="event.stopPropagation(); unblock(\\'' + f.name + '\\')">🟢 Unblock</button>'
+              : '<button onclick="event.stopPropagation(); block(\\'' + f.name + '\\')">⛔ Block</button>') +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+    
+    function openFeature(name) {
+      vscode.postMessage({ type: 'openFeature', name });
+    }
+    
+    function block(name) {
+      vscode.postMessage({ type: 'block', feature: name });
+    }
+    
+    function unblock(name) {
+      vscode.postMessage({ type: 'unblock', feature: name });
+    }
+  </script>
+</body>
+</html>`;
   }
 }
