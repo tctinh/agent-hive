@@ -145,6 +145,29 @@ const plugin: Plugin = async (ctx) => {
     }
   };
 
+  /**
+   * Check if a feature is blocked by the Beekeeper.
+   * Returns the block message if blocked, null otherwise.
+   * 
+   * File protocol: .hive/features/<name>/BLOCKED
+   * - If file exists, feature is blocked
+   * - File contents = reason for blocking
+   */
+  const checkBlocked = (feature: string): string | null => {
+    const fs = require('fs');
+    const blockedPath = path.join(directory, '.hive', 'features', feature, 'BLOCKED');
+    if (fs.existsSync(blockedPath)) {
+      const reason = fs.readFileSync(blockedPath, 'utf-8').trim();
+      return `⛔ BLOCKED by Beekeeper
+
+${reason || '(No reason provided)'}
+
+The human has blocked this feature. Wait for them to unblock it.
+To unblock: Remove .hive/features/${feature}/BLOCKED`;
+    }
+    return null;
+  };
+
   return {
     "experimental.chat.system.transform": async (_input: unknown, output: { system: string[] }) => {
       output.system.push(HIVE_SYSTEM_PROMPT);
@@ -316,6 +339,9 @@ const plugin: Plugin = async (ctx) => {
         async execute({ task, feature: explicitFeature }) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+
+          const blocked = checkBlocked(feature);
+          if (blocked) return blocked;
 
           const taskInfo = taskService.get(feature, task);
           if (!taskInfo) return `Error: Task "${task}" not found`;
@@ -559,6 +585,9 @@ const plugin: Plugin = async (ctx) => {
 
           const featureData = featureService.get(feature);
           if (!featureData) return `Error: Feature '${feature}' not found`;
+
+          const blocked = checkBlocked(feature);
+          if (blocked) return blocked;
 
           // Track session
           const ctx = toolContext as { sessionID?: string };
