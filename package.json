@@ -3,7 +3,9 @@
   "version": "0.8.2",
   "private": true,
   "description": "Context-Driven Development for AI coding assistants",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build --workspaces",
     "dev": "npm run dev --workspaces"
