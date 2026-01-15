@@ -239,4 +239,16 @@ Description.
 6. **Wait for approval** - Don't execute until plan is approved
 7. **Use right tools** - Hive for orchestration, Copilot for file ops
 
+## Skills
+
+For detailed workflow instructions, read the skill files in `.opencode/skill/` or `.claude/skills/`:
+
+| Skill | When to Use |
+|-------|-------------|
+| `hive-workflow` | Core lifecycle: plan -> review -> execute -> merge |
+| `hive-execution` | Task execution with worktrees |
+| `hive-planning` | Writing effective plans |
+
+Run "Init Hive Nest" in VS Code to generate these skills if they don't exist.
+
 ````
