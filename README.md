@@ -79,7 +79,7 @@ See [PHILOSOPHY.md](PHILOSOPHY.md) for the full breakdown of what we learned fro
    I want to hive plan add user authentication
    ```
 
-The extension provides all 24 Hive tools. The agent file teaches Copilot how to use them.
+The extension provides all 23 Hive tools. The agent file teaches Copilot how to use them.
 
 See the full [GitHub Copilot Guide](docs/GITHUB-COPILOT-GUIDE.md) for creating and customizing your agent.
 

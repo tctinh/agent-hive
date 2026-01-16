@@ -59,7 +59,7 @@ Launch tasks directly in OpenCode from the sidebar.
 
 **Key Features:**
 - **Plan-first approach**: AI writes plans, you review before execution
-- **24 integrated tools**: From feature creation to merging
+- **23 integrated tools**: From feature creation to merging
 - **Parallel execution**: Run multiple tasks at once with sub-agents
 - **Persistent context**: Research findings saved across sessions
 - **TDD support**: Built-in subtasks for test-driven development
