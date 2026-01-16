@@ -33,7 +33,6 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
           hints: [
             'Do all work inside this worktree. Ensure any subagents do the same.',
             'Call hive_session_refresh periodically to check for user steering comments.',
-            'Use hive_ask if you need user input to proceed.',
             'Read context files (hive_context_read) before starting implementation.'
           ]
         });

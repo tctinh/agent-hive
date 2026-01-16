@@ -37,7 +37,6 @@ class HiveExtension {
   private workspaceRoot: string | null = null
   private initialized = false
 
-
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly workspaceFolder: string

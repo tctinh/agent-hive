@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { FeatureService, PlanService, TaskService, ContextService, AskService } from 'hive-core';
+import { FeatureService, PlanService, TaskService, ContextService } from 'hive-core';
 import type { ToolRegistration } from './base';
 
 function getProjectRoot(): string {
@@ -21,7 +21,6 @@ interface SessionRefreshResult {
   tasks: { id: string; name: string; status: string; summary?: string }[];
   progress: { total: number; done: number; inProgress: number; pending: number };
   contextFiles: string[];
-  pendingAsks: { id: string; question: string }[];
   warnings: string[];
   tips: string[];
 }
@@ -31,7 +30,7 @@ export function getSessionTools(): ToolRegistration[] {
     {
       name: 'hiveSessionRefresh',
       displayName: 'Hive Session Refresh',
-      modelDescription: 'Get current feature state to stay aligned. Returns plan summary, task progress, context files, pending asks, and guidance. Call periodically during execution to check for user steering and prevent context drift.',
+      modelDescription: 'Get current feature state to stay aligned. Returns plan summary, task progress, context files, and guidance. Call periodically during execution to check for user steering and prevent context drift.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -50,7 +49,6 @@ export function getSessionTools(): ToolRegistration[] {
         const planService = new PlanService(projectRoot);
         const taskService = new TaskService(projectRoot);
         const contextService = new ContextService(projectRoot);
-        const askService = new AskService(projectRoot);
 
         let featureName = input.feature;
         if (!featureName) {
@@ -68,7 +66,6 @@ export function getSessionTools(): ToolRegistration[] {
           tasks: [],
           progress: { total: 0, done: 0, inProgress: 0, pending: 0 },
           contextFiles: [],
-          pendingAsks: [],
           warnings: [],
           tips: []
         };
@@ -111,24 +108,12 @@ export function getSessionTools(): ToolRegistration[] {
           result.warnings.push('Could not read context files');
         }
 
-        try {
-          const pending = askService.listPending(featureName);
-          result.pendingAsks = pending.map(a => ({ id: a.id, question: a.question }));
-        } catch {
-          result.warnings.push('Could not read pending asks');
-        }
-
         if (result.contextFiles.length === 0 && result.phase === 'planning') {
           result.warnings.push('No context files created! Document research, patterns, and decisions using hive_context_write.');
         }
 
-        if (result.pendingAsks.length > 0) {
-          result.warnings.push(`${result.pendingAsks.length} pending question(s) waiting for user answer.`);
-        }
-
         if (result.phase === 'execution') {
           result.tips.push('Check for user steering comments periodically.');
-          result.tips.push('Use hive_ask if you need user input to proceed.');
         } else {
           result.tips.push('Create context files to document findings for workers.');
           result.tips.push('Read existing context before modifying the plan.');
@@ -160,14 +145,6 @@ export function getSessionTools(): ToolRegistration[] {
           output += `## Context Files\n`;
           for (const file of result.contextFiles) {
             output += `- ${file}\n`;
-          }
-          output += '\n';
-        }
-
-        if (result.pendingAsks.length > 0) {
-          output += `## Pending Questions\n`;
-          for (const ask of result.pendingAsks) {
-            output += `- [${ask.id}] ${ask.question}\n`;
           }
           output += '\n';
         }

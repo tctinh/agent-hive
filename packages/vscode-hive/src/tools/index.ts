@@ -7,5 +7,4 @@ export { getSubtaskTools } from './subtask';
 export { getExecTools } from './exec';
 export { getMergeTools } from './merge';
 export { getContextTools } from './context';
-export { getAskTools } from './ask';
 export { getSessionTools } from './session';
