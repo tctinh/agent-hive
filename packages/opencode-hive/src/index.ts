@@ -847,16 +847,14 @@ Make the requested changes, then call hive_request_review again.`;
         description: `Load a Hive skill for detailed workflow instructions.
 
 Available skills:
-- hive-workflow: Core lifecycle (plan -> review -> execute -> merge)
-- hive-execution: Task execution with worktrees
-- hive-planning: Writing effective plans
+- hive: Complete Hive workflow (plan -> review -> execute -> merge)
 
 Skills are discovered from:
 - .hive/skills/<name>/SKILL.md
 - .opencode/skill/<name>/SKILL.md
 - .claude/skills/<name>/SKILL.md`,
         args: {
-          name: tool.schema.string().describe('Skill name to load (e.g., "hive-workflow")'),
+          name: tool.schema.string().describe('Skill name to load (e.g., "hive")'),
         },
         async execute({ name }) {
           const skillLocations = [

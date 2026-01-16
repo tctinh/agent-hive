@@ -17,5 +17,5 @@ export function getCopilotAgentTemplate(): string {
 }
 
 export function getAllSkillNames(): string[] {
-  return ['hive-workflow', 'hive-execution', 'hive-planning'];
+  return ['hive'];
 }
