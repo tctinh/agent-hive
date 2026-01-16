@@ -1,10 +1,9 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
-import { FeatureService, PlanService, TaskService, WorktreeService, AskService } from 'hive-core'
+import { FeatureService, PlanService, TaskService, WorktreeService } from 'hive-core'
 import { HiveWatcher, Launcher } from './services'
 import { HiveSidebarProvider, PlanCommentController } from './providers'
-import { HiveQueenPanel } from './panels/HiveQueenPanel'
 import {
   registerAllTools,
   getFeatureTools,
@@ -14,7 +13,6 @@ import {
   getExecTools,
   getMergeTools,
   getContextTools,
-  getAskTools,
   getSessionTools
 } from './tools'
 import { initNest } from './commands/initNest'
@@ -38,7 +36,7 @@ class HiveExtension {
   private creationWatcher: vscode.FileSystemWatcher | null = null
   private workspaceRoot: string | null = null
   private initialized = false
-  private statusBarItem: vscode.StatusBarItem | null = null
+
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -75,20 +73,13 @@ class HiveExtension {
       ...getExecTools(workspaceRoot),
       ...getMergeTools(workspaceRoot),
       ...getContextTools(workspaceRoot),
-      ...getAskTools(),
       ...getSessionTools()
     ])
 
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => {
       this.sidebarProvider?.refresh()
-      this.updateStatusBar(workspaceRoot)
     })
     this.context.subscriptions.push({ dispose: () => this.hiveWatcher?.dispose() })
-
-    this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100)
-    this.statusBarItem.command = 'hive.openQueenPanel'
-    this.context.subscriptions.push(this.statusBarItem)
-    this.updateStatusBar(workspaceRoot)
 
     if (this.creationWatcher) {
       this.creationWatcher.dispose()
@@ -114,28 +105,6 @@ class HiveExtension {
 
     this.creationWatcher.onDidCreate(onHiveCreated)
     this.context.subscriptions.push(this.creationWatcher)
-  }
-
-  private updateStatusBar(workspaceRoot: string): void {
-    if (!this.statusBarItem) return
-    
-    const askService = new AskService(workspaceRoot)
-    const featureService = new FeatureService(workspaceRoot)
-    const activeFeature = featureService.getActive()
-    
-    if (!activeFeature) {
-      this.statusBarItem.hide()
-      return
-    }
-    
-    const pendingAsks = askService.listPending(activeFeature.name)
-    const askCount = pendingAsks.length
-    
-    this.statusBarItem.text = askCount > 0 ? `$(bee) ${askCount}` : '$(bee)'
-    this.statusBarItem.tooltip = askCount > 0 
-      ? `Hive: ${askCount} pending question(s) - Click to open Queen Panel`
-      : `Hive: ${activeFeature.name} - Click to open Queen Panel`
-    this.statusBarItem.show()
   }
 
   registerCommands(): void {
@@ -340,58 +309,6 @@ class HiveExtension {
         // Copy feedback to clipboard for easy pasting
         await vscode.env.clipboard.writeText(`@Hive ${feedback}`)
         vscode.window.showInformationMessage('Hive: Feedback copied to clipboard. Paste in Copilot Chat.')
-      }),
-
-      vscode.commands.registerCommand('hive.showAsk', (ask: { id: string; question: string; feature: string; timestamp: string }) => {
-        if (!this.workspaceRoot) return
-        
-        const askService = new AskService(this.workspaceRoot)
-        
-        vscode.window.showInformationMessage(
-          `Agent Question: ${ask.question}`,
-          'Answer'
-        ).then(async (selection) => {
-          if (selection === 'Answer') {
-            const answer = await vscode.window.showInputBox({
-              prompt: ask.question,
-              placeHolder: 'Enter your answer...'
-            })
-            if (answer) {
-              askService.submitAnswer(ask.feature, ask.id, answer)
-              vscode.window.showInformationMessage('Hive: Answer submitted to agent.')
-            }
-          }
-        })
-      }),
-
-      vscode.commands.registerCommand('hive.openQueenPanel', async () => {
-        if (!this.workspaceRoot) {
-          vscode.window.showWarningMessage('Hive: No .hive directory found.')
-          return
-        }
-        
-        const featureService = new FeatureService(this.workspaceRoot)
-        const planService = new PlanService(this.workspaceRoot)
-        const activeFeature = featureService.getActive()
-        
-        if (!activeFeature) {
-          vscode.window.showWarningMessage('Hive: No active feature. Create one first.')
-          return
-        }
-        
-        const plan = planService.read(activeFeature.name)
-        const comments = planService.getComments(activeFeature.name)
-        const mode = activeFeature.status === 'planning' ? 'planning' : 'execution'
-        
-        await HiveQueenPanel.showWithOptions(this.context.extensionUri, {
-          plan: plan || '',
-          title: `Hive Queen: ${activeFeature.name}`,
-          mode,
-          featureName: activeFeature.name,
-          featurePath: path.join(this.workspaceRoot, '.hive', 'features', activeFeature.name),
-          projectRoot: this.workspaceRoot,
-          existingComments: comments
-        })
       })
     )
   }
