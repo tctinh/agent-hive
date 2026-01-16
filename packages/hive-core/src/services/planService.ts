@@ -2,6 +2,7 @@ import {
   getPlanPath,
   getCommentsPath,
   getFeatureJsonPath,
+  getApprovedPath,
   readJson,
   writeJson,
   readText,
@@ -9,6 +10,7 @@ import {
   fileExists,
 } from '../utils/paths.js';
 import { FeatureJson, CommentsJson, PlanComment, PlanReadResult } from '../types.js';
+import * as fs from 'fs';
 
 export class PlanService {
   constructor(private projectRoot: string) {}
@@ -18,6 +20,7 @@ export class PlanService {
     writeText(planPath, content);
     
     this.clearComments(featureName);
+    this.revokeApproval(featureName);
     
     return planPath;
   }
@@ -28,28 +31,53 @@ export class PlanService {
     
     if (content === null) return null;
 
-    const feature = readJson<FeatureJson>(getFeatureJsonPath(this.projectRoot, featureName));
     const comments = this.getComments(featureName);
+    const isApproved = this.isApproved(featureName);
 
     return {
       content,
-      status: feature?.status || 'planning',
+      status: isApproved ? 'approved' : 'planning',
       comments,
     };
   }
 
   approve(featureName: string): void {
-    const featurePath = getFeatureJsonPath(this.projectRoot, featureName);
-    const feature = readJson<FeatureJson>(featurePath);
-    
-    if (!feature) throw new Error(`Feature '${featureName}' not found`);
     if (!fileExists(getPlanPath(this.projectRoot, featureName))) {
       throw new Error(`No plan.md found for feature '${featureName}'`);
     }
 
-    feature.status = 'approved';
-    feature.approvedAt = new Date().toISOString();
-    writeJson(featurePath, feature);
+    const approvedPath = getApprovedPath(this.projectRoot, featureName);
+    const timestamp = new Date().toISOString();
+    fs.writeFileSync(approvedPath, `Approved at ${timestamp}\n`);
+    
+    // Also update feature.json for backwards compatibility
+    const featurePath = getFeatureJsonPath(this.projectRoot, featureName);
+    const feature = readJson<FeatureJson>(featurePath);
+    if (feature) {
+      feature.status = 'approved';
+      feature.approvedAt = timestamp;
+      writeJson(featurePath, feature);
+    }
+  }
+
+  isApproved(featureName: string): boolean {
+    return fileExists(getApprovedPath(this.projectRoot, featureName));
+  }
+
+  revokeApproval(featureName: string): void {
+    const approvedPath = getApprovedPath(this.projectRoot, featureName);
+    if (fileExists(approvedPath)) {
+      fs.unlinkSync(approvedPath);
+    }
+    
+    // Also update feature.json for backwards compatibility
+    const featurePath = getFeatureJsonPath(this.projectRoot, featureName);
+    const feature = readJson<FeatureJson>(featurePath);
+    if (feature && feature.status === 'approved') {
+      feature.status = 'planning';
+      delete feature.approvedAt;
+      writeJson(featurePath, feature);
+    }
   }
 
   getComments(featureName: string): PlanComment[] {

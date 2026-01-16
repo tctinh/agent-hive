@@ -10,6 +10,7 @@ const COMMENTS_FILE = 'comments.json';
 const FEATURE_FILE = 'feature.json';
 const STATUS_FILE = 'status.json';
 const REPORT_FILE = 'report.md';
+const APPROVED_FILE = 'APPROVED';
 
 export function getHivePath(projectRoot: string): string {
   return path.join(projectRoot, HIVE_DIR);
@@ -57,6 +58,10 @@ export function getTaskReportPath(projectRoot: string, featureName: string, task
 
 export function getTaskSpecPath(projectRoot: string, featureName: string, taskFolder: string): string {
   return path.join(getTaskPath(projectRoot, featureName, taskFolder), 'spec.md');
+}
+
+export function getApprovedPath(projectRoot: string, featureName: string): string {
+  return path.join(getFeaturePath(projectRoot, featureName), APPROVED_FILE);
 }
 
 const SUBTASKS_DIR = 'subtasks';
