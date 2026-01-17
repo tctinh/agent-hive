@@ -13,16 +13,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@opentui/core": "^0.1.74",
+    "@opentui/solid": "^0.1.74",
+    "chokidar": "^3.6.0",
     "hive-core": "workspace:*",
-    "ink": "^5.0.1",
-    "ink-text-input": "^6.0.0",
-    "react": "^18.3.1",
-    "chokidar": "^3.6.0"
+    "solid-js": "^1.9.10"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/react": "^18.3.0",
     "typescript": "^5.0.0",
-    "tsup": "^8.0.0"
+    "tsup": "^8.0.0",
+    "babel-preset-solid": "^1.9.4",
+    "@babel/core": "^7.26.0",
+    "@babel/preset-typescript": "^7.26.0"
   }
 }

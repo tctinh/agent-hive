@@ -9,4 +9,8 @@ export default defineConfig({
     js: '#!/usr/bin/env node',
   },
   external: ['hive-core'],
+  esbuildOptions(options) {
+    options.jsx = 'automatic';
+    options.jsxImportSource = '@opentui/solid';
+  },
 });
