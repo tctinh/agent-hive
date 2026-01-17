@@ -13,6 +13,59 @@ import {
   listFeatures,
 } from "hive-core";
 
+// OMO-Slim Integration
+// Detect if oh-my-opencode-slim is installed and available
+type ExecMode = 'inline' | 'delegated';
+
+interface OmoSlimIntegration {
+  available: boolean;
+  execMode: ExecMode;
+  backgroundTaskHandler?: (params: {
+    agent: string;
+    prompt: string;
+    description: string;
+    sync?: boolean;
+  }) => Promise<{ taskId: string; sessionId: string }>;
+}
+
+// Global state for OMO-Slim integration
+let omoSlimIntegration: OmoSlimIntegration = {
+  available: false,
+  execMode: 'inline',
+};
+
+/**
+ * Attempt to detect and integrate with OMO-Slim.
+ * Called during plugin initialization.
+ */
+const detectOmoSlim = (): void => {
+  try {
+    // Check if the OMO-Slim package is installed
+    // We look for the background_task tool registration marker
+    const omoSlimMarker = path.join(process.cwd(), 'node_modules', 'oh-my-opencode-slim');
+    if (fs.existsSync(omoSlimMarker)) {
+      omoSlimIntegration = {
+        available: true,
+        execMode: 'delegated',
+      };
+      console.log('[hive] OMO-Slim detected - delegated execution mode enabled');
+    }
+  } catch {
+    // OMO-Slim not available, use inline mode
+    omoSlimIntegration = {
+      available: false,
+      execMode: 'inline',
+    };
+  }
+};
+
+/**
+ * Check if delegated execution is available.
+ * Can be used by tools to decide behavior.
+ */
+export const getExecMode = (): ExecMode => omoSlimIntegration.execMode;
+export const isOmoSlimAvailable = (): boolean => omoSlimIntegration.available;
+
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development System
 
@@ -30,6 +83,19 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Context | hive_context_write |
 | Status | hive_status |
 | Skill | hive_skill |
+
+### Execution Modes
+
+Hive supports two execution modes for \`hive_exec_start\`:
+
+- **Inline mode**: You work directly in the worktree (default)
+- **Delegated mode**: If oh-my-opencode-slim is installed, tasks spawn as background agents in tmux panes
+
+In delegated mode:
+- Worker agents receive full context (plan, task spec, context files)
+- Workers can ask questions via \`question\` tool (human-in-the-loop)
+- Workers write CHECKPOINT files for major decisions
+- You can watch workers in real-time via tmux panes
 
 ### Workflow
 
@@ -108,6 +174,9 @@ type ToolContext = {
 
 const plugin: Plugin = async (ctx) => {
   const { directory } = ctx;
+
+  // Detect OMO-Slim integration on startup
+  detectOmoSlim();
 
   const featureService = new FeatureService(directory);
   const planService = new PlanService(directory);
@@ -609,6 +678,10 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
               status: featureData.status,
               ticket: featureData.ticket || null,
               createdAt: featureData.createdAt,
+            },
+            execution: {
+              mode: omoSlimIntegration.execMode,
+              omoSlimAvailable: omoSlimIntegration.available,
             },
             plan: {
               exists: !!plan,
