@@ -5,15 +5,8 @@
  */
 
 import { render } from '@opentui/solid';
-
-// Minimal app to verify build
-function App() {
-  return (
-    <box>
-      <text><b>Hive TUI</b> - Loading...</text>
-    </box>
-  );
-}
+import { HiveProvider, useHive } from './context/hive';
+import { App } from './app';
 
 // Entry point
 const featureName = process.argv[2];
@@ -22,7 +15,24 @@ if (!featureName) {
   process.exit(1);
 }
 
-render(() => <App />, {
-  targetFps: 60,
-  exitOnCtrlC: true,
-});
+// Root component with providers
+function Root() {
+  // Set initial feature after context is available
+  const hive = useHive();
+  hive.setFeature(featureName);
+  hive.setProjectRoot(process.cwd());
+  
+  return <App />;
+}
+
+render(
+  () => (
+    <HiveProvider>
+      <Root />
+    </HiveProvider>
+  ),
+  {
+    targetFps: 60,
+    exitOnCtrlC: false, // Handle q key ourselves
+  }
+);
