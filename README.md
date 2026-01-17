@@ -38,7 +38,7 @@ Vibe coding is powerful but chaotic. Without structure:
 | Scope creep | **Plan approval gate** — Human shapes, agent builds |
 | Messes to clean up | **Worktree isolation** — Each task isolated, easy discard |
 | No audit trail | **Automatic tracking** — Every task logged to `.hive/` |
-| Agent hallucination | **TDD subtasks** — Tests ground the agent, verify work, 2-3x quality |
+| Agent hallucination | **Context files** — Research and decisions ground agent work |
 
 **Hive doesn't change how you work. It makes what happens traceable, auditable, and grounded.**
 
@@ -50,7 +50,7 @@ We studied what actually works in the AI coding community and built upon it:
 
 | Source | What We Learned | Hive Implementation |
 |--------|-----------------|---------------------|
-| **[Boris Cherny's 13 Tips](https://www.anthropic.com/research/claude-code-best-practices)** | Feedback loops = 2-3x quality | TDD subtasks with spec.md/report.md |
+| **[Boris Cherny's 13 Tips](https://www.anthropic.com/research/claude-code-best-practices)** | Feedback loops = 2-3x quality | Task-level verification with tests |
 | **[Spec Kit](https://github.com/github/spec-kit)** | Specs are valuable | Specs emerge from dialogue, not upfront |
 | **[Conductor](https://github.com/gemini-cli-extensions/conductor)** | Context persistence matters | Feature-scoped `.hive/context/` |
 | **[Ralph Wiggum](https://awesomeclaude.ai/ralph-wiggum)** | Retry loops work for verification | TDD loops, not infinite retries |
@@ -79,7 +79,7 @@ See [PHILOSOPHY.md](PHILOSOPHY.md) for the full breakdown of what we learned fro
    I want to hive plan add user authentication
    ```
 
-The extension provides all 23 Hive tools. The agent file teaches Copilot how to use them.
+The extension provides all 18 Hive tools. The agent file teaches Copilot how to use them.
 
 See the full [GitHub Copilot Guide](docs/GITHUB-COPILOT-GUIDE.md) for creating and customizing your agent.
 
@@ -127,9 +127,7 @@ Main Agent: Creates plan, you approve it
     │
     ├── Batch 1 (parallel):
     │   ├── Task A (own worktree, tracked)
-    │   │   └── Subtasks: test → implement → verify
     │   ├── Task B (own worktree, tracked)
-    │   │   └── Subtasks: test → implement → verify
     │   └── Task C (own worktree, tracked)
     │           ↓
     │      Context flows forward
@@ -278,7 +276,7 @@ Visual management without leaving your editor:
 | **Task Details** | Expand any task to see spec.md (context) and report.md (results) |
 | **Status Icons** | Visual indicators: ✅ done, 🔄 in-progress, ⏳ pending, ❌ failed |
 | **Context Files** | Browse and edit context files stored per-feature |
-| **Session History** | View past sessions and their outcomes |
+| **Session History** | View feature history and status |
 
 ### Extension Requirements
 
@@ -356,7 +354,7 @@ Hive is built on 6 core principles:
 3. **Human Shapes, Agent Builds** — Human owns the why. Agent owns the how.
 4. **Good Enough Wins** — Capture what works for this context. Reject over-engineering.
 5. **Batched Parallelism** — Parallel tasks in batches. Sequential batches share context.
-6. **Tests Define Done** — For implementation tasks, tests provide the feedback loop. TDD for agents.
+6. **Tests Define Done** — For implementation tasks, tests provide the feedback loop.
 
 See [PHILOSOPHY.md](PHILOSOPHY.md) for the full framework.
 

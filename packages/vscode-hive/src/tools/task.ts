@@ -33,7 +33,7 @@ export function getTaskTools(workspaceRoot: string): ToolRegistration[] {
             'Use hive_exec_start to begin work on a task.',
             'Tasks should be executed in order unless explicitly parallelizable.',
             'Read context files before starting implementation.',
-            'Call hive_session_refresh periodically to check for user steering.'
+            'Update via hive_task_update when work progresses.'
           ]
         });
       },

@@ -53,6 +53,17 @@ export class FeatureService {
       .map(d => d.name);
   }
 
+  getActive(): FeatureJson | null {
+    const features = this.list();
+    for (const name of features) {
+      const feature = this.get(name);
+      if (feature && feature.status !== 'completed') {
+        return feature;
+      }
+    }
+    return null;
+  }
+
   updateStatus(name: string, status: FeatureStatusType): FeatureJson {
     const feature = this.get(name);
     if (!feature) throw new Error(`Feature '${name}' not found`);

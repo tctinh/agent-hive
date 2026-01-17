@@ -23,5 +23,18 @@ npm-debug.log*
 
 # Hive runtime data
 .hive/
+.hive2/
 opencode-antigravity-auth/
 gistpad/
+
+# Cloned/embedded repos (not part of this project)
+copilot-orchestra/
+oh-my-opencode/
+oh-my-opencode-slim/
+opencode/
+seamless-agent/
+
+# Tool configs
+.claude/
+.sisyphus/
+.opencode/

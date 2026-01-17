@@ -197,9 +197,9 @@ hive_exec_start(task="<task>")  # Fresh start
 3. Run \`hive_merge\` again
 `;
 
-const COPILOT_AGENT_TEMPLATE = \`---
+const COPILOT_AGENT_TEMPLATE = `---
 description: 'Plan-first feature development with isolated worktrees and persistent context.'
-tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureList', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveSubtaskCreate', 'tctinh.vscode-hive/hiveSubtaskUpdate', 'tctinh.vscode-hive/hiveSubtaskList', 'tctinh.vscode-hive/hiveSubtaskSpecWrite', 'tctinh.vscode-hive/hiveSubtaskReportWrite', 'tctinh.vscode-hive/hiveExecStart', 'tctinh.vscode-hive/hiveExecComplete', 'tctinh.vscode-hive/hiveExecAbort', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveWorktreeList', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveContextRead', 'tctinh.vscode-hive/hiveContextList', 'tctinh.vscode-hive/hiveSessionOpen', 'tctinh.vscode-hive/hiveSessionList']
+tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureList', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveExecStart', 'tctinh.vscode-hive/hiveExecComplete', 'tctinh.vscode-hive/hiveExecAbort', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveWorktreeList', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveStatus']
 ---
 
 # Hive Agent
@@ -230,11 +230,11 @@ User reviews in VS Code, adds comments, approves when ready.
 
 ## Rules
 1. Never skip planning
-2. Save context with \\\`contextWrite\\\`
+2. Save context with \`contextWrite\`
 3. Wait for approval before execution
 4. One task at a time
 5. Squash merges for clean history
-\`;
+`;
 
 function createSkill(basePath: string): void {
   const skillPath = path.join(basePath, 'hive');

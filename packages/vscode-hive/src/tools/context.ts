@@ -8,7 +8,7 @@ export function getContextTools(workspaceRoot: string): ToolRegistration[] {
     {
       name: 'hive_context_write',
       displayName: 'Write Context File',
-      modelDescription: 'Write a context file to store research findings, decisions, or reference material. Context persists across sessions and helps workers understand background.',
+      modelDescription: 'Write a context file to store research findings, decisions, or reference material. Context persists and helps workers understand background.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -24,48 +24,6 @@ export function getContextTools(workspaceRoot: string): ToolRegistration[] {
         return JSON.stringify({ success: true, path });
       },
     },
-    {
-      name: 'hive_context_read',
-      displayName: 'Read Context',
-      modelDescription: 'Read a specific context file or all context for a feature. Use to understand background before starting work.',
-      readOnly: true,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          feature: { type: 'string', description: 'Feature name' },
-          name: { type: 'string', description: 'Context file name (optional, omit to read all)' },
-        },
-        required: ['feature'],
-      },
-      invoke: async (input) => {
-        const { feature, name } = input as { feature: string; name?: string };
-        if (name) {
-          const content = contextService.read(feature, name);
-          return JSON.stringify({ name, content });
-        }
-        const compiled = contextService.compile(feature);
-        return JSON.stringify({ allContext: compiled });
-      },
-    },
-    {
-      name: 'hive_context_list',
-      displayName: 'List Context Files',
-      modelDescription: 'List all context files for a feature. Shows what background information is available.',
-      readOnly: true,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          feature: { type: 'string', description: 'Feature name' },
-        },
-        required: ['feature'],
-      },
-      invoke: async (input) => {
-        const { feature } = input as { feature: string };
-        const files = contextService.list(feature);
-        return JSON.stringify({
-          files: files.map(f => ({ name: f.name, updatedAt: f.updatedAt })),
-        });
-      },
-    },
+
   ];
 }

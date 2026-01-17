@@ -25,11 +25,10 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Feature | hive_feature_create, hive_feature_list, hive_feature_complete |
 | Plan | hive_plan_write, hive_plan_read, hive_plan_approve |
 | Task | hive_tasks_sync, hive_task_create, hive_task_update |
-| Subtask | hive_subtask_create, hive_subtask_update, hive_subtask_list, hive_subtask_spec_write, hive_subtask_report_write |
 | Exec | hive_exec_start, hive_exec_complete, hive_exec_abort |
 | Merge | hive_merge, hive_worktree_list |
-| Context | hive_context_write, hive_context_read, hive_context_list |
-| Session | hive_session_open, hive_session_list |
+| Context | hive_context_write |
+| Status | hive_status |
 | Skill | hive_skill |
 
 ### Workflow
@@ -532,114 +531,103 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
         },
       }),
 
-      hive_context_read: tool({
-        description: 'Read a specific context file or all context for the feature',
-        args: {
-          name: tool.schema.string().optional().describe('Context file name. If omitted, returns all context compiled.'),
-          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
-        },
-        async execute({ name, feature: explicitFeature }) {
-          const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
-
-          if (name) {
-            const content = contextService.read(feature, name);
-            if (!content) return `Error: Context file '${name}' not found`;
-            return content;
-          }
-
-          const compiled = contextService.compile(feature);
-          if (!compiled) return "No context files found";
-          return compiled;
-        },
-      }),
-
-      hive_context_list: tool({
-        description: 'List all context files for the feature',
+      // Status Tool
+      hive_status: tool({
+        description: 'Get comprehensive status of a feature including plan, tasks, and context. Returns JSON with all relevant state for resuming work.',
         args: {
           feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
         },
         async execute({ feature: explicitFeature }) {
           const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
-
-          const files = contextService.list(feature);
-          if (files.length === 0) return "No context files";
-
-          return files.map(f => `${f.name} (${f.content.length} chars, updated ${f.updatedAt})`).join('\n');
-        },
-      }),
-
-      // Session Tools
-      hive_session_open: tool({
-        description: 'Open session, return full context for a feature',
-        args: {
-          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
-          task: tool.schema.string().optional().describe('Task folder to focus on'),
-        },
-        async execute({ feature: explicitFeature, task }, toolContext) {
-          const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+          if (!feature) {
+            return JSON.stringify({
+              error: 'No feature specified and no active feature found',
+              hint: 'Use hive_feature_create to create a new feature',
+            });
+          }
 
           const featureData = featureService.get(feature);
-          if (!featureData) return `Error: Feature '${feature}' not found`;
+          if (!featureData) {
+            return JSON.stringify({
+              error: `Feature '${feature}' not found`,
+              availableFeatures: featureService.list(),
+            });
+          }
 
           const blocked = checkBlocked(feature);
           if (blocked) return blocked;
 
-          // Track session
-          const ctx = toolContext as { sessionID?: string };
-          if (ctx?.sessionID) {
-            sessionService.track(feature, ctx.sessionID, task);
-          }
-
-          const planResult = planService.read(feature);
+          const plan = planService.read(feature);
           const tasks = taskService.list(feature);
-          const contextCompiled = contextService.compile(feature);
-          const sessions = sessionService.list(feature);
+          const contextFiles = contextService.list(feature);
 
-          let output = `## Feature: ${feature} [${featureData.status}]\n\n`;
-          
-          if (planResult) {
-            output += `### Plan\n${planResult.content.substring(0, 500)}...\n\n`;
-          }
+          const tasksSummary = tasks.map(t => ({
+            folder: t.folder,
+            name: t.name,
+            status: t.status,
+            origin: t.origin || 'plan',
+          }));
 
-          output += `### Tasks (${tasks.length})\n`;
-          tasks.forEach(t => {
-            output += `- ${t.folder}: ${t.name} [${t.status}]\n`;
+          const contextSummary = contextFiles.map(c => ({
+            name: c.name,
+            chars: c.content.length,
+            updatedAt: c.updatedAt,
+          }));
+
+          const pendingTasks = tasksSummary.filter(t => t.status === 'pending');
+          const inProgressTasks = tasksSummary.filter(t => t.status === 'in_progress');
+          const doneTasks = tasksSummary.filter(t => t.status === 'done');
+
+          const getNextAction = (planStatus: string | null, tasks: Array<{ status: string; folder: string }>): string => {
+            if (!planStatus || planStatus === 'draft') {
+              return 'Write or revise plan with hive_plan_write, then get approval';
+            }
+            if (planStatus === 'review') {
+              return 'Wait for plan approval or revise based on comments';
+            }
+            if (tasks.length === 0) {
+              return 'Generate tasks from plan with hive_tasks_sync';
+            }
+            const inProgress = tasks.find(t => t.status === 'in_progress');
+            if (inProgress) {
+              return `Continue work on task: ${inProgress.folder}`;
+            }
+            const pending = tasks.find(t => t.status === 'pending');
+            if (pending) {
+              return `Start next task with hive_exec_start: ${pending.folder}`;
+            }
+            return 'All tasks complete. Review and merge or complete feature.';
+          };
+
+          const planStatus = featureData.status === 'planning' ? 'draft' : 
+                            featureData.status === 'approved' ? 'approved' : 
+                            featureData.status === 'executing' ? 'locked' : 'none';
+
+          return JSON.stringify({
+            feature: {
+              name: feature,
+              status: featureData.status,
+              ticket: featureData.ticket || null,
+              createdAt: featureData.createdAt,
+            },
+            plan: {
+              exists: !!plan,
+              status: planStatus,
+              approved: planStatus === 'approved' || planStatus === 'locked',
+            },
+            tasks: {
+              total: tasks.length,
+              pending: pendingTasks.length,
+              inProgress: inProgressTasks.length,
+              done: doneTasks.length,
+              list: tasksSummary,
+            },
+            context: {
+              fileCount: contextFiles.length,
+              files: contextSummary,
+            },
+            nextAction: getNextAction(planStatus, tasksSummary),
           });
-
-          if (contextCompiled) {
-            output += `\n### Context\n${contextCompiled.substring(0, 500)}...\n`;
-          }
-
-          output += `\n### Sessions (${sessions.length})\n`;
-          sessions.forEach(s => {
-            output += `- ${s.sessionId} (${s.taskFolder || 'no task'})\n`;
-          });
-
-          return output;
-        },
-      }),
-
-      hive_session_list: tool({
-        description: 'List all sessions for the feature',
-        args: {
-          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
-        },
-        async execute({ feature: explicitFeature }) {
-          const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
-
-          const sessions = sessionService.list(feature);
-          const master = sessionService.getMaster(feature);
-
-          if (sessions.length === 0) return "No sessions";
-
-          return sessions.map(s => {
-            const masterMark = s.sessionId === master ? ' (master)' : '';
-            return `${s.sessionId}${masterMark} - ${s.taskFolder || 'no task'} - ${s.lastActiveAt}`;
-          }).join('\n');
         },
       }),
 

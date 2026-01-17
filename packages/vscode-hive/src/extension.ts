@@ -9,11 +9,10 @@ import {
   getFeatureTools,
   getPlanTools,
   getTaskTools,
-  getSubtaskTools,
   getExecTools,
   getMergeTools,
   getContextTools,
-  getSessionTools
+  getStatusTools
 } from './tools'
 import { initNest } from './commands/initNest'
 
@@ -68,11 +67,10 @@ class HiveExtension {
       ...getFeatureTools(workspaceRoot),
       ...getPlanTools(workspaceRoot),
       ...getTaskTools(workspaceRoot),
-      ...getSubtaskTools(workspaceRoot),
       ...getExecTools(workspaceRoot),
       ...getMergeTools(workspaceRoot),
       ...getContextTools(workspaceRoot),
-      ...getSessionTools()
+      ...getStatusTools(workspaceRoot)
     ])
 
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => {

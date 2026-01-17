@@ -32,8 +32,7 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
           message: `Worktree created. Work in ${worktree.path}. When done, use hive_exec_complete.`,
           hints: [
             'Do all work inside this worktree. Ensure any subagents do the same.',
-            'Call hive_session_refresh periodically to check for user steering comments.',
-            'Read context files (hive_context_read) before starting implementation.'
+            'Context files are in .hive/features/<feature>/context/ if you need background.'
           ]
         });
       },
@@ -72,7 +71,6 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
             ? `Changes committed. Use hive_merge to integrate into main branch.`
             : result.message || 'No changes to commit',
           hints: result.committed ? [
-            'Call hive_session_refresh to check progress and pending user questions.',
             'Proceed to next task or use hive_merge to integrate changes.'
           ] : []
         });
