@@ -1,46 +1,45 @@
-# Deprecated: Ink/React TUI Implementation
+# Deprecated: Multi-View TUI Implementation
 
 **Status**: DEPRECATED - Do not use for new development
 
-This directory contains the original hive-tui implementation built with:
-- [Ink](https://github.com/vadimdemedes/ink) (React for CLIs)
+This directory contains deprecated hive-tui implementations:
+
+## _deprecated/views-old/ (OpenTUI multi-view - DEPRECATED)
+
+The original OpenTUI multi-view implementation with:
+- Dashboard, PlanViewer, SpecViewer, FeatureSelect views
+- Complex view router in app-multi-view.tsx
+- HiveProvider context
+
+**Why Deprecated:** Multi-view navigation was complex. Single-purpose TUIs are simpler:
+- `hive-tui plan <feature>` - Plan Viewer only
+- `hive-tui tasks <feature>` - Task Tracker only
+
+## _deprecated/App.tsx, views/, components/ (Ink/React - DOUBLE DEPRECATED)
+
+The original Ink/React implementation:
+- Ink (React for CLIs)
 - React 18
 - ink-text-input
 
-## Why Deprecated
+**Why Deprecated:**
+- No mouse click support
+- Keyboard/scroll sync issues
+- Complex state management
 
-The Ink/React implementation has limitations:
-- **No mouse click support** - Ink doesn't support onClick/onMouseDown events
-- **Keyboard/scroll sync issues** - Mouse scroll via tmux doesn't sync with keyboard navigation
-- **Complex state management** - React hooks less elegant for terminal UI patterns
+## Current Implementation
 
-## Replacement
+Use the new single-purpose TUIs:
 
-The new implementation uses `@opentui/solid` (same framework as OpenCode):
-- Native mouse event support (`onMouseDown`, `onMouseUp`)
-- SolidJS reactive signals
-- Better keyboard handling via `useKeyboard()`
-
-## Files Preserved
-
+```bash
+hive-tui plan my-feature   # Plan Viewer with inline comments
+hive-tui tasks my-feature  # Task Tracker with spec/report panels
 ```
-_deprecated/
-├── App.tsx           # View router with keyboard handling
-├── components/
-│   ├── Header.tsx
-│   ├── ProgressBar.tsx
-│   ├── TaskList.tsx
-│   └── CommentInput.tsx
-├── hooks/
-│   ├── useHiveState.ts
-│   └── useMouse.ts   # Attempted mouse support (incomplete)
-├── views/
-│   ├── Dashboard.tsx
-│   ├── PlanViewer.tsx
-│   ├── SpecViewer.tsx
-│   └── FeatureSelect.tsx
-└── utils/
-    └── tmux.ts
+
+Or via hive tools with `show_tui: true`:
+```
+hive_plan_read(feature="my-feature", show_tui=true)
+hive_status(feature="my-feature", show_tui=true)
 ```
 
 ## Reference Only
