@@ -1,7 +1,7 @@
 /**
  * Shared Header component for TUIs
  */
-import type { JSX } from 'solid-js';
+import { Show, type JSX } from 'solid-js';
 
 export interface HeaderProps {
   /** Icon emoji */
@@ -16,16 +16,13 @@ export interface HeaderProps {
 
 export function Header(props: HeaderProps): JSX.Element {
   return (
-    <box
-      borderStyle="round"
-      borderColor="cyan"
-      paddingLeft={1}
-      paddingRight={1}
-    >
-      <text>
-        {props.icon} <b fg="cyan">{props.title}</b>: {props.feature}
-        {props.status && <text fg="gray"> [{props.status}]</text>}
-      </text>
+    <box borderStyle="single" paddingLeft={1}>
+      <text>{props.icon} </text>
+      <text fg="cyan">{props.title}</text>
+      <text>: {props.feature}</text>
+      <Show when={props.status}>
+        <text fg="gray"> [{props.status}]</text>
+      </Show>
     </box>
   );
 }
