@@ -36,6 +36,7 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Context | hive_context_write |
 | Status | hive_status |
 | Skill | hive_skill |
+| TUI | hive_tui |
 
 ### Workflow
 
@@ -975,7 +976,69 @@ Skills are discovered from:
             return `No skills found. Run "Init Hive Nest" in VS Code to create skills, or create .opencode/skill/${name}/SKILL.md manually.`;
           }
 
-          return `Skill "${name}" not found. Available: ${[...new Set(available)].join(', ')}`;
+          return `Skill \"${name}\" not found. Available: ${[...new Set(available)].join(', ')}`;
+        },
+      }),
+
+      hive_tui: tool({
+        description: `Launch the Hive TUI (Terminal User Interface) in a tmux pane for visual plan review and task tracking.
+
+The TUI provides:
+- Visual task list with status icons and progress bar
+- Full-screen plan viewer with line-based commenting
+- Task spec viewer
+- Real-time file watching (auto-updates)
+
+If inside tmux: spawns TUI in a side pane automatically.
+If not in tmux: returns the command to run manually.`,
+        args: {
+          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
+        },
+        async execute({ feature: explicitFeature }) {
+          const feature = resolveFeature(explicitFeature);
+          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+
+          const isTmux = !!process.env.TMUX;
+          
+          if (!isTmux) {
+            return `Not inside tmux. Run manually with:
+
+  bun ${directory}/packages/hive-tui/src/index.tsx ${feature}
+
+Or start a tmux session first:
+
+  tmux new -s hive
+  # then call hive_tui again`;
+          }
+
+          // Check if tmux is available
+          try {
+            require('child_process').execSync('which tmux', { stdio: 'ignore' });
+          } catch {
+            return 'Error: tmux not found in PATH';
+          }
+
+          try {
+            // Spawn TUI in a side pane
+            const { execSync } = require('child_process');
+            const command = `tmux split-window -h -d -l 60 -P -c "${directory}" "bun ${directory}/packages/hive-tui/src/index.tsx ${feature}"`;
+            const paneId = execSync(command, { encoding: 'utf-8', cwd: directory }).trim();
+            
+            return `Hive TUI launched in tmux pane ${paneId}
+
+Keyboard shortcuts:
+  1/2/3/4 - Switch views (Dashboard/Plan/Spec/Features)
+  q       - Quit TUI
+  
+In Plan view:
+  j/k or ↑↓ - Navigate lines
+  c         - Add comment on current line
+  Esc       - Back to dashboard`;
+          } catch (err: any) {
+            return `Failed to spawn TUI: ${err.message}
+
+Run manually: bun ${directory}/packages/hive-tui/src/index.tsx ${feature}`;
+          }
         },
       }),
     },
