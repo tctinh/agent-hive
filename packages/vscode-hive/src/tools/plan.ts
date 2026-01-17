@@ -57,11 +57,23 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
             type: 'string',
             description: 'Feature name',
           },
+          show_tui: {
+            type: 'boolean',
+            description: 'Launch Plan Viewer TUI (only supported in terminal/tmux environments)',
+          },
         },
         required: ['feature'],
       },
       invoke: async (input) => {
-        const { feature } = input as { feature: string };
+        const { feature, show_tui } = input as { feature: string; show_tui?: boolean };
+        
+        if (show_tui) {
+          return JSON.stringify({ 
+            warning: 'TUI mode not supported in VSCode. Use terminal with tmux for TUI features.',
+            fallback: 'Returning plan data instead.',
+          });
+        }
+        
         const result = planService.read(feature);
         if (!result) {
           return JSON.stringify({ error: `No plan found for feature '${feature}'` });

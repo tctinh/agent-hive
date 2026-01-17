@@ -20,10 +20,19 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
             type: 'string',
             description: 'Feature name (optional, uses active feature if omitted)',
           },
+          show_tui: {
+            type: 'boolean',
+            description: 'Launch Task Tracker TUI (only supported in terminal/tmux environments)',
+          },
         },
       },
       invoke: async (input) => {
-        const { feature: explicitFeature } = input as { feature?: string };
+        const { feature: explicitFeature, show_tui } = input as { feature?: string; show_tui?: boolean };
+        
+        if (show_tui) {
+          // TUI not supported in VSCode, continue with normal output
+          console.log('TUI mode not supported in VSCode context');
+        }
         
         const feature = explicitFeature || featureService.getActive()?.name;
         if (!feature) {
