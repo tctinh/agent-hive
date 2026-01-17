@@ -96,6 +96,34 @@ Add `opencode-hive` to your `opencode.json`:
 
 OpenCode handles the rest — no manual npm install needed.
 
+### Option C: OpenCode + OMO-Slim (Recommended)
+
+For the best experience, use both Hive and [oh-my-opencode-slim](https://github.com/code-yeongyu/oh-my-opencode-slim):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-hive", "oh-my-opencode-slim"]
+}
+```
+
+**What you get:**
+
+| Feature | Hive Only | Hive + OMO-Slim |
+|---------|-----------|-----------------|
+| Worktree isolation | ✅ | ✅ |
+| Plan → Approve → Execute | ✅ | ✅ |
+| Worker visibility | ❌ | ✅ Tmux panes |
+| Human-in-the-loop | ❌ | ✅ `question` tool |
+| Agent specialization | ❌ | ✅ Auto-selects agent |
+| Parallel workers | Manual | ✅ Automatic |
+
+When OMO-Slim is detected, `hive_exec_start` automatically:
+1. Creates the worktree (isolation)
+2. Selects the right agent (explore, frontend, document-writer, etc.)
+3. Spawns a worker in a tmux pane (visibility)
+4. Worker can ask you questions via UI (human-in-the-loop)
+
 ### Start Hiving
 
 ```

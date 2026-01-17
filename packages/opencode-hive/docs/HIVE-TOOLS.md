@@ -1,6 +1,6 @@
 # Hive Tools Inventory
 
-## Tools (18 total)
+## Tools (19 total)
 
 ### Feature Management (3 tools)
 | Tool | Purpose |
@@ -26,7 +26,7 @@
 ### Execution (3 tools)
 | Tool | Purpose |
 |------|---------|
-| `hive_exec_start` | Create worktree and begin work |
+| `hive_exec_start` | Create worktree and begin work. With OMO-Slim: spawns delegated worker |
 | `hive_exec_complete` | Commit changes, write report (does NOT merge) |
 | `hive_exec_abort` | Discard changes, reset status |
 
@@ -41,10 +41,11 @@
 |------|---------|
 | `hive_context_write` | Write context file |
 
-### Status (1 tool)
+### Status (2 tools)
 | Tool | Purpose |
 |------|---------|
 | `hive_status` | Get comprehensive feature status as JSON |
+| `hive_worker_status` | Check delegated worker status (OMO-Slim integration) |
 
 ### Review (1 tool)
 | Tool | Purpose |
@@ -57,6 +58,47 @@
 | `hive_steering` | Get steering comments from VSCode sidebar |
 
 ---
+
+## OMO-Slim Integration
+
+When `oh-my-opencode-slim` is installed alongside Hive, additional capabilities are unlocked:
+
+### Delegated Execution Mode
+
+| Without OMO-Slim | With OMO-Slim |
+|------------------|---------------|
+| `hive_exec_start` creates worktree, you work inline | `hive_exec_start` spawns a worker agent in tmux pane |
+| Single agent works on task | Specialized agents (explore, frontend, etc.) |
+| No visibility into progress | Watch workers in real-time |
+| Manual human-in-the-loop | `question` tool for decisions |
+
+### Worker Agents
+
+Hive auto-selects the right agent based on task content:
+
+| Pattern | Agent |
+|---------|-------|
+| test, spec, coverage | `explore` |
+| ui, component, react | `frontend-ui-ux-engineer` |
+| doc, readme, comment | `document-writer` |
+| refactor, simplify | `code-simplicity-reviewer` |
+| research, investigate | `librarian` |
+| image, visual, design | `multimodal-looker` |
+| architecture, strategy | `oracle` |
+| (default) | `general` |
+
+### Checkpoint Protocol
+
+Workers write CHECKPOINT files for major decisions:
+
+```
+REASON: About to commit authentication changes
+STATUS: Implemented JWT refresh, added tests
+NEXT: Commit and move to API routes
+DECISION_NEEDED: no
+```
+
+Use `hive_worker_status` to check for checkpoints.
 
 ## Removed Tools
 
