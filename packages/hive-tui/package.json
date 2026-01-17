@@ -1,0 +1,27 @@
+{
+  "name": "hive-tui",
+  "version": "0.9.0",
+  "type": "module",
+  "bin": {
+    "hive-tui": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "bun src/index.tsx",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hive-core": "workspace:*",
+    "ink": "^5.0.1",
+    "react": "^18.3.1",
+    "chokidar": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.0.0",
+    "tsup": "^8.0.0"
+  }
+}
