@@ -1,0 +1,1 @@
+preload = ["./packages/hive-tui/node_modules/@opentui/solid/scripts/preload.ts"]
