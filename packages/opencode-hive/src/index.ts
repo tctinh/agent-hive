@@ -13,156 +13,11 @@ import {
   listFeatures,
 } from "hive-core";
 
-// ============================================================================
-// OMO-Slim Integration
-// ============================================================================
-
-type ExecMode = 'inline' | 'delegated';
-type OmoSlimAgent = 
-  | 'general'
-  | 'explore'
-  | 'librarian'
-  | 'oracle'
-  | 'frontend-ui-ux-engineer'
-  | 'document-writer'
-  | 'multimodal-looker'
-  | 'code-simplicity-reviewer';
-
-interface OmoSlimIntegration {
-  available: boolean;
-  execMode: ExecMode;
-}
-
-// Global state for OMO-Slim integration
-let omoSlimIntegration: OmoSlimIntegration = {
+// OMO-Slim integration state (will be set by Task 4's detectOmoSlim)
+const omoSlimIntegration = {
   available: false,
-  execMode: 'inline',
+  execMode: 'inline' as 'inline' | 'delegated',
 };
-
-/**
- * Detect if OMO-Slim is available by checking for its package.
- */
-const detectOmoSlim = (): void => {
-  try {
-    const omoSlimMarker = path.join(process.cwd(), 'node_modules', 'oh-my-opencode-slim');
-    if (fs.existsSync(omoSlimMarker)) {
-      omoSlimIntegration = { available: true, execMode: 'delegated' };
-      console.log('[hive] OMO-Slim detected - delegated execution mode enabled');
-    }
-  } catch {
-    omoSlimIntegration = { available: false, execMode: 'inline' };
-  }
-};
-
-export const getExecMode = (): ExecMode => omoSlimIntegration.execMode;
-export const isOmoSlimAvailable = (): boolean => omoSlimIntegration.available;
-
-/**
- * Select agent based on task name and spec content.
- */
-function selectAgentForTask(taskName: string, spec: string): OmoSlimAgent {
-  const content = `${taskName} ${spec}`.toLowerCase();
-  
-  if (/\b(test|spec|coverage|jest|vitest)\b/.test(content)) return 'explore';
-  if (/\b(ui|component|frontend|react|vue|css|style|tailwind)\b/.test(content)) return 'frontend-ui-ux-engineer';
-  if (/\b(doc|readme|comment|jsdoc|changelog)\b/.test(content)) return 'document-writer';
-  if (/\b(refactor|simplify|clean|optimize)\b/.test(content)) return 'code-simplicity-reviewer';
-  if (/\b(research|investigate|find|explore|audit)\b/.test(content)) return 'librarian';
-  if (/\b(image|screenshot|visual|design|mockup)\b/.test(content)) return 'multimodal-looker';
-  if (/\b(architecture|strategy|approach|decision)\b/.test(content)) return 'oracle';
-  
-  return 'general';
-}
-
-/**
- * Build the worker prompt for delegated execution.
- */
-function buildDelegatedWorkerPrompt(params: {
-  feature: string;
-  task: string;
-  worktreePath: string;
-  branch: string;
-  planContent: string;
-  contextCompiled: string;
-  taskSpec: string;
-  priorTasks: string[];
-}): string {
-  const { feature, task, worktreePath, branch, planContent, contextCompiled, taskSpec, priorTasks } = params;
-
-  return `# Hive Worker Task
-
-You are executing task "${task}" for feature "${feature}".
-
-## Execution Environment
-
-- **Worktree Path**: \`${worktreePath}\`
-- **Branch**: \`${branch}\`
-
-**CRITICAL**: All file operations MUST be within the worktree path above.
-
----
-
-## Task Specification
-
-${taskSpec}
-
----
-
-## Human-in-the-Loop Protocol
-
-You have access to the \`question\` tool. **USE IT** when you need:
-- Clarification on requirements
-- Decision between approaches  
-- Approval before destructive actions
-
-Example:
-\`\`\`
-question({
-  questions: [{
-    header: "Approach",
-    question: "Should I use X or Y?",
-    options: [
-      { label: "X", description: "..." },
-      { label: "Y", description: "..." }
-    ]
-  }]
-})
-\`\`\`
-
----
-
-## Checkpoint Protocol
-
-For major milestones, write a CHECKPOINT file:
-\`\`\`bash
-echo "REASON: <why>
-STATUS: <done>
-NEXT: <planned>" > "${worktreePath}/.hive/CHECKPOINT"
-\`\`\`
-
----
-
-## Completion
-
-When done:
-\`\`\`
-hive_exec_complete({ task: "${task}", summary: "..." })
-\`\`\`
-
-If blocked:
-\`\`\`
-hive_exec_abort({ task: "${task}" })
-\`\`\`
-
----
-
-## Tool Restrictions
-
-CANNOT use: hive_exec_start, hive_merge, hive_feature_*, background_task
-
-Begin working now.
-`;
-}
 
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development System
@@ -259,9 +114,6 @@ type ToolContext = {
 
 const plugin: Plugin = async (ctx) => {
   const { directory } = ctx;
-
-  // Detect OMO-Slim integration on startup
-  detectOmoSlim();
 
   const featureService = new FeatureService(directory);
   const planService = new PlanService(directory);
@@ -482,13 +334,12 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       }),
 
       hive_exec_start: tool({
-        description: 'Create worktree and begin work on task. In delegated mode (OMO-Slim installed), returns instructions to spawn a worker agent via background_task.',
+        description: 'Create worktree and begin work on task',
         args: { 
           task: tool.schema.string().describe('Task folder name'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
-          inline: tool.schema.boolean().optional().describe('Force inline mode even if OMO-Slim is available'),
         },
-        async execute({ task, feature: explicitFeature, inline: forceInline }) {
+        async execute({ task, feature: explicitFeature }) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
@@ -533,58 +384,7 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
 
           taskService.writeSpec(feature, task, specContent);
 
-          // Check if delegated mode is available and not forced inline
-          const useDelegated = omoSlimIntegration.available && !forceInline;
-
-          if (useDelegated) {
-            // Build worker prompt for background_task
-            const workerPrompt = buildDelegatedWorkerPrompt({
-              feature,
-              task,
-              worktreePath: worktree.path,
-              branch: worktree.branch,
-              planContent: planResult?.content || '',
-              contextCompiled: contextCompiled || '',
-              taskSpec: specContent,
-              priorTasks,
-            });
-
-            // Select agent based on task content
-            const agent = selectAgentForTask(taskInfo.name, specContent);
-
-            return `## Delegated Execution Mode
-
-Worktree created at \`${worktree.path}\`
-Branch: \`${worktree.branch}\`
-Selected agent: **${agent}**
-
-### Next Step: Spawn Worker
-
-Call \`background_task\` to spawn the worker agent:
-
-\`\`\`
-background_task({
-  agent: "${agent}",
-  description: "Task: ${task}",
-  prompt: \`${workerPrompt.replace(/`/g, '\\`')}\`,
-  sync: false
-})
-\`\`\`
-
-The worker will appear in a tmux pane. It can:
-- Ask you questions via the \`question\` tool
-- Write CHECKPOINT files when it needs review
-- Call \`hive_exec_complete\` when done
-
-Use \`hive_worker_status\` to check progress.`;
-          }
-
-          // Inline mode - original behavior
-          return `Worktree created at ${worktree.path}
-Branch: ${worktree.branch}
-Base commit: ${worktree.commit}
-Spec: ${task}/spec.md generated
-Reminder: do all work inside this worktree and ensure any subagents do the same.`;
+          return `Worktree created at ${worktree.path}\nBranch: ${worktree.branch}\nBase commit: ${worktree.commit}\nSpec: ${task}/spec.md generated\nReminder: do all work inside this worktree and ensure any subagents do the same.`;
         },
       }),
 
@@ -834,6 +634,99 @@ Reminder: do all work inside this worktree and ensure any subagents do the same.
             },
             nextAction: getNextAction(planStatus, tasksSummary),
           });
+        },
+      }),
+
+      hive_worker_status: tool({
+        description: 'Check status of delegated workers (only available when OMO-Slim is installed). Shows running workers, checkpoints, and completion status.',
+        args: {
+          task: tool.schema.string().optional().describe('Specific task to check (defaults to all active workers)'),
+          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
+        },
+        async execute({ task, feature: explicitFeature }) {
+          if (!omoSlimIntegration.available) {
+            return JSON.stringify({
+              available: false,
+              message: 'OMO-Slim not installed. Workers run inline in the current session.',
+              execMode: 'inline',
+            });
+          }
+
+          const feature = resolveFeature(explicitFeature);
+          
+          // Get all in-progress tasks for the feature
+          const inProgressTasks = feature 
+            ? taskService.list(feature).filter(t => t.status === 'in_progress')
+            : [];
+
+          // Check for checkpoint files in worktrees
+          const workerStatuses = [];
+          
+          for (const taskInfo of inProgressTasks) {
+            if (task && taskInfo.folder !== task) continue;
+            
+            const worktreePath = path.join(
+              directory, 
+              '.hive', 
+              '.worktrees', 
+              feature!, 
+              taskInfo.folder
+            );
+            
+            // Check if worktree exists
+            if (!fs.existsSync(worktreePath)) continue;
+            
+            // Check for CHECKPOINT file
+            const checkpointPath = path.join(worktreePath, '.hive', 'CHECKPOINT');
+            let checkpoint = null;
+            
+            if (fs.existsSync(checkpointPath)) {
+              try {
+                const content = fs.readFileSync(checkpointPath, 'utf-8');
+                const lines = content.split('\n');
+                checkpoint = {
+                  reason: '',
+                  status: '',
+                  next: '',
+                  decisionNeeded: false,
+                };
+                
+                for (const line of lines) {
+                  const [key, ...valueParts] = line.split(':');
+                  const value = valueParts.join(':').trim();
+                  
+                  switch (key.trim().toUpperCase()) {
+                    case 'REASON': checkpoint.reason = value; break;
+                    case 'STATUS': checkpoint.status = value; break;
+                    case 'NEXT': checkpoint.next = value; break;
+                    case 'DECISION_NEEDED': checkpoint.decisionNeeded = value.toLowerCase() === 'yes'; break;
+                  }
+                }
+              } catch {
+                // Ignore parse errors
+              }
+            }
+            
+            workerStatuses.push({
+              task: taskInfo.folder,
+              name: taskInfo.name,
+              feature: feature,
+              worktreePath,
+              status: checkpoint ? 'checkpoint' : 'running',
+              checkpoint,
+            });
+          }
+
+          return JSON.stringify({
+            available: true,
+            execMode: 'delegated',
+            workers: workerStatuses,
+            summary: {
+              total: workerStatuses.length,
+              running: workerStatuses.filter(w => w.status === 'running').length,
+              atCheckpoint: workerStatuses.filter(w => w.status === 'checkpoint').length,
+            },
+          }, null, 2);
         },
       }),
 
