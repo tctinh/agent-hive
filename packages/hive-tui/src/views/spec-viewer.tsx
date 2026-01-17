@@ -3,7 +3,7 @@
  */
 import { createSignal, createEffect, For, type JSX, Show } from 'solid-js';
 import { useKeyboard, useTerminalDimensions } from '@opentui/solid';
-import { taskService } from 'hive-core';
+import { TaskService } from 'hive-core';
 import { useHive } from '../context/hive';
 
 interface TaskInfo {
@@ -31,7 +31,8 @@ export function SpecViewer(): JSX.Element {
     if (!feature) return;
 
     try {
-      const taskList = taskService.list(feature, hive.projectRoot);
+      const taskService = new TaskService(hive.projectRoot);
+      const taskList = taskService.list(feature);
       setTasks(taskList);
       
       // If selectedTask is set, find its index
@@ -56,7 +57,8 @@ export function SpecViewer(): JSX.Element {
     if (!task) return;
 
     try {
-      const spec = taskService.getSpec?.(hive.feature, task.folder, hive.projectRoot);
+      const taskService = new TaskService(hive.projectRoot);
+      const spec = taskService.readSpec(hive.feature, task.folder);
       setSpecContent(spec || `# No spec.md for ${task.folder}`);
       setScrollOffset(0);
     } catch (e) {
@@ -112,8 +114,8 @@ export function SpecViewer(): JSX.Element {
             return (
               <box onMouseDown={() => handleTaskClick(idx())}>
                 <text
-                  fg={isSelected() ? 'cyan' : 'gray'}
-                  backgroundColor={isSelected() ? 'blue' : undefined}
+                  fg={isSelected() ? 'black' : 'gray'}
+                  bg={isSelected() ? 'cyan' : undefined}
                 >
                   {isSelected() ? '▶' : ' '} {num}. {displayName}
                 </text>

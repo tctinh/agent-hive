@@ -1,11 +1,13 @@
 /**
  * PlanViewer - View plan.md with mouse click to select lines for commenting
  * Key feature: Click on any line to select it, then press 'c' to comment
+ * Auto-refreshes when plan.md or comments change
  */
 import { createSignal, createEffect, For, type JSX, Show } from 'solid-js';
 import { useKeyboard, useTerminalDimensions } from '@opentui/solid';
-import { planService } from 'hive-core';
+import { PlanService } from 'hive-core';
 import { useHive } from '../context/hive';
+import { useHiveWatcher } from '../hooks';
 
 export function PlanViewer(): JSX.Element {
   const hive = useHive();
@@ -18,6 +20,12 @@ export function PlanViewer(): JSX.Element {
   const [commentText, setCommentText] = createSignal('');
   const [comments, setComments] = createSignal<Record<number, string[]>>({});
 
+  // Watch for file changes (auto-refresh)
+  const refreshKey = useHiveWatcher(
+    () => hive.feature,
+    () => hive.projectRoot
+  );
+
   // Calculate visible lines based on terminal height
   // Reserve: header(3) + footer(3) + margins(2) = 8 lines
   const visibleLines = () => Math.max(5, dimensions().height - 10);
@@ -25,17 +33,21 @@ export function PlanViewer(): JSX.Element {
   const lines = () => planContent().split('\n');
   const visibleContent = () => lines().slice(scrollOffset(), scrollOffset() + visibleLines());
 
-  // Load plan content
+  // Load plan content (re-runs when refreshKey changes)
   createEffect(() => {
     const feature = hive.feature;
     if (!feature) return;
+    
+    // Track refreshKey to re-run on file changes
+    const _ = refreshKey();
 
     try {
-      const plan = planService.read(feature, hive.projectRoot);
+      const planService = new PlanService(hive.projectRoot);
+      const plan = planService.read(feature);
       setPlanContent(plan?.content || '# No plan.md found');
       
       // Load comments
-      const planComments = planService.getComments?.(feature, hive.projectRoot) || [];
+      const planComments = (planService as any).getComments?.(feature) || [];
       const commentsByLine: Record<number, string[]> = {};
       planComments.forEach((c: any) => {
         if (!commentsByLine[c.line]) commentsByLine[c.line] = [];
@@ -67,11 +79,12 @@ export function PlanViewer(): JSX.Element {
         // Save comment
         if (commentText().trim()) {
           try {
-            planService.addComment?.(hive.feature, {
+            const planService = new PlanService(hive.projectRoot);
+            (planService as any).addComment?.(hive.feature, {
               line: currentLine(),
               body: commentText().trim(),
               author: 'tui',
-            }, hive.projectRoot);
+            });
             // Update local state
             const newComments = { ...comments() };
             if (!newComments[currentLine()]) newComments[currentLine()] = [];
@@ -85,8 +98,9 @@ export function PlanViewer(): JSX.Element {
         setCommentText('');
       } else if (evt.name === 'backspace') {
         setCommentText(t => t.slice(0, -1));
-      } else if (evt.key && evt.key.length === 1) {
-        setCommentText(t => t + evt.key);
+      } else if (evt.raw && evt.raw.length === 1 && evt.raw.match(/[\x20-\x7E]/)) {
+        // Printable ASCII character
+        setCommentText(t => t + evt.raw);
       }
       return;
     }
@@ -161,8 +175,8 @@ export function PlanViewer(): JSX.Element {
                 <text fg="gray">{lineNumStr()}</text>
                 <text fg={hasComment() ? 'yellow' : 'gray'}>{hasComment() ? '💬' : ' │'}</text>
                 <text 
-                  fg={isSelected() ? 'cyan' : undefined}
-                  backgroundColor={isSelected() ? 'blue' : undefined}
+                  fg={isSelected() ? 'black' : undefined}
+                  bg={isSelected() ? 'cyan' : undefined}
                 >
                   {line || ' '}
                 </text>

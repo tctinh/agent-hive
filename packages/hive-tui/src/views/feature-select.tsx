@@ -3,7 +3,7 @@
  */
 import { createSignal, createEffect, For, type JSX } from 'solid-js';
 import { useKeyboard } from '@opentui/solid';
-import { featureService } from 'hive-core';
+import { FeatureService } from 'hive-core';
 import { useHive } from '../context/hive';
 
 export function FeatureSelect(): JSX.Element {
@@ -16,7 +16,8 @@ export function FeatureSelect(): JSX.Element {
   // Load features
   createEffect(() => {
     try {
-      const featureList = featureService.list(hive.projectRoot);
+      const featureService = new FeatureService(hive.projectRoot);
+      const featureList = featureService.list();
       setFeatures(featureList);
       
       // Select current feature if it exists
@@ -78,8 +79,8 @@ export function FeatureSelect(): JSX.Element {
               return (
                 <box onMouseDown={() => handleFeatureClick(idx())}>
                   <text
-                    fg={isSelected() ? 'cyan' : isCurrent() ? 'green' : undefined}
-                    backgroundColor={isSelected() ? 'blue' : undefined}
+                    fg={isSelected() ? 'black' : isCurrent() ? 'green' : undefined}
+                    bg={isSelected() ? 'cyan' : undefined}
                   >
                     {isSelected() ? '▶' : ' '} {feature} {isCurrent() ? '(current)' : ''}
                   </text>

@@ -40,8 +40,8 @@ export function TaskList(props: TaskListProps): JSX.Element {
           return (
             <box onMouseDown={() => props.onTaskClick?.(task)}>
               <text
-                fg={isSelected() ? 'cyan' : undefined}
-                backgroundColor={isSelected() ? 'blue' : undefined}
+                fg={isSelected() ? 'black' : undefined}
+                bg={isSelected() ? 'cyan' : undefined}
               >
                 {icon()} <text fg="gray">{num}.</text> {displayName}
               </text>

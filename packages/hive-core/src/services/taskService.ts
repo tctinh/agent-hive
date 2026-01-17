@@ -162,6 +162,11 @@ export class TaskService {
     return specPath;
   }
 
+  readSpec(featureName: string, taskFolder: string): string | null {
+    const specPath = getTaskSpecPath(this.projectRoot, featureName, taskFolder);
+    return readText(specPath);
+  }
+
   update(featureName: string, taskFolder: string, updates: Partial<Pick<TaskStatus, 'status' | 'summary' | 'baseCommit'>>): TaskStatus {
     const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);
     const current = readJson<TaskStatus>(statusPath);
