@@ -13,19 +13,24 @@ import {
   listFeatures,
 } from "hive-core";
 
+// ============================================================================
 // OMO-Slim Integration
-// Detect if oh-my-opencode-slim is installed and available
+// ============================================================================
+
 type ExecMode = 'inline' | 'delegated';
+type OmoSlimAgent = 
+  | 'general'
+  | 'explore'
+  | 'librarian'
+  | 'oracle'
+  | 'frontend-ui-ux-engineer'
+  | 'document-writer'
+  | 'multimodal-looker'
+  | 'code-simplicity-reviewer';
 
 interface OmoSlimIntegration {
   available: boolean;
   execMode: ExecMode;
-  backgroundTaskHandler?: (params: {
-    agent: string;
-    prompt: string;
-    description: string;
-    sync?: boolean;
-  }) => Promise<{ taskId: string; sessionId: string }>;
 }
 
 // Global state for OMO-Slim integration
@@ -35,36 +40,129 @@ let omoSlimIntegration: OmoSlimIntegration = {
 };
 
 /**
- * Attempt to detect and integrate with OMO-Slim.
- * Called during plugin initialization.
+ * Detect if OMO-Slim is available by checking for its package.
  */
 const detectOmoSlim = (): void => {
   try {
-    // Check if the OMO-Slim package is installed
-    // We look for the background_task tool registration marker
     const omoSlimMarker = path.join(process.cwd(), 'node_modules', 'oh-my-opencode-slim');
     if (fs.existsSync(omoSlimMarker)) {
-      omoSlimIntegration = {
-        available: true,
-        execMode: 'delegated',
-      };
+      omoSlimIntegration = { available: true, execMode: 'delegated' };
       console.log('[hive] OMO-Slim detected - delegated execution mode enabled');
     }
   } catch {
-    // OMO-Slim not available, use inline mode
-    omoSlimIntegration = {
-      available: false,
-      execMode: 'inline',
-    };
+    omoSlimIntegration = { available: false, execMode: 'inline' };
   }
 };
 
-/**
- * Check if delegated execution is available.
- * Can be used by tools to decide behavior.
- */
 export const getExecMode = (): ExecMode => omoSlimIntegration.execMode;
 export const isOmoSlimAvailable = (): boolean => omoSlimIntegration.available;
+
+/**
+ * Select agent based on task name and spec content.
+ */
+function selectAgentForTask(taskName: string, spec: string): OmoSlimAgent {
+  const content = `${taskName} ${spec}`.toLowerCase();
+  
+  if (/\b(test|spec|coverage|jest|vitest)\b/.test(content)) return 'explore';
+  if (/\b(ui|component|frontend|react|vue|css|style|tailwind)\b/.test(content)) return 'frontend-ui-ux-engineer';
+  if (/\b(doc|readme|comment|jsdoc|changelog)\b/.test(content)) return 'document-writer';
+  if (/\b(refactor|simplify|clean|optimize)\b/.test(content)) return 'code-simplicity-reviewer';
+  if (/\b(research|investigate|find|explore|audit)\b/.test(content)) return 'librarian';
+  if (/\b(image|screenshot|visual|design|mockup)\b/.test(content)) return 'multimodal-looker';
+  if (/\b(architecture|strategy|approach|decision)\b/.test(content)) return 'oracle';
+  
+  return 'general';
+}
+
+/**
+ * Build the worker prompt for delegated execution.
+ */
+function buildDelegatedWorkerPrompt(params: {
+  feature: string;
+  task: string;
+  worktreePath: string;
+  branch: string;
+  planContent: string;
+  contextCompiled: string;
+  taskSpec: string;
+  priorTasks: string[];
+}): string {
+  const { feature, task, worktreePath, branch, planContent, contextCompiled, taskSpec, priorTasks } = params;
+
+  return `# Hive Worker Task
+
+You are executing task "${task}" for feature "${feature}".
+
+## Execution Environment
+
+- **Worktree Path**: \`${worktreePath}\`
+- **Branch**: \`${branch}\`
+
+**CRITICAL**: All file operations MUST be within the worktree path above.
+
+---
+
+## Task Specification
+
+${taskSpec}
+
+---
+
+## Human-in-the-Loop Protocol
+
+You have access to the \`question\` tool. **USE IT** when you need:
+- Clarification on requirements
+- Decision between approaches  
+- Approval before destructive actions
+
+Example:
+\`\`\`
+question({
+  questions: [{
+    header: "Approach",
+    question: "Should I use X or Y?",
+    options: [
+      { label: "X", description: "..." },
+      { label: "Y", description: "..." }
+    ]
+  }]
+})
+\`\`\`
+
+---
+
+## Checkpoint Protocol
+
+For major milestones, write a CHECKPOINT file:
+\`\`\`bash
+echo "REASON: <why>
+STATUS: <done>
+NEXT: <planned>" > "${worktreePath}/.hive/CHECKPOINT"
+\`\`\`
+
+---
+
+## Completion
+
+When done:
+\`\`\`
+hive_exec_complete({ task: "${task}", summary: "..." })
+\`\`\`
+
+If blocked:
+\`\`\`
+hive_exec_abort({ task: "${task}" })
+\`\`\`
+
+---
+
+## Tool Restrictions
+
+CANNOT use: hive_exec_start, hive_merge, hive_feature_*, background_task
+
+Begin working now.
+`;
+}
 
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development System
@@ -83,19 +181,6 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Context | hive_context_write |
 | Status | hive_status |
 | Skill | hive_skill |
-
-### Execution Modes
-
-Hive supports two execution modes for \`hive_exec_start\`:
-
-- **Inline mode**: You work directly in the worktree (default)
-- **Delegated mode**: If oh-my-opencode-slim is installed, tasks spawn as background agents in tmux panes
-
-In delegated mode:
-- Worker agents receive full context (plan, task spec, context files)
-- Workers can ask questions via \`question\` tool (human-in-the-loop)
-- Workers write CHECKPOINT files for major decisions
-- You can watch workers in real-time via tmux panes
 
 ### Workflow
 
@@ -397,12 +482,13 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       }),
 
       hive_exec_start: tool({
-        description: 'Create worktree and begin work on task',
+        description: 'Create worktree and begin work on task. In delegated mode (OMO-Slim installed), returns instructions to spawn a worker agent via background_task.',
         args: { 
           task: tool.schema.string().describe('Task folder name'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
+          inline: tool.schema.boolean().optional().describe('Force inline mode even if OMO-Slim is available'),
         },
-        async execute({ task, feature: explicitFeature }) {
+        async execute({ task, feature: explicitFeature, inline: forceInline }) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
@@ -447,7 +533,58 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
 
           taskService.writeSpec(feature, task, specContent);
 
-          return `Worktree created at ${worktree.path}\nBranch: ${worktree.branch}\nBase commit: ${worktree.commit}\nSpec: ${task}/spec.md generated\nReminder: do all work inside this worktree and ensure any subagents do the same.`;
+          // Check if delegated mode is available and not forced inline
+          const useDelegated = omoSlimIntegration.available && !forceInline;
+
+          if (useDelegated) {
+            // Build worker prompt for background_task
+            const workerPrompt = buildDelegatedWorkerPrompt({
+              feature,
+              task,
+              worktreePath: worktree.path,
+              branch: worktree.branch,
+              planContent: planResult?.content || '',
+              contextCompiled: contextCompiled || '',
+              taskSpec: specContent,
+              priorTasks,
+            });
+
+            // Select agent based on task content
+            const agent = selectAgentForTask(taskInfo.name, specContent);
+
+            return `## Delegated Execution Mode
+
+Worktree created at \`${worktree.path}\`
+Branch: \`${worktree.branch}\`
+Selected agent: **${agent}**
+
+### Next Step: Spawn Worker
+
+Call \`background_task\` to spawn the worker agent:
+
+\`\`\`
+background_task({
+  agent: "${agent}",
+  description: "Task: ${task}",
+  prompt: \`${workerPrompt.replace(/`/g, '\\`')}\`,
+  sync: false
+})
+\`\`\`
+
+The worker will appear in a tmux pane. It can:
+- Ask you questions via the \`question\` tool
+- Write CHECKPOINT files when it needs review
+- Call \`hive_exec_complete\` when done
+
+Use \`hive_worker_status\` to check progress.`;
+          }
+
+          // Inline mode - original behavior
+          return `Worktree created at ${worktree.path}
+Branch: ${worktree.branch}
+Base commit: ${worktree.commit}
+Spec: ${task}/spec.md generated
+Reminder: do all work inside this worktree and ensure any subagents do the same.`;
         },
       }),
 
@@ -678,10 +815,6 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
               status: featureData.status,
               ticket: featureData.ticket || null,
               createdAt: featureData.createdAt,
-            },
-            execution: {
-              mode: omoSlimIntegration.execMode,
-              omoSlimAvailable: omoSlimIntegration.available,
             },
             plan: {
               exists: !!plan,
