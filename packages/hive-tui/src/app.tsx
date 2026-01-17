@@ -5,12 +5,9 @@ import { Switch, Match } from 'solid-js';
 import { useKeyboard, useTerminalDimensions } from '@opentui/solid';
 import { useHive, type ViewType } from './context/hive';
 import { Dashboard } from './views/dashboard';
+import { PlanViewer } from './views/plan-viewer';
 
 // Placeholder views - will be replaced in later tasks
-function PlanViewer() {
-  return <text>Plan Viewer - Press 1 for Dashboard, Esc to go back</text>;
-}
-
 function SpecViewer() {
   return <text>Spec Viewer - Press 1 for Dashboard, Esc to go back</text>;
 }
