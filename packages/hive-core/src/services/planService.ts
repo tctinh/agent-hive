@@ -102,6 +102,40 @@ export class PlanService {
     return newComment;
   }
 
+  updateComment(featureName: string, commentId: string, body: string): PlanComment | null {
+    const commentsPath = getCommentsPath(this.projectRoot, featureName);
+    const data = readJson<CommentsJson>(commentsPath);
+    
+    if (!data) return null;
+    
+    const idx = data.threads.findIndex(c => c.id === commentId);
+    if (idx === -1) return null;
+    
+    data.threads[idx] = {
+      ...data.threads[idx],
+      body,
+      timestamp: new Date().toISOString(), // Update timestamp on edit
+    };
+    
+    writeJson(commentsPath, data);
+    return data.threads[idx];
+  }
+
+  deleteComment(featureName: string, commentId: string): boolean {
+    const commentsPath = getCommentsPath(this.projectRoot, featureName);
+    const data = readJson<CommentsJson>(commentsPath);
+    
+    if (!data) return false;
+    
+    const initialLength = data.threads.length;
+    data.threads = data.threads.filter(c => c.id !== commentId);
+    
+    if (data.threads.length === initialLength) return false;
+    
+    writeJson(commentsPath, data);
+    return true;
+  }
+
   clearComments(featureName: string): void {
     const commentsPath = getCommentsPath(this.projectRoot, featureName);
     writeJson(commentsPath, { threads: [] });
