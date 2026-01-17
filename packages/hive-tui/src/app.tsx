@@ -6,15 +6,8 @@ import { useKeyboard, useTerminalDimensions } from '@opentui/solid';
 import { useHive, type ViewType } from './context/hive';
 import { Dashboard } from './views/dashboard';
 import { PlanViewer } from './views/plan-viewer';
-
-// Placeholder views - will be replaced in later tasks
-function SpecViewer() {
-  return <text>Spec Viewer - Press 1 for Dashboard, Esc to go back</text>;
-}
-
-function FeatureSelect() {
-  return <text>Feature Select - Press 1 for Dashboard, Esc to go back</text>;
-}
+import { SpecViewer } from './views/spec-viewer';
+import { FeatureSelect } from './views/feature-select';
 
 export function App() {
   const hive = useHive();
