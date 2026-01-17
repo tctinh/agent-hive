@@ -4,12 +4,9 @@
 import { Switch, Match } from 'solid-js';
 import { useKeyboard, useTerminalDimensions } from '@opentui/solid';
 import { useHive, type ViewType } from './context/hive';
+import { Dashboard } from './views/dashboard';
 
 // Placeholder views - will be replaced in later tasks
-function Dashboard() {
-  return <text>Dashboard - Press 2 for Plan, 3 for Spec, 4 for Features, q to quit</text>;
-}
-
 function PlanViewer() {
   return <text>Plan Viewer - Press 1 for Dashboard, Esc to go back</text>;
 }
@@ -29,13 +26,13 @@ export function App() {
   // Global keyboard handler
   useKeyboard((evt) => {
     // Number keys to switch views
-    if (evt.name === '1') {
+    if (evt.name === '1' || evt.name === 'd') {
       hive.setView('dashboard');
-    } else if (evt.name === '2') {
+    } else if (evt.name === '2' || evt.name === 'p') {
       hive.setView('plan');
-    } else if (evt.name === '3') {
+    } else if (evt.name === '3' || evt.name === 's') {
       hive.setView('spec');
-    } else if (evt.name === '4') {
+    } else if (evt.name === '4' || evt.name === 'f') {
       hive.setView('features');
     } else if (evt.name === 'q') {
       process.exit(0);
