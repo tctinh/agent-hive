@@ -276,7 +276,7 @@ export function App(props: AppProps): JSX.Element {
       <Show when={editMode() !== 'none'}>
         <CommentEditor
           mode={editMode()}
-          text={editText()}
+          text={editText}
           lineNum={selectedLine()}
         />
       </Show>
