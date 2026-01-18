@@ -6,9 +6,7 @@ import {
   FeatureService,
   PlanService,
   TaskService,
-  SubtaskService,
   ContextService,
-  SessionService,
   detectContext,
   listFeatures,
 } from "hive-core";
@@ -18,7 +16,7 @@ const HIVE_SYSTEM_PROMPT = `
 
 Plan-first development: Write plan → User reviews → Approve → Execute tasks
 
-### Tools (24 total)
+### Tools (18 total)
 
 | Domain | Tools |
 |--------|-------|
@@ -43,21 +41,6 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 
 **Important:** \`hive_exec_complete\` commits changes to task branch but does NOT merge.
 Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manually removed.
-
-### Subtasks & TDD
-
-For complex tasks, break work into subtasks:
-
-\`\`\`
-hive_subtask_create(task, "Write failing tests", "test")
-hive_subtask_create(task, "Implement until green", "implement")
-hive_subtask_create(task, "Run test suite", "verify")
-\`\`\`
-
-Subtask types: test, implement, review, verify, research, debug, custom
-
-**Test-Driven Development**: For implementation tasks, consider writing tests first.
-Tests define "done" and provide feedback loops that improve quality.
 
 ### Plan Format
 
@@ -93,10 +76,10 @@ Save context BEFORE writing the plan, and UPDATE it as planning iterates.
 
 ### Execution Phase - Stay Aligned
 
-During execution, call \`hive_session_refresh\` periodically to:
-- Check for user steering comments
-- See current progress and pending work
-- Get reminded of context files to read
+During execution, call \`hive_status\` periodically to:
+- Check current progress and pending work
+- See context files to read
+- Get reminded of next actions
 `;
 
 type ToolContext = {
@@ -112,13 +95,40 @@ const plugin: Plugin = async (ctx) => {
   const featureService = new FeatureService(directory);
   const planService = new PlanService(directory);
   const taskService = new TaskService(directory);
-  const subtaskService = new SubtaskService(directory);
   const contextService = new ContextService(directory);
-  const sessionService = new SessionService(directory);
   const worktreeService = new WorktreeService({
     baseDir: directory,
     hiveDir: path.join(directory, '.hive'),
   });
+
+  // OMO-Slim detection state
+  let omoSlimDetected = false;
+  let detectionDone = false;
+
+  /**
+   * Detect OMO-Slim by checking for background_task tool.
+   * Called lazily on first tool invocation that needs delegation.
+   */
+  const detectOmoSlim = (toolContext: unknown): boolean => {
+    if (detectionDone) return omoSlimDetected;
+    
+    const ctx = toolContext as any;
+    // Check if background_task is available in tool registry
+    // This indicates OMO-Slim is installed
+    if (ctx?.tools?.includes?.('background_task') || 
+        ctx?.background_task || 
+        typeof ctx?.callTool === 'function') {
+      // We'll verify on first actual use
+      omoSlimDetected = true;
+    }
+    detectionDone = true;
+    
+    if (omoSlimDetected) {
+      console.log('[Hive] OMO-Slim detected: delegated execution with tmux panes enabled');
+    }
+    
+    return omoSlimDetected;
+  };
 
   const resolveFeature = (explicit?: string): string | null => {
     if (explicit) return explicit;
@@ -714,115 +724,6 @@ After merging, proceed to the next task.`;
 ${result}
 
 Make the requested changes, then call hive_request_review again.`;
-          }
-        },
-      }),
-
-      hive_subtask_create: tool({
-        description: 'Create a subtask within a task. Use for TDD: create test/implement/verify subtasks.',
-        args: {
-          task: tool.schema.string().describe('Task folder name'),
-          name: tool.schema.string().describe('Subtask description'),
-          type: tool.schema.enum(['test', 'implement', 'review', 'verify', 'research', 'debug', 'custom']).optional().describe('Subtask type'),
-          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
-        },
-        async execute({ task, name, type, feature: explicitFeature }) {
-          const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
-
-          try {
-            const subtask = subtaskService.create(feature, task, name, type as any);
-            return `Subtask created: ${subtask.id} - ${subtask.name} [${subtask.type || 'custom'}]`;
-          } catch (e: any) {
-            return `Error: ${e.message}`;
-          }
-        },
-      }),
-
-      hive_subtask_update: tool({
-        description: 'Update subtask status',
-        args: {
-          task: tool.schema.string().describe('Task folder name'),
-          subtask: tool.schema.string().describe('Subtask ID (e.g., "1.1")'),
-          status: tool.schema.enum(['pending', 'in_progress', 'done', 'cancelled']).describe('New status'),
-          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
-        },
-        async execute({ task, subtask, status, feature: explicitFeature }) {
-          const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
-
-          try {
-            const updated = subtaskService.update(feature, task, subtask, status as any);
-            return `Subtask ${updated.id} updated: ${updated.status}`;
-          } catch (e: any) {
-            return `Error: ${e.message}`;
-          }
-        },
-      }),
-
-      hive_subtask_list: tool({
-        description: 'List all subtasks for a task',
-        args: {
-          task: tool.schema.string().describe('Task folder name'),
-          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
-        },
-        async execute({ task, feature: explicitFeature }) {
-          const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
-
-          try {
-            const subtasks = subtaskService.list(feature, task);
-            if (subtasks.length === 0) return "No subtasks for this task.";
-
-            return subtasks.map(s => {
-              const typeTag = s.type ? ` [${s.type}]` : '';
-              const statusIcon = s.status === 'done' ? '✓' : s.status === 'in_progress' ? '→' : '○';
-              return `${statusIcon} ${s.id}: ${s.name}${typeTag}`;
-            }).join('\n');
-          } catch (e: any) {
-            return `Error: ${e.message}`;
-          }
-        },
-      }),
-
-      hive_subtask_spec_write: tool({
-        description: 'Write spec.md for a subtask (detailed instructions)',
-        args: {
-          task: tool.schema.string().describe('Task folder name'),
-          subtask: tool.schema.string().describe('Subtask ID (e.g., "1.1")'),
-          content: tool.schema.string().describe('Spec content (markdown)'),
-          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
-        },
-        async execute({ task, subtask, content, feature: explicitFeature }) {
-          const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
-
-          try {
-            const specPath = subtaskService.writeSpec(feature, task, subtask, content);
-            return `Subtask spec written: ${specPath}`;
-          } catch (e: any) {
-            return `Error: ${e.message}`;
-          }
-        },
-      }),
-
-      hive_subtask_report_write: tool({
-        description: 'Write report.md for a subtask (what was done)',
-        args: {
-          task: tool.schema.string().describe('Task folder name'),
-          subtask: tool.schema.string().describe('Subtask ID (e.g., "1.1")'),
-          content: tool.schema.string().describe('Report content (markdown)'),
-          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
-        },
-        async execute({ task, subtask, content, feature: explicitFeature }) {
-          const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
-
-          try {
-            const reportPath = subtaskService.writeReport(feature, task, subtask, content);
-            return `Subtask report written: ${reportPath}`;
-          } catch (e: any) {
-            return `Error: ${e.message}`;
           }
         },
       }),
