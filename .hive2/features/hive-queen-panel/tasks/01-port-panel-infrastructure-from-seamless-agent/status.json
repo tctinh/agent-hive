@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "97cc29a4b1e885c5f37afcb10e59e93c9d688895",
-  "startedAt": "2026-01-13T18:27:11.918Z",
-  "summary": "Created HiveQueenPanel infrastructure:\n- packages/vscode-hive/src/panels/types.ts (message types, PanelMode, TaskProgress, PendingAsk)\n- packages/vscode-hive/src/panels/HiveQueenPanel.ts (WebviewPanel class with Promise-based blocking, _panels/_pendingResolvers maps, showPlan/showWithOptions methods)\n- packages/vscode-hive/media/hiveQueen.html (CSP, header/content/sidebar/dialogs structure)\n- packages/vscode-hive/media/hiveQueen.css (VS Code theme variables, responsive layout)\nBuild verified: vscode-hive.vsix packaged successfully with all new assets.",
-  "completedAt": "2026-01-13T18:35:55.452Z"
-}

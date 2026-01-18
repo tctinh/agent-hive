@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "e2c035ac8879d6d63b9faeb1e93e3333a6a38a3e",
-  "startedAt": "2026-01-17T05:42:36.359Z",
-  "summary": "Created worker-prompt.ts template with buildWorkerPrompt() that injects full context (feature, task, worktree, plan, context files), documents question tool protocol for human-in-the-loop, checkpoint protocol for major pauses, and completion protocol (hive_exec_complete/abort).",
-  "completedAt": "2026-01-17T05:44:39.194Z"
-}

@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "d0bac434192b91fb47eb327de2c0867960e06c71",
-  "startedAt": "2026-01-15T13:03:21.310Z",
-  "summary": "Added initNest command to vscode-hive: Created src/commands/initNest.ts with embedded skill templates, creates .hive/, .opencode/skill/, .claude/skills/, and .github/agents/Hive.agent.md. Registered command in extension.ts and package.json. Build succeeds (249.41 KB vsix).",
-  "completedAt": "2026-01-15T13:07:26.617Z"
-}

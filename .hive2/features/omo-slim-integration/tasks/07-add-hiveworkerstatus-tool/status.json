@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "e2c035ac8879d6d63b9faeb1e93e3333a6a38a3e",
-  "startedAt": "2026-01-17T05:50:18.024Z",
-  "summary": "Added hive_worker_status tool that checks status of delegated workers: shows running/checkpoint status, reads CHECKPOINT files from worktrees, returns JSON with worker list and summary counts. Returns info message when OMO-Slim is not installed.",
-  "completedAt": "2026-01-17T05:51:33.295Z"
-}

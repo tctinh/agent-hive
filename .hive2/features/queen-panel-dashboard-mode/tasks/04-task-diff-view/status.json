@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "55f1995012ffa93cd1ff2d3b442514494cd1b3eb",
-  "startedAt": "2026-01-15T12:11:41.348Z",
-  "summary": "Added hive.viewTaskDiff command that opens the task's worktree folder in a new VS Code window. Uses WorktreeService.get() to find the worktree path.",
-  "completedAt": "2026-01-15T12:12:58.914Z"
-}

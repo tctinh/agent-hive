@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "55f1995012ffa93cd1ff2d3b442514494cd1b3eb",
-  "startedAt": "2026-01-15T12:14:46.910Z",
-  "summary": "Simplified hive_session_open to focus on reading files. Removed session tracking, now returns full plan content (not truncated), checks BLOCKED file, shows PENDING_REVIEW badges on tasks, and includes spec.md/report.md when task is specified. Added fs import.",
-  "completedAt": "2026-01-15T12:17:05.073Z"
-}

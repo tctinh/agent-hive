@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "8a245e8cfcee721ba95a957a6431c50e5ee2d7c2",
-  "startedAt": "2026-01-16T16:35:37.600Z",
-  "summary": "## Renamed session_open to hive_status, Deleted SessionService\n\n### Files Deleted\n- `packages/hive-core/src/services/sessionService.ts` (142 lines)\n\n### Files Modified\n- `hive-core/services/index.ts` - Removed SessionService and SubtaskService exports\n- `opencode-hive/index.ts`:\n  - Removed SessionService import/instantiate\n  - Renamed `hive_session_open` to `hive_status`\n  - Removed `hive_session_list` tool\n  - Updated system prompt: 24 tools → 18 tools\n- `vscode-hive/tools/session.ts` - Renamed to hiveStatus\n\n### Tool Changes\n- `hive_session_open` → `hive_status`\n- Removed `hive_session_list`\n- Session tracking removed (was using sessionService)\n\n**Total: 192 deletions, 13 insertions, 4 files changed**",
-  "completedAt": "2026-01-16T16:39:00.206Z"
-}

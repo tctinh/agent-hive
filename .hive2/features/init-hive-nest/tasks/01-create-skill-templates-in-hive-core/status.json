@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "08264c015257b76f5d4b088f56d696f3f663a57f",
-  "startedAt": "2026-01-15T12:57:51.969Z",
-  "summary": "Created skill templates in packages/hive-core/templates/skills/: hive-workflow.md (core lifecycle), hive-execution.md (worktree orchestration), hive-planning.md (writing effective plans), copilot-agent.md (GitHub Copilot agent template). Added src/templates.ts for template loading functions. Build succeeds.",
-  "completedAt": "2026-01-15T13:03:08.429Z"
-}

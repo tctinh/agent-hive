@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "e2c035ac8879d6d63b9faeb1e93e3333a6a38a3e",
-  "startedAt": "2026-01-17T05:47:23.408Z",
-  "summary": "Created checkpoint-monitor.ts with: Checkpoint/WorkerStatus interfaces, registerWorker/unregisterWorker for tracking, checkForCheckpoint/clearCheckpoint for file ops, getActiveWorkers/getWorkerStatus for querying, markWorkerCompleted/markWorkerFailed for status updates.",
-  "completedAt": "2026-01-17T05:48:10.213Z"
-}

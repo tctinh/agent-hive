@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "8913ea2bd4e91f22e6596b31b2f0c1e402f08a31",
-  "startedAt": "2026-01-18T12:46:04.145Z",
-  "summary": "Removed show_tui parameter from hive_plan_read and hive_status:\n- Removed show_tui arg from both tools\n- Removed TUI spawn logic from both tools\n- Cleaned up the inlined dynamic import\n- Users should now use hive_tui(mode, feature) to launch TUIs explicitly",
-  "completedAt": "2026-01-18T12:48:26.873Z"
-}

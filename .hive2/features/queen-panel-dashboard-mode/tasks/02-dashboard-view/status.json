@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "55f1995012ffa93cd1ff2d3b442514494cd1b3eb",
-  "startedAt": "2026-01-15T12:02:42.428Z",
-  "summary": "Added dashboard mode to HiveQueenPanel showing all features as cards with status badges (blocked/pending review/stale). Added showDashboard static method, FeatureCard types, message handlers for openFeature/backToDashboard/block/unblock. Dashboard HTML rendered inline with grid layout.",
-  "completedAt": "2026-01-15T12:06:25.284Z"
-}

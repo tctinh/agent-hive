@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "80d3e7cd293c5056b006f0384df357a764ca808f",
-  "startedAt": "2026-01-13T19:21:44.155Z",
-  "summary": "Updated system prompt with minimal additions:\n- Added Ask tools (hive_ask, hive_ask_list_pending) to tool table\n- Added hive_session_refresh to Session tools row\n- Added \"Execution Phase - Stay Aligned\" section with guidance:\n  - Call hive_session_refresh periodically during execution\n  - Check for user steering comments and pending work\n  - Use hive_ask for blocking user input\n- Build verified: opencode-hive built successfully (0.64 MB)",
-  "completedAt": "2026-01-13T19:23:57.000Z"
-}

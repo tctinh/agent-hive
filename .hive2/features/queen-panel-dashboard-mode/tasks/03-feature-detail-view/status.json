@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "55f1995012ffa93cd1ff2d3b442514494cd1b3eb",
-  "startedAt": "2026-01-15T12:07:53.997Z",
-  "summary": "Task 03 implementation is included in Task 02 - the _showFeatureDetail method and featureDetail message type were already added to HiveQueenPanel.ts in the dashboard-view task. This task's worktree starts from base without those changes, so marking as complete since the functionality exists in task 02's branch.",
-  "completedAt": "2026-01-15T12:08:34.559Z"
-}

@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "7aed5b0bec352dd2088c73db76599cb4d5cb622f",
-  "startedAt": "2026-01-13T18:36:11.543Z",
-  "summary": "Added file reference system (#filename autocomplete):\n- Extended types.ts with FileSearchResult and FileAttachment interfaces\n- Added TO webview messages: fileSearchResults, updateAttachments\n- Added FROM webview messages: searchFiles, addFileReference, removeAttachment\n- Implemented _handleSearchFiles: uses vscode.workspace.findFiles, filters folders+files, sorts by relevance\n- Implemented _handleAddFileReference: creates attachment from selection\n- Implemented _handleRemoveAttachment: removes by ID\n- Added _getFileIcon helper for file type icons\n- Build verified: vscode-hive.vsix packaged successfully",
-  "completedAt": "2026-01-13T18:42:16.426Z"
-}

@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "e2c035ac8879d6d63b9faeb1e93e3333a6a38a3e",
-  "startedAt": "2026-01-17T05:48:18.160Z",
-  "summary": "Created worker-tools.ts config defining WORKER_ALLOWED_TOOLS (question, hive_exec_complete, hive_exec_abort, etc.) and WORKER_DENIED_TOOLS (hive_exec_start, background_task, hive_merge, etc.). Added isToolAllowedForWorker(), getWorkerToolConfig(), and generateToolAccessDoc() helpers.",
-  "completedAt": "2026-01-17T05:50:11.931Z"
-}

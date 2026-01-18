@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "8a245e8cfcee721ba95a957a6431c50e5ee2d7c2",
-  "startedAt": "2026-01-16T16:28:03.933Z",
-  "summary": "## Removed Subtask System (5 tools)\n\n### Files Deleted\n- `packages/hive-core/src/services/subtaskService.ts` (198 lines)\n- `packages/vscode-hive/src/tools/subtask.ts` (116 lines)\n\n### Files Modified\n- `hive-core/services/index.ts` - Removed SubtaskService export\n- `hive-core/services/taskService.ts` - Removed 182 lines of subtask methods\n- `hive-core/types.ts` - Removed Subtask, SubtaskType, SubtaskStatus (19 lines)\n- `hive-core/utils/paths.ts` - Removed subtask path functions (23 lines)\n- `opencode-hive/index.ts` - Removed 5 tools, updated system prompt (140 lines)\n- `vscode-hive/tools/index.ts` - Removed getSubtaskTools export\n\n### System Prompt Updated\n- Tool count: 24 → 18\n- Removed subtask tools from table\n- Removed \"Subtasks & TDD\" section\n- Changed `hive_session_refresh` to `hive_status` in text\n\n**Total: 670 deletions, 8 files changed**",
-  "completedAt": "2026-01-16T16:35:04.209Z"
-}

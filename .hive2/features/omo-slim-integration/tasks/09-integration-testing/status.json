@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "e2c035ac8879d6d63b9faeb1e93e3333a6a38a3e",
-  "startedAt": "2026-01-17T05:55:00.785Z",
-  "summary": "Created INTEGRATION-TESTING.md with 9 test cases covering: OMO-Slim detection, delegated exec_start, worker spawning, human-in-the-loop (question tool), checkpoint protocol, hive_worker_status, worker completion, inline mode fallback, and graceful fallback without OMO-Slim. Includes agent selection tests and success criteria checklist.",
-  "completedAt": "2026-01-17T05:55:37.965Z"
-}

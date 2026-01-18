@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "beb9ef33fa2bb66f11656c29f9a616b9a0058939",
-  "startedAt": "2026-01-18T12:36:11.831Z",
-  "summary": "Verified Plan Viewer TUI functionality:\n- Displays plan.md with line numbers\n- Syntax highlighting works for headers\n- Correctly integrates with `hive_plan_read(show_tui: true)`\n- Responds to navigation keys (j/k)\n- Successfully launched in tmux side pane",
-  "completedAt": "2026-01-18T12:36:22.855Z"
-}

@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "8a245e8cfcee721ba95a957a6431c50e5ee2d7c2",
-  "startedAt": "2026-01-16T16:26:05.229Z",
-  "summary": "## Audit Complete\n\n### SubtaskService (4 files)\n- `hive-core/services/subtaskService.ts` - DELETE\n- `hive-core/services/index.ts:4` - Remove export\n- `vscode-hive/tools/subtask.ts` - DELETE\n- `opencode-hive/index.ts:9,116` - Remove import/instantiate\n\n### SessionService (4 files)\n- `hive-core/services/sessionService.ts` - DELETE\n- `hive-core/services/index.ts:8` - Remove export\n- `opencode-hive/index.ts:11,118` - Remove import/instantiate\n- `opencode-hive/e2e/plugin-smoke.test.ts:151` - Comment only, no change\n\n### Subtask Extensive (EXPANDED SCOPE)\nBeyond SubtaskService, also need to clean:\n- `hive-core/types.ts:41` - Remove `subtasks` from Task type\n- `hive-core/paths.ts:67-87` - Remove getSubtaskPath/Status/Spec/ReportPath\n- `hive-core/taskService.ts:297-468` - Remove createSubtask, updateSubtask, deleteSubtask, getSubtask, writeSubtaskSpec/Report, readSubtaskSpec/Report\n- `vscode-hive/sidebarProvider.ts` - SubtaskItem, subtaskCount, getSubtasksFromFolders\n- 5 tool definitions in opencode-hive\n\n### Context read/list\n- REMOVE: opencode-hive tools, vscode-hive tools\n- KEEP: contextService.list() method (used by session.ts:105, plan.ts:33,96)\n- UPDATE: exec.ts:36 tip mentions context_read\n\n### No unexpected dependencies found.",
-  "completedAt": "2026-01-16T16:27:47.710Z"
-}

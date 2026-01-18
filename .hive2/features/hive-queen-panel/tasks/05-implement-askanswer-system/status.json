@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "ad7440386167775d26a65442529d492cd67653e0",
-  "startedAt": "2026-01-13T19:00:05.897Z",
-  "summary": "Implemented ask/answer system with lock-based blocking:\n- Created packages/hive-core/src/services/askService.ts (~130 lines):\n  - createAsk(): writes ask.json + .lock file\n  - isLocked(): checks if lock file exists\n  - getAnswer(): reads answer.json\n  - submitAnswer(): writes answer.json, removes lock\n  - listPending(): returns all asks with active locks\n  - cleanup(): removes ask/answer/lock files\n- Created packages/vscode-hive/src/tools/ask.ts (~115 lines):\n  - hiveAsk tool: creates ask, shows VS Code notification, polls lock, returns answer\n  - hiveAskListPending tool: lists pending questions\n- Updated extension.ts: added hive.showAsk command for notification-based answering\n- Updated index.ts exports for both packages\n- Build verified: vscode-hive.vsix packaged (18 files, 238KB)",
-  "completedAt": "2026-01-13T19:11:06.268Z"
-}

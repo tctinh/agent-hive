@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "beb9ef33fa2bb66f11656c29f9a616b9a0058939",
-  "startedAt": "2026-01-18T12:36:27.768Z",
-  "summary": "Verified Task Tracker TUI functionality:\n- Displays task list with status icons\n- Shows progress bar correctly (25% done as Task 1 was merged)\n- Spec/Report panel toggle works\n- Correctly integrates with `hive_status(show_tui: true)`\n- Successfully launched in tmux side pane",
-  "completedAt": "2026-01-18T12:36:39.656Z"
-}

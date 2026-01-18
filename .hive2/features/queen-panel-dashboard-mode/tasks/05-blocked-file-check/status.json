@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "55f1995012ffa93cd1ff2d3b442514494cd1b3eb",
-  "startedAt": "2026-01-15T11:55:46.030Z",
-  "summary": "Added checkBlocked helper function and integrated it into hive_exec_start and hive_session_open tools. When a BLOCKED file exists in .hive/features/<name>/BLOCKED, agents receive a clear message explaining the block and how to proceed.",
-  "completedAt": "2026-01-15T11:58:58.543Z"
-}

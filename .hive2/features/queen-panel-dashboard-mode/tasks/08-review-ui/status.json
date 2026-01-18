@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "55f1995012ffa93cd1ff2d3b442514494cd1b3eb",
-  "startedAt": "2026-01-15T12:09:00.657Z",
-  "summary": "Added Review UI with showReview() static method and _getReviewHtml(). Added types: ReviewRequest interface, showReview/approveTask/requestChanges messages. Review panel shows agent summary, feedback textarea, Approve and Request Changes buttons. Handlers write REVIEW_RESULT and remove PENDING_REVIEW file to unblock agent.",
-  "completedAt": "2026-01-15T12:11:25.171Z"
-}

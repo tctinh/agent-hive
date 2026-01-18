@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "12b229ef6ebec226736cb312e29402e87cf92375",
-  "startedAt": "2026-01-18T12:48:37.451Z",
-  "summary": "Removed show_tui from VSCode extension tools:\n- Removed show_tui property from hive_plan_read inputSchema\n- Removed show_tui property from hive_status inputSchema\n- Removed TUI warning logic since it's no longer needed\n- VSCode tools now only return JSON data (TUI is terminal-only)",
-  "completedAt": "2026-01-18T12:49:36.934Z"
-}

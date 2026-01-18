@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "69dc67892eb2f148c1454794b546b16d6fe069f4",
-  "startedAt": "2026-01-15T13:14:25.336Z",
-  "summary": "Added Skills section to Hive.agent.md with table of available skills (hive-workflow, hive-execution, hive-planning) and reference to Init Hive Nest command for generating them.",
-  "completedAt": "2026-01-15T13:15:26.963Z"
-}

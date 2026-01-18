@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "e2c035ac8879d6d63b9faeb1e93e3333a6a38a3e",
-  "startedAt": "2026-01-17T05:38:01.456Z",
-  "summary": "Added OMO-Slim detection in opencode-hive: detectOmoSlim() function checks for oh-my-opencode-slim package, exports getExecMode() and isOmoSlimAvailable(), updated system prompt with execution modes documentation, added execution mode to hive_status output",
-  "completedAt": "2026-01-17T05:40:01.514Z"
-}
