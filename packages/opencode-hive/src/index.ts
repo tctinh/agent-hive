@@ -251,22 +251,11 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
         description: 'Read plan.md and user comments',
         args: { 
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
-          show_tui: tool.schema.boolean().optional().describe('Launch Plan Viewer TUI in tmux pane (optional)'),
         },
-        async execute({ feature: explicitFeature, show_tui }, toolContext) {
+        async execute({ feature: explicitFeature }, toolContext) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
           captureSession(feature, toolContext);
-          
-          // Optionally spawn TUI
-          if (show_tui) {
-            const { spawnTuiPane } = await import('hive-tui/shared');
-            const result = spawnTuiPane('plan', feature, projectRoot);
-            if (!result.success) {
-              return `Plan TUI spawn failed: ${result.error}\n\nFalling back to text output:\n${JSON.stringify(planService.read(feature), null, 2)}`;
-            }
-            return `Plan Viewer TUI launched in tmux pane ${result.paneId}`;
-          }
           
           const result = planService.read(feature);
           if (!result) return "Error: No plan.md found";
@@ -555,9 +544,8 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
         description: 'Get comprehensive status of a feature including plan, tasks, and context. Returns JSON with all relevant state for resuming work.',
         args: {
           feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
-          show_tui: tool.schema.boolean().optional().describe('Launch Task Tracker TUI in tmux pane (optional)'),
         },
-        async execute({ feature: explicitFeature, show_tui }) {
+        async execute({ feature: explicitFeature }) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) {
             return JSON.stringify({
@@ -572,18 +560,6 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
               error: `Feature '${feature}' not found`,
               availableFeatures: featureService.list(),
             });
-          }
-
-          // Optionally spawn TUI
-          if (show_tui) {
-            const { spawnTuiPane } = await import('hive-tui/shared');
-            const result = spawnTuiPane('tasks', feature, projectRoot);
-            if (!result.success) {
-              // Fall through to normal output if TUI fails
-              console.error(`Task Tracker TUI spawn failed: ${result.error}`);
-            } else {
-              return `Task Tracker TUI launched in tmux pane ${result.paneId}\n\nStatus also returned below for reference.`;
-            }
           }
 
           const blocked = checkBlocked(feature);
