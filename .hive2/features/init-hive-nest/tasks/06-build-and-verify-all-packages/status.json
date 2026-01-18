@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "fb9f0cecc45d1c100d8be4455326bd957175b811",
+  "startedAt": "2026-01-15T13:15:45.407Z",
+  "summary": "All packages build successfully: hive-core (206.70 KB), opencode-hive (0.65 MB), vscode-hive (249.58 KB vsix). Feature complete.",
+  "completedAt": "2026-01-15T13:16:30.931Z"
+}

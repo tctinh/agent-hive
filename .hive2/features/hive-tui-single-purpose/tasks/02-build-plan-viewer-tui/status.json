@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "e915232a868f36e56edefc6ad201425a030ce2bd",
+  "startedAt": "2026-01-17T11:39:40.295Z",
+  "summary": "Built Plan Viewer TUI with OpenTUI/SolidJS:\n\n**Files Created:**\n- `packages/hive-tui/src/plan-viewer/index.tsx` - Entry point with CLI args parsing\n- `packages/hive-tui/src/plan-viewer/app.tsx` - Main app with state, keyboard navigation, comment handling\n- `packages/hive-tui/src/plan-viewer/components/plan-line.tsx` - Line display with inline comments\n- `packages/hive-tui/src/plan-viewer/components/comment-editor.tsx` - Comment input UI\n\n**Features:**\n- Displays plan.md with line numbers and syntax highlighting\n- Shows inline comments below lines (💬 icon)\n- Navigation: j/k, g/G for top/bottom\n- Comment actions: c=add, e=edit, d=delete\n- Auto-refresh via useFileWatcher\n- Header and footer with keybinding hints\n\n**Fixed:**\n- Updated shared/header.tsx to use borderStyle=\"single\" (valid OpenTUI)\n- Used proper OpenTUI API: text fg/bg, onMouseDown, Show component\n\n**Note:** Typecheck fails due to workspace:* resolution in worktrees (hive-core not found). This resolves after merge when running from main.",
+  "completedAt": "2026-01-17T11:50:29.412Z"
+}

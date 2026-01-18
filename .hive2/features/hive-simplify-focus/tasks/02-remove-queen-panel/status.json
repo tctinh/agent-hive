@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "fb9f0cecc45d1c100d8be4455326bd957175b811",
+  "startedAt": "2026-01-16T09:46:40.217Z",
+  "summary": "Removed Queen Panel completely: deleted panels/ and webview/ directories (HiveQueenPanel.ts, types.ts, hiveQueen.ts = 1458 lines). Updated extension.ts to remove imports, status bar item, hive.openQueenPanel and hive.showAsk commands. Updated package.json to remove command registration, keybinding, and webview build step. Net -1,557 lines.",
+  "completedAt": "2026-01-16T09:52:31.425Z"
+}

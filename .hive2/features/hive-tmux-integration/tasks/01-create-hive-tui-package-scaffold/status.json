@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "46f986dd63f992a8c433609583e2b33413ac6a58",
+  "startedAt": "2026-01-17T08:41:19.003Z",
+  "summary": "Created hive-tui package with Ink/React scaffold:\n- package.json with ink, react, chokidar, hive-core deps\n- tsconfig.json and tsup.config.ts for build\n- src/index.tsx entry point\n- src/App.tsx with view router and keyboard handling\n- Stub views: Dashboard, PlanViewer, SpecViewer, FeatureSelect\n- All views receive projectRoot prop for hive-core services\n- Build passes, generates dist/index.js (9.4KB)",
+  "completedAt": "2026-01-17T08:48:04.626Z"
+}

@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "b973e4f13cd4426cb48edfbfa4eaaad8dab7b30d",
+  "startedAt": "2026-01-17T08:56:42.727Z",
+  "summary": "Added tmux utilities (packages/hive-tui/src/utils/tmux.ts) with isInsideTmux, isTmuxAvailable, spawnTuiPane, closeTuiPane, getManualCommand functions. Added hive_tui tool to opencode-hive that auto-spawns TUI in tmux pane or returns manual command. Updated HIVE_SYSTEM_PROMPT to include TUI tool. Both packages build successfully.",
+  "completedAt": "2026-01-17T08:58:45.104Z"
+}

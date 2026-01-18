@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "59b2a9e6cc2460a44c9141fa55bf811443170fa9",
+  "startedAt": "2026-01-15T13:11:25.414Z",
+  "summary": "Added hive_skill tool to opencode-hive. Discovers skills from .hive/skills/, .opencode/skill/, .claude/skills/. Parses YAML frontmatter and returns skill body. Lists available skills if requested skill not found. Updated HIVE_SYSTEM_PROMPT tool table. Build succeeds (0.65 MB).",
+  "completedAt": "2026-01-15T13:14:04.381Z"
+}

@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "679a7f697ba138e8d117f9f51b62bc6f8d04953c",
+  "startedAt": "2026-01-17T11:57:33.674Z",
+  "summary": "Added `show_tui` parameter to hive tools for TUI integration:\n\n**OpenCode Plugin (packages/opencode-hive/src/index.ts):**\n- `hive_plan_read`: Added `show_tui` boolean param that spawns Plan Viewer TUI via `spawnTuiPane('plan', feature, projectRoot)`\n- `hive_status`: Added `show_tui` boolean param that spawns Task Tracker TUI via `spawnTuiPane('tasks', feature, projectRoot)`\n\n**VSCode Extension:**\n- `packages/vscode-hive/src/tools/plan.ts`: Added `show_tui` param with graceful fallback (VSCode doesn't support tmux)\n- `packages/vscode-hive/src/tools/status.ts`: Added `show_tui` param with log warning\n\n**Behavior:**\n- When `show_tui: true` in tmux: spawns TUI in side pane\n- When TUI spawn fails: falls back to JSON output\n- In VSCode: warns that TUI not supported, returns normal data",
+  "completedAt": "2026-01-17T11:59:44.615Z"
+}

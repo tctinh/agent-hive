@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "1e1e1e088facdf6e4484889d2d43e30446e89871",
+  "startedAt": "2026-01-17T08:52:53.626Z",
+  "summary": "Built SpecViewer for task specs:\n- Shows spec.md for in-progress/pending task\n- Task selector with ←→ navigation\n- Scrollable content with line numbers\n- Keyboard: ↑↓ scroll, ←→ switch tasks, Esc back\n- Build passes (25.29 KB)",
+  "completedAt": "2026-01-17T08:54:05.764Z"
+}

@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "9651bc5f9c9a2574ed615ae94ecbcd10fc87513e",
+  "startedAt": "2026-01-17T09:49:05.972Z",
+  "summary": "Created SolidJS context and app shell: context/helper.tsx (createSimpleContext pattern), context/hive.tsx (feature, projectRoot, view, selectedTask signals with navigate helper), app.tsx (useKeyboard for 1/2/3/4/q/Esc, Switch/Match view routing, placeholder views), index.tsx (HiveProvider wrapper, render with targetFps:60). Build passes (4.14 KB).",
+  "completedAt": "2026-01-17T09:50:52.109Z"
+}

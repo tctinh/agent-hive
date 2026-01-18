@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "4bf9e5bf791c5deeb4f7f07731d5b6bb809d3ebb",
+  "startedAt": "2026-01-17T08:58:56.857Z",
+  "summary": "Added comprehensive README.md for hive-tui package with Quick Start guide, Keyboard Shortcuts reference (global, Plan Viewer, Spec Viewer, Feature Selector), Views documentation, tmux integration instructions, and Architecture overview. Build verified at 26.52 KB.",
+  "completedAt": "2026-01-17T09:00:00.083Z"
+}

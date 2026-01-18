@@ -1,0 +1,30 @@
+import { TaskStatus, TaskStatusType, TasksSyncResult, TaskInfo, Subtask, SubtaskType } from '../types.js';
+export declare class TaskService {
+    private projectRoot;
+    constructor(projectRoot: string);
+    sync(featureName: string): TasksSyncResult;
+    create(featureName: string, name: string, order?: number): string;
+    private createFromPlan;
+    writeSpec(featureName: string, taskFolder: string, content: string): string;
+    readSpec(featureName: string, taskFolder: string): string | null;
+    update(featureName: string, taskFolder: string, updates: Partial<Pick<TaskStatus, 'status' | 'summary' | 'baseCommit'>>): TaskStatus;
+    get(featureName: string, taskFolder: string): TaskInfo | null;
+    list(featureName: string): TaskInfo[];
+    writeReport(featureName: string, taskFolder: string, report: string): string;
+    private listFolders;
+    private deleteTask;
+    private getNextOrder;
+    private parseTasksFromPlan;
+    createSubtask(featureName: string, taskFolder: string, name: string, type?: SubtaskType): Subtask;
+    updateSubtask(featureName: string, taskFolder: string, subtaskId: string, status: TaskStatusType): Subtask;
+    listSubtasks(featureName: string, taskFolder: string): Subtask[];
+    deleteSubtask(featureName: string, taskFolder: string, subtaskId: string): void;
+    getSubtask(featureName: string, taskFolder: string, subtaskId: string): Subtask | null;
+    writeSubtaskSpec(featureName: string, taskFolder: string, subtaskId: string, content: string): string;
+    writeSubtaskReport(featureName: string, taskFolder: string, subtaskId: string, content: string): string;
+    readSubtaskSpec(featureName: string, taskFolder: string, subtaskId: string): string | null;
+    readSubtaskReport(featureName: string, taskFolder: string, subtaskId: string): string | null;
+    private listSubtaskFolders;
+    private findSubtaskFolder;
+    private slugify;
+}

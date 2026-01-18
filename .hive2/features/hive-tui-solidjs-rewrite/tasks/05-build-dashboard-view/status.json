@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "a3ab8be0e983491a1663db755dd93cb1a41bb9fc",
+  "startedAt": "2026-01-17T09:52:41.385Z",
+  "summary": "Created views/dashboard.tsx: Uses Header, ProgressBar, TaskList components. Loads feature info and tasks from hive-core (featureService, taskService). onTaskClick navigates to spec view. Updated app.tsx to import real Dashboard and added letter shortcuts (d/p/s/f). Build passes (9.22 KB).",
+  "completedAt": "2026-01-17T09:54:16.143Z"
+}

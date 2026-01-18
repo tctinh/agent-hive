@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "671a81b41d4805611444ca8593683aa925ee9abb",
+  "startedAt": "2026-01-13T19:24:17.049Z",
+  "summary": "Added hive.openQueenPanel command with Cmd+Shift+H keybinding, status bar item showing 🐝 with pending asks count that auto-updates on .hive/ changes, and command handler that opens HiveQueenPanel for the active feature.",
+  "completedAt": "2026-01-13T19:34:17.625Z"
+}

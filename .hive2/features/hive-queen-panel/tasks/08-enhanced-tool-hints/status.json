@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "907ed2601e7e214bd390013aeee97179d8287a2c",
+  "startedAt": "2026-01-13T19:19:13.831Z",
+  "summary": "Added enhanced tool hints:\n- Modified packages/vscode-hive/src/tools/exec.ts:\n  - hive_exec_start: Added hints array with worktree, refresh, ask, and context reminders\n  - hive_exec_complete: Added hints for refresh and next steps\n- Modified packages/vscode-hive/src/tools/task.ts:\n  - hive_tasks_sync: Changed output to JSON with hints for exec_start, task ordering, context reading, and session refresh\n- Build verified: vscode-hive.vsix packaged (18 files, 239KB)",
+  "completedAt": "2026-01-13T19:21:01.137Z"
+}

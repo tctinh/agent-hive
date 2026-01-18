@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "1cee0bcd9f890386d39004fbfe5f9a5087f7e6da",
+  "startedAt": "2026-01-17T09:59:22.371Z",
+  "summary": "Added chokidar-based file watcher hook (useHiveWatcher) that monitors .hive/features/<feature> for changes and auto-refreshes Dashboard and PlanViewer. Fixed type errors: instantiated FeatureService/TaskService/PlanService correctly, changed backgroundColor to bg, used evt.raw for keyboard input, and applied bg+fg for selection highlighting. Added readSpec() method to TaskService. Build: 26.25 KB (passed typecheck).",
+  "completedAt": "2026-01-17T10:12:08.124Z"
+}

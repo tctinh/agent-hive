@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "be0a964882797258323276e6c2c6f39aeeefac76",
+  "startedAt": "2026-01-13T18:52:54.080Z",
+  "summary": "Integrated HiveQueenPanel with hive-core services:\n- Added import for TaskService from hive-core\n- Added _featureName and _projectRoot properties to panel\n- Replaced raw fs operations in _refreshTaskProgress() with TaskService.list() call\n- Added _mapTaskStatus() helper to convert service status strings to panel status\n- Extended HiveQueenOptions with projectRoot field\n- Build verified: vscode-hive.vsix packaged successfully (18 files, 236KB)",
+  "completedAt": "2026-01-13T18:58:13.353Z"
+}

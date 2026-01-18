@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "f838018426dd2f3151282c8e12819beb8ae267a3",
+  "startedAt": "2026-01-17T09:57:06.298Z",
+  "summary": "Created views/spec-viewer.tsx (clickable task list with onMouseDown, spec content display, ←→ to switch tasks, j/k to scroll) and views/feature-select.tsx (clickable feature list with Enter/click to select, shows current feature). Updated app.tsx to import real components. Build passes (24.42 KB).",
+  "completedAt": "2026-01-17T09:58:55.483Z"
+}

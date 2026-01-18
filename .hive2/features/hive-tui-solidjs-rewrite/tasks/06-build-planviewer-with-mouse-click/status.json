@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "ff3cf6a84886cd2f0503e0aceb789d696938219a",
+  "startedAt": "2026-01-17T09:54:36.924Z",
+  "summary": "Created views/plan-viewer.tsx with MOUSE CLICK support: onMouseDown on each line to select, j/k/arrows navigation synced with scroll, g/G top/bottom, c to comment with inline input, Esc to cancel/back. Comments saved via planService.addComment and displayed with 💬 indicator. Updated app.tsx to import real PlanViewer. Build passes (16.02 KB).",
+  "completedAt": "2026-01-17T09:56:50.157Z"
+}

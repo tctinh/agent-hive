@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "b9767d4120e5536c419b82b31973e4abfc6c98ba",
+  "startedAt": "2026-01-18T12:43:21.030Z",
+  "summary": "Updated hive_tui tool to use new single-purpose TUIs:\n- Added `mode` parameter: 'plan' | 'tasks' (required)\n- 'plan' mode launches Plan Viewer TUI\n- 'tasks' mode launches Task Tracker TUI\n- Updated keyboard shortcut hints for each mode\n- Changed pane width from 60 to 70 columns",
+  "completedAt": "2026-01-18T12:44:54.469Z"
+}

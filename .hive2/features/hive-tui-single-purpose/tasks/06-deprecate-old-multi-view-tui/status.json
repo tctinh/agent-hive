@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "07ccc3a732bd1015202846a469df8f6c1a5efb8e",
+  "startedAt": "2026-01-17T12:01:30.186Z",
+  "summary": "Deprecated old multi-view TUI and updated entry point:\n\n**Changes:**\n1. Moved old files to `src/_deprecated/`:\n   - `views/` → `views-old/`\n   - `components/` → `components-old/`\n   - `hooks/` → `hooks-old/`\n   - `context/` → `context/`\n   - `app.tsx` → `app-multi-view.tsx`\n\n2. Updated `src/index.tsx` as new launcher:\n   - `hive-tui plan <feature>` → Plan Viewer TUI\n   - `hive-tui tasks <feature>` → Task Tracker TUI\n   - Old usage shows deprecation warning with migration instructions\n\n3. Updated `_deprecated/README.md`:\n   - Documents why multi-view was deprecated\n   - Points to new single-purpose TUIs\n   - Notes both OpenTUI multi-view and old Ink/React versions",
+  "completedAt": "2026-01-17T12:02:48.858Z"
+}

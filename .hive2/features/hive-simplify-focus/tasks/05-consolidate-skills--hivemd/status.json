@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "fb9f0cecc45d1c100d8be4455326bd957175b811",
+  "startedAt": "2026-01-16T10:03:02.001Z",
+  "summary": "Consolidated 3 skills (hive-workflow, hive-planning, hive-execution) into single hive.md. Removed 548 lines net. Updated templates.ts, opencode-hive/index.ts, and initNest.ts to use unified 'hive' skill.",
+  "completedAt": "2026-01-16T10:06:41.352Z"
+}

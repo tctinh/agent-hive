@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "68d9829c5e22bc42dcf64cfaaacad61da418710c",
+  "startedAt": "2026-01-17T09:43:53.669Z",
+  "summary": "Moved all Ink/React TUI files to src/_deprecated/ (App.tsx, components/, hooks/, views/, utils/). Added README.md explaining deprecation reasons and preserved file structure. Only index.tsx remains in src/ root.",
+  "completedAt": "2026-01-17T09:44:47.269Z"
+}

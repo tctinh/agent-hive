@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "55f1995012ffa93cd1ff2d3b442514494cd1b3eb",
+  "startedAt": "2026-01-15T11:59:44.580Z",
+  "summary": "Added hive_request_review tool that implements PR-style review flow. Agent calls it after completing work, tool creates PENDING_REVIEW file and polls every 2s until human responds. Appends to report.md with attempt history. Returns APPROVED or changes feedback.",
+  "completedAt": "2026-01-15T12:02:28.055Z"
+}

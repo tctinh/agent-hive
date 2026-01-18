@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "490dc8c85ca974eb863495be07fed099f1207aac",
+  "startedAt": "2026-01-13T19:11:23.913Z",
+  "summary": "Implemented hive_session_refresh tool:\n- Created packages/vscode-hive/src/tools/session.ts (~180 lines):\n  - hiveSessionRefresh tool returns feature-specific state:\n    - Phase (planning/execution)\n    - Plan summary (first 500 chars)\n    - Task list with status icons (✓/→/○)\n    - Progress counts (done/inProgress/pending)\n    - Context file list\n    - Pending asks\n    - Warnings (no context files, pending asks waiting)\n    - Tips (phase-specific guidance)\n- Updated tools/index.ts to export getSessionTools\n- Updated extension.ts to register session tools\n- Build verified: vscode-hive.vsix packaged (18 files, 239KB)",
+  "completedAt": "2026-01-13T19:16:35.381Z"
+}

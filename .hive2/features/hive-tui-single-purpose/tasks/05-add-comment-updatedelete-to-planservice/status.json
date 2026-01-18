@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "d3dda3ecb6c908d7357c8c2c6649e7c821d5d055",
+  "startedAt": "2026-01-17T12:00:18.518Z",
+  "summary": "Added update and delete methods to PlanService for comment CRUD:\n\n**New Methods in packages/hive-core/src/services/planService.ts:**\n\n1. `updateComment(featureName, commentId, body)`:\n   - Finds comment by ID and updates its body\n   - Updates timestamp on edit\n   - Returns updated PlanComment or null if not found\n\n2. `deleteComment(featureName, commentId)`:\n   - Removes comment by ID from threads array\n   - Returns true if deleted, false if not found\n\nBoth methods read/write to comments.json file via existing path utilities.",
+  "completedAt": "2026-01-17T12:01:18.636Z"
+}

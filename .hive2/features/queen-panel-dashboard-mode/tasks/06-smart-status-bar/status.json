@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "55f1995012ffa93cd1ff2d3b442514494cd1b3eb",
+  "startedAt": "2026-01-15T12:13:34.396Z",
+  "summary": "Enhanced updateStatusBar to show fleet health: feature count, pending reviews count, blocked count. Uses codicons (bee/bell/stop). Works even without active feature - shows all features.",
+  "completedAt": "2026-01-15T12:14:31.927Z"
+}

@@ -1,0 +1,8 @@
+{
+  "status": "done",
+  "origin": "plan",
+  "baseCommit": "cc987e6015c98f312fd962b809b3aab01626597e",
+  "startedAt": "2026-01-17T11:36:54.706Z",
+  "summary": "Created shared infrastructure for single-purpose TUIs:\n\n**shared/hooks/**\n- `use-file-watcher.ts` - Chokidar-based file watcher that monitors .hive/features/<feature>/ and returns refreshKey signal\n\n**shared/utils/**\n- `tmux.ts` - Tmux utilities: isInsideTmux(), isTmuxAvailable(), spawnTuiPane(mode, feature, root), closeTuiPane(paneId), getManualCommand()\n\n**shared/components/**\n- `header.tsx` - Reusable header component with icon, title, feature name, and optional status\n\nAll exports consolidated in shared/index.ts. Build passed: 26.25 KB.",
+  "completedAt": "2026-01-17T11:39:23.897Z"
+}
