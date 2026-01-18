@@ -10,7 +10,7 @@ export interface FeatureJson {
   completedAt?: string;
 }
 
-export type TaskStatusType = 'pending' | 'in_progress' | 'done' | 'cancelled';
+export type TaskStatusType = 'pending' | 'in_progress' | 'done' | 'cancelled' | 'blocked';
 export type TaskOrigin = 'plan' | 'manual';
 export type SubtaskType = 'test' | 'implement' | 'review' | 'verify' | 'research' | 'debug' | 'custom';
 

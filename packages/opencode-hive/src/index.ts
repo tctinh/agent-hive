@@ -10,13 +10,16 @@ import {
   detectContext,
   listFeatures,
 } from "hive-core";
+import { selectAgent, type OmoSlimAgent } from "./utils/agent-selector";
+import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
+import { buildHiveAgentPrompt, type FeatureContext } from "./agents/hive";
 
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development System
 
 Plan-first development: Write plan → User reviews → Approve → Execute tasks
 
-### Tools (18 total)
+### Tools (19 total)
 
 | Domain | Tools |
 |--------|-------|
@@ -24,6 +27,7 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Plan | hive_plan_write, hive_plan_read, hive_plan_approve |
 | Task | hive_tasks_sync, hive_task_create, hive_task_update |
 | Exec | hive_exec_start, hive_exec_complete, hive_exec_abort |
+| Worker | hive_worker_status |
 | Merge | hive_merge, hive_worktree_list |
 | Context | hive_context_write |
 | Status | hive_status |
@@ -41,6 +45,35 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 
 **Important:** \`hive_exec_complete\` commits changes to task branch but does NOT merge.
 Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manually removed.
+
+### Delegated Execution (OMO-Slim Integration)
+
+When OMO-Slim is installed, \`hive_exec_start\` spawns worker agents in tmux panes:
+
+1. \`hive_exec_start(task)\` → Creates worktree + spawns worker via \`background_task\`
+2. Worker appears in tmux pane - watch it work in real-time
+3. Worker completes → calls \`hive_exec_complete(status: "completed")\`
+4. Worker blocked → calls \`hive_exec_complete(status: "blocked", blocker: {...})\`
+
+**Handling blocked workers:**
+1. Check blockers with \`hive_worker_status()\`
+2. Read the blocker info (reason, options, recommendation)
+3. Ask user via \`question()\` tool
+4. Resume with \`hive_exec_start(task, continueFrom: "blocked", decision: answer)\`
+
+**Agent auto-selection** based on task content:
+| Pattern | Agent |
+|---------|-------|
+| find, search, explore | explore |
+| research, docs | librarian |
+| ui, component, react | frontend-ui-ux-engineer |
+| refactor, simplify | code-simplicity-reviewer |
+| readme, document | document-writer |
+| image, screenshot | multimodal-looker |
+| architect, decision | oracle |
+| (default) | general |
+
+Without OMO-Slim: \`hive_exec_start\` falls back to inline mode (work in same session).
 
 ### Plan Format
 
@@ -338,12 +371,14 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       }),
 
       hive_exec_start: tool({
-        description: 'Create worktree and begin work on task',
+        description: 'Create worktree and begin work on task. When OMO-Slim is installed, spawns worker agent in tmux pane.',
         args: { 
           task: tool.schema.string().describe('Task folder name'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
+          continueFrom: tool.schema.enum(['blocked']).optional().describe('Resume a blocked task'),
+          decision: tool.schema.string().optional().describe('Answer to blocker question when continuing'),
         },
-        async execute({ task, feature: explicitFeature }) {
+        async execute({ task, feature: explicitFeature, continueFrom, decision }, toolContext) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
@@ -352,9 +387,22 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
 
           const taskInfo = taskService.get(feature, task);
           if (!taskInfo) return `Error: Task "${task}" not found`;
+          
+          // Allow continuing blocked tasks, but not completed ones
           if (taskInfo.status === 'done') return "Error: Task already completed";
+          if (continueFrom === 'blocked' && taskInfo.status !== 'blocked') {
+            return "Error: Task is not in blocked state. Use without continueFrom.";
+          }
 
-          const worktree = await worktreeService.create(feature, task);
+          // Check if we're continuing from blocked - reuse existing worktree
+          let worktree;
+          if (continueFrom === 'blocked') {
+            worktree = await worktreeService.get(feature, task);
+            if (!worktree) return "Error: No worktree found for blocked task";
+          } else {
+            worktree = await worktreeService.create(feature, task);
+          }
+          
           taskService.update(feature, task, { 
             status: 'in_progress',
             baseCommit: worktree.commit,
@@ -372,7 +420,7 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
           specContent += `## Feature: ${feature}\n\n`;
           
           if (planResult) {
-            const taskMatch = planResult.content.match(new RegExp(`###\\s*\\d+\\.\\s*${taskInfo.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?(?=###|$)`, 'i'));
+            const taskMatch = planResult.content.match(new RegExp(`###\\s*\\d+\\.\\s*${taskInfo.name.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}[\\s\\S]*?(?=###|$)`, 'i'));
             if (taskMatch) {
               specContent += `## Plan Section\n\n${taskMatch[0].trim()}\n\n`;
             }
@@ -388,35 +436,138 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
 
           taskService.writeSpec(feature, task, specContent);
 
+          // Check for OMO-Slim and delegate if available
+          detectOmoSlim(toolContext);
+          
+          if (omoSlimDetected) {
+            // Prepare context for worker prompt
+            const contextFiles: ContextFile[] = [];
+            const contextDir = path.join(directory, '.hive', 'features', feature, 'context');
+            if (fs.existsSync(contextDir)) {
+              const files = fs.readdirSync(contextDir).filter(f => f.endsWith('.md'));
+              for (const file of files) {
+                const content = fs.readFileSync(path.join(contextDir, file), 'utf-8');
+                contextFiles.push({ name: file, content });
+              }
+            }
+
+            const previousTasks: CompletedTask[] = allTasks
+              .filter(t => t.status === 'done' && t.summary)
+              .map(t => ({ name: t.folder, summary: t.summary! }));
+
+            // Build worker prompt
+            const workerPrompt = buildWorkerPrompt({
+              feature,
+              task,
+              taskOrder: parseInt(taskInfo.folder.match(/^(\d+)/)?.[1] || '0', 10),
+              worktreePath: worktree.path,
+              branch: worktree.branch,
+              plan: planResult?.content || 'No plan available',
+              contextFiles,
+              spec: specContent,
+              previousTasks,
+              continueFrom: continueFrom === 'blocked' ? {
+                status: 'blocked',
+                previousSummary: (taskInfo as any).summary || 'No previous summary',
+                decision: decision || 'No decision provided',
+              } : undefined,
+            });
+
+            // Select appropriate agent based on task content
+            const agent = selectAgent(taskInfo.name, specContent);
+
+            // Call OMO-Slim's background_task
+            try {
+              const ctx = toolContext as any;
+              if (ctx.callTool) {
+                const result = await ctx.callTool('background_task', {
+                  agent,
+                  prompt: workerPrompt,
+                  description: `Hive: ${task}`,
+                  sync: false,
+                });
+
+                // Store worker info in task
+                taskService.update(feature, task, {
+                  status: 'in_progress',
+                  workerId: result?.task_id,
+                  agent,
+                  mode: 'omo-slim',
+                } as any);
+
+                return JSON.stringify({
+                  worktreePath: worktree.path,
+                  branch: worktree.branch,
+                  mode: 'delegated',
+                  agent,
+                  taskId: result?.task_id,
+                  message: `Worker spawned via OMO-Slim (${agent} agent). Watch in tmux pane. Use hive_worker_status to check progress.`,
+                }, null, 2);
+              }
+            } catch (e: any) {
+              // Fall through to inline mode if delegation fails
+              console.log('[Hive] OMO-Slim delegation failed, falling back to inline:', e.message);
+            }
+          }
+
+          // Inline mode (no OMO-Slim or delegation failed)
           return `Worktree created at ${worktree.path}\nBranch: ${worktree.branch}\nBase commit: ${worktree.commit}\nSpec: ${task}/spec.md generated\nReminder: do all work inside this worktree and ensure any subagents do the same.`;
         },
       }),
 
       hive_exec_complete: tool({
-        description: 'Complete task: commit changes to branch, write report (does NOT merge or cleanup)',
+        description: 'Complete task: commit changes to branch, write report. Supports blocked/failed/partial status for worker communication.',
         args: {
           task: tool.schema.string().describe('Task folder name'),
           summary: tool.schema.string().describe('Summary of what was done'),
+          status: tool.schema.enum(['completed', 'blocked', 'failed', 'partial']).optional().default('completed').describe('Task completion status'),
+          blocker: tool.schema.object({
+            reason: tool.schema.string().describe('Why the task is blocked'),
+            options: tool.schema.array(tool.schema.string()).optional().describe('Available options for the user'),
+            recommendation: tool.schema.string().optional().describe('Your recommended choice'),
+            context: tool.schema.string().optional().describe('Additional context for the decision'),
+          }).optional().describe('Blocker info when status is blocked'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
-        async execute({ task, summary, feature: explicitFeature }) {
+        async execute({ task, summary, status = 'completed', blocker, feature: explicitFeature }) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
           const taskInfo = taskService.get(feature, task);
           if (!taskInfo) return `Error: Task "${task}" not found`;
-          if (taskInfo.status !== 'in_progress') return "Error: Task not in progress";
+          if (taskInfo.status !== 'in_progress' && taskInfo.status !== 'blocked') return "Error: Task not in progress";
 
+          // Handle blocked status - don't commit, just update status
+          if (status === 'blocked') {
+            taskService.update(feature, task, { 
+              status: 'blocked', 
+              summary,
+              blocker: blocker as any,
+            } as any);
+
+            const worktree = await worktreeService.get(feature, task);
+            return JSON.stringify({
+              status: 'blocked',
+              task,
+              summary,
+              blocker,
+              worktreePath: worktree?.path,
+              message: 'Task blocked. Hive Master will ask user and resume with hive_exec_start(continueFrom: "blocked", decision: answer)',
+            }, null, 2);
+          }
+
+          // For failed/partial, still commit what we have
           const commitResult = await worktreeService.commitChanges(feature, task, `hive(${task}): ${summary.slice(0, 50)}`);
           
           const diff = await worktreeService.getDiff(feature, task);
 
+          const statusLabel = status === 'completed' ? 'success' : status;
           const reportLines: string[] = [
             `# Task Report: ${task}`,
             '',
             `**Feature:** ${feature}`,
             `**Completed:** ${new Date().toISOString()}`,
-            `**Status:** success`,
+            `**Status:** ${statusLabel}`,
             `**Commit:** ${commitResult.sha || 'none'}`,
             '',
             '---',
@@ -451,10 +602,12 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
           }
 
           taskService.writeReport(feature, task, reportLines.join('\n'));
-          taskService.update(feature, task, { status: 'done', summary });
+          
+          const finalStatus = status === 'completed' ? 'done' : status;
+          taskService.update(feature, task, { status: finalStatus as any, summary });
 
           const worktree = await worktreeService.get(feature, task);
-          return `Task "${task}" completed. Changes committed to branch ${worktree?.branch || 'unknown'}.\nUse hive_merge to integrate changes. Worktree preserved at ${worktree?.path || 'unknown'}.`;
+          return `Task "${task}" ${status}. Changes committed to branch ${worktree?.branch || 'unknown'}.\nUse hive_merge to integrate changes. Worktree preserved at ${worktree?.path || 'unknown'}.`;
         },
       }),
 
@@ -472,6 +625,67 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
           taskService.update(feature, task, { status: 'pending' });
 
           return `Task "${task}" aborted. Status reset to pending.`;
+        },
+      }),
+
+      hive_worker_status: tool({
+        description: 'Check status of delegated workers. Shows running workers, blockers, and progress.',
+        args: {
+          task: tool.schema.string().optional().describe('Specific task to check, or omit for all'),
+          feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
+        },
+        async execute({ task: specificTask, feature: explicitFeature }) {
+          const feature = resolveFeature(explicitFeature);
+          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+
+          const STUCK_THRESHOLD = 10 * 60 * 1000; // 10 minutes
+          const now = Date.now();
+
+          const tasks = taskService.list(feature);
+          const inProgressTasks = tasks.filter(t => 
+            (t.status === 'in_progress' || t.status === 'blocked') &&
+            (!specificTask || t.folder === specificTask)
+          );
+
+          if (inProgressTasks.length === 0) {
+            return specificTask 
+              ? `No active worker for task "${specificTask}"`
+              : "No active workers.";
+          }
+
+          const workers = await Promise.all(inProgressTasks.map(async (t) => {
+            const worktree = await worktreeService.get(feature, t.folder);
+            const taskData = t as any;
+            
+            // Calculate if stuck (if we have startedAt)
+            const startedAt = taskData.startedAt ? new Date(taskData.startedAt).getTime() : now;
+            const maybeStuck = (now - startedAt) > STUCK_THRESHOLD && t.status === 'in_progress';
+
+            return {
+              task: t.folder,
+              name: t.name,
+              status: t.status,
+              agent: taskData.agent || 'inline',
+              mode: taskData.mode || 'inline',
+              workerId: taskData.workerId || null,
+              worktreePath: worktree?.path || null,
+              branch: worktree?.branch || null,
+              maybeStuck,
+              blocker: taskData.blocker || null,
+              summary: t.summary || null,
+            };
+          }));
+
+          return JSON.stringify({
+            feature,
+            omoSlimDetected,
+            workers,
+            hint: workers.some(w => w.status === 'blocked')
+              ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
+              : workers.some(w => w.maybeStuck)
+              ? 'Some workers may be stuck. Check tmux panes or abort with hive_exec_abort.'
+              : 'Workers in progress. Watch tmux panes for live updates.',
+          }, null, 2);
         },
       }),
 
@@ -791,6 +1005,90 @@ Skills are discovered from:
           return `Create feature "${name}" using hive_feature_create tool.`;
         },
       },
+    },
+
+    // Hive Agent - hybrid planner-orchestrator
+    // Agent config follows OpenCode SDK format: model, prompt, temperature
+    agent: {
+      hive: {
+        model: undefined, // Use default model
+        temperature: 0.7,
+        description: 'Hive Master - plan-first development with structured workflow and worker delegation',
+        // Static base prompt - dynamic context injected via systemPrompt hook
+        prompt: buildHiveAgentPrompt(undefined, false),
+      },
+    },
+
+    // Dynamic context injection - this runs on every message
+    systemPrompt: (existingPrompt: string) => {
+      // Only enhance if using hive agent (check if our prompt is in there)
+      if (!existingPrompt.includes('Hive Master')) {
+        return existingPrompt;
+      }
+
+      // Build feature context if active
+      const featureNames = listFeatures(directory);
+      let featureContext: FeatureContext | undefined;
+      
+      for (const featureName of featureNames) {
+        const feature = featureService.get(featureName);
+        if (feature && ['planning', 'executing'].includes(feature.status)) {
+          const tasks = taskService.list(featureName);
+          const pendingCount = tasks.filter(t => t.status === 'pending').length;
+          const inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
+          const doneCount = tasks.filter(t => t.status === 'done').length;
+          
+          const contextDir = path.join(directory, '.hive', 'features', featureName, 'context');
+          const contextList = fs.existsSync(contextDir)
+            ? fs.readdirSync(contextDir).filter(f => f.endsWith('.md'))
+            : [];
+
+          const planResult = planService.read(featureName);
+          let planStatus: 'none' | 'draft' | 'approved' = 'none';
+          if (planResult) {
+            planStatus = planResult.status === 'approved' || planResult.status === 'executing' 
+              ? 'approved' 
+              : 'draft';
+          }
+
+          featureContext = {
+            name: featureName,
+            planStatus,
+            tasksSummary: `${doneCount} done, ${inProgressCount} in progress, ${pendingCount} pending`,
+            contextList,
+          };
+          break;
+        }
+      }
+
+      // If we have feature context or OMO-Slim, rebuild with dynamic content
+      if (featureContext || omoSlimDetected) {
+        return buildHiveAgentPrompt(featureContext, omoSlimDetected);
+      }
+
+      return existingPrompt;
+    },
+
+    // Config hook - merge agents into opencodeConfig.agent (like OMO-Slim does)
+    config: async (opencodeConfig: Record<string, unknown>) => {
+      // Define hive agent config
+      const hiveAgentConfig = {
+        model: undefined,
+        temperature: 0.7,
+        description: 'Hive Master - plan-first development with structured workflow and worker delegation',
+        prompt: buildHiveAgentPrompt(undefined, false),
+      };
+
+      // Merge hive agent into opencodeConfig.agent
+      const configAgent = opencodeConfig.agent as Record<string, unknown> | undefined;
+      if (!configAgent) {
+        opencodeConfig.agent = { hive: hiveAgentConfig };
+      } else {
+        (configAgent as Record<string, unknown>).hive = hiveAgentConfig;
+      }
+
+      // Note: Don't override default_agent if OMO-Slim is also installed
+      // Let user choose via @hive or config
     },
   };
 };
