@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "fb9f0cecc45d1c100d8be4455326bd957175b811",
-  "startedAt": "2026-01-16T09:55:03.876Z",
-  "summary": "Dropped hive_ask tool and all related code. Removed: ask.ts (129 lines), panels/ (1117 lines), webview/ (341 lines). Cleaned extension.ts (statusBarItem, AskService, hive.showAsk/openQueenPanel commands). Updated hive-core/services/index.ts. Updated opencode-hive docs. Net -1,706 lines.",
-  "completedAt": "2026-01-16T10:02:34.854Z"
-}

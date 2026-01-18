@@ -1,8 +1,0 @@
-{
-  "status": "done",
-  "origin": "plan",
-  "baseCommit": "fb9f0cecc45d1c100d8be4455326bd957175b811",
-  "startedAt": "2026-01-16T09:44:45.249Z",
-  "summary": "Created HIVE-TOOLS.md inventory documenting 25 tools (23 keep, 2 remove: hive_ask, hive_ask_list_pending) and 7 skills (3 consolidate into hive.md, keep copilot-agent.md separate).",
-  "completedAt": "2026-01-16T09:46:29.992Z"
-}
