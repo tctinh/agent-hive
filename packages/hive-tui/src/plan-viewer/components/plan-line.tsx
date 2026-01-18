@@ -29,8 +29,8 @@ export interface PlanLineProps {
 }
 
 export function PlanLine(props: PlanLineProps): JSX.Element {
-  // Format line number with padding
-  const lineNumStr = () => String(props.lineNum).padStart(3, ' ');
+  // Format line number with padding (4 chars: "  1 " to " 99 " to "999 ")
+  const lineNumStr = () => String(props.lineNum).padStart(3, ' ') + ' ';
 
   // Determine line color based on content
   const lineColor = () => {
@@ -43,13 +43,16 @@ export function PlanLine(props: PlanLineProps): JSX.Element {
   };
 
   const hasComments = () => props.comments.length > 0;
+  
+  // Use consistent separator (2 chars each)
+  const separator = () => hasComments() ? '* ' : '| ';
 
   return (
     <box flexDirection="column">
-      {/* Main line */}
+      {/* Main line: "  1 | text here" */}
       <box onMouseDown={props.onLineClick}>
         <text fg="gray">{lineNumStr()}</text>
-        <text fg={hasComments() ? 'yellow' : 'gray'}>{hasComments() ? '💬' : ' │'}</text>
+        <text fg={hasComments() ? 'yellow' : 'gray'}>{separator()}</text>
         <text 
           fg={props.isSelected ? 'black' : lineColor()}
           bg={props.isSelected ? 'cyan' : undefined}
@@ -63,12 +66,12 @@ export function PlanLine(props: PlanLineProps): JSX.Element {
         <For each={props.comments}>
           {(comment) => (
             <box onMouseDown={() => props.onCommentClick(comment.id)}>
-              <text fg="gray">     </text>
+              <text fg="gray">      </text>
               <text 
                 fg={props.selectedCommentId === comment.id ? 'black' : 'cyan'}
                 bg={props.selectedCommentId === comment.id ? 'magenta' : undefined}
               >
-                💬 {comment.author}: {comment.body}
+                {'>> '}{comment.author}: {comment.body}
               </text>
             </box>
           )}
