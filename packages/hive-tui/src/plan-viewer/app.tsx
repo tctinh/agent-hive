@@ -114,6 +114,8 @@ export function App(props: AppProps): JSX.Element {
       if (selectedCommentId()) {
         deleteComment(selectedCommentId()!);
       }
+    } else if (evt.name === 'q') {
+      process.exit(0);
     }
   });
 
@@ -260,7 +262,6 @@ export function App(props: AppProps): JSX.Element {
         <For each={visibleContent()}>
           {(item) => (
             <PlanLine
-              lineNum={item.lineNum}
               text={item.text}
               comments={item.comments}
               isSelected={selectedLine() === item.lineNum && !selectedCommentId()}
@@ -285,7 +286,7 @@ export function App(props: AppProps): JSX.Element {
       <box borderStyle="single" paddingLeft={1}>
         <Show when={editMode() !== 'none'} fallback={
           <text fg="gray">
-            [c]omment  {selectedCommentId() ? '[e]dit [d]elete  ' : ''}[j/k] Navigate  [g/G] Top/Bottom
+            [c]omment  {selectedCommentId() ? '[e]dit [d]elete  ' : ''}[j/k] Navigate  [g/G] Top/Bottom  [q] Quit
           </text>
         }>
           <text fg="gray">

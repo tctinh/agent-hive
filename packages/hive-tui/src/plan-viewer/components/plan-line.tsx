@@ -1,5 +1,6 @@
 /**
  * PlanLine - Displays a single line from plan.md with inline comments
+ * Simplified: No line numbers, just content with syntax highlighting
  */
 import { For, Show, type JSX } from 'solid-js';
 
@@ -12,8 +13,6 @@ export interface PlanComment {
 }
 
 export interface PlanLineProps {
-  /** Line number (1-based) */
-  lineNum: number;
   /** Line text content */
   text: string;
   /** Comments on this line */
@@ -29,51 +28,44 @@ export interface PlanLineProps {
 }
 
 export function PlanLine(props: PlanLineProps): JSX.Element {
-  // Format line number with padding (4 chars: "  1 " to " 99 " to "999 ")
-  const lineNumStr = () => String(props.lineNum).padStart(3, ' ') + ' ';
-
-  // Determine line color based on content
+  // Determine line color based on content (markdown syntax highlighting)
   const lineColor = () => {
     const text = props.text;
     if (text.startsWith('# ')) return 'cyan';
     if (text.startsWith('## ')) return 'yellow';
     if (text.startsWith('### ')) return 'green';
     if (text.startsWith('```')) return 'magenta';
-    return undefined;
+    if (text.startsWith('- ') || text.startsWith('* ')) return 'white';
+    return 'white';
   };
 
   const hasComments = () => props.comments.length > 0;
-  
-  // Use consistent separator (2 chars each)
-  const separator = () => hasComments() ? '* ' : '| ';
+
+  // Prefix indicator: * for lines with comments, space otherwise
+  const prefix = () => hasComments() ? '* ' : '  ';
 
   return (
     <box flexDirection="column">
-      {/* Main line: "  1 | text here" */}
-      <box onMouseDown={props.onLineClick}>
-        <text fg="gray">{lineNumStr()}</text>
-        <text fg={hasComments() ? 'yellow' : 'gray'}>{separator()}</text>
-        <text 
-          fg={props.isSelected ? 'black' : lineColor()}
-          bg={props.isSelected ? 'cyan' : undefined}
-        >
-          {props.text || ' '}
-        </text>
-      </box>
+      {/* Main line */}
+      <text
+        fg={props.isSelected ? 'black' : lineColor()}
+        bg={props.isSelected ? 'cyan' : undefined}
+        onClick={props.onLineClick}
+      >
+        {prefix()}{props.text || ' '}
+      </text>
 
       {/* Inline comments below the line */}
       <Show when={hasComments()}>
         <For each={props.comments}>
           {(comment) => (
-            <box onMouseDown={() => props.onCommentClick(comment.id)}>
-              <text fg="gray">      </text>
-              <text 
-                fg={props.selectedCommentId === comment.id ? 'black' : 'cyan'}
-                bg={props.selectedCommentId === comment.id ? 'magenta' : undefined}
-              >
-                {'>> '}{comment.author}: {comment.body}
-              </text>
-            </box>
+            <text
+              fg={props.selectedCommentId === comment.id ? 'black' : 'cyan'}
+              bg={props.selectedCommentId === comment.id ? 'magenta' : undefined}
+              onClick={() => props.onCommentClick(comment.id)}
+            >
+              {'    >> '}{comment.author}: {comment.body}
+            </text>
           )}
         </For>
       </Show>

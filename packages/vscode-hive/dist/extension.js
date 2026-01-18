@@ -1159,6 +1159,34 @@ var PlanService = class {
     writeJson(commentsPath, data);
     return newComment;
   }
+  updateComment(featureName, commentId, body) {
+    const commentsPath = getCommentsPath(this.projectRoot, featureName);
+    const data = readJson(commentsPath);
+    if (!data)
+      return null;
+    const idx = data.threads.findIndex((c) => c.id === commentId);
+    if (idx === -1)
+      return null;
+    data.threads[idx] = {
+      ...data.threads[idx],
+      body,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    writeJson(commentsPath, data);
+    return data.threads[idx];
+  }
+  deleteComment(featureName, commentId) {
+    const commentsPath = getCommentsPath(this.projectRoot, featureName);
+    const data = readJson(commentsPath);
+    if (!data)
+      return false;
+    const initialLength = data.threads.length;
+    data.threads = data.threads.filter((c) => c.id !== commentId);
+    if (data.threads.length === initialLength)
+      return false;
+    writeJson(commentsPath, data);
+    return true;
+  }
   clearComments(featureName) {
     const commentsPath = getCommentsPath(this.projectRoot, featureName);
     writeJson(commentsPath, { threads: [] });
@@ -1275,6 +1303,10 @@ var TaskService = class {
     const specPath = getTaskSpecPath(this.projectRoot, featureName, taskFolder);
     writeText(specPath, content);
     return specPath;
+  }
+  readSpec(featureName, taskFolder) {
+    const specPath = getTaskSpecPath(this.projectRoot, featureName, taskFolder);
+    return readText(specPath);
   }
   update(featureName, taskFolder, updates) {
     const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);

@@ -5,8 +5,8 @@
   "description": "Context-Driven Development for AI coding assistants",
   "workspaces": ["packages/*"],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "dev": "npm run dev --workspaces"
+    "build": "bun run --filter '*' build",
+    "dev": "bun run --filter '*' dev"
   },
   "license": "MIT"
 }
