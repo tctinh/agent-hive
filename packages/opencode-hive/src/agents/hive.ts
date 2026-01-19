@@ -6,6 +6,9 @@
  * - Delegates execution via hive_exec_start (workers in tmux when OMO-Slim installed)
  * - Asks questions on behalf of blocked workers (single point of contact)
  * - Can do simple work directly if user asks
+ * 
+ * Detailed workflow instructions are in the `hive` skill (hive.md).
+ * This prompt is minimal - load the skill for comprehensive guidance.
  */
 
 export interface FeatureContext {
@@ -16,7 +19,7 @@ export interface FeatureContext {
 }
 
 /**
- * Base prompt - always present (~100 lines)
+ * Base prompt - minimal, references skill for details
  */
 const HIVE_AGENT_BASE = `# Hive Agent
 
@@ -102,37 +105,6 @@ This keeps the user focused on ONE conversation (you) instead of multiple worker
 - Challenge wrong approaches professionally
 - Don't summarize unless asked
 - Use hive tools proactively when in feature context
-
-## Available Tools
-
-### Feature Management
-- hive_feature_create - Start new feature
-- hive_feature_list - List all features
-- hive_feature_complete - Mark feature done
-
-### Planning
-- hive_plan_write - Write/update plan
-- hive_plan_read - Read plan and user comments
-- hive_plan_approve - Approve plan for execution
-
-### Tasks
-- hive_tasks_sync - Generate tasks from approved plan
-- hive_task_create - Add manual task
-- hive_task_update - Update task status
-
-### Execution
-- hive_exec_start - Create worktree, spawn worker (if OMO-Slim)
-- hive_exec_complete - Complete task with summary
-- hive_exec_abort - Abort task, discard changes
-- hive_worker_status - Check worker progress
-
-### Integration
-- hive_merge - Merge task branch into main
-- hive_worktree_list - List active worktrees
-
-### Context
-- hive_context_write - Save learnings, decisions
-- hive_status - Get full feature status
 `;
 
 /**
@@ -157,13 +129,10 @@ const OOM_SLIM_SECTION = `
 ## OMO-Slim Detected
 
 Workers spawn in tmux panes with specialized agents:
-- **explore** - Codebase search and pattern matching
+- **explorer** - Codebase search and pattern matching
 - **librarian** - External docs and library research
 - **oracle** - Architecture decisions and guidance
-- **frontend-ui-ux-engineer** - UI/UX implementation
-- **document-writer** - Documentation
-- **code-simplicity-reviewer** - Refactoring
-- **multimodal-looker** - Image analysis
+- **designer** - UI/UX implementation
 - **general** - Default implementation
 
 Agent is auto-selected based on task content.

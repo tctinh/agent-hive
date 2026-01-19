@@ -64,33 +64,13 @@ When OMO-Slim is installed, \`hive_exec_start\` spawns worker agents in tmux pan
 **Agent auto-selection** based on task content:
 | Pattern | Agent |
 |---------|-------|
-| find, search, explore | explore |
+| find, search, explore | explorer |
 | research, docs | librarian |
-| ui, component, react | frontend-ui-ux-engineer |
-| refactor, simplify | code-simplicity-reviewer |
-| readme, document | document-writer |
-| image, screenshot | multimodal-looker |
+| ui, component, react | designer |
 | architect, decision | oracle |
 | (default) | general |
 
 Without OMO-Slim: \`hive_exec_start\` falls back to inline mode (work in same session).
-
-### Plan Format
-
-\`\`\`markdown
-# Feature Name
-
-## Overview
-What we're building and why.
-
-## Tasks
-
-### 1. Task Name
-Description of what to do.
-
-### 2. Another Task
-Description.
-\`\`\`
 
 ### Planning Phase - Context Management REQUIRED
 
@@ -102,8 +82,6 @@ As you research and plan, CONTINUOUSLY save findings using \`hive_context_write\
 
 **Update existing context files** when new info emerges - dont create duplicates.
 Workers depend on context for background. Without it, they work blind.
-
-Save context BEFORE writing the plan, and UPDATE it as planning iterates.
 
 \`hive_tasks_sync\` parses \`### N. Task Name\` headers.
 
