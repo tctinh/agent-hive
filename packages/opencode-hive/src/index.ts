@@ -13,6 +13,7 @@ import {
 import { selectAgent, type OmoSlimAgent } from "./utils/agent-selector";
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
 import { buildHiveAgentPrompt, type FeatureContext } from "./agents/hive";
+import { loadBuiltinSkill, getBuiltinSkills, BUILTIN_SKILLS } from "./skills/index";
 
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development System
@@ -923,10 +924,15 @@ Make the requested changes, then call hive_request_review again.`;
       hive_skill: tool({
         description: `Load a Hive skill for detailed workflow instructions.
 
-Available skills:
-- hive: Complete Hive workflow (plan -> review -> execute -> merge)
+<available_skills>
+  <skill>
+    <name>hive</name>
+    <description>Complete Hive workflow (plan -> review -> execute -> merge)</description>
+  </skill>
+</available_skills>
 
 Skills are discovered from:
+- Builtin skills (bundled with hive-core)
 - .hive/skills/<name>/SKILL.md
 - .opencode/skill/<name>/SKILL.md
 - .claude/skills/<name>/SKILL.md`,
@@ -934,6 +940,13 @@ Skills are discovered from:
           name: tool.schema.string().describe('Skill name to load (e.g., "hive")'),
         },
         async execute({ name }) {
+          // Check builtin skills first
+          const builtinResult = loadBuiltinSkill(name);
+          if (builtinResult.found && builtinResult.skill) {
+            return builtinResult.skill.template;
+          }
+
+          // Fall back to file-based discovery
           const skillLocations = [
             path.join(directory, '.hive', 'skills'),
             path.join(directory, '.opencode', 'skill'),
@@ -950,7 +963,8 @@ Skills are discovered from:
             }
           }
 
-          const available: string[] = [];
+          // List available skills (builtin + file-based)
+          const available: string[] = [...BUILTIN_SKILLS];
           for (const skillsDir of skillLocations) {
             if (fs.existsSync(skillsDir)) {
               const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
