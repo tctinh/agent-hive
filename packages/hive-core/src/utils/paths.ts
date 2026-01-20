@@ -12,14 +12,9 @@ const STATUS_FILE = 'status.json';
 const REPORT_FILE = 'report.md';
 const APPROVED_FILE = 'APPROVED';
 const JOURNAL_FILE = 'journal.md';
-const CONFIG_FILE = 'config.json';
 
 export function getHivePath(projectRoot: string): string {
   return path.join(projectRoot, HIVE_DIR);
-}
-
-export function getConfigPath(projectRoot: string): string {
-  return path.join(getHivePath(projectRoot), CONFIG_FILE);
 }
 
 export function getJournalPath(projectRoot: string): string {

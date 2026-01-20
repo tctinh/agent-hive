@@ -1,48 +1,58 @@
-import {
-  getConfigPath,
-  getHivePath,
-  ensureDir,
-  readJson,
-  writeJson,
-  fileExists,
-} from '../utils/paths.js';
+import * as fs from 'fs';
+import * as path from 'path';
 import { HiveConfig, DEFAULT_HIVE_CONFIG } from '../types.js';
 
 /**
- * ConfigService manages the `.hive/config.json` file.
+ * ConfigService manages user config at ~/.config/opencode/agent_hive.json
  * 
- * Config is project-scoped and shared between:
- * - OpenCode Hive plugin
- * - VSCode extension
- * - CLI tools
+ * This is USER config (not project-scoped):
+ * - VSCode extension reads/writes this
+ * - OpenCode plugin reads this to enable features
+ * - Agent does NOT have tools to access this
  */
 export class ConfigService {
-  constructor(private projectRoot: string) {}
+  private configPath: string;
+
+  constructor() {
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+    const configDir = path.join(homeDir, '.config', 'opencode');
+    this.configPath = path.join(configDir, 'agent_hive.json');
+  }
+
+  /**
+   * Get config path
+   */
+  getPath(): string {
+    return this.configPath;
+  }
 
   /**
    * Get the full config, merged with defaults.
    */
   get(): HiveConfig {
-    const configPath = getConfigPath(this.projectRoot);
-    const stored = readJson<Partial<HiveConfig>>(configPath);
-    
-    if (!stored) {
+    try {
+      if (!fs.existsSync(this.configPath)) {
+        return { ...DEFAULT_HIVE_CONFIG };
+      }
+      const raw = fs.readFileSync(this.configPath, 'utf-8');
+      const stored = JSON.parse(raw) as Partial<HiveConfig>;
+
+      // Deep merge with defaults
+      return {
+        ...DEFAULT_HIVE_CONFIG,
+        ...stored,
+        agents: {
+          ...DEFAULT_HIVE_CONFIG.agents,
+          ...stored.agents,
+        },
+        omoSlim: {
+          ...DEFAULT_HIVE_CONFIG.omoSlim,
+          ...stored.omoSlim,
+        },
+      };
+    } catch {
       return { ...DEFAULT_HIVE_CONFIG };
     }
-
-    // Deep merge with defaults
-    return {
-      ...DEFAULT_HIVE_CONFIG,
-      ...stored,
-      agents: {
-        ...DEFAULT_HIVE_CONFIG.agents,
-        ...stored.agents,
-      },
-      omoSlim: {
-        ...DEFAULT_HIVE_CONFIG.omoSlim,
-        ...stored.omoSlim,
-      },
-    };
   }
 
   /**
@@ -64,10 +74,13 @@ export class ConfigService {
       } : current.omoSlim,
     };
 
-    // Ensure .hive directory exists
-    ensureDir(getHivePath(this.projectRoot));
-    writeJson(getConfigPath(this.projectRoot), merged);
+    // Ensure config directory exists
+    const configDir = path.dirname(this.configPath);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
     
+    fs.writeFileSync(this.configPath, JSON.stringify(merged, null, 2));
     return merged;
   }
 
@@ -75,7 +88,7 @@ export class ConfigService {
    * Check if config file exists.
    */
   exists(): boolean {
-    return fileExists(getConfigPath(this.projectRoot));
+    return fs.existsSync(this.configPath);
   }
 
   /**

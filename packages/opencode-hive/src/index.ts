@@ -258,15 +258,15 @@ const plugin: Plugin = async (ctx) => {
   const planService = new PlanService(directory);
   const taskService = new TaskService(directory);
   const contextService = new ContextService(directory);
-  const configService = new ConfigService(directory);
+  const configService = new ConfigService(); // User config at ~/.config/opencode/agent_hive.json
   const worktreeService = new WorktreeService({
     baseDir: directory,
     hiveDir: path.join(directory, '.hive'),
   });
 
   /**
-   * Check if OMO-Slim delegation is enabled via config.
-   * Users enable this in .hive/config.json: { "omoSlim": { "enabled": true } }
+   * Check if OMO-Slim delegation is enabled via user config.
+   * Users enable this in ~/.config/opencode/agent_hive.json
    */
   const isOmoSlimEnabled = (): boolean => {
     return configService.isOmoSlimEnabled();
@@ -1071,52 +1071,6 @@ Re-run with updated summary showing verification results.`;
             },
             nextAction: getNextAction(planStatus, tasksSummary),
           });
-        },
-      }),
-
-      // Config Tools
-      hive_config_get: tool({
-        description: 'Get current Hive configuration from .hive/config.json. Shows omoSlim, agents, and other settings.',
-        args: {},
-        async execute() {
-          const config = configService.get();
-          return JSON.stringify({
-            config,
-            configPath: path.join(directory, '.hive', 'config.json'),
-            exists: configService.exists(),
-          }, null, 2);
-        },
-      }),
-
-      hive_config_set: tool({
-        description: 'Update Hive configuration. Supports enabling/disabling OMO-Slim delegation.',
-        args: {
-          omoSlimEnabled: tool.schema.boolean().optional().describe('Enable OMO-Slim delegated execution (spawns workers in tmux panes)'),
-          workerVisible: tool.schema.boolean().optional().describe('Whether worker agents are visible in tmux'),
-        },
-        async execute({ omoSlimEnabled, workerVisible }) {
-          const updates: any = {};
-          
-          if (omoSlimEnabled !== undefined) {
-            updates.omoSlim = { enabled: omoSlimEnabled };
-          }
-          
-          if (workerVisible !== undefined) {
-            updates.agents = { worker: { visible: workerVisible } };
-          }
-          
-          if (Object.keys(updates).length === 0) {
-            return 'No updates provided. Use omoSlimEnabled or workerVisible parameters.';
-          }
-          
-          const newConfig = configService.set(updates);
-          return JSON.stringify({
-            success: true,
-            config: newConfig,
-            message: omoSlimEnabled !== undefined 
-              ? `OMO-Slim delegation ${omoSlimEnabled ? 'enabled' : 'disabled'}`
-              : 'Config updated',
-          }, null, 2);
         },
       }),
 
