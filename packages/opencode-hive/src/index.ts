@@ -670,7 +670,18 @@ Add this section to your plan content and try again.`;
                   mode: 'delegated',
                   agent,
                   taskId: result?.task_id,
-                  message: `Worker spawned via OMO-Slim (${agent} agent). Watch in tmux pane. Use hive_worker_status to check progress.`,
+                  message: `Worker spawned via OMO-Slim (${agent} agent). Watch in tmux pane.`,
+                  masterGuidance: `## Delegation Protocol
+
+- **Monitor**: Use hive_worker_status to check progress
+- **Don't duplicate work**: Worker handles implementation
+- **Handle blockers**: Worker will exit with blocker info
+  - Read blocker via hive_worker_status
+  - Ask user for decision
+  - Resume with hive_exec_start(continueFrom: "blocked", decision: answer)
+- **After completion**: Merge with hive_merge(task, strategy: "squash")
+
+NEXT: Monitor worker progress or start another parallel task.`,
                 }, null, 2);
               }
             } catch (e: any) {
