@@ -440,7 +440,7 @@ NEXT: Ask your first clarifying question about this feature.`;
           constraint: tool.schema.string().optional().describe('Never/Always rule derived'),
         },
         async execute({ feature, trouble, resolution, constraint }) {
-          const journalPath = path.join(projectRoot, '.hive', 'journal.md');
+          const journalPath = path.join(directory, '.hive', 'journal.md');
           
           if (!fs.existsSync(journalPath)) {
             return `Error: journal.md not found. Create a feature first to initialize the journal.`;
