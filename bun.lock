@@ -7,7 +7,7 @@
     },
     "packages/hive-core": {
       "name": "hive-core",
-      "version": "0.8.2",
+      "version": "0.8.3",
       "dependencies": {
         "simple-git": "^3.27.0",
       },
@@ -19,8 +19,9 @@
     },
     "packages/opencode-hive": {
       "name": "opencode-hive",
-      "version": "0.8.2",
+      "version": "0.8.3",
       "dependencies": {
+        "jsonc-parser": "^3.3.1",
         "simple-git": "^3.27.0",
       },
       "devDependencies": {
@@ -37,7 +38,7 @@
     },
     "packages/vscode-hive": {
       "name": "vscode-hive",
-      "version": "0.8.2",
+      "version": "0.8.3",
       "dependencies": {
         "@opencode-ai/sdk": "^1.1.1",
         "hive-core": "workspace:*",

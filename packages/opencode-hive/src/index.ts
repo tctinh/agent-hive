@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { tool, type Plugin, type ToolDefinition } from "@opencode-ai/plugin";
+import * as jsonc from 'jsonc-parser';
 
 // ============================================================================
 // Skill Discovery & Loading
@@ -267,21 +268,31 @@ const plugin: Plugin = async (ctx) => {
   let detectionDone = false;
 
   /**
-   * Detect OMO-Slim by checking for background_task tool.
-   * Called lazily on first tool invocation that needs delegation.
+   * Detect OMO-Slim by checking opencode.json config file.
+   * Checks for 'oh-my-opencode-slim' in plugin array.
    */
-  const detectOmoSlim = (toolContext: unknown): boolean => {
+  const detectOmoSlim = (): boolean => {
     if (detectionDone) return omoSlimDetected;
     
-    const ctx = toolContext as any;
-    // Check if background_task is available in tool registry
-    // This indicates OMO-Slim is installed
-    if (ctx?.tools?.includes?.('background_task') || 
-        ctx?.background_task || 
-        typeof ctx?.callTool === 'function') {
-      // We'll verify on first actual use
-      omoSlimDetected = true;
+    try {
+      // Check opencode.json for omo-slim plugin
+      const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+      const configPath = path.join(homeDir, '.config', 'opencode', 'opencode.json');
+      
+      if (fs.existsSync(configPath)) {
+        // Use JSONC parser to handle comments
+        const raw = fs.readFileSync(configPath, 'utf-8');
+        const config = jsonc.parse(raw);
+        const plugins = config.plugin || [];
+        omoSlimDetected = plugins.some((p: string) => 
+          p.includes('oh-my-opencode-slim') || p.includes('oh-my-opencode')
+        );
+      }
+    } catch (e) {
+      // Config not found or invalid - assume no OMO-Slim
+      omoSlimDetected = false;
     }
+    
     detectionDone = true;
     
     if (omoSlimDetected) {
@@ -645,7 +656,7 @@ Add this section to your plan content and try again.`;
           taskService.writeSpec(feature, task, specContent);
 
           // Check for OMO-Slim and delegate if available
-          detectOmoSlim(toolContext);
+          detectOmoSlim();
           
           if (omoSlimDetected) {
             // Prepare context for worker prompt
