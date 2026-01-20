@@ -5,10 +5,7 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., 0.4.0)'
-        required: true
+    {}
 
 jobs:
   build:
@@ -39,6 +36,14 @@ jobs:
         working-directory: packages/vscode-hive
         run: bun run build
 
+      - name: Test hive-core
+        working-directory: packages/hive-core
+        run: bun test
+
+      - name: Test opencode-hive
+        working-directory: packages/opencode-hive
+        run: bun test
+
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
@@ -54,6 +59,7 @@ jobs:
   publish-npm:
     needs: build
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
       id-token: write
@@ -81,6 +87,7 @@ jobs:
   publish-vscode:
     needs: build
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Download VSIX
         uses: actions/download-artifact@v4
@@ -95,6 +102,7 @@ jobs:
   release:
     needs: [build, publish-npm, publish-vscode]
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:

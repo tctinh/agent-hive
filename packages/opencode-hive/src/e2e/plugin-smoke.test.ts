@@ -27,6 +27,12 @@ const EXPECTED_TOOLS = [
   "hive_exec_start",
   "hive_exec_complete",
   "hive_exec_abort",
+  "hive_worker_status",
+  "hive_merge",
+  "hive_worktree_list",
+  "hive_context_write",
+  "hive_status",
+  "hive_skill",
 ] as const;
 
 const TEST_ROOT_BASE = "/tmp/hive-e2e-plugin";
@@ -144,25 +150,20 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
 
     expect(fs.existsSync(taskFolder)).toBe(true);
 
-    // Open a session to test session tracking
-    const sessionOutput = await hooks.tool!.hive_session_open.execute({ feature: "smoke-feature" }, toolContext);
-    expect(sessionOutput).toContain("smoke-feature");
-
-    // Session is now stored in sessions.json via SessionService
-    const sessionsPath = path.join(
+    // Session is tracked on the feature metadata
+    const featureJsonPath = path.join(
       testRoot,
       ".hive",
       "features",
       "smoke-feature",
-      "sessions.json"
+      "feature.json"
     );
 
-    const sessions = JSON.parse(fs.readFileSync(sessionsPath, "utf-8")) as {
-      master?: string;
-      sessions?: Array<{ sessionId: string }>;
+    const featureJson = JSON.parse(fs.readFileSync(featureJsonPath, "utf-8")) as {
+      sessionId?: string;
     };
 
-    expect(sessions.master).toBe(sessionID);
+    expect(featureJson.sessionId).toBe(sessionID);
   });
 
   it("system prompt hook injects Hive instructions", async () => {

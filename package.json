@@ -6,7 +6,9 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "build": "npm run build --workspaces",
-    "dev": "npm run dev --workspaces"
+    "dev": "npm run dev --workspaces",
+    "release:prepare": "node scripts/release/prepare.mjs",
+    "release:check": "bun install && npm run build --workspaces && npm -ws --if-present run test"
   },
   "license": "MIT"
 }
