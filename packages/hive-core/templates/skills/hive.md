@@ -74,6 +74,17 @@ hive_context_write({
 
 ### Write the Plan
 
+Your plan should include these sections:
+
+| Section | Required | Purpose |
+|---------|----------|---------|
+| `## Discovery` | Yes (gate enforced) | Q&A and research before planning |
+| `## Problem` | Yes | What we're solving |
+| `## Non-Goals` | Recommended | What we're NOT building (scope boundaries) |
+| `## Tasks` | Yes | Implementation steps with `### N. Task Name` format |
+| `## Ghost Diffs` | Recommended | Rejected alternatives (prevents re-proposing) |
+| `## Success Criteria` | Optional | How we know we're done |
+
 Format for task parsing:
 
 ```markdown
