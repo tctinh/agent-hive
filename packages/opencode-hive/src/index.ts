@@ -423,6 +423,37 @@ NEXT: Ask your first clarifying question about this feature.`;
         },
       }),
 
+      hive_journal_append: tool({
+        description: 'Append entry to .hive/journal.md for audit trail',
+        args: {
+          feature: tool.schema.string().describe('Feature name for context'),
+          trouble: tool.schema.string().describe('What went wrong'),
+          resolution: tool.schema.string().describe('How it was fixed'),
+          constraint: tool.schema.string().optional().describe('Never/Always rule derived'),
+        },
+        async execute({ feature, trouble, resolution, constraint }) {
+          const journalPath = path.join(projectRoot, '.hive', 'journal.md');
+          
+          if (!fs.existsSync(journalPath)) {
+            return `Error: journal.md not found. Create a feature first to initialize the journal.`;
+          }
+          
+          const date = new Date().toISOString().split('T')[0];
+          const entry = `
+### ${date}: ${feature}
+
+**Trouble**: ${trouble}
+**Resolution**: ${resolution}
+${constraint ? `**Constraint**: ${constraint}` : ''}
+**See**: .hive/features/${feature}/plan.md
+
+---
+`;
+          fs.appendFileSync(journalPath, entry);
+          return `Journal entry added for ${feature}. ${constraint ? `Constraint: "${constraint}"` : ''}`;
+        },
+      }),
+
       hive_plan_write: tool({
         description: 'Write plan.md (clears existing comments)',
         args: { 
