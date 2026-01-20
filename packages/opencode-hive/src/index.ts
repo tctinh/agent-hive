@@ -432,6 +432,20 @@ NEXT: Ask your first clarifying question about this feature.`;
         async execute({ content, feature: explicitFeature }, toolContext) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+          
+          // GATE: Check for discovery section
+          const hasDiscovery = content.toLowerCase().includes('## discovery');
+          if (!hasDiscovery) {
+            return `BLOCKED: Discovery section required before planning.
+
+Your plan must include a \`## Discovery\` section documenting:
+- Questions you asked and answers received
+- Research findings from codebase exploration
+- Key decisions made
+
+Add this section to your plan content and try again.`;
+          }
+          
           captureSession(feature, toolContext);
           const planPath = planService.write(feature, content);
           return `Plan written to ${planPath}. Comments cleared for fresh review.`;
