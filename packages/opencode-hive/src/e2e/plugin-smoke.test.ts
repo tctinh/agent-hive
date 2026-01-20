@@ -126,7 +126,22 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
     );
     expect(createOutput).toContain('Feature "smoke-feature" created');
 
-    const plan = `# Smoke Feature\n\n## Overview\n\nTest\n\n## Tasks\n\n### 1. First Task\nDo it\n`;
+    const plan = `# Smoke Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes
+
+## Overview
+
+Test
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
     const planOutput = await hooks.tool!.hive_plan_write.execute(
       { content: plan, feature: "smoke-feature" },
       toolContext

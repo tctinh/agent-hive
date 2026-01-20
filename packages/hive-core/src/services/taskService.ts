@@ -86,11 +86,18 @@ export class TaskService {
     return result;
   }
 
+  /**
+   * Create a manual task with auto-incrementing index.
+   * Folder format: "01-task-name", "02-task-name", etc.
+   * Index ensures alphabetical sort = chronological order.
+   */
   create(featureName: string, name: string, order?: number): string {
     const tasksPath = getTasksPath(this.projectRoot, featureName);
     const existingFolders = this.listFolders(featureName);
     
+    // Auto-increment: finds max existing index + 1
     const nextOrder = order ?? this.getNextOrder(existingFolders);
+    // Zero-pad to 2 digits for correct alphabetical sorting (01, 02, ... 99)
     const folder = `${String(nextOrder).padStart(2, '0')}-${name}`;
     const taskPath = getTaskPath(this.projectRoot, featureName, folder);
 
