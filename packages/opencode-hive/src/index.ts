@@ -706,6 +706,26 @@ Add this section to your plan content and try again.`;
           if (!taskInfo) return `Error: Task "${task}" not found`;
           if (taskInfo.status !== 'in_progress' && taskInfo.status !== 'blocked') return "Error: Task not in progress";
 
+          // GATE: Check for verification mention when completing
+          if (status === 'completed') {
+            const verificationKeywords = ['test', 'build', 'lint', 'vitest', 'jest', 'npm run', 'pnpm', 'cargo', 'pytest', 'verified', 'passes', 'succeeds'];
+            const summaryLower = summary.toLowerCase();
+            const hasVerificationMention = verificationKeywords.some(kw => summaryLower.includes(kw));
+            
+            if (!hasVerificationMention) {
+              return `BLOCKED: No verification detected in summary.
+
+Before claiming completion, you must:
+1. Run tests (vitest, jest, pytest, etc.)
+2. Run build (npm run build, cargo build, etc.)
+3. Include verification results in summary
+
+Example summary: "Implemented auth flow. Tests pass (vitest). Build succeeds."
+
+Re-run with updated summary showing verification results.`;
+            }
+          }
+
           // Handle blocked status - don't commit, just update status
           if (status === 'blocked') {
             taskService.update(feature, task, { 
