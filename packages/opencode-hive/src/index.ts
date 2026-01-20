@@ -1,6 +1,156 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { tool, type Plugin } from "@opencode-ai/plugin";
+import { fileURLToPath } from 'url';
+import { tool, type Plugin, type ToolDefinition } from "@opencode-ai/plugin";
+
+// ============================================================================
+// Skill Discovery & Loading
+// ============================================================================
+
+interface HiveSkillMeta {
+  name: string;
+  description: string;
+}
+
+interface HiveSkill {
+  name: string;
+  description: string;
+  path: string;
+  body: string;
+}
+
+function parseFrontmatter(content: string): { meta: Record<string, string>; body: string } {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  if (!match) {
+    return { meta: {}, body: content.trim() };
+  }
+  
+  const meta: Record<string, string> = {};
+  const frontmatter = match[1];
+  const body = match[2];
+  
+  for (const line of frontmatter.split('\n')) {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx > 0) {
+      const key = line.slice(0, colonIdx).trim();
+      const value = line.slice(colonIdx + 1).trim();
+      meta[key] = value;
+    }
+  }
+  
+  return { meta, body: body.trim() };
+}
+
+function getSkillsDir(): string {
+  // In ESM, use import.meta.url to find the skills directory relative to this file
+  // At runtime, we're in dist/index.js, so skills/ is ../skills/ from dist/
+  const filename = fileURLToPath(import.meta.url);
+  const dirname = path.dirname(filename);
+  return path.join(dirname, '..', 'skills');
+}
+
+function discoverHiveSkills(): HiveSkill[] {
+  const skillsDir = getSkillsDir();
+  const skills: HiveSkill[] = [];
+  
+  if (!fs.existsSync(skillsDir)) {
+    return skills;
+  }
+  
+  const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+  
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    
+    const skillPath = path.join(skillsDir, entry.name, 'SKILL.md');
+    if (!fs.existsSync(skillPath)) continue;
+    
+    try {
+      const content = fs.readFileSync(skillPath, 'utf-8');
+      const { meta, body } = parseFrontmatter(content);
+      
+      skills.push({
+        name: meta.name || entry.name,
+        description: meta.description || '',
+        path: skillPath,
+        body,
+      });
+    } catch {
+      // Skip skills that fail to parse
+    }
+  }
+  
+  return skills;
+}
+
+function formatSkillsXml(skills: HiveSkill[]): string {
+  if (skills.length === 0) return '';
+  
+  const skillsXml = skills.map(skill => {
+    return [
+      '  <skill>',
+      `    <name>${skill.name}</name>`,
+      `    <description>(hive - Skill) ${skill.description}</description>`,
+      '  </skill>',
+    ].join('\n');
+  }).join('\n');
+  
+  return `\n\n<available_skills>\n${skillsXml}\n</available_skills>`;
+}
+
+function createHiveSkillTool(): ToolDefinition {
+  let cachedSkills: HiveSkill[] | null = null;
+  let cachedDescription: string | null = null;
+  
+  const getSkills = (): HiveSkill[] => {
+    if (cachedSkills) return cachedSkills;
+    cachedSkills = discoverHiveSkills();
+    return cachedSkills;
+  };
+  
+  const getDescription = (): string => {
+    if (cachedDescription) return cachedDescription;
+    const skills = getSkills();
+    const base = 'Load a Hive skill to get detailed instructions for a specific workflow.';
+    if (skills.length === 0) {
+      cachedDescription = base + '\n\nNo Hive skills available.';
+    } else {
+      cachedDescription = base + formatSkillsXml(skills);
+    }
+    return cachedDescription;
+  };
+  
+  // Eagerly compute description
+  getDescription();
+  
+  return tool({
+    get description() {
+      return cachedDescription ?? 'Load a Hive skill to get detailed instructions for a specific workflow.';
+    },
+    args: {
+      name: tool.schema.string().describe('The skill name from available_skills'),
+    },
+    async execute({ name }) {
+      const skills = getSkills();
+      const skill = skills.find(s => s.name === name);
+      
+      if (!skill) {
+        const available = skills.map(s => s.name).join(', ');
+        throw new Error(`Skill "${name}" not found. Available Hive skills: ${available || 'none'}`);
+      }
+      
+      return [
+        `## Hive Skill: ${skill.name}`,
+        '',
+        `**Description**: ${skill.description}`,
+        '',
+        skill.body,
+      ].join('\n');
+    },
+  });
+}
+
+// ============================================================================
 import {
   WorktreeService,
   FeatureService,
@@ -13,7 +163,6 @@ import {
 import { selectAgent, type OmoSlimAgent } from "./utils/agent-selector";
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
 import { buildHiveAgentPrompt, type FeatureContext } from "./agents/hive";
-import { loadBuiltinSkill, getBuiltinSkills, BUILTIN_SKILLS } from "./skills/index";
 
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development System
@@ -209,6 +358,8 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
     },
 
     tool: {
+      hive_skill: createHiveSkillTool(),
+
       hive_feature_create: tool({
         description: 'Create a new feature and set it as active',
         args: {
@@ -921,71 +1072,6 @@ Make the requested changes, then call hive_request_review again.`;
         },
       }),
 
-      hive_skill: tool({
-        description: `Load a Hive skill for detailed workflow instructions.
-
-<available_skills>
-  <skill>
-    <name>hive</name>
-    <description>Complete Hive workflow (plan -> review -> execute -> merge)</description>
-  </skill>
-</available_skills>
-
-Skills are discovered from:
-- Builtin skills (bundled with hive-core)
-- .hive/skills/<name>/SKILL.md
-- .opencode/skill/<name>/SKILL.md
-- .claude/skills/<name>/SKILL.md`,
-        args: {
-          name: tool.schema.string().describe('Skill name to load (e.g., "hive")'),
-        },
-        async execute({ name }) {
-          // Check builtin skills first
-          const builtinResult = loadBuiltinSkill(name);
-          if (builtinResult.found && builtinResult.skill) {
-            return builtinResult.skill.template;
-          }
-
-          // Fall back to file-based discovery
-          const skillLocations = [
-            path.join(directory, '.hive', 'skills'),
-            path.join(directory, '.opencode', 'skill'),
-            path.join(directory, '.claude', 'skills'),
-          ];
-
-          for (const skillsDir of skillLocations) {
-            const skillPath = path.join(skillsDir, name, 'SKILL.md');
-            if (fs.existsSync(skillPath)) {
-              const content = fs.readFileSync(skillPath, 'utf-8');
-              const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
-              const body = match ? match[1].trim() : content;
-              return body;
-            }
-          }
-
-          // List available skills (builtin + file-based)
-          const available: string[] = [...BUILTIN_SKILLS];
-          for (const skillsDir of skillLocations) {
-            if (fs.existsSync(skillsDir)) {
-              const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-              for (const entry of entries) {
-                if (entry.isDirectory()) {
-                  const skillMd = path.join(skillsDir, entry.name, 'SKILL.md');
-                  if (fs.existsSync(skillMd)) {
-                    available.push(entry.name);
-                  }
-                }
-              }
-            }
-          }
-
-          if (available.length === 0) {
-            return `No skills found. Run "Init Hive Nest" in VS Code to create skills, or create .opencode/skill/${name}/SKILL.md manually.`;
-          }
-
-          return `Skill "${name}" not found. Available: ${[...new Set(available)].join(', ')}`;
-        },
-      }),
     },
 
     command: {
