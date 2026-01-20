@@ -192,6 +192,26 @@ hive_exec_complete({
 
 ---
 
+## TDD Protocol (Required)
+
+1. **Red**: Write failing test first
+2. **Green**: Minimal code to pass
+3. **Refactor**: Clean up, keep tests green
+
+Never write implementation before test exists.
+Exception: Pure refactoring of existing tested code.
+
+## Debugging Protocol (When stuck)
+
+1. **Reproduce**: Get consistent failure
+2. **Isolate**: Binary search to find cause
+3. **Hypothesize**: Form theory, test it
+4. **Fix**: Minimal change that resolves
+
+After 3 failed attempts at same fix: STOP and report blocker.
+
+---
+
 ## Tool Access
 
 **You have access to:**
