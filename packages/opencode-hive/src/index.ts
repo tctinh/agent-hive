@@ -663,52 +663,44 @@ Add this section to your plan content and try again.`;
             // Select appropriate agent based on task content
             const agent = selectAgent(taskInfo.name, specContent);
 
-            // Call OMO-Slim's background_task
-            try {
-              const ctx = toolContext as any;
-              if (ctx.callTool) {
-                const result = await ctx.callTool('background_task', {
-                  agent,
-                  prompt: workerPrompt,
-                  description: `Hive: ${task}`,
-                  sync: false,
-                });
+            // Return delegation instructions for the agent
+            // Agent will call background_task tool itself
+            return JSON.stringify({
+              worktreePath: worktree.path,
+              branch: worktree.branch,
+              mode: 'delegate',
+              agent,
+              delegationRequired: true,
+              backgroundTaskCall: {
+                agent,
+                prompt: workerPrompt,
+                description: `Hive: ${task}`,
+                sync: false,
+              },
+              instructions: `## Delegation Required
 
-                // Store worker info in task
-                taskService.update(feature, task, {
-                  status: 'in_progress',
-                  workerId: result?.task_id,
-                  agent,
-                  mode: 'omo-slim',
-                } as any);
+You MUST now call background_task to spawn a worker:
 
-                return JSON.stringify({
-                  worktreePath: worktree.path,
-                  branch: worktree.branch,
-                  mode: 'delegated',
-                  agent,
-                  taskId: result?.task_id,
-                  message: `Worker spawned via OMO-Slim (${agent} agent). Watch in tmux pane.`,
-                  masterGuidance: `## Delegation Protocol
+\`\`\`
+background_task({
+  agent: "${agent}",
+  prompt: <the workerPrompt below>,
+  description: "Hive: ${task}",
+  sync: false
+})
+\`\`\`
 
-- **Monitor**: Use hive_worker_status to check progress
-- **Don't duplicate work**: Worker handles implementation
-- **Handle blockers**: Worker will exit with blocker info
-  - Read blocker via hive_worker_status
-  - Ask user for decision
-  - Resume with hive_exec_start(continueFrom: "blocked", decision: answer)
-- **After completion**: Merge with hive_merge(task, strategy: "squash")
+After spawning:
+- Monitor with hive_worker_status
+- Handle blockers when worker exits
+- Merge completed work with hive_merge
 
-NEXT: Monitor worker progress or start another parallel task.`,
-                }, null, 2);
-              }
-            } catch (e: any) {
-              // Fall through to inline mode if delegation fails
-              console.log('[Hive] OMO-Slim delegation failed, falling back to inline:', e.message);
-            }
+DO NOT do the work yourself. Delegate it.`,
+              workerPrompt,
+            }, null, 2);
           }
 
-          // Inline mode (no OMO-Slim or delegation failed)
+          // Inline mode (no OMO-Slim)
           return `Worktree created at ${worktree.path}\nBranch: ${worktree.branch}\nBase commit: ${worktree.commit}\nSpec: ${task}/spec.md generated\nReminder: do all work inside this worktree and ensure any subagents do the same.`;
         },
       }),
