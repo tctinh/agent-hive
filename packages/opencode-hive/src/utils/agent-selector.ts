@@ -1,17 +1,22 @@
 /**
  * Agent selection for OMO-Slim delegation.
  * Maps task content patterns to specialized agent types.
+ * 
+ * Available agents in OMO-Slim config:
+ * - orchestrator: Main orchestrator (not for delegation)
+ * - oracle: Architecture decisions, complex debugging, code review
+ * - librarian: External docs, library research, GitHub examples
+ * - explorer: Fast codebase search, pattern matching
+ * - designer: UI/UX, styling, component architecture
+ * - fixer: Fast implementation, receives context and executes
  */
 
 export type OmoSlimAgent = 
-  | 'general'
-  | 'explore'
+  | 'fixer'
+  | 'explorer'
   | 'librarian'
   | 'oracle'
-  | 'frontend-ui-ux-engineer'
-  | 'document-writer'
-  | 'multimodal-looker'
-  | 'code-simplicity-reviewer';
+  | 'designer';
 
 interface AgentPattern {
   pattern: RegExp;
@@ -20,23 +25,14 @@ interface AgentPattern {
 
 const AGENT_PATTERNS: AgentPattern[] = [
   // Research & exploration
-  { pattern: /\b(find|search|locate|where|grep|explore|scan)\b/i, agent: 'explore' },
-  { pattern: /\b(research|investigate|learn|understand|docs?|documentation|library|api)\b/i, agent: 'librarian' },
+  { pattern: /\b(find|search|locate|where|grep|explore|scan|codebase)\b/i, agent: 'explorer' },
+  { pattern: /\b(research|investigate|learn|docs?|documentation|library|api|external|github)\b/i, agent: 'librarian' },
   
   // Frontend & UI
-  { pattern: /\b(ui|ux|component|frontend|react|vue|svelte|css|style|layout|design|button|form|modal)\b/i, agent: 'frontend-ui-ux-engineer' },
-  
-  // Code quality
-  { pattern: /\b(refactor|simplify|clean|reduce|complexity|review|optimize)\b/i, agent: 'code-simplicity-reviewer' },
-  
-  // Documentation
-  { pattern: /\b(readme|document|explain|write.*doc|comment|jsdoc|tsdoc)\b/i, agent: 'document-writer' },
-  
-  // Visual/images
-  { pattern: /\b(image|screenshot|visual|diagram|mockup|pdf|picture|photo)\b/i, agent: 'multimodal-looker' },
+  { pattern: /\b(ui|ux|component|frontend|react|vue|svelte|css|style|layout|design|button|form|modal|visual|responsive)\b/i, agent: 'designer' },
   
   // Architecture decisions
-  { pattern: /\b(architect|design.*decision|tradeoff|approach|strategy|choose|decide|compare)\b/i, agent: 'oracle' },
+  { pattern: /\b(architect|decision|tradeoff|approach|strategy|choose|decide|compare|review|debug|complex)\b/i, agent: 'oracle' },
 ];
 
 /**
@@ -55,8 +51,8 @@ export function selectAgent(taskName: string, spec: string): OmoSlimAgent {
     }
   }
   
-  // Default: general purpose agent for implementation
-  return 'general';
+  // Default: fixer for implementation tasks
+  return 'fixer';
 }
 
 /**
@@ -64,14 +60,11 @@ export function selectAgent(taskName: string, spec: string): OmoSlimAgent {
  */
 export function getAgentDescription(agent: OmoSlimAgent): string {
   const descriptions: Record<OmoSlimAgent, string> = {
-    'general': 'General-purpose implementation agent',
-    'explore': 'Codebase search and pattern matching',
+    'fixer': 'Fast implementation specialist - receives context, executes code changes',
+    'explorer': 'Fast codebase search and pattern matching',
     'librarian': 'External documentation and library research',
-    'oracle': 'Architecture decisions and technical guidance',
-    'frontend-ui-ux-engineer': 'UI/UX and frontend implementation',
-    'document-writer': 'Technical documentation writing',
-    'multimodal-looker': 'Image and visual content analysis',
-    'code-simplicity-reviewer': 'Code review and simplification',
+    'oracle': 'Strategic advisor - architecture, debugging, code review',
+    'designer': 'UI/UX design and implementation',
   };
   return descriptions[agent];
 }
@@ -81,13 +74,10 @@ export function getAgentDescription(agent: OmoSlimAgent): string {
  */
 export function getAvailableAgents(): OmoSlimAgent[] {
   return [
-    'general',
-    'explore',
+    'fixer',
+    'explorer',
     'librarian',
     'oracle',
-    'frontend-ui-ux-engineer',
-    'document-writer',
-    'multimodal-looker',
-    'code-simplicity-reviewer',
+    'designer',
   ];
 }
