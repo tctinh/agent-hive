@@ -393,6 +393,14 @@ A: No, online-only is fine
 - Uses CSS variables pattern
 \`\`\`
 
+## Planning Guidelines
+
+When writing your plan, include:
+- \`## Non-Goals\` - What we're explicitly NOT building (scope boundaries)
+- \`## Ghost Diffs\` - Alternatives you considered but rejected
+
+These prevent scope creep and re-proposing rejected solutions.
+
 NEXT: Ask your first clarifying question about this feature.`;
         },
       }),
