@@ -2,7 +2,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { tool, type Plugin, type ToolDefinition } from "@opencode-ai/plugin";
-import * as jsonc from 'jsonc-parser';
 
 // ============================================================================
 // Skill Discovery & Loading
@@ -158,6 +157,7 @@ import {
   PlanService,
   TaskService,
   ContextService,
+  ConfigService,
   detectContext,
   listFeatures,
 } from "hive-core";
@@ -252,54 +252,24 @@ type ToolContext = {
 };
 
 const plugin: Plugin = async (ctx) => {
-  const { directory } = ctx;
+  const { directory, client } = ctx;
 
   const featureService = new FeatureService(directory);
   const planService = new PlanService(directory);
   const taskService = new TaskService(directory);
   const contextService = new ContextService(directory);
+  const configService = new ConfigService(directory);
   const worktreeService = new WorktreeService({
     baseDir: directory,
     hiveDir: path.join(directory, '.hive'),
   });
 
-  // OMO-Slim detection state
-  let omoSlimDetected = false;
-  let detectionDone = false;
-
   /**
-   * Detect OMO-Slim by checking opencode.json config file.
-   * Checks for 'oh-my-opencode-slim' in plugin array.
+   * Check if OMO-Slim delegation is enabled via config.
+   * Users enable this in .hive/config.json: { "omoSlim": { "enabled": true } }
    */
-  const detectOmoSlim = (): boolean => {
-    if (detectionDone) return omoSlimDetected;
-    
-    try {
-      // Check opencode.json for omo-slim plugin
-      const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-      const configPath = path.join(homeDir, '.config', 'opencode', 'opencode.json');
-      
-      if (fs.existsSync(configPath)) {
-        // Use JSONC parser to handle comments
-        const raw = fs.readFileSync(configPath, 'utf-8');
-        const config = jsonc.parse(raw);
-        const plugins = config.plugin || [];
-        omoSlimDetected = plugins.some((p: string) => 
-          p.includes('oh-my-opencode-slim') || p.includes('oh-my-opencode')
-        );
-      }
-    } catch (e) {
-      // Config not found or invalid - assume no OMO-Slim
-      omoSlimDetected = false;
-    }
-    
-    detectionDone = true;
-    
-    if (omoSlimDetected) {
-      console.log('[Hive] OMO-Slim detected: delegated execution with tmux panes enabled');
-    }
-    
-    return omoSlimDetected;
+  const isOmoSlimEnabled = (): boolean => {
+    return configService.isOmoSlimEnabled();
   };
 
   const resolveFeature = (explicit?: string): string | null => {
@@ -655,10 +625,8 @@ Add this section to your plan content and try again.`;
 
           taskService.writeSpec(feature, task, specContent);
 
-          // Check for OMO-Slim and delegate if available
-          detectOmoSlim();
-          
-          if (omoSlimDetected) {
+          // Check if OMO-Slim delegation is enabled in config
+          if (isOmoSlimEnabled()) {
             // Prepare context for worker prompt
             const contextFiles: ContextFile[] = [];
             const contextDir = path.join(directory, '.hive', 'features', feature, 'context');
@@ -926,9 +894,10 @@ Re-run with updated summary showing verification results.`;
             };
           }));
 
+          const omoSlimEnabled = isOmoSlimEnabled();
           return JSON.stringify({
             feature,
-            omoSlimDetected,
+            omoSlimEnabled,
             workers,
             hint: workers.some(w => w.status === 'blocked')
               ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
@@ -1105,6 +1074,52 @@ Re-run with updated summary showing verification results.`;
         },
       }),
 
+      // Config Tools
+      hive_config_get: tool({
+        description: 'Get current Hive configuration from .hive/config.json. Shows omoSlim, agents, and other settings.',
+        args: {},
+        async execute() {
+          const config = configService.get();
+          return JSON.stringify({
+            config,
+            configPath: path.join(directory, '.hive', 'config.json'),
+            exists: configService.exists(),
+          }, null, 2);
+        },
+      }),
+
+      hive_config_set: tool({
+        description: 'Update Hive configuration. Supports enabling/disabling OMO-Slim delegation.',
+        args: {
+          omoSlimEnabled: tool.schema.boolean().optional().describe('Enable OMO-Slim delegated execution (spawns workers in tmux panes)'),
+          workerVisible: tool.schema.boolean().optional().describe('Whether worker agents are visible in tmux'),
+        },
+        async execute({ omoSlimEnabled, workerVisible }) {
+          const updates: any = {};
+          
+          if (omoSlimEnabled !== undefined) {
+            updates.omoSlim = { enabled: omoSlimEnabled };
+          }
+          
+          if (workerVisible !== undefined) {
+            updates.agents = { worker: { visible: workerVisible } };
+          }
+          
+          if (Object.keys(updates).length === 0) {
+            return 'No updates provided. Use omoSlimEnabled or workerVisible parameters.';
+          }
+          
+          const newConfig = configService.set(updates);
+          return JSON.stringify({
+            success: true,
+            config: newConfig,
+            message: omoSlimEnabled !== undefined 
+              ? `OMO-Slim delegation ${omoSlimEnabled ? 'enabled' : 'disabled'}`
+              : 'Config updated',
+          }, null, 2);
+        },
+      }),
+
       hive_request_review: tool({
         description: 'Request human review of completed task. BLOCKS until human approves or requests changes. Call after completing work, before merging.',
         args: {
@@ -1260,8 +1275,8 @@ Make the requested changes, then call hive_request_review again.`;
       }
 
       // If we have feature context or OMO-Slim, rebuild with dynamic content
-      if (featureContext || omoSlimDetected) {
-        return buildHiveAgentPrompt(featureContext, omoSlimDetected);
+      if (featureContext || isOmoSlimEnabled()) {
+        return buildHiveAgentPrompt(featureContext, isOmoSlimEnabled());
       }
 
       return existingPrompt;

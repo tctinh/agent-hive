@@ -110,10 +110,29 @@ export interface TaskSpec {
 }
 
 export interface HiveConfig {
-  enableToolsFor: string[];
-  agents: {
+  /** Enable hive tools for specific features */
+  enableToolsFor?: string[];
+  /** Agent configuration */
+  agents?: {
     worker: {
       visible: boolean;
     };
   };
+  /** OMO-Slim integration settings */
+  omoSlim?: {
+    /** Enable delegated execution via OMO-Slim background tasks */
+    enabled: boolean;
+  };
 }
+
+export const DEFAULT_HIVE_CONFIG: HiveConfig = {
+  enableToolsFor: [],
+  agents: {
+    worker: {
+      visible: true,
+    },
+  },
+  omoSlim: {
+    enabled: false,
+  },
+};

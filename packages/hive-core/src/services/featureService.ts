@@ -8,12 +8,14 @@ import {
   getPlanPath,
   getCommentsPath,
   getJournalPath,
+  getConfigPath,
+  getHivePath,
   ensureDir,
   readJson,
   writeJson,
   fileExists,
 } from '../utils/paths.js';
-import { FeatureJson, FeatureStatusType, TaskInfo, FeatureInfo, CommentsJson, TaskStatus } from '../types.js';
+import { FeatureJson, FeatureStatusType, TaskInfo, FeatureInfo, CommentsJson, TaskStatus, DEFAULT_HIVE_CONFIG } from '../types.js';
 
 const JOURNAL_TEMPLATE = `# Hive Journal
 
@@ -49,6 +51,12 @@ export class FeatureService {
     const journalPath = getJournalPath(this.projectRoot);
     if (!fileExists(journalPath)) {
       fs.writeFileSync(journalPath, JOURNAL_TEMPLATE);
+    }
+
+    // Create config.json if it doesn't exist (first feature init)
+    const configPath = getConfigPath(this.projectRoot);
+    if (!fileExists(configPath)) {
+      writeJson(configPath, DEFAULT_HIVE_CONFIG);
     }
 
     const feature: FeatureJson = {
