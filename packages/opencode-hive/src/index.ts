@@ -368,7 +368,32 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
         },
         async execute({ name, ticket }) {
           const feature = featureService.create(name, ticket);
-          return `Feature "${name}" created. Status: ${feature.status}. Write a plan with hive_plan_write.`;
+          return `Feature "${name}" created.
+
+## Discovery Phase Required
+
+Before writing a plan, you MUST:
+1. Ask clarifying questions about the feature
+2. Document Q&A in plan.md with a \`## Discovery\` section
+3. Research the codebase (grep, read existing code)
+4. Save findings with hive_context_write
+
+Example discovery section:
+\`\`\`markdown
+## Discovery
+
+**Q: What authentication system do we use?**
+A: JWT with refresh tokens, see src/auth/
+
+**Q: Should this work offline?**
+A: No, online-only is fine
+
+**Research:**
+- Found existing theme system in src/theme/
+- Uses CSS variables pattern
+\`\`\`
+
+NEXT: Ask your first clarifying question about this feature.`;
         },
       }),
 
