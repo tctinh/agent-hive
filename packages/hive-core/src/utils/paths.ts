@@ -11,9 +11,14 @@ const FEATURE_FILE = 'feature.json';
 const STATUS_FILE = 'status.json';
 const REPORT_FILE = 'report.md';
 const APPROVED_FILE = 'APPROVED';
+const JOURNAL_FILE = 'journal.md';
 
 export function getHivePath(projectRoot: string): string {
   return path.join(projectRoot, HIVE_DIR);
+}
+
+export function getJournalPath(projectRoot: string): string {
+  return path.join(getHivePath(projectRoot), JOURNAL_FILE);
 }
 
 export function getFeaturesPath(projectRoot: string): string {

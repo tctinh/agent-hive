@@ -7,12 +7,29 @@ import {
   getTasksPath,
   getPlanPath,
   getCommentsPath,
+  getJournalPath,
   ensureDir,
   readJson,
   writeJson,
   fileExists,
 } from '../utils/paths.js';
 import { FeatureJson, FeatureStatusType, TaskInfo, FeatureInfo, CommentsJson, TaskStatus } from '../types.js';
+
+const JOURNAL_TEMPLATE = `# Hive Journal
+
+Audit trail of project learnings. Updated when trouble is resolved.
+
+---
+
+<!-- Entry template:
+### YYYY-MM-DD: feature-name
+
+**Trouble**: What went wrong
+**Resolution**: How it was fixed
+**Constraint**: Never/Always rule derived (add to Iron Laws if recurring)
+**See**: .hive/features/feature-name/plan.md
+-->
+`;
 
 export class FeatureService {
   constructor(private projectRoot: string) {}
@@ -27,6 +44,12 @@ export class FeatureService {
     ensureDir(featurePath);
     ensureDir(getContextPath(this.projectRoot, name));
     ensureDir(getTasksPath(this.projectRoot, name));
+
+    // Create journal.md if it doesn't exist (first feature init)
+    const journalPath = getJournalPath(this.projectRoot);
+    if (!fileExists(journalPath)) {
+      fs.writeFileSync(journalPath, JOURNAL_TEMPLATE);
+    }
 
     const feature: FeatureJson = {
       name,
