@@ -116,7 +116,7 @@ Vibe coding is powerful but chaotic. We identified 6 pain points:
 
 ---
 
-## The 6 Core Principles
+## The 7 Core Principles
 
 ### P1: Context Persists
 
@@ -208,6 +208,41 @@ Task: Implement calculator
 Each subtask has its own `spec.md` (what to do) and `report.md` (what was done) — first-class audit trail.
 
 *Inspired by Boris's Tip 13: "Give Claude a way to verify its work. When Claude has a feedback loop, it will 2-3x the quality of the final result."*
+
+### P7: Iron Laws + Hard Gates
+
+Soft guidance fails. Agents rationalize around it. Enforce with tools, not prompts.
+
+**Iron Laws** (~15 lines in system prompt):
+```
+Never:
+- Plan without asking questions first
+- Code without failing test first
+- Complete without running verification
+- Assume when uncertain - ASK
+
+Always:
+- One question at a time (discovery)
+- Test → Code → Verify (TDD)
+- Stop and ask when blocked
+```
+
+**Hard Gates** (tools refuse without prerequisites):
+| Tool | Gate | Error |
+|------|------|-------|
+| `hive_plan_write` | `## Discovery` section required | "BLOCKED: Discovery required" |
+| `hive_exec_complete` | Verification keywords in summary | "BLOCKED: No verification" |
+
+**Phase Injection** (right context at right time):
+| Phase | Injection |
+|-------|-----------|
+| Feature create | Discovery prompt with example Q&A |
+| Exec start (delegated) | Delegation protocol for Master |
+| Worker spawn | TDD + Debugging protocols |
+
+*Why this works*: Agent must consciously write `## Discovery` section. Agent must mention verification in summary. No silent bypassing.
+
+*Inspired by Git's philosophy*: Simple primitives, hard enforcement. `git commit` refuses without staged changes. No exceptions.
 
 ---
 
@@ -483,8 +518,16 @@ Human shapes at the top. Agent builds at the bottom. Gate in the middle. Tests v
 - TDD workflow: test → implement → verify
 - Inspired by Boris Cherny's "feedback loop" principle
 
+### v0.9 (Iron Laws + Hard Gates)
+- Added P7: Iron Laws + Hard Gates
+- Soft guidance fails — agents rationalize around it
+- Iron Laws: ~15 lines of Never/Always rules in system prompt
+- Hard Gates: Tools refuse without prerequisites (discovery, verification)
+- Phase Injection: Right context at right time (discovery → delegation → TDD)
+- Inspired by Git's philosophy: simple primitives, hard enforcement
+
 ---
 
 <p align="center">
-  <em>Plan first. Execute with trust. Context persists. Tests verify.</em>
+  <em>Plan first. Execute with trust. Context persists. Tests verify. Gates enforce.</em>
 </p>
