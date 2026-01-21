@@ -149,7 +149,7 @@ Workers spawn in tmux panes with specialized agents:
 - **librarian** - External docs and library research
 - **oracle** - Architecture decisions and guidance
 - **designer** - UI/UX implementation
-- **general** - Default implementation
+- **fixer** - Default implementation (code changes)
 
 Agent is auto-selected based on task content.
 Watch workers in tmux panes for real-time progress.
