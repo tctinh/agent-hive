@@ -2,6 +2,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { tool, type Plugin, type ToolDefinition } from "@opencode-ai/plugin";
 import { getBuiltinSkills, loadBuiltinSkill } from './skills/builtin.js';
+import { SCOUT_PROMPT } from './agents/scout.js';
+import { RECEIVER_PROMPT } from './agents/receiver.js';
+import { FORAGER_PROMPT, foragerAgent } from './agents/forager.js';
 
 // ============================================================================
 // Skill Tool - Uses generated registry (no file-based discovery)
@@ -10,7 +13,7 @@ import { getBuiltinSkills, loadBuiltinSkill } from './skills/builtin.js';
 function formatSkillsXml(): string {
   const skills = getBuiltinSkills();
   if (skills.length === 0) return '';
-  
+
   const skillsXml = skills.map(skill => {
     return [
       '  <skill>',
@@ -19,17 +22,17 @@ function formatSkillsXml(): string {
       '  </skill>',
     ].join('\n');
   }).join('\n');
-  
+
   return `\n\n<available_skills>\n${skillsXml}\n</available_skills>`;
 }
 
 function createHiveSkillTool(): ToolDefinition {
   const base = 'Load a Hive skill to get detailed instructions for a specific workflow.';
   const skills = getBuiltinSkills();
-  const description = skills.length === 0 
+  const description = skills.length === 0
     ? base + '\n\nNo Hive skills available.'
     : base + formatSkillsXml();
-  
+
   return tool({
     description,
     args: {
@@ -37,12 +40,12 @@ function createHiveSkillTool(): ToolDefinition {
     },
     async execute({ name }) {
       const result = loadBuiltinSkill(name);
-      
+
       if (!result.found || !result.skill) {
         const available = skills.map(s => s.name).join(', ');
         throw new Error(`Skill "${name}" not found. Available Hive skills: ${available || 'none'}`);
       }
-      
+
       const skill = result.skill;
       return [
         `## Hive Skill: ${skill.name}`,
@@ -113,9 +116,12 @@ When OMO-Slim is installed, \`hive_exec_start\` spawns worker agents in tmux pan
 
 **Handling blocked workers:**
 1. Check blockers with \`hive_worker_status()\`
-2. Read the blocker info (reason, options, recommendation)
-3. Ask user via \`question()\` tool
+2. Read the blocker info (reason, options, recommendation, context)
+3. Ask user via \`question()\` tool - NEVER plain text
 4. Resume with \`hive_exec_start(task, continueFrom: "blocked", decision: answer)\`
+
+**CRITICAL**: When resuming, a NEW worker spawns in the SAME worktree.
+The previous worker's progress is preserved. Include the user's decision in the \`decision\` parameter.
 
 **Agent auto-selection** based on task content:
 | Pattern | Agent |
@@ -179,13 +185,13 @@ const plugin: Plugin = async (ctx) => {
 
   const resolveFeature = (explicit?: string): string | null => {
     if (explicit) return explicit;
-    
+
     const context = detectContext(directory);
     if (context.feature) return context.feature;
-    
+
     const features = listFeatures(directory);
     if (features.length === 1) return features[0];
-    
+
     return null;
   };
 
@@ -327,11 +333,11 @@ NEXT: Ask your first clarifying question about this feature.`;
         },
         async execute({ feature, trouble, resolution, constraint }) {
           const journalPath = path.join(directory, '.hive', 'journal.md');
-          
+
           if (!fs.existsSync(journalPath)) {
             return `Error: journal.md not found. Create a feature first to initialize the journal.`;
           }
-          
+
           const date = new Date().toISOString().split('T')[0];
           const entry = `
 ### ${date}: ${feature}
@@ -350,14 +356,14 @@ ${constraint ? `**Constraint**: ${constraint}` : ''}
 
       hive_plan_write: tool({
         description: 'Write plan.md (clears existing comments)',
-        args: { 
+        args: {
           content: tool.schema.string().describe('Plan markdown content'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
         async execute({ content, feature: explicitFeature }, toolContext) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
-          
+
           // GATE: Check for discovery section
           const hasDiscovery = content.toLowerCase().includes('## discovery');
           if (!hasDiscovery) {
@@ -370,7 +376,7 @@ Your plan must include a \`## Discovery\` section documenting:
 
 Add this section to your plan content and try again.`;
           }
-          
+
           captureSession(feature, toolContext);
           const planPath = planService.write(feature, content);
           return `Plan written to ${planPath}. Comments cleared for fresh review.`;
@@ -379,7 +385,7 @@ Add this section to your plan content and try again.`;
 
       hive_plan_read: tool({
         description: 'Read plan.md and user comments',
-        args: { 
+        args: {
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
         async execute({ feature: explicitFeature }, toolContext) {
@@ -394,7 +400,7 @@ Add this section to your plan content and try again.`;
 
       hive_plan_approve: tool({
         description: 'Approve plan for execution',
-        args: { 
+        args: {
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
         async execute({ feature: explicitFeature }, toolContext) {
@@ -412,7 +418,7 @@ Add this section to your plan content and try again.`;
 
       hive_tasks_sync: tool({
         description: 'Generate tasks from approved plan',
-        args: { 
+        args: {
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
         async execute({ feature: explicitFeature }) {
@@ -466,7 +472,7 @@ Add this section to your plan content and try again.`;
 
       hive_exec_start: tool({
         description: 'Create worktree and begin work on task. When OMO-Slim is installed, spawns worker agent in tmux pane.',
-        args: { 
+        args: {
           task: tool.schema.string().describe('Task folder name'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
           continueFrom: tool.schema.enum(['blocked']).optional().describe('Resume a blocked task'),
@@ -481,7 +487,7 @@ Add this section to your plan content and try again.`;
 
           const taskInfo = taskService.get(feature, task);
           if (!taskInfo) return `Error: Task "${task}" not found`;
-          
+
           // Allow continuing blocked tasks, but not completed ones
           if (taskInfo.status === 'done') return "Error: Task already completed";
           if (continueFrom === 'blocked' && taskInfo.status !== 'blocked') {
@@ -496,8 +502,8 @@ Add this section to your plan content and try again.`;
           } else {
             worktree = await worktreeService.create(feature, task);
           }
-          
-          taskService.update(feature, task, { 
+
+          taskService.update(feature, task, {
             status: 'in_progress',
             baseCommit: worktree.commit,
           });
@@ -512,7 +518,7 @@ Add this section to your plan content and try again.`;
 
           let specContent = `# Task: ${task}\n\n`;
           specContent += `## Feature: ${feature}\n\n`;
-          
+
           if (planResult) {
             const taskMatch = planResult.content.match(new RegExp(`###\\s*\\d+\\.\\s*${taskInfo.name.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}[\\s\\S]*?(?=###|$)`, 'i'));
             if (taskMatch) {
@@ -565,8 +571,10 @@ Add this section to your plan content and try again.`;
               } : undefined,
             });
 
-            // Select appropriate agent based on task content
-            const agent = selectAgent(taskInfo.name, specContent);
+            // Always use Forager for task execution
+            // Forager knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
+            // Forager can delegate research to explorer/librarian via background_task
+            const agent = 'forager';
 
             // Return delegation instructions for the agent
             // Agent will call background_task tool itself
@@ -584,11 +592,11 @@ Add this section to your plan content and try again.`;
               },
               instructions: `## Delegation Required
 
-You MUST now call background_task to spawn a worker:
+You MUST now call background_task to spawn a Forager worker:
 
 \`\`\`
 background_task({
-  agent: "${agent}",
+  agent: "forager",
   prompt: <the workerPrompt below>,
   description: "Hive: ${task}",
   sync: false
@@ -637,7 +645,7 @@ DO NOT do the work yourself. Delegate it.`,
             const verificationKeywords = ['test', 'build', 'lint', 'vitest', 'jest', 'npm run', 'pnpm', 'cargo', 'pytest', 'verified', 'passes', 'succeeds'];
             const summaryLower = summary.toLowerCase();
             const hasVerificationMention = verificationKeywords.some(kw => summaryLower.includes(kw));
-            
+
             if (!hasVerificationMention) {
               return `BLOCKED: No verification detected in summary.
 
@@ -654,8 +662,8 @@ Re-run with updated summary showing verification results.`;
 
           // Handle blocked status - don't commit, just update status
           if (status === 'blocked') {
-            taskService.update(feature, task, { 
-              status: 'blocked', 
+            taskService.update(feature, task, {
+              status: 'blocked',
               summary,
               blocker: blocker as any,
             } as any);
@@ -673,7 +681,7 @@ Re-run with updated summary showing verification results.`;
 
           // For failed/partial, still commit what we have
           const commitResult = await worktreeService.commitChanges(feature, task, `hive(${task}): ${summary.slice(0, 50)}`);
-          
+
           const diff = await worktreeService.getDiff(feature, task);
 
           const statusLabel = status === 'completed' ? 'success' : status;
@@ -704,7 +712,7 @@ Re-run with updated summary showing verification results.`;
               `- **Deletions:** -${diff.deletions}`,
               '',
             );
-            
+
             if (diff.filesChanged.length > 0) {
               reportLines.push('### Files Modified', '');
               for (const file of diff.filesChanged) {
@@ -717,7 +725,7 @@ Re-run with updated summary showing verification results.`;
           }
 
           taskService.writeReport(feature, task, reportLines.join('\n'));
-          
+
           const finalStatus = status === 'completed' ? 'done' : status;
           taskService.update(feature, task, { status: finalStatus as any, summary });
 
@@ -728,7 +736,7 @@ Re-run with updated summary showing verification results.`;
 
       hive_exec_abort: tool({
         description: 'Abort task: discard changes, reset status',
-        args: { 
+        args: {
           task: tool.schema.string().describe('Task folder name'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
@@ -757,13 +765,13 @@ Re-run with updated summary showing verification results.`;
           const now = Date.now();
 
           const tasks = taskService.list(feature);
-          const inProgressTasks = tasks.filter(t => 
+          const inProgressTasks = tasks.filter(t =>
             (t.status === 'in_progress' || t.status === 'blocked') &&
             (!specificTask || t.folder === specificTask)
           );
 
           if (inProgressTasks.length === 0) {
-            return specificTask 
+            return specificTask
               ? `No active worker for task "${specificTask}"`
               : "No active workers.";
           }
@@ -771,7 +779,7 @@ Re-run with updated summary showing verification results.`;
           const workers = await Promise.all(inProgressTasks.map(async (t) => {
             const worktree = await worktreeService.get(feature, t.folder);
             const taskData = t as any;
-            
+
             // Calculate if stuck (if we have startedAt)
             const startedAt = taskData.startedAt ? new Date(taskData.startedAt).getTime() : now;
             const maybeStuck = (now - startedAt) > STUCK_THRESHOLD && t.status === 'in_progress';
@@ -799,8 +807,8 @@ Re-run with updated summary showing verification results.`;
             hint: workers.some(w => w.status === 'blocked')
               ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
               : workers.some(w => w.maybeStuck)
-              ? 'Some workers may be stuck. Check tmux panes or abort with hive_exec_abort.'
-              : 'Workers in progress. Watch tmux panes for live updates.',
+                ? 'Some workers may be stuck. Check tmux panes or abort with hive_exec_abort.'
+                : 'Workers in progress. Watch tmux panes for live updates.',
           }, null, 2);
         },
       }),
@@ -821,7 +829,7 @@ Re-run with updated summary showing verification results.`;
           if (taskInfo.status !== 'done') return "Error: Task must be completed before merging. Use hive_exec_complete first.";
 
           const result = await worktreeService.merge(feature, task, strategy);
-          
+
           if (!result.success) {
             if (result.conflicts && result.conflicts.length > 0) {
               return `Merge failed with conflicts in:\n${result.conflicts.map(f => `- ${f}`).join('\n')}\n\nResolve conflicts manually or try a different strategy.`;
@@ -939,9 +947,9 @@ Re-run with updated summary showing verification results.`;
             return 'All tasks complete. Review and merge or complete feature.';
           };
 
-          const planStatus = featureData.status === 'planning' ? 'draft' : 
-                            featureData.status === 'approved' ? 'approved' : 
-                            featureData.status === 'executing' ? 'locked' : 'none';
+          const planStatus = featureData.status === 'planning' ? 'draft' :
+            featureData.status === 'approved' ? 'approved' :
+              featureData.status === 'executing' ? 'locked' : 'none';
 
           return JSON.stringify({
             feature: {
@@ -988,13 +996,13 @@ Re-run with updated summary showing verification results.`;
           }
 
           const reportPath = path.join(taskDir, 'report.md');
-          const existingReport = fs.existsSync(reportPath) 
-            ? fs.readFileSync(reportPath, 'utf-8') 
+          const existingReport = fs.existsSync(reportPath)
+            ? fs.readFileSync(reportPath, 'utf-8')
             : '# Task Report\n';
-          
+
           const attemptCount = (existingReport.match(/## Attempt \d+/g) || []).length + 1;
           const timestamp = new Date().toISOString();
-          
+
           const newContent = existingReport + `
 ## Attempt ${attemptCount}
 
@@ -1071,15 +1079,59 @@ Make the requested changes, then call hive_request_review again.`;
       },
     },
 
-    // Hive Agent - hybrid planner-orchestrator
-    // Agent config follows OpenCode SDK format: model, prompt, temperature
+    // Hive Agents - Colony Model with Phase-Aware Main Agent
     agent: {
+      // Main agent - auto-switches Scout/Receiver based on feature state
       hive: {
-        model: undefined, // Use default model
+        model: undefined,
         temperature: 0.7,
-        description: 'Hive Master - plan-first development with structured workflow and worker delegation',
-        // Static base prompt - dynamic context injected via systemPrompt hook
+        description: 'Hive Master - phase-aware planner+orchestrator. Auto-switches Scout/Receiver mode.',
         prompt: buildHiveAgentPrompt(undefined, false),
+        permission: {
+          question: "allow",
+          skill: "allow",
+          todowrite: "allow",
+          todoread: "allow",
+          webfetch: "allow"
+        }
+      },
+      // Explicit Scout - use when you want planning ONLY
+      scout: {
+        model: undefined,
+        temperature: 0.7,
+        description: 'Scout (explicit) - Discovery and planning only. Use @hive for automatic mode.',
+        prompt: SCOUT_PROMPT,
+        permission: {
+          edit: "deny",
+          question: "allow",
+          skill: "allow",
+          todowrite: "allow",
+          todoread: "allow",
+          webfetch: "allow"
+        }
+      },
+      // Explicit Receiver - use when you want orchestration ONLY
+      receiver: {
+        model: undefined,
+        temperature: 0.5,
+        description: 'Receiver (explicit) - Orchestration only. Use @hive for automatic mode.',
+        prompt: RECEIVER_PROMPT,
+        permission: {
+          question: "allow",
+          skill: "allow",
+          todowrite: "allow",
+          todoread: "allow"
+        }
+      },
+      // Forager - Worker subagent (spawned by Receiver/hive_exec_start)
+      forager: {
+        model: undefined,
+        temperature: 0.3,
+        description: 'Forager - Task executor (subagent). Spawned automatically, not for direct use.',
+        prompt: FORAGER_PROMPT,
+        permission: {
+          skill: "allow"
+        }
       },
     },
 
@@ -1093,33 +1145,39 @@ Make the requested changes, then call hive_request_review again.`;
       // Build feature context if active
       const featureNames = listFeatures(directory);
       let featureContext: FeatureContext | undefined;
-      
+
       for (const featureName of featureNames) {
         const feature = featureService.get(featureName);
-        if (feature && ['planning', 'executing'].includes(feature.status)) {
+        if (feature && ['planning', 'approved', 'executing'].includes(feature.status)) {
           const tasks = taskService.list(featureName);
-          const pendingCount = tasks.filter(t => t.status === 'pending').length;
+          const pendingTasks = tasks.filter(t => t.status === 'pending').map(t => t.folder);
+          const blockedTasks = tasks.filter(t => t.status === 'blocked').map(t => t.folder);
           const inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
           const doneCount = tasks.filter(t => t.status === 'done').length;
-          
+
           const contextDir = path.join(directory, '.hive', 'features', featureName, 'context');
           const contextList = fs.existsSync(contextDir)
             ? fs.readdirSync(contextDir).filter(f => f.endsWith('.md'))
             : [];
 
           const planResult = planService.read(featureName);
-          let planStatus: 'none' | 'draft' | 'approved' = 'none';
-          if (planResult) {
-            planStatus = planResult.status === 'approved' || planResult.status === 'executing' 
-              ? 'approved' 
-              : 'draft';
-          }
+          const planApproved = planResult?.status === 'approved' || planResult?.status === 'executing' || feature.status === 'approved' || feature.status === 'executing';
+
+          // Map feature status to context status
+          const status: 'none' | 'planning' | 'approved' | 'executing' | 'completed' = 
+            feature.status === 'completed' ? 'completed' :
+            feature.status === 'approved' ? 'approved' :
+            feature.status === 'executing' ? 'executing' :
+            'planning';
 
           featureContext = {
             name: featureName,
-            planStatus,
-            tasksSummary: `${doneCount} done, ${inProgressCount} in progress, ${pendingCount} pending`,
+            status,
+            planApproved,
+            tasksSummary: `${doneCount} done, ${inProgressCount} in progress, ${pendingTasks.length} pending`,
             contextList,
+            pendingTasks,
+            blockedTasks,
           };
           break;
         }
@@ -1135,20 +1193,47 @@ Make the requested changes, then call hive_request_review again.`;
 
     // Config hook - merge agents into opencodeConfig.agent (like OMO-Slim does)
     config: async (opencodeConfig: Record<string, unknown>) => {
+      // Auto-generate config file with defaults if it doesn't exist
+      configService.init();
+
+      // Get user config for agents (now merged with defaults)
+      const hiveUserConfig = configService.getAgentConfig('hive');
+      const foragerUserConfig = configService.getAgentConfig('forager');
+
       // Define hive agent config
       const hiveAgentConfig = {
-        model: undefined,
-        temperature: 0.7,
+        model: hiveUserConfig.model,  // From ~/.config/opencode/agent_hive.json
+        temperature: hiveUserConfig.temperature ?? 0.7,
         description: 'Hive Master - plan-first development with structured workflow and worker delegation',
         prompt: buildHiveAgentPrompt(undefined, false),
+        // Enable question tool via permission (per OMO-Slim pattern)
+        permission: {
+          question: "allow",
+          skill: "allow",
+          todowrite: "allow",
+          todoread: "allow",
+          webfetch: "allow",
+        },
       };
 
-      // Merge hive agent into opencodeConfig.agent
+      // Define forager agent config (worker for task execution)
+      const foragerAgentConfig = {
+        model: foragerUserConfig.model,  // From ~/.config/opencode/agent_hive.json
+        temperature: foragerUserConfig.temperature ?? 0.3,  // Low temperature for focused implementation
+        description: 'Forager - Task executor (worker). Spawned by Hive Master for isolated task execution.',
+        prompt: foragerAgent.prompt,
+        permission: {
+          skill: "allow",
+        },
+      };
+
+      // Merge hive and forager agents into opencodeConfig.agent
       const configAgent = opencodeConfig.agent as Record<string, unknown> | undefined;
       if (!configAgent) {
-        opencodeConfig.agent = { hive: hiveAgentConfig };
+        opencodeConfig.agent = { hive: hiveAgentConfig, forager: foragerAgentConfig };
       } else {
         (configAgent as Record<string, unknown>).hive = hiveAgentConfig;
+        (configAgent as Record<string, unknown>).forager = foragerAgentConfig;
       }
 
       // Note: Don't override default_agent if OMO-Slim is also installed

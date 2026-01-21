@@ -5,17 +5,103 @@ description: Execute Hive feature tasks with worktree isolation, parallel orches
 
 # Hive Execution
 
-Quick reference for executing Hive tasks.
+Quick reference for executing Hive tasks (Receiver Mode).
+
+## Architecture
+
+```
+@hive (Receiver Mode)
+      │
+      ▼
+hive_exec_start ──► Forager Worker (isolated worktree)
+      │                    │
+      │                    ▼
+      │             background_task (research if needed)
+      │                    │
+      │                    ▼
+      │             hive_exec_complete
+      ▼
+hive_merge ──► Main branch
+```
+
+---
 
 ## Workflow Summary
 
-1. **Feature create** → Discovery guide injected
-2. **Discovery** → Q&A documented in plan.md
-3. **Plan write** → GATE: requires ## Discovery section
-4. **Approval** → User reviews in VS Code
-5. **Exec start** → Delegation guide (Master), TDD+debugging (Worker)
-6. **Complete** → GATE: requires verification mention
-7. **Merge** → Squash into feature branch
+1. **Tasks sync** → Generate from approved plan
+2. **Exec start** → Spawns Forager in worktree
+3. **Worker executes** → Implements, verifies, reports
+4. **Complete** → GATE: requires verification mention
+5. **Merge** → Squash into feature branch
+
+---
+
+## Task Lifecycle
+
+```
+hive_exec_start({ task })           # Creates worktree, spawns Forager
+  ↓
+[Forager implements in worktree]
+  ↓
+hive_exec_complete({ task, summary, status })  # Commits to branch
+  ↓
+hive_merge({ task, strategy: "squash" })  # Integrates to main
+```
+
+---
+
+## Parallel Execution (Swarming)
+
+For parallelizable tasks:
+
+```
+hive_exec_start({ task: "02-task-a" })
+hive_exec_start({ task: "03-task-b" })
+hive_exec_start({ task: "04-task-c" })
+
+hive_worker_status()  # Monitor all
+```
+
+---
+
+## Blocker Handling
+
+### Quick Decision
+
+```
+hive_worker_status()  # Get blocker details
+→ Ask user via question tool
+→ hive_exec_start({ task, continueFrom: "blocked", decision: "..." })
+```
+
+### Plan Gap (Replan)
+
+If blocker suggests plan is incomplete:
+
+1. Ask user: Revise Plan / Quick Fix / Abort
+2. If revise:
+   ```
+   hive_exec_abort({ task })
+   hive_context_write({ name: "learnings", content: "..." })
+   hive_plan_write({ content: "..." })  // Updated plan
+   ```
+3. Wait for re-approval, then `hive_tasks_sync()`
+
+---
+
+## Research During Execution
+
+Workers can delegate research:
+
+```
+background_task({
+  agent: "explorer",  // or librarian, oracle, designer
+  prompt: "Find usage patterns for...",
+  sync: true
+})
+```
+
+---
 
 ## Gates
 
@@ -24,37 +110,38 @@ Quick reference for executing Hive tasks.
 | hive_plan_write | ## Discovery section | "BLOCKED: Discovery required" |
 | hive_exec_complete | Verification in summary | "BLOCKED: No verification" |
 
-## Task Lifecycle
+---
 
-```
-hive_exec_start(task)      # Creates worktree
-  ↓
-[implement in worktree]
-  ↓
-hive_exec_complete(task, summary)  # Commits to branch
-  ↓
-hive_merge(task, strategy: "squash")  # Integrates to main
-```
-
-## Quick Reference
+## Tool Reference
 
 | Tool | Purpose |
 |------|---------|
-| hive_status | Check overall progress |
-| hive_worker_status | Check delegated workers |
+| hive_status | Check overall progress + phase |
+| hive_tasks_sync | Generate tasks from plan |
+| hive_exec_start | Spawn Forager worker |
+| hive_exec_complete | Mark task done |
 | hive_exec_abort | Discard changes, restart |
-| hive_merge | Integrate completed task |
+| hive_worker_status | Check workers/blockers |
+| hive_merge | Integrate to main |
 | hive_worktree_list | See active worktrees |
+| background_task | Research delegation |
+
+---
 
 ## Error Recovery
 
 ### Task Failed
 ```
-hive_exec_abort(task)  # Discards changes
-hive_exec_start(task)  # Fresh start
+hive_exec_abort({ task })  # Discards changes
+hive_exec_start({ task })  # Fresh start
 ```
+
+### After 3 Failures
+1. Stop all workers
+2. Consult: `background_task({ agent: "oracle", prompt: "Analyze..." })`
+3. Ask user how to proceed
 
 ### Merge Conflicts
 1. Resolve conflicts in worktree
 2. Commit resolution
-3. Run hive_merge again
+3. Run `hive_merge` again

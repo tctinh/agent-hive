@@ -44,6 +44,16 @@ export class ConfigService {
         agents: {
           ...DEFAULT_HIVE_CONFIG.agents,
           ...stored.agents,
+          // Deep merge hive agent config
+          hive: {
+            ...DEFAULT_HIVE_CONFIG.agents?.hive,
+            ...stored.agents?.hive,
+          },
+          // Deep merge forager agent config
+          forager: {
+            ...DEFAULT_HIVE_CONFIG.agents?.forager,
+            ...stored.agents?.forager,
+          },
         },
         omoSlim: {
           ...DEFAULT_HIVE_CONFIG.omoSlim,
@@ -113,5 +123,13 @@ export class ConfigService {
    */
   setOmoSlim(enabled: boolean): HiveConfig {
     return this.set({ omoSlim: { enabled } });
+  }
+
+  /**
+   * Get agent-specific model config (hive or forager)
+   */
+  getAgentConfig(agent: 'hive' | 'forager'): { model?: string; temperature?: number; skills?: string[] } {
+    const config = this.get();
+    return config.agents?.[agent] ?? {};
   }
 }

@@ -5,215 +5,342 @@ description: Plan-first AI development with isolated git worktrees and human rev
 
 # Hive Workflow
 
-You are working in a Hive-enabled repository. Follow this plan-first workflow.
+Plan-first development with phase-aware orchestration.
 
-## Lifecycle
+## Architecture
 
 ```
-Feature -> Plan -> Review -> Approve -> Execute -> Merge -> Complete
+┌─────────────────────────────────────────────────────────────┐
+│                  @hive (Phase-Aware Master)                 │
+│                                                             │
+│  Scout Mode ◄────── replan ──────► Receiver Mode            │
+│  (Planning)                        (Orchestration)          │
+│      │                                   │                  │
+│      ▼                                   ▼                  │
+│  background_task                   hive_exec_start          │
+│  (research)                        (spawn worker)           │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Forager (Worker)                         │
+│  - Executes in isolated worktree                            │
+│  - Reports via hive_exec_complete                           │
+│  - Can research via background_task                         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Phase 1: Planning
+## Phase Detection
 
-### Start Feature
+The @hive agent auto-switches mode based on feature state:
+
+| State | Mode | Focus |
+|-------|------|-------|
+| No feature / planning | **Scout** | Discovery → Planning |
+| Approved | **Transition** | Sync tasks → Start execution |
+| Executing | **Receiver** | Spawn workers → Handle blockers → Merge |
+| Completed | **Report** | Summarize and close |
+
+Check with `hive_status()`.
+
+---
+
+## Agents
+
+| Agent | Mode | Use |
+|-------|------|-----|
+| `@hive` | Auto | Primary agent - switches Scout/Receiver |
+| `@scout` | Explicit | Planning only (won't execute) |
+| `@receiver` | Explicit | Orchestration only (won't plan) |
+| `@forager` | Subagent | Spawned by exec_start (don't invoke directly) |
+
+---
+
+## Research Delegation (OMO-Slim)
+
+All agents can delegate research to specialists:
+
+| Specialist | Use For |
+|------------|---------|
+| **explorer** | Find code patterns, locate files |
+| **librarian** | External docs, API references |
+| **oracle** | Architecture advice, debugging |
+| **designer** | UI/UX guidance, component patterns |
+
+```
+background_task({
+  agent: "explorer",
+  prompt: "Find all API routes in src/api/",
+  description: "Find API patterns",
+  sync: true
+})
+```
+
+---
+
+## Intent Classification (Do First)
+
+| Intent | Signals | Action |
+|--------|---------|--------|
+| **Trivial** | Single file, <10 lines | Do directly. No feature. |
+| **Simple** | 1-2 files, <30 min | Quick questions → light plan or just do it |
+| **Complex** | 3+ files, needs review | Full feature workflow |
+| **Refactor** | "refactor", existing code | Safety: tests, rollback, blast radius |
+| **Greenfield** | New feature, "build new" | Discovery: find patterns first |
+
+**Don't over-plan trivial tasks.**
+
+---
+
+## Lifecycle
+
+```
+Classify Intent → Discovery → Plan → Review → Execute → Merge
+                      ↑                           │
+                      └───────── replan ──────────┘
+```
+
+---
+
+## Phase 1: Discovery (Scout Mode)
+
+### Research First (Greenfield/Complex)
+
+```
+background_task({ agent: "explorer", prompt: "Find patterns...", sync: true })
+hive_context_write({ name: "research", content: "# Findings\n..." })
+```
+
+### Question Tool
+
+```json
+{
+  "questions": [{
+    "question": "What authentication should we use?",
+    "header": "Auth Strategy",
+    "options": [
+      { "label": "JWT", "description": "Token-based, stateless" },
+      { "label": "Session", "description": "Cookie-based, server state" }
+    ]
+  }]
+}
+```
+
+### Self-Clearance Check
+
+After each exchange:
+```
+□ Core objective clear?
+□ Scope boundaries defined?
+□ No critical ambiguities?
+□ Technical approach decided?
+
+ALL YES → Write plan
+ANY NO → Ask the unclear thing
+```
+
+---
+
+## Phase 2: Plan
+
+### Create Feature
 
 ```
 hive_feature_create({ name: "feature-name" })
 ```
 
-### Discovery Phase (Required)
+### Save Context (Royal Jelly)
 
-BEFORE writing a plan, you MUST:
-1. Ask clarifying questions about the feature
-2. Document Q&A in plan.md with a `## Discovery` section
-3. Research the codebase (grep, read existing code)
-4. Save findings with hive_context_write
-
-Your plan MUST include a `## Discovery` section or hive_plan_write will be BLOCKED.
-
-Example discovery section:
-```markdown
-## Discovery
-
-**Q: What authentication system do we use?**
-A: JWT with refresh tokens, see src/auth/
-
-**Q: Should this work offline?**
-A: No, online-only is fine
-
-**Research:**
-- Found existing theme system in src/theme/
-- Uses CSS variables pattern
-```
-
-### Research First
-
-Before writing anything:
-1. Search for relevant files (grep, explore)
-2. Read existing implementations
-3. Identify patterns and conventions
-
-Save all findings:
 ```
 hive_context_write({
   name: "research",
-  content: `# Research Findings
-
-## Existing Patterns
-- Theme system uses CSS variables in src/theme/
-- Components follow atomic design
-
-## Files to Modify
-- src/theme/colors.ts
-- src/components/ThemeProvider.tsx
-`
+  content: "# Findings\n- Pattern at src/lib/auth:45-78..."
 })
 ```
 
-### Write the Plan
+### Write Plan
 
-Your plan should include these sections:
+```
+hive_plan_write({ content: "..." })
+```
 
-| Section | Required | Purpose |
-|---------|----------|---------|
-| `## Discovery` | Yes (gate enforced) | Q&A and research before planning |
-| `## Problem` | Yes | What we're solving |
-| `## Non-Goals` | Recommended | What we're NOT building (scope boundaries) |
-| `## Tasks` | Yes | Implementation steps with `### N. Task Name` format |
-| `## Ghost Diffs` | Recommended | Rejected alternatives (prevents re-proposing) |
-| `## Success Criteria` | Optional | How we know we're done |
-
-Format for task parsing:
+### Plan Structure (REQUIRED)
 
 ```markdown
-# Feature Name
+# {Feature Title}
 
-## Overview
-One paragraph explaining what and why.
+## Discovery
+
+### Original Request
+- "{User's exact words}"
+
+### Interview Summary
+- {Point}: {Decision}
+
+### Research Findings
+- `{file:lines}`: {Finding}
+
+---
+
+## Non-Goals (What we're NOT building)
+- {Explicit exclusion}
+
+## Ghost Diffs (Alternatives Rejected)
+- {Approach}: {Why rejected}
+
+---
 
 ## Tasks
 
-### 1. Task Name
-Description of what this task accomplishes.
-- Specific files to modify
-- Expected outcome
+### 1. {Task Title}
 
-### 2. Another Task
-Description...
+**What to do**:
+- {Implementation step}
 
-### 3. Final Task
-Description...
-```
+**Must NOT do**:
+- {Task guardrail}
 
-Write with:
-```
-hive_plan_write({ content: `...` })
-```
+**References**:
+- `{file:lines}` — {WHY this reference}
 
-**STOP** and tell user: "Plan written. Please review."
+**Acceptance Criteria**:
+- [ ] {Verifiable outcome}
+- [ ] Run: `{command}` → {expected}
 
 ---
 
-## Phase 2: Review (Human)
+## Success Criteria
+- [ ] {Final checklist}
+```
 
-- User reviews plan.md in VS Code sidebar
-- User can add comments
-- Use `hive_plan_read()` to see user comments
-- Revise plan based on feedback
-- User clicks "Approve" or runs `hive_plan_approve()`
+### Key Sections
+
+| Section | Purpose |
+|---------|---------|
+| **Discovery** | Ground plan in user words + research |
+| **Non-Goals** | Prevents scope creep |
+| **Ghost Diffs** | Prevents re-proposing rejected solutions |
+| **References** | File:line citations with WHY |
+| **Must NOT do** | Task-level guardrails |
+| **Acceptance Criteria** | Verifiable conditions |
 
 ---
 
-## Phase 3: Execution
+## Phase 3: Review
 
-### Generate Tasks
+1. User reviews in VS Code
+2. Check comments: `hive_plan_read()`
+3. Revise if needed
+4. User approves via: `hive_plan_approve()`
+
+---
+
+## Phase 4: Execute (Receiver Mode)
+
+### Sync Tasks
 
 ```
 hive_tasks_sync()
 ```
 
-Parses `### N. Task Name` headers into task folders.
-
 ### Execute Each Task
 
-For each task in order:
-
-#### 1. Start (creates worktree)
 ```
-hive_exec_start({ task: "01-task-name" })
-```
-
-#### 2. Implement
-Work in the isolated worktree path. Read `spec.md` for context.
-
-#### 3. Complete (commits to branch)
-```
-hive_exec_complete({ task: "01-task-name", summary: "What was done. Tests pass." })
-```
-
-**Note**: Summary must mention verification (tests/build) or completion will be BLOCKED.
-
-#### 4. Merge (integrates to main)
-```
+hive_exec_start({ task: "01-task-name" })  // Spawns Forager
+  ↓
+[Forager implements in worktree]
+  ↓
+hive_exec_complete({ task, summary, status: "completed" })
+  ↓
 hive_merge({ task: "01-task-name", strategy: "squash" })
 ```
 
+### Parallel Execution (Swarming)
+
+When tasks are parallelizable:
+
+```
+hive_exec_start({ task: "02-task-a" })
+hive_exec_start({ task: "03-task-b" })
+hive_worker_status()  // Monitor all
+```
+
 ---
 
-## Phase 4: Completion
+## Blocker Handling
 
-After all tasks merged:
+When worker returns `status: 'blocked'`:
+
+### Quick Decision (No Plan Change)
+
+1. `hive_worker_status()` - get details
+2. Ask user via question tool
+3. Resume: `hive_exec_start({ task, continueFrom: "blocked", decision: "..." })`
+
+### Plan Gap Detected
+
+If blocker suggests plan is incomplete:
+
+```json
+{
+  "questions": [{
+    "question": "This suggests our plan may need revision. How proceed?",
+    "header": "Plan Gap Detected",
+    "options": [
+      { "label": "Revise Plan", "description": "Go back to planning" },
+      { "label": "Quick Fix", "description": "Handle as one-off" },
+      { "label": "Abort Feature", "description": "Stop entirely" }
+    ]
+  }]
+}
 ```
-hive_feature_complete({ name: "feature-name" })
-```
+
+If "Revise Plan":
+1. `hive_exec_abort({ task })`
+2. `hive_context_write({ name: "learnings", content: "..." })`
+3. `hive_plan_write({ content: "..." })` (updated plan)
+4. Wait for re-approval
 
 ---
 
-## Tool Quick Reference
+## Tool Reference
 
 | Phase | Tool | Purpose |
 |-------|------|---------|
-| Plan | `hive_feature_create` | Start new feature |
-| Plan | `hive_context_write` | Save research findings |
-| Plan | `hive_plan_write` | Write the plan |
-| Plan | `hive_plan_read` | Check for user comments |
+| Discovery | `background_task` | Research delegation |
+| Plan | `hive_feature_create` | Start feature |
+| Plan | `hive_context_write` | Save research |
+| Plan | `hive_plan_write` | Write plan |
+| Plan | `hive_plan_read` | Check comments |
 | Plan | `hive_plan_approve` | Approve plan |
-| Execute | `hive_tasks_sync` | Generate tasks from plan |
-| Execute | `hive_exec_start` | Start task (creates worktree) |
-| Execute | `hive_exec_complete` | Finish task (commits changes) |
-| Execute | `hive_merge` | Integrate task to main |
-| Complete | `hive_feature_complete` | Mark feature done |
+| Execute | `hive_tasks_sync` | Generate tasks |
+| Execute | `hive_exec_start` | Spawn Forager worker |
+| Execute | `hive_exec_complete` | Finish task |
+| Execute | `hive_exec_abort` | Discard task |
+| Execute | `hive_merge` | Integrate task |
+| Execute | `hive_worker_status` | Check workers/blockers |
+| Complete | `hive_feature_complete` | Mark done |
+| Status | `hive_status` | Overall progress |
 
 ---
 
-## Task Design Guidelines
+## Iron Laws
 
-### Good Tasks
+**Never:**
+- Plan without discovery
+- Execute without approval
+- Complete without verification
+- Assume when uncertain - ASK
+- Force through blockers that suggest plan gaps
 
-| Characteristic | Example |
-|---------------|---------|
-| **Atomic** | "Add ThemeContext provider" not "Add theming" |
-| **Testable** | "Toggle switches between light/dark" |
-| **Independent** | Can be completed without other tasks (where possible) |
-| **Ordered** | Dependencies come first |
-
-### Task Sizing
-
-- **Too small**: "Add import statement" - combine with related work
-- **Too large**: "Implement entire feature" - break into logical units
-- **Just right**: "Create theme context with light/dark values"
-
----
-
-## Rules
-
-1. **Never skip planning** - Always write plan first
-2. **Context is critical** - Save all research with `hive_context_write`
-3. **Wait for approval** - Don't execute until user approves
-4. **One task at a time** - Complete and merge before starting next
-5. **Squash merges** - Keep history clean with single commit per task
+**Always:**
+- Match effort to complexity
+- Include file:line references with WHY
+- Define Non-Goals and Must NOT guardrails
+- Provide verification commands
+- Offer replan when blockers suggest gaps
 
 ---
 
@@ -221,29 +348,16 @@ hive_feature_complete({ name: "feature-name" })
 
 ### Task Failed
 ```
-hive_exec_abort(task="<task>")  # Discards changes
-hive_exec_start(task="<task>")  # Fresh start
+hive_exec_abort({ task })  # Discard
+hive_exec_start({ task })  # Fresh start
 ```
+
+### After 3 Failures
+1. Stop all workers
+2. Consult oracle: `background_task({ agent: "oracle", prompt: "Analyze failure..." })`
+3. Ask user how to proceed
 
 ### Merge Conflicts
-1. Resolve conflicts in the worktree
-2. Commit the resolution
-3. Run `hive_merge` again
-
----
-
-## Example
-
-User: "Add dark mode support"
-
-```
-1. hive_feature_create({ name: "dark-mode" })
-2. Research: grep for theme, colors, CSS variables
-3. hive_context_write({ name: "research", content: "Found theme in src/theme/..." })
-4. hive_plan_write({ content: "# Dark Mode\n\n## Tasks\n\n### 1. Add theme context..." })
-5. Tell user: "Plan ready for review"
-6. [User reviews and approves]
-7. hive_tasks_sync()
-8. For each task: exec_start -> implement -> exec_complete -> merge
-9. hive_feature_complete({ name: "dark-mode" })
-```
+1. Resolve in worktree
+2. Commit resolution
+3. `hive_merge` again

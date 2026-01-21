@@ -109,6 +109,16 @@ export interface TaskSpec {
   priorTasks: Array<{ folder: string; summary?: string }>;
 }
 
+/** Agent model/temperature configuration (matches OMO-Slim pattern) */
+export interface AgentModelConfig {
+  /** Model to use - format: "provider/model-id" (e.g., 'anthropic/claude-sonnet-4-20250514') */
+  model?: string;
+  /** Temperature for generation (0-2) */
+  temperature?: number;
+  /** Skills to enable for this agent */
+  skills?: string[];
+}
+
 export interface HiveConfig {
   /** Enable hive tools for specific features */
   enableToolsFor?: string[];
@@ -117,6 +127,10 @@ export interface HiveConfig {
     worker: {
       visible: boolean;
     };
+    /** Hive Master agent config */
+    hive?: AgentModelConfig;
+    /** Forager worker agent config */
+    forager?: AgentModelConfig;
   };
   /** OMO-Slim integration settings */
   omoSlim?: {
@@ -125,11 +139,27 @@ export interface HiveConfig {
   };
 }
 
+/** Default models for Hive agents (like OMO-Slim's DEFAULT_MODELS) */
+export const DEFAULT_AGENT_MODELS = {
+  hive: 'anthropic/claude-sonnet-4-20250514',
+  forager: 'anthropic/claude-sonnet-4-20250514',
+} as const;
+
 export const DEFAULT_HIVE_CONFIG: HiveConfig = {
   enableToolsFor: [],
   agents: {
     worker: {
       visible: true,
+    },
+    hive: {
+      model: DEFAULT_AGENT_MODELS.hive,
+      temperature: 0.7,
+      skills: ['*'],
+    },
+    forager: {
+      model: DEFAULT_AGENT_MODELS.forager,
+      temperature: 0.3,
+      skills: [],
     },
   },
   omoSlim: {
