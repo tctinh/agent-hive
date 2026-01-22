@@ -34,6 +34,7 @@ export interface SubtaskStatus {
 export interface TaskStatus {
   status: TaskStatusType;
   origin: TaskOrigin;
+  planTitle?: string;
   summary?: string;
   startedAt?: string;
   completedAt?: string;
@@ -71,6 +72,7 @@ export interface TaskInfo {
   name: string;
   status: TaskStatusType;
   origin: TaskOrigin;
+  planTitle?: string;
   summary?: string;
 }
 

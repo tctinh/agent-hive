@@ -141,6 +141,7 @@ export class FeatureService {
         name,
         status: status?.status || 'pending',
         origin: status?.origin || 'plan',
+        planTitle: status?.planTitle,
         summary: status?.summary,
       };
     });

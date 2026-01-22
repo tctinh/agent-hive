@@ -106,6 +106,7 @@ export class TaskService {
     const status: TaskStatus = {
       status: 'pending',
       origin: 'manual',
+      planTitle: name,
     };
     writeJson(getTaskStatusPath(this.projectRoot, featureName, folder), status);
 
@@ -119,6 +120,7 @@ export class TaskService {
     const status: TaskStatus = {
       status: 'pending',
       origin: 'plan',
+      planTitle: task.name,
     };
     writeJson(getTaskStatusPath(this.projectRoot, featureName, task.folder), status);
 
@@ -204,6 +206,7 @@ export class TaskService {
       name: taskFolder.replace(/^\d+-/, ''),
       status: status.status,
       origin: status.origin,
+      planTitle: status.planTitle,
       summary: status.summary,
     };
   }
