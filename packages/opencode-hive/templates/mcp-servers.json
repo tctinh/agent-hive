@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "grep_app": {
+      "command": "npx",
+      "args": ["-y", "grep-mcp"],
+      "description": "GitHub code search via grep.app"
+    },
+    "ast_grep": {
+      "command": "npx",
+      "args": ["-y", "@notprolands/ast-grep-mcp"],
+      "description": "AST-aware code search and refactoring"
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "description": "Library documentation lookup"
+    },
+    "websearch_exa": {
+      "command": "npx",
+      "args": ["-y", "exa-mcp-server"],
+      "env": {
+        "EXA_API_KEY": "${EXA_API_KEY}"
+      },
+      "description": "Exa AI web search (requires API key)"
+    }
+  }
+}
