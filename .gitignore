@@ -20,6 +20,8 @@ npm-debug.log*
 # Environment
 .env
 .env.local
+.ignore
+tmp/
 
 # Hive runtime data
 .hive/

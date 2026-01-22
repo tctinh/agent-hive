@@ -520,7 +520,21 @@ Add this section to your plan content and try again.`;
           specContent += `## Feature: ${feature}\n\n`;
 
           if (planResult) {
-            const taskMatch = planResult.content.match(new RegExp(`###\\s*\\d+\\.\\s*${taskInfo.name.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}[\\s\\S]*?(?=###|$)`, 'i'));
+            // Prefer raw planTitle for matching (preserves original casing/punctuation)
+            const planTitle = taskInfo.planTitle ?? taskInfo.name;
+            const escapedTitle = planTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const titleRegex = new RegExp(`###\\s*\\d+\\.\\s*${escapedTitle}[\\s\\S]*?(?=###|$)`, 'i');
+            let taskMatch = planResult.content.match(titleRegex);
+            
+            // Fallback: if planTitle match fails, try matching by task order (e.g., "### 1.")
+            if (!taskMatch) {
+              const orderMatch = taskInfo.folder.match(/^(\d+)-/);
+              if (orderMatch) {
+                const orderRegex = new RegExp(`###\\s*${orderMatch[1]}\\.\\s*[^\\n]+[\\s\\S]*?(?=###|$)`, 'i');
+                taskMatch = planResult.content.match(orderRegex);
+              }
+            }
+            
             if (taskMatch) {
               specContent += `## Plan Section\n\n${taskMatch[0].trim()}\n\n`;
             }
