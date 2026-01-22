@@ -225,14 +225,19 @@ You are in **Receiver Mode** - focus on orchestration.
 1. **Sync tasks** (if not done): \`hive_tasks_sync()\`
 
 2. **For each task**:
+   In OMO-Slim mode, hive_exec_start only creates the worktree. It does NOT spawn a worker.
+   You MUST spawn the worker with background_task using backgroundTaskCall when delegationRequired is true.
+
    \`\`\`
-   hive_exec_start({ task: "01-task-name" })  // Spawns worker
+   hive_exec_start({ task: "01-task-name" })
+   background_task({ ...backgroundTaskCall })  // Required when delegationRequired is true
    hive_worker_status()                        // Monitor
    hive_exec_complete(...)                     // When done
    hive_merge({ task: "01-task-name" })        // Integrate
    \`\`\`
 
 3. **Parallel execution** (when tasks are independent):
+   When delegationRequired is returned, call background_task to spawn that worker.
    \`\`\`
    hive_exec_start({ task: "02-task-a" })
    hive_exec_start({ task: "03-task-b" })

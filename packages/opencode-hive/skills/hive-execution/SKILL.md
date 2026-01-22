@@ -13,13 +13,13 @@ Quick reference for executing Hive tasks (Receiver Mode).
 @hive (Receiver Mode)
       │
       ▼
-hive_exec_start ──► Forager Worker (isolated worktree)
-      │                    │
-      │                    ▼
-      │             background_task (research if needed)
-      │                    │
-      │                    ▼
-      │             hive_exec_complete
+hive_exec_start ──► background_task ──► Forager Worker (isolated worktree)
+      │                                │
+      │                                ▼
+      │                         background_task (research if needed)
+      │                                │
+      │                                ▼
+      │                         hive_exec_complete
       ▼
 hive_merge ──► Main branch
 ```
@@ -29,7 +29,7 @@ hive_merge ──► Main branch
 ## Workflow Summary
 
 1. **Tasks sync** → Generate from approved plan
-2. **Exec start** → Spawns Forager in worktree
+2. **Exec start** → Creates worktree; call background_task to spawn Forager (OMO-Slim)
 3. **Worker executes** → Implements, verifies, reports
 4. **Complete** → GATE: requires verification mention
 5. **Merge** → Squash into feature branch
@@ -39,7 +39,7 @@ hive_merge ──► Main branch
 ## Task Lifecycle
 
 ```
-hive_exec_start({ task })           # Creates worktree, spawns Forager
+hive_exec_start({ task })           # Creates worktree; if delegationRequired, spawn Forager via background_task
   ↓
 [Forager implements in worktree]
   ↓
@@ -53,6 +53,8 @@ hive_merge({ task, strategy: "squash" })  # Integrates to main
 ## Parallel Execution (Swarming)
 
 For parallelizable tasks:
+
+If `delegationRequired` is returned for a task, call `background_task` to spawn that worker.
 
 ```
 hive_exec_start({ task: "02-task-a" })

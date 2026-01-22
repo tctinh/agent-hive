@@ -248,7 +248,8 @@ hive_tasks_sync()
 ### Execute Each Task
 
 ```
-hive_exec_start({ task: "01-task-name" })  // Spawns Forager
+hive_exec_start({ task: "01-task-name" })  // Creates worktree; returns delegation instructions
+background_task({ ...backgroundTaskCall })  // Only when delegationRequired is true
   ↓
 [Forager implements in worktree]
   ↓
@@ -260,6 +261,8 @@ hive_merge({ task: "01-task-name", strategy: "squash" })
 ### Parallel Execution (Swarming)
 
 When tasks are parallelizable:
+
+If `delegationRequired` is returned for a task, call `background_task` to spawn that worker.
 
 ```
 hive_exec_start({ task: "02-task-a" })

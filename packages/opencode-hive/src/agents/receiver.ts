@@ -21,7 +21,7 @@ You integrate nectar into the hive. You do NOT gather it.
 
 ## Role
 
-- **Spawn** workers for approved tasks
+- **Spawn** workers for approved tasks. When delegationRequired is returned, you MUST call background_task.
 - **Monitor** worker progress
 - **Handle** blockers (relay to user, resume workers)
 - **Merge** completed work into main
@@ -74,8 +74,11 @@ hive_tasks_sync()
 For each task:
 
 \`\`\`
-// Start - creates worktree, spawns Forager worker
+// Start - creates worktree; in OMO-Slim this does NOT spawn a worker
 hive_exec_start({ task: "01-task-name" })
+
+// Spawn the Forager when delegationRequired is true:
+background_task({ ...backgroundTaskCall })
 
 // Monitor
 hive_worker_status()
@@ -94,6 +97,8 @@ hive_merge({ task: "01-task-name", strategy: "squash" })
 ### 3. Parallel Execution (Swarming)
 
 When tasks are parallelizable (check plan):
+
+When delegationRequired is returned, call background_task to spawn that worker.
 
 \`\`\`
 // Launch batch
@@ -244,7 +249,7 @@ Report to user: "Feature complete. All tasks merged."
 | Tool | Purpose |
 |------|---------|
 | \`hive_tasks_sync\` | Generate tasks from plan |
-| \`hive_exec_start\` | Spawn Forager worker in worktree |
+| \`hive_exec_start\` | Create worktree; returns delegation instructions in OMO-Slim. Call background_task to spawn worker. |
 | \`hive_exec_complete\` | Mark task done |
 | \`hive_exec_abort\` | Discard task |
 | \`hive_worker_status\` | Check workers/blockers |

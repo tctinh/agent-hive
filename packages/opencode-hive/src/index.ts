@@ -107,10 +107,10 @@ Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manu
 
 ### Delegated Execution (OMO-Slim Integration)
 
-When OMO-Slim is installed, \`hive_exec_start\` spawns worker agents in tmux panes:
+When OMO-Slim is installed, \`hive_exec_start\` returns delegation instructions. You MUST call \`background_task\` to spawn the worker:
 
-1. \`hive_exec_start(task)\` → Creates worktree + spawns worker via \`background_task\`
-2. Worker appears in tmux pane - watch it work in real-time
+1. \`hive_exec_start(task)\` → Creates worktree + returns delegation instructions
+2. Call \`background_task\` with those instructions → Worker appears in tmux pane
 3. Worker completes → calls \`hive_exec_complete(status: "completed")\`
 4. Worker blocked → calls \`hive_exec_complete(status: "blocked", blocker: {...})\`
 
@@ -471,7 +471,7 @@ Add this section to your plan content and try again.`;
       }),
 
       hive_exec_start: tool({
-        description: 'Create worktree and begin work on task. When OMO-Slim is installed, spawns worker agent in tmux pane.',
+        description: 'Create worktree and begin work on task. In OMO-Slim, returns delegation instructions; call background_task to spawn worker.',
         args: {
           task: tool.schema.string().describe('Task folder name'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
