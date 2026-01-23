@@ -16,6 +16,7 @@ import { isValidTransition, isTerminalStatus, VALID_TRANSITIONS } from './types.
 import { AgentGate } from './agent-gate.js';
 import { ConcurrencyManager, createConcurrencyManager } from './concurrency.js';
 import { BackgroundPoller, createPoller } from './poller.js';
+import { BackgroundManager } from './manager.js';
 import type { OpencodeClient } from './types.js';
 
 // ============================================================================
@@ -659,7 +660,8 @@ describe('ConcurrencyManager', () => {
       expect(cancelled).toBe(1);
 
       await promise;
-      expect(error?.message).toContain('cancelled');
+      expect(error).toBeTruthy();
+      expect((error as Error).message).toContain('cancelled');
       expect(manager.getQueueLength('test')).toBe(0);
     });
   });
@@ -864,6 +866,99 @@ describe('BackgroundPoller', () => {
 
       expect(poller.isRunning()).toBe(false);
     });
+  });
+
+  describe('completion detection', () => {
+    it('invokes onSessionIdle when session.status reports idle', async () => {
+      const task = store.create({
+        agent: 'explorer',
+        description: 'Test',
+        sessionId: 'session-123',
+      });
+      store.updateStatus(task.taskId, 'running');
+
+      let called = 0;
+      const poller = createPoller(
+        store,
+        {
+          ...client,
+          session: {
+            ...client.session,
+            status: async () => ({
+              data: {
+                'session-123': { type: 'idle' },
+              },
+            }),
+            messages: async () => ({ data: [{ info: { role: 'assistant' } }] as unknown[] }),
+          },
+        },
+        undefined,
+        {
+          onSessionIdle: () => {
+            called++;
+          },
+        }
+      );
+
+      await poller.poll();
+      expect(called).toBe(1);
+    });
+  });
+});
+
+// =========================================================================
+// BackgroundManager integration: completion -> terminal state
+// =========================================================================
+
+describe('BackgroundManager completion integration', () => {
+  it('transitions running -> completed when poller observes idle session', async () => {
+    const store = new BackgroundTaskStore();
+
+    const client: OpencodeClient = {
+      session: {
+        create: async () => ({ data: { id: 'session-123' } }),
+        prompt: async () => ({ data: {} }),
+        get: async () => ({ data: { id: 'session-123', status: 'idle' } }),
+        messages: async () => ({ data: [{ info: { role: 'assistant' } }] as unknown[] }),
+        abort: async () => {},
+        status: async () => ({ data: { 'session-123': { type: 'idle' } } }),
+      },
+      app: {
+        agents: async () => ({ data: [{ name: 'explorer', mode: 'subagent' }] }),
+        log: async () => {},
+      },
+      config: {
+        get: async () => ({ data: {} }),
+      },
+    };
+
+    const manager = new BackgroundManager({
+      client,
+      projectRoot: '/tmp',
+      store,
+      concurrency: { defaultLimit: 1, minDelayBetweenStartsMs: 0 },
+    });
+
+    const spawn = await manager.spawn({
+      agent: 'explorer',
+      prompt: 'say hi',
+      description: 'test',
+      idempotencyKey: 'idem-1',
+      sync: false,
+    });
+
+    expect(spawn.error).toBeUndefined();
+    const taskId = spawn.task.taskId;
+
+    expect(manager.getTask(taskId)?.status).toBe('running');
+    expect(manager.getConcurrencyManager().getCount('explorer')).toBe(1);
+
+    await manager.getPoller().poll();
+
+    expect(manager.getTask(taskId)?.status).toBe('completed');
+    expect(manager.getConcurrencyManager().getCount('explorer')).toBe(0);
+
+    manager.shutdown();
   });
 });
 

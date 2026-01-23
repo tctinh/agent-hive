@@ -63,7 +63,9 @@ export class BackgroundManager {
     this.agentGate = createAgentGate(options.client);
     this.taskService = new TaskService(options.projectRoot);
     this.concurrencyManager = createConcurrencyManager(options.concurrency);
-    this.poller = createPoller(this.store, options.client, options.poller);
+    this.poller = createPoller(this.store, options.client, options.poller, {
+      onSessionIdle: (sessionId) => this.handleSessionIdle(sessionId),
+    });
     this.enforceHiveSequential = options.enforceHiveSequential ?? true;
   }
 

@@ -30,6 +30,25 @@ export interface PollerConfig {
   stableCountThreshold?: number;
 }
 
+/**
+ * Optional callbacks for reacting to observed session state.
+ *
+ * NOTE: Poller remains "read-only" with respect to `.hive`.
+ * These callbacks are intended for in-memory lifecycle transitions (e.g. marking
+ * a background task completed) handled by the owning manager.
+ */
+export interface PollerHandlers {
+  /**
+   * Invoked when the poller observes that a background session is idle/complete.
+   *
+   * The owning manager should:
+   * - transition the task to a terminal state
+   * - release any concurrency slot
+   * - cleanup poller state
+   */
+  onSessionIdle?: (sessionId: string, reason: 'status' | 'stable') => void;
+}
+
 const DEFAULT_CONFIG: Required<PollerConfig> = {
   pollIntervalMs: 5000,
   maxPollIntervalMs: 30000,
@@ -72,6 +91,7 @@ export class BackgroundPoller {
   private store: BackgroundTaskStore;
   private client: OpencodeClient;
   private config: Required<PollerConfig>;
+  private handlers: PollerHandlers;
   private pollingState: Map<string, TaskPollingState> = new Map();
   private pollInterval: ReturnType<typeof setInterval> | null = null;
   private isPolling = false;
@@ -80,11 +100,13 @@ export class BackgroundPoller {
   constructor(
     store: BackgroundTaskStore,
     client: OpencodeClient,
-    config: PollerConfig = {}
+    config: PollerConfig = {},
+    handlers: PollerHandlers = {}
   ) {
     this.store = store;
     this.client = client;
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.handlers = handlers;
     this.currentIntervalMs = this.config.pollIntervalMs;
   }
 
@@ -206,6 +228,8 @@ export class BackgroundPoller {
     };
 
     try {
+      const sessionType = sessionStatuses[task.sessionId]?.type;
+
       // Get message count from session
       const messagesResult = await this.client.session.messages({
         path: { id: task.sessionId },
@@ -234,6 +258,37 @@ export class BackgroundPoller {
       state.consecutiveErrors = 0;
 
       this.pollingState.set(task.taskId, state);
+
+      // Completion detection
+      //
+      // Preferred: rely on session.status() batch endpoint when available.
+      // Fallback: if status is unknown, use stability (no message growth) as a
+      // conservative completion signal to avoid tasks stuck "running" forever.
+      const isIdle = sessionType === 'idle' || sessionType === 'completed';
+      if (isIdle) {
+        this.handlers.onSessionIdle?.(task.sessionId, 'status');
+        return;
+      }
+
+      // If we don't have a usable status signal, use stability detection.
+      // Only attempt this once the session has produced at least one message,
+      // otherwise we risk completing before the agent loop actually starts.
+      if (!sessionType && currentMessageCount > 0 && state.stablePolls >= this.config.stableCountThreshold) {
+        // Try session.get() first if it exposes status.
+        try {
+          const session = await this.client.session.get({ path: { id: task.sessionId } });
+          const status = (session.data as { status?: string } | undefined)?.status;
+          if (status === 'idle' || status === 'completed') {
+            this.handlers.onSessionIdle?.(task.sessionId, 'status');
+            return;
+          }
+        } catch {
+          // Ignore and fall back to stability.
+        }
+
+        // Last-resort fallback: stable message count for N polls.
+        this.handlers.onSessionIdle?.(task.sessionId, 'stable');
+      }
     } catch (error) {
       state.consecutiveErrors++;
       state.lastPollAt = Date.now();
@@ -345,7 +400,8 @@ export class BackgroundPoller {
 export function createPoller(
   store: BackgroundTaskStore,
   client: OpencodeClient,
-  config?: PollerConfig
+  config?: PollerConfig,
+  handlers?: PollerHandlers
 ): BackgroundPoller {
-  return new BackgroundPoller(store, client, config);
+  return new BackgroundPoller(store, client, config, handlers);
 }
