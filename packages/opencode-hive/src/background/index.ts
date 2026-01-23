@@ -13,7 +13,7 @@
  */
 
 // Types
-export {
+export type {
   BackgroundTaskStatus,
   BackgroundTaskRecord,
   BackgroundTaskProgress,
@@ -22,6 +22,9 @@ export {
   OpencodeClient,
   AgentInfo,
   AgentValidationResult,
+} from './types.js';
+
+export {
   VALID_TRANSITIONS,
   isTerminalStatus,
   isValidTransition,
@@ -35,15 +38,21 @@ export {
 } from './store.js';
 
 // Agent Gate
+export type {
+  AgentValidationOptions,
+} from './agent-gate.js';
+
 export {
   AgentGate,
-  AgentValidationOptions,
   createAgentGate,
 } from './agent-gate.js';
 
 // Manager
+export type {
+  BackgroundManagerOptions,
+} from './manager.js';
+
 export {
   BackgroundManager,
-  BackgroundManagerOptions,
   createBackgroundManager,
 } from './manager.js';

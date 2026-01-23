@@ -72,6 +72,8 @@ import {
 import { selectAgent, type OmoSlimAgent } from "./utils/agent-selector";
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
 import { buildHiveAgentPrompt, type FeatureContext } from "./agents/hive";
+import { createBackgroundManager, type OpencodeClient } from "./background/index.js";
+import { createBackgroundTools } from "./tools/background-tools.js";
 
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development System
@@ -175,6 +177,18 @@ const plugin: Plugin = async (ctx) => {
     hiveDir: path.join(directory, '.hive'),
   });
 
+  // Create BackgroundManager for delegated task execution
+  const backgroundManager = createBackgroundManager({
+    client: client as unknown as OpencodeClient,
+    projectRoot: directory,
+  });
+
+  // Create background tools
+  const backgroundTools = createBackgroundTools(
+    backgroundManager,
+    client as unknown as OpencodeClient
+  );
+
   /**
    * Check if OMO-Slim delegation is enabled via user config.
    * Users enable this in ~/.config/opencode/agent_hive.json
@@ -251,6 +265,11 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
 
     tool: {
       hive_skill: createHiveSkillTool(),
+
+      // Background task tools for delegated execution
+      background_task: backgroundTools.background_task,
+      background_output: backgroundTools.background_output,
+      background_cancel: backgroundTools.background_cancel,
 
       hive_feature_create: tool({
         description: 'Create a new feature and set it as active',
