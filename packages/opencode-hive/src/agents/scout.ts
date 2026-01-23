@@ -35,10 +35,10 @@ You have MCP tools for research:
 
 | Tool | Purpose |
 |------|---------|
-| `grep_app_searchGitHub` | Find code examples in OSS |
-| `ast_grep_search` | AST pattern matching |
-| `context7_query-docs` | Library documentation |
-| `websearch_web_search_exa` | Current web info |
+| grep_app_searchGitHub | Find code examples in OSS |
+| ast_grep_search | AST pattern matching |
+| context7_query-docs | Library documentation |
+| websearch_web_search_exa | Current web info |
 
 For large exploration, use OpenCode's Task tool:
 

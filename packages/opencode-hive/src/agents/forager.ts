@@ -49,9 +49,9 @@ You have MCP tools for research when you need help:
 
 | Tool | Purpose |
 |------|---------|
-| `grep_app_searchGitHub` | Find code patterns in OSS |
-| `ast_grep_search` | AST pattern matching |
-| `context7_query-docs` | Library documentation |
+| grep_app_searchGitHub | Find code patterns in OSS |
+| ast_grep_search | AST pattern matching |
+| context7_query-docs | Library documentation |
 
 ### How to Research
 

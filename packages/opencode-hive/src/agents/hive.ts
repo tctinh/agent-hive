@@ -51,10 +51,10 @@ You have MCP tools for research:
 
 | Tool | Purpose |
 |------|---------|
-| `grep_app_searchGitHub` | Find code examples in OSS |
-| `ast_grep_search` | AST pattern matching |
-| `context7_query-docs` | Library documentation |
-| `websearch_web_search_exa` | Current web info |
+| grep_app_searchGitHub | Find code examples in OSS |
+| ast_grep_search | AST pattern matching |
+| context7_query-docs | Library documentation |
+| websearch_web_search_exa | Current web info |
 
 For delegation, use OpenCode's Task tool:
 
@@ -221,20 +221,20 @@ You are in **Receiver Mode** - focus on orchestration.
 1. **Sync tasks** (if not done): \`hive_tasks_sync()\`
 
 2. **For each task**:
-   \\`\\`\\`
-   hive_exec_start({ task: \"01-task-name\" })
+   \`\`\`
+   hive_exec_start({ task: "01-task-name" })
    // Forager worker is spawned automatically
    hive_worker_status()                        // Monitor
    hive_exec_complete(...)                     // When done
-   hive_merge({ task: \"01-task-name\" })        // Integrate
-   \\`\\`\\`
+   hive_merge({ task: "01-task-name" })        // Integrate
+   \`\`\`
 
 3. **Parallel execution** (when tasks are independent):
-   \\`\\`\\`
-   hive_exec_start({ task: \"02-task-a\" })
-   hive_exec_start({ task: \"03-task-b\" })
+   \`\`\`
+   hive_exec_start({ task: "02-task-a" })
+   hive_exec_start({ task: "03-task-b" })
    hive_worker_status()  // Monitor all
-   \\`\\`\\`
+   \`\`\`
 
 ### Blocker Handling
 

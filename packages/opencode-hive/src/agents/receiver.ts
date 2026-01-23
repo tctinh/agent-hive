@@ -37,8 +37,8 @@ When debugging or analyzing blockers, you can use MCP tools:
 
 | Tool | Purpose |
 |------|---------|
-| `grep_app_searchGitHub` | Find similar bugs/solutions in OSS |
-| `context7_query-docs` | Check library documentation |
+| grep_app_searchGitHub | Find similar bugs/solutions in OSS |
+| context7_query-docs | Check library documentation |
 
 \`\`\`
 // Or delegate comprehensive research
@@ -95,17 +95,17 @@ hive_merge({ task: "01-task-name", strategy: "squash" })
 
 When tasks are parallelizable (check plan):
 
-\\`\\`\\`
+\`\`\`
 // Launch batch
-hive_exec_start({ task: \"02-task-a\" })
-hive_exec_start({ task: \"03-task-b\" })
-hive_exec_start({ task: \"04-task-c\" })
+hive_exec_start({ task: "02-task-a" })
+hive_exec_start({ task: "03-task-b" })
+hive_exec_start({ task: "04-task-c" })
 
 // Monitor all
 hive_worker_status()
 
 // Complete + merge as they finish
-\\`\\`\\`
+\`\`\`
 
 ---
 
@@ -196,7 +196,7 @@ If user chooses "Revise Plan":
 
 1. **STOP** all workers
 2. **Consult tools** for analysis:
-   \\`\\`\\`
+   \`\`\`
    // Use MCP tools for quick debugging info
    grep_app_searchGitHub({ query: "error X solution" })
    // Or delegate
@@ -204,7 +204,7 @@ If user chooses "Revise Plan":
      subagent_type: "scout-bee",
      prompt: "Task failed 3 times: {error summary}. Analyze root cause."
    })
-   \\`\\`\\`
+   \`\`\`
 3. **Report** to user with oracle's analysis
 4. **Ask** how to proceed (retry, abort, fix manually, or revise plan)
 
@@ -245,14 +245,14 @@ Report to user: "Feature complete. All tasks merged."
 
 | Tool | Purpose |
 |------|---------|
-| \`hive_tasks_sync\` | Generate tasks from plan |
-| \\`hive_exec_start\\` | Create worktree and spawn Forager worker |
-| \\`hive_exec_complete\\` | Mark task done |
-| \\`hive_exec_abort\\` | Discard task |
-| \\`hive_worker_status\\` | Check workers/blockers |
-| \\`hive_merge\\` | Integrate task to main |
-| \\`hive_feature_complete\\` | Mark feature done |
-| \\`task\\` | Delegate research |
+| hive_tasks_sync | Generate tasks from plan |
+| hive_exec_start | Create worktree and spawn Forager worker |
+| hive_exec_complete | Mark task done |
+| hive_exec_abort | Discard task |
+| hive_worker_status | Check workers/blockers |
+| hive_merge | Integrate task to main |
+| hive_feature_complete | Mark feature done |
+| task | Delegate research |
 
 ---
 
