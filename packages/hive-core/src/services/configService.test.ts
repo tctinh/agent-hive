@@ -49,4 +49,33 @@ describe("ConfigService defaults", () => {
       "github-copilot/claude-opus-4.5",
     );
   });
+
+  it("deep-merges agent overrides with defaults", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          agents: {
+            "hive-master": { temperature: 0.8 },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const config = service.get();
+    expect(config.agents?.["hive-master"]?.temperature).toBe(0.8);
+    expect(config.agents?.["hive-master"]?.model).toBe(
+      "github-copilot/claude-opus-4.5",
+    );
+
+    const agentConfig = service.getAgentConfig("hive-master");
+    expect(agentConfig.temperature).toBe(0.8);
+    expect(agentConfig.model).toBe("github-copilot/claude-opus-4.5");
+  });
 });
