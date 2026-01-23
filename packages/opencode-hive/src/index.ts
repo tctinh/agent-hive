@@ -609,6 +609,26 @@ Add this section to your plan content and try again.`;
             // Forager can delegate research to explorer/librarian via background_task
             const agent = 'forager';
 
+            // Generate stable idempotency key for safe retries
+            // Format: hive-<feature>-<task>-<attempt>
+            const rawStatus = taskService.getRawStatus(feature, task);
+            const attempt = (rawStatus?.workerSession?.attempt || 0) + 1;
+            const idempotencyKey = `hive-${feature}-${task}-${attempt}`;
+
+            // Persist workerSession metadata for tracking
+            const sessionId = `${feature}-${task}-${Date.now()}`;
+            taskService.patchBackgroundFields(feature, task, {
+              idempotencyKey,
+              workerSession: {
+                sessionId,
+                agent,
+                mode: 'delegate',
+                attempt,
+                lastHeartbeatAt: new Date().toISOString(),
+                messageCount: 0,
+              },
+            });
+
             // Return delegation instructions for the agent
             // Agent will call background_task tool itself
             return JSON.stringify({
@@ -622,6 +642,8 @@ Add this section to your plan content and try again.`;
                 prompt: workerPrompt,
                 description: `Hive: ${task}`,
                 sync: false,
+                workdir: worktree.path,
+                idempotencyKey,
               },
               instructions: `## Delegation Required
 
@@ -632,7 +654,9 @@ background_task({
   agent: "forager",
   prompt: <the workerPrompt below>,
   description: "Hive: ${task}",
-  sync: false
+  sync: false,
+  workdir: "${worktree.path}",
+  idempotencyKey: "${idempotencyKey}"
 })
 \`\`\`
 
@@ -641,7 +665,18 @@ After spawning:
 - Handle blockers when worker exits
 - Merge completed work with hive_merge
 
-DO NOT do the work yourself. Delegate it.`,
+DO NOT do the work yourself. Delegate it.
+
+## Troubleshooting
+
+If background_task rejects workdir/idempotencyKey parameters or the worker runs in the wrong directory:
+
+**Symptom**: "Unknown parameter: workdir" or worker operates on main repo instead of worktree
+**Cause**: agent-hive plugin not loaded last, or outdated OMO-Slim version
+**Fix**: 
+1. Ensure agent-hive loads AFTER omo-slim in opencode config
+2. Update OMO-Slim to latest version with workdir support
+3. Check ~/.config/opencode/config.json plugin order`,
               workerPrompt,
             }, null, 2);
           }
@@ -795,6 +830,7 @@ Re-run with updated summary showing verification results.`;
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
           const STUCK_THRESHOLD = 10 * 60 * 1000; // 10 minutes
+          const HEARTBEAT_STALE_THRESHOLD = 5 * 60 * 1000; // 5 minutes without heartbeat
           const now = Date.now();
 
           const tasks = taskService.list(feature);
@@ -811,23 +847,41 @@ Re-run with updated summary showing verification results.`;
 
           const workers = await Promise.all(inProgressTasks.map(async (t) => {
             const worktree = await worktreeService.get(feature, t.folder);
-            const taskData = t as any;
+            // Use getRawStatus to get full TaskStatus including workerSession
+            const rawStatus = taskService.getRawStatus(feature, t.folder);
+            const workerSession = rawStatus?.workerSession;
 
-            // Calculate if stuck (if we have startedAt)
-            const startedAt = taskData.startedAt ? new Date(taskData.startedAt).getTime() : now;
-            const maybeStuck = (now - startedAt) > STUCK_THRESHOLD && t.status === 'in_progress';
+            // Calculate if stuck - prefer workerSession.lastHeartbeatAt, fall back to startedAt
+            let maybeStuck = false;
+            let lastActivityAt: number | null = null;
+
+            if (workerSession?.lastHeartbeatAt) {
+              lastActivityAt = new Date(workerSession.lastHeartbeatAt).getTime();
+              // Consider stuck if no heartbeat for threshold AND no message activity
+              const heartbeatStale = (now - lastActivityAt) > HEARTBEAT_STALE_THRESHOLD;
+              const noRecentMessages = !workerSession.messageCount || workerSession.messageCount === 0;
+              maybeStuck = heartbeatStale && t.status === 'in_progress';
+            } else if (rawStatus?.startedAt) {
+              lastActivityAt = new Date(rawStatus.startedAt).getTime();
+              maybeStuck = (now - lastActivityAt) > STUCK_THRESHOLD && t.status === 'in_progress';
+            }
 
             return {
               task: t.folder,
               name: t.name,
               status: t.status,
-              agent: taskData.agent || 'inline',
-              mode: taskData.mode || 'inline',
-              workerId: taskData.workerId || null,
+              // Surface workerSession fields
+              sessionId: workerSession?.sessionId || null,
+              agent: workerSession?.agent || 'inline',
+              mode: workerSession?.mode || 'inline',
+              attempt: workerSession?.attempt || 1,
+              messageCount: workerSession?.messageCount || 0,
+              lastHeartbeatAt: workerSession?.lastHeartbeatAt || null,
+              workerId: workerSession?.workerId || null,
               worktreePath: worktree?.path || null,
               branch: worktree?.branch || null,
               maybeStuck,
-              blocker: taskData.blocker || null,
+              blocker: (rawStatus as any)?.blocker || null,
               summary: t.summary || null,
             };
           }));
@@ -836,6 +890,7 @@ Re-run with updated summary showing verification results.`;
           return JSON.stringify({
             feature,
             omoSlimEnabled,
+            backgroundTaskProvider: 'hive',
             workers,
             hint: workers.some(w => w.status === 'blocked')
               ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
