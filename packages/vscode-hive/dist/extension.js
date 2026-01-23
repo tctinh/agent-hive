@@ -947,9 +947,9 @@ var require_strip_json_comments = __commonJS((exports2, module2) => {
   };
 });
 var DEFAULT_AGENT_MODELS = {
-  "hive-master": "google/antigravity-claude-opus-4-5-thinking",
-  "architect-planner": "google/antigravity-claude-opus-4-5-thinking",
-  "swarm-orchestrator": "github-copilot/claude-opus-4-5",
+  "hive-master": "github-copilot/claude-opus-4.5",
+  "architect-planner": "github-copilot/gpt-5.2-codex",
+  "swarm-orchestrator": "github-copilot/claude-opus-4.5",
   "scout-researcher": "zai-coding-plan/glm-4.7",
   "forager-worker": "github-copilot/gpt-5.2-codex",
   "hygienic-reviewer": "github-copilot/gpt-5.2-codex"
