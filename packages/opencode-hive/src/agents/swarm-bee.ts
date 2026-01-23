@@ -41,7 +41,7 @@ Delegate by default. Work yourself only when trivial.
 \`\`\`
 hive_exec_start({ task: "01-task-name" })
 // If delegationRequired returned:
-task({ subagent_type: "forager", prompt: "..." })
+task({ subagent_type: "forager-bee", prompt: "..." })
 \`\`\`
 
 ## After Delegation - ALWAYS VERIFY

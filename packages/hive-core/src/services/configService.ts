@@ -54,6 +54,31 @@ export class ConfigService {
             ...DEFAULT_HIVE_CONFIG.agents?.forager,
             ...stored.agents?.forager,
           },
+          // Deep merge architect-bee agent config
+          'architect-bee': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['architect-bee'],
+            ...stored.agents?.['architect-bee'],
+          },
+          // Deep merge swarm-bee agent config
+          'swarm-bee': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['swarm-bee'],
+            ...stored.agents?.['swarm-bee'],
+          },
+          // Deep merge scout-bee agent config
+          'scout-bee': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['scout-bee'],
+            ...stored.agents?.['scout-bee'],
+          },
+          // Deep merge forager-bee agent config
+          'forager-bee': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['forager-bee'],
+            ...stored.agents?.['forager-bee'],
+          },
+          // Deep merge hygienic-bee agent config
+          'hygienic-bee': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['hygienic-bee'],
+            ...stored.agents?.['hygienic-bee'],
+          },
         },
         omoSlim: {
           ...DEFAULT_HIVE_CONFIG.omoSlim,
@@ -119,6 +144,57 @@ export class ConfigService {
   }
 
   /**
+   * Register Hive agents in OpenCode's opencode.json.
+   * This is required because OpenCode doesn't support dynamic agent registration via plugin hooks.
+   * Agents are written to ~/.config/opencode/opencode.json under the 'agent' key.
+   */
+  registerAgentsInOpenCode(agents: Record<string, {
+    model?: string;
+    temperature?: number;
+    description: string;
+    prompt: string;
+    hidden?: boolean;
+    permission?: Record<string, string>;
+  }>): void {
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+    const opencodePath = path.join(homeDir, '.config', 'opencode', 'opencode.json');
+    
+    try {
+      if (!fs.existsSync(opencodePath)) {
+        // No opencode.json, skip registration
+        return;
+      }
+
+      const raw = fs.readFileSync(opencodePath, 'utf-8');
+      const config = JSON.parse(raw);
+      
+      // Initialize agent section if not exists
+      if (!config.agent) {
+        config.agent = {};
+      }
+
+      // Merge in our agents (don't overwrite user customizations)
+      for (const [name, agentConfig] of Object.entries(agents)) {
+        if (!config.agent[name]) {
+          config.agent[name] = agentConfig;
+        } else {
+          // Preserve user's model/temperature overrides, but update prompt and description
+          config.agent[name] = {
+            ...agentConfig,
+            model: config.agent[name].model || agentConfig.model,
+            temperature: config.agent[name].temperature ?? agentConfig.temperature,
+          };
+        }
+      }
+
+      fs.writeFileSync(opencodePath, JSON.stringify(config, null, 2));
+    } catch (err) {
+      // Silent fail - don't break plugin if we can't write
+      console.error('[Hive] Failed to register agents in opencode.json:', err);
+    }
+  }
+
+  /**
    * Enable or disable OMO-Slim delegation.
    */
   setOmoSlim(enabled: boolean): HiveConfig {
@@ -128,7 +204,9 @@ export class ConfigService {
   /**
    * Get agent-specific model config (hive or forager)
    */
-  getAgentConfig(agent: 'hive' | 'forager'): { model?: string; temperature?: number; skills?: string[] } {
+  getAgentConfig(
+    agent: 'hive' | 'forager' | 'architect-bee' | 'swarm-bee' | 'scout-bee' | 'forager-bee' | 'hygienic-bee',
+  ): { model?: string; temperature?: number; skills?: string[] } {
     const config = this.get();
     return config.agents?.[agent] ?? {};
   }

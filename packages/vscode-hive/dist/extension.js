@@ -882,6 +882,61 @@ var require_dist2 = __commonJS((exports2) => {
   exports2.createDeferred = deferred;
   exports2.default = deferred;
 });
+var DEFAULT_AGENT_MODELS = {
+  hive: "anthropic/claude-sonnet-4-20250514",
+  forager: "anthropic/claude-sonnet-4-20250514",
+  "architect-bee": "anthropic/claude-sonnet-4-20250514",
+  "swarm-bee": "anthropic/claude-sonnet-4-20250514",
+  "scout-bee": "anthropic/claude-sonnet-4-20250514",
+  "forager-bee": "anthropic/claude-sonnet-4-20250514",
+  "hygienic-bee": "anthropic/claude-sonnet-4-20250514"
+};
+var DEFAULT_HIVE_CONFIG = {
+  enableToolsFor: [],
+  agents: {
+    worker: {
+      visible: true
+    },
+    hive: {
+      model: DEFAULT_AGENT_MODELS.hive,
+      temperature: 0.7,
+      skills: ["*"]
+    },
+    forager: {
+      model: DEFAULT_AGENT_MODELS.forager,
+      temperature: 0.3,
+      skills: []
+    },
+    "architect-bee": {
+      model: DEFAULT_AGENT_MODELS["architect-bee"],
+      temperature: 0.7,
+      skills: ["*"]
+    },
+    "swarm-bee": {
+      model: DEFAULT_AGENT_MODELS["swarm-bee"],
+      temperature: 0.5,
+      skills: ["*"]
+    },
+    "scout-bee": {
+      model: DEFAULT_AGENT_MODELS["scout-bee"],
+      temperature: 0.5,
+      skills: ["*"]
+    },
+    "forager-bee": {
+      model: DEFAULT_AGENT_MODELS["forager-bee"],
+      temperature: 0.3,
+      skills: []
+    },
+    "hygienic-bee": {
+      model: DEFAULT_AGENT_MODELS["hygienic-bee"],
+      temperature: 0.3,
+      skills: ["*"]
+    }
+  },
+  omoSlim: {
+    enabled: false
+  }
+};
 var HIVE_DIR = ".hive";
 var FEATURES_DIR = "features";
 var TASKS_DIR = "tasks";
@@ -1083,6 +1138,7 @@ var FeatureService = class {
         name,
         status: status?.status || "pending",
         origin: status?.origin || "plan",
+        planTitle: status?.planTitle,
         summary: status?.summary
       };
     });
@@ -1246,7 +1302,8 @@ var TaskService = class {
     ensureDir(taskPath);
     const status = {
       status: "pending",
-      origin: "manual"
+      origin: "manual",
+      planTitle: name
     };
     writeJson(getTaskStatusPath(this.projectRoot, featureName, folder), status);
     return folder;
@@ -1256,7 +1313,8 @@ var TaskService = class {
     ensureDir(taskPath);
     const status = {
       status: "pending",
-      origin: "plan"
+      origin: "plan",
+      planTitle: task.name
     };
     writeJson(getTaskStatusPath(this.projectRoot, featureName, task.folder), status);
     const specLines = [
@@ -1328,6 +1386,7 @@ var TaskService = class {
       name: taskFolder.replace(/^\d+-/, ""),
       status: status.status,
       origin: status.origin,
+      planTitle: status.planTitle,
       summary: status.summary
     };
   }

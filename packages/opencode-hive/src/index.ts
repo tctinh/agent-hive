@@ -5,6 +5,12 @@ import { getBuiltinSkills, loadBuiltinSkill } from './skills/builtin.js';
 import { SCOUT_PROMPT } from './agents/scout.js';
 import { RECEIVER_PROMPT } from './agents/receiver.js';
 import { FORAGER_PROMPT, foragerAgent } from './agents/forager.js';
+// Bee agents (lean, focused)
+import { ARCHITECT_BEE_PROMPT } from './agents/architect-bee.js';
+import { SWARM_BEE_PROMPT } from './agents/swarm-bee.js';
+import { SCOUT_BEE_PROMPT } from './agents/scout-bee.js';
+import { FORAGER_BEE_PROMPT } from './agents/forager-bee.js';
+import { HYGIENIC_BEE_PROMPT } from './agents/hygienic-bee.js';
 
 // ============================================================================
 // Skill Tool - Uses generated registry (no file-based discovery)
@@ -578,10 +584,10 @@ Add this section to your plan content and try again.`;
               } : undefined,
             });
 
-            // Always use Forager for task execution
-            // Forager knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
-            // Forager can research via MCP tools (grep_app, context7, etc.)
-            const agent = 'forager';
+            // Always use Forager Bee for task execution
+            // Forager Bee knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
+            // Forager Bee can research via MCP tools (grep_app, context7, etc.)
+            const agent = 'forager-bee';
 
             // Return delegation instructions for the agent
             // Agent will call task tool itself (OpenCode native)
@@ -598,11 +604,11 @@ Add this section to your plan content and try again.`;
               },
               instructions: `## Delegation Required
 
-You MUST now call the task tool to spawn a Forager worker:
+You MUST now call the task tool to spawn a Forager Bee worker:
 
 \`\`\`
 task({
-  subagent_type: "forager",
+  subagent_type: "forager-bee",
   prompt: <the workerPrompt below>,
   description: "Hive: ${task}"
 })
@@ -1205,13 +1211,12 @@ Make the requested changes, then call hive_request_review again.`;
       const hiveUserConfig = configService.getAgentConfig('hive');
       const foragerUserConfig = configService.getAgentConfig('forager');
 
-      // Define hive agent config
+      // Define hive agent config (legacy - phase-aware main agent)
       const hiveAgentConfig = {
         model: hiveUserConfig.model,  // From ~/.config/opencode/agent_hive.json
         temperature: hiveUserConfig.temperature ?? 0.7,
         description: 'Hive Master - plan-first development with structured workflow and worker delegation',
         prompt: buildHiveAgentPrompt(undefined, false),
-        // Enable question tool via permission (per OMO-Slim pattern)
         permission: {
           question: "allow",
           skill: "allow",
@@ -1221,10 +1226,10 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      // Define forager agent config (worker for task execution)
+      // Define forager agent config (legacy worker)
       const foragerAgentConfig = {
-        model: foragerUserConfig.model,  // From ~/.config/opencode/agent_hive.json
-        temperature: foragerUserConfig.temperature ?? 0.3,  // Low temperature for focused implementation
+        model: foragerUserConfig.model,
+        temperature: foragerUserConfig.temperature ?? 0.3,
         description: 'Forager - Task executor (worker). Spawned by Hive Master for isolated task execution.',
         prompt: foragerAgent.prompt,
         permission: {
@@ -1232,13 +1237,96 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      // Merge hive and forager agents into opencodeConfig.agent
+      // Bee Agents (lean, focused - new architecture)
+      const architectBeeUserConfig = configService.getAgentConfig('architect-bee');
+      const architectBeeConfig = {
+        model: architectBeeUserConfig.model,
+        temperature: architectBeeUserConfig.temperature ?? 0.7,
+        description: 'Architect Bee - Plans features, interviews, writes plans. NEVER executes.',
+        prompt: ARCHITECT_BEE_PROMPT,
+        permission: {
+          edit: "deny",  // Planners don't edit code
+          question: "allow",
+          skill: "allow",
+          todowrite: "allow",
+          todoread: "allow",
+          webfetch: "allow",
+        },
+      };
+
+      const swarmBeeUserConfig = configService.getAgentConfig('swarm-bee');
+      const swarmBeeConfig = {
+        model: swarmBeeUserConfig.model,
+        temperature: swarmBeeUserConfig.temperature ?? 0.5,
+        description: 'Swarm Bee - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
+        prompt: SWARM_BEE_PROMPT,
+        permission: {
+          question: "allow",
+          skill: "allow",
+          todowrite: "allow",
+          todoread: "allow",
+        },
+      };
+
+      const scoutBeeUserConfig = configService.getAgentConfig('scout-bee');
+      const scoutBeeConfig = {
+        model: scoutBeeUserConfig.model,
+        temperature: scoutBeeUserConfig.temperature ?? 0.5,
+        hidden: true,  // Subagent - hide from @autocomplete but callable via Task
+        description: 'Scout Bee - Researches in parallel. Codebase exploration + external docs.',
+        prompt: SCOUT_BEE_PROMPT,
+        permission: {
+          edit: "deny",  // Researchers don't edit code
+          skill: "allow",
+          webfetch: "allow",
+        },
+      };
+
+      const foragerBeeUserConfig = configService.getAgentConfig('forager-bee');
+      const foragerBeeConfig = {
+        model: foragerBeeUserConfig.model,
+        temperature: foragerBeeUserConfig.temperature ?? 0.3,
+        hidden: true,  // Subagent - hide from @autocomplete but callable via Task
+        description: 'Forager Bee - Executes tasks directly in isolated worktrees. Never delegates.',
+        prompt: FORAGER_BEE_PROMPT,
+        permission: {
+          skill: "allow",
+        },
+      };
+
+      const hygienicBeeUserConfig = configService.getAgentConfig('hygienic-bee');
+      const hygienicBeeConfig = {
+        model: hygienicBeeUserConfig.model,
+        temperature: hygienicBeeUserConfig.temperature ?? 0.3,
+        hidden: true,  // Subagent - hide from @autocomplete but callable via Task
+        description: 'Hygienic Bee - Reviews plan documentation quality. OKAY/REJECT verdict.',
+        prompt: HYGIENIC_BEE_PROMPT,
+        permission: {
+          edit: "deny",  // Reviewers don't edit
+          skill: "allow",
+        },
+      };
+
+      // Build agents map
+      const allAgents = {
+        hive: hiveAgentConfig,
+        forager: foragerAgentConfig,
+        'architect-bee': architectBeeConfig,
+        'swarm-bee': swarmBeeConfig,
+        'scout-bee': scoutBeeConfig,
+        'forager-bee': foragerBeeConfig,
+        'hygienic-bee': hygienicBeeConfig,
+      };
+
+      // Register agents directly in opencode.json (required for Task tool to find them)
+      configService.registerAgentsInOpenCode(allAgents);
+
+      // Also merge into opencodeConfig.agent (in case config hook works in future)
       const configAgent = opencodeConfig.agent as Record<string, unknown> | undefined;
       if (!configAgent) {
-        opencodeConfig.agent = { hive: hiveAgentConfig, forager: foragerAgentConfig };
+        opencodeConfig.agent = allAgents;
       } else {
-        (configAgent as Record<string, unknown>).hive = hiveAgentConfig;
-        (configAgent as Record<string, unknown>).forager = foragerAgentConfig;
+        Object.assign(configAgent, allAgents);
       }
 
       // Note: Don't override default_agent if OMO-Slim is also installed

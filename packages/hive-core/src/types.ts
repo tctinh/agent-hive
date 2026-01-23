@@ -133,6 +133,16 @@ export interface HiveConfig {
     hive?: AgentModelConfig;
     /** Forager worker agent config */
     forager?: AgentModelConfig;
+    /** Architect Bee (planning-only) */
+    'architect-bee'?: AgentModelConfig;
+    /** Swarm Bee (orchestrator) */
+    'swarm-bee'?: AgentModelConfig;
+    /** Scout Bee (research) */
+    'scout-bee'?: AgentModelConfig;
+    /** Forager Bee (worker) */
+    'forager-bee'?: AgentModelConfig;
+    /** Hygienic Bee (plan review) */
+    'hygienic-bee'?: AgentModelConfig;
   };
   /** OMO-Slim integration settings */
   omoSlim?: {
@@ -145,6 +155,11 @@ export interface HiveConfig {
 export const DEFAULT_AGENT_MODELS = {
   hive: 'anthropic/claude-sonnet-4-20250514',
   forager: 'anthropic/claude-sonnet-4-20250514',
+  'architect-bee': 'anthropic/claude-sonnet-4-20250514',
+  'swarm-bee': 'anthropic/claude-sonnet-4-20250514',
+  'scout-bee': 'anthropic/claude-sonnet-4-20250514',
+  'forager-bee': 'anthropic/claude-sonnet-4-20250514',
+  'hygienic-bee': 'anthropic/claude-sonnet-4-20250514',
 } as const;
 
 export const DEFAULT_HIVE_CONFIG: HiveConfig = {
@@ -162,6 +177,31 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
       model: DEFAULT_AGENT_MODELS.forager,
       temperature: 0.3,
       skills: [],
+    },
+    'architect-bee': {
+      model: DEFAULT_AGENT_MODELS['architect-bee'],
+      temperature: 0.7,
+      skills: ['*'],
+    },
+    'swarm-bee': {
+      model: DEFAULT_AGENT_MODELS['swarm-bee'],
+      temperature: 0.5,
+      skills: ['*'],
+    },
+    'scout-bee': {
+      model: DEFAULT_AGENT_MODELS['scout-bee'],
+      temperature: 0.5,
+      skills: ['*'],
+    },
+    'forager-bee': {
+      model: DEFAULT_AGENT_MODELS['forager-bee'],
+      temperature: 0.3,
+      skills: [],
+    },
+    'hygienic-bee': {
+      model: DEFAULT_AGENT_MODELS['hygienic-bee'],
+      temperature: 0.3,
+      skills: ['*'],
     },
   },
   omoSlim: {
