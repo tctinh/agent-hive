@@ -166,7 +166,13 @@ export class ConfigService {
       }
 
       const raw = fs.readFileSync(opencodePath, 'utf-8');
-      const config = JSON.parse(raw);
+      
+      // Strip JSONC comments (// and /* */) before parsing
+      const jsonWithoutComments = raw
+        .replace(/\/\/.*$/gm, '')  // Remove single-line comments
+        .replace(/\/\*[\s\S]*?\*\//g, '');  // Remove multi-line comments
+      
+      const config = JSON.parse(jsonWithoutComments);
       
       // Initialize agent section if not exists
       if (!config.agent) {
