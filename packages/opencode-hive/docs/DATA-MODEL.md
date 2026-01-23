@@ -5,47 +5,79 @@
 ```
 .hive/
 ├── config.json
+├── journal.md
 └── features/
     └── {feature-name}/
-        ├── problem/
-        │   ├── ticket.md
-        │   ├── requirements.md
-        │   └── notes.md
-        ├── context/
+        ├── status.json          # Feature state (planning/approved/executing/completed)
+        ├── plan.md              # Execution plan
+        ├── comments.json        # Plan review comments
+        ├── sessions.json        # Session tracking
+        ├── context/             # Persistent knowledge files
         │   ├── decisions.md
         │   ├── architecture.md
         │   └── constraints.md
-        ├── execution/
-        │   ├── 01-first-step.json
-        │   └── 02-second-step.json
-        ├── master/
-        │   └── sessions.json
-        └── report.md
+        └── tasks/               # Individual task folders (PRIMARY)
+            └── {NN-task-name}/
+                ├── status.json  # Task state + metadata
+                ├── spec.md      # Task context and requirements
+                └── report.md    # Execution summary and results
+
+.hive/.worktrees/              # Isolated git worktrees
+    └── {feature}/{task}/      # Full repo copy for safe execution
 ```
 
-## Step JSON
+## Task status.json
 
 ```json
 {
-  "name": "first-step",
-  "order": 1,
-  "spec": "# Auth Flow\n\nImplement login...",
   "status": "done",
+  "origin": "plan",
+  "planTitle": "Implement login",
+  "summary": "Login endpoint implemented with JWT",
   "startedAt": "2025-01-05T09:00:00Z",
   "completedAt": "2025-01-05T10:30:00Z",
-  "summary": "Login endpoint implemented",
-  "sessions": {
-    "opencode": {
-      "sessionId": "ses_abc123",
-      "lastActive": "2025-01-05T10:30:00Z"
-    }
-  }
+  "baseCommit": "abc123"
 }
 ```
 
 ## Status Values
 
-- pending: Not started
-- wip: Work in progress
-- done: Completed
-- bug: Has issues
+Task statuses (TaskStatusType):
+- `pending`: Not started
+- `in_progress`: Currently being worked on
+- `done`: Completed successfully
+- `blocked`: Waiting for user decision
+- `failed`: Execution failed (errors, tests not passing)
+- `partial`: Partially completed (some work done, not finished)
+- `cancelled`: Cancelled by user
+
+Feature statuses (FeatureStatusType):
+- `planning`: Plan being written/reviewed
+- `approved`: Plan approved, ready for execution
+- `executing`: Tasks being executed
+- `completed`: All tasks done, feature complete
+
+## Session Metadata
+
+Sessions are tracked per feature in `sessions.json`:
+
+```json
+{
+  "master": "ses_abc123",
+  "sessions": [
+    {
+      "sessionId": "ses_abc123",
+      "taskFolder": "01-first-task",
+      "startedAt": "2025-01-05T09:00:00Z",
+      "lastActiveAt": "2025-01-05T10:30:00Z",
+      "messageCount": 42
+    }
+  ]
+}
+```
+
+## Migration from Legacy
+
+Previous versions used `execution/` directory with step-based JSON files.
+Current version uses `tasks/` with folder-per-task structure containing
+`status.json`, `spec.md`, and `report.md`.

@@ -74,7 +74,7 @@ hive_tasks_sync()
 For each task:
 
 \`\`\`
-// Start - creates worktree; in OMO-Slim this does NOT spawn a worker
+// Start - creates worktree and returns delegation instructions; does NOT spawn a worker
 hive_exec_start({ task: "01-task-name" })
 
 // Spawn the Forager when delegationRequired is true:
@@ -249,7 +249,7 @@ Report to user: "Feature complete. All tasks merged."
 | Tool | Purpose |
 |------|---------|
 | \`hive_tasks_sync\` | Generate tasks from plan |
-| \`hive_exec_start\` | Create worktree; returns delegation instructions in OMO-Slim. Call background_task to spawn worker. |
+| \`hive_exec_start\` | Create worktree; returns delegation instructions. Call background_task to spawn worker. |
 | \`hive_exec_complete\` | Mark task done |
 | \`hive_exec_abort\` | Discard task |
 | \`hive_worker_status\` | Check workers/blockers |

@@ -72,6 +72,8 @@ import {
 import { selectAgent, type OmoSlimAgent } from "./utils/agent-selector";
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
 import { buildHiveAgentPrompt, type FeatureContext } from "./agents/hive";
+import { createBackgroundManager, type OpencodeClient } from "./background/index.js";
+import { createBackgroundTools } from "./tools/background-tools.js";
 
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development System
@@ -175,6 +177,18 @@ const plugin: Plugin = async (ctx) => {
     hiveDir: path.join(directory, '.hive'),
   });
 
+  // Create BackgroundManager for delegated task execution
+  const backgroundManager = createBackgroundManager({
+    client: client as unknown as OpencodeClient,
+    projectRoot: directory,
+  });
+
+  // Create background tools
+  const backgroundTools = createBackgroundTools(
+    backgroundManager,
+    client as unknown as OpencodeClient
+  );
+
   /**
    * Check if OMO-Slim delegation is enabled via user config.
    * Users enable this in ~/.config/opencode/agent_hive.json
@@ -251,6 +265,11 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
 
     tool: {
       hive_skill: createHiveSkillTool(),
+
+      // Background task tools for delegated execution
+      background_task: backgroundTools.background_task,
+      background_output: backgroundTools.background_output,
+      background_cancel: backgroundTools.background_cancel,
 
       hive_feature_create: tool({
         description: 'Create a new feature and set it as active',
@@ -547,64 +566,79 @@ Add this section to your plan content and try again.`;
           if (priorTasks.length > 0) {
             specContent += `## Completed Tasks\n\n${priorTasks.join('\n')}\n\n`;
           }
-
+          
           taskService.writeSpec(feature, task, specContent);
 
-          // Check if OMO-Slim delegation is enabled in config
-          if (isOmoSlimEnabled()) {
-            // Prepare context for worker prompt
-            const contextFiles: ContextFile[] = [];
-            const contextDir = path.join(directory, '.hive', 'features', feature, 'context');
-            if (fs.existsSync(contextDir)) {
-              const files = fs.readdirSync(contextDir).filter(f => f.endsWith('.md'));
-              for (const file of files) {
-                const content = fs.readFileSync(path.join(contextDir, file), 'utf-8');
-                contextFiles.push({ name: file, content });
-              }
+          // Delegated execution is always available via Hive-owned background_task tools.
+          // OMO-Slim is optional and should not gate delegation.
+
+          // Prepare context for worker prompt
+          const contextFiles: ContextFile[] = [];
+          const contextDir = path.join(directory, '.hive', 'features', feature, 'context');
+          if (fs.existsSync(contextDir)) {
+            const files = fs.readdirSync(contextDir).filter(f => f.endsWith('.md'));
+            for (const file of files) {
+              const content = fs.readFileSync(path.join(contextDir, file), 'utf-8');
+              contextFiles.push({ name: file, content });
             }
+          }
 
-            const previousTasks: CompletedTask[] = allTasks
-              .filter(t => t.status === 'done' && t.summary)
-              .map(t => ({ name: t.folder, summary: t.summary! }));
+          const previousTasks: CompletedTask[] = allTasks
+            .filter(t => t.status === 'done' && t.summary)
+            .map(t => ({ name: t.folder, summary: t.summary! }));
 
-            // Build worker prompt
-            const workerPrompt = buildWorkerPrompt({
+          // Build worker prompt
+          const workerPrompt = buildWorkerPrompt({
+            feature,
+            task,
+            taskOrder: parseInt(taskInfo.folder.match(/^(\d+)/)?.[1] || '0', 10),
+            worktreePath: worktree.path,
+            branch: worktree.branch,
+            plan: planResult?.content || 'No plan available',
+            contextFiles,
+            spec: specContent,
+            previousTasks,
+            continueFrom: continueFrom === 'blocked' ? {
+              status: 'blocked',
+              previousSummary: (taskInfo as any).summary || 'No previous summary',
+              decision: decision || 'No decision provided',
+            } : undefined,
+          });
+
+          // Always use Forager for task execution
+          // Forager knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
+          const agent = 'forager';
+
+          // Generate stable idempotency key for safe retries
+          // Format: hive-<feature>-<task>-<attempt>
+          const rawStatus = taskService.getRawStatus(feature, task);
+          const attempt = (rawStatus?.workerSession?.attempt || 0) + 1;
+          const idempotencyKey = `hive-${feature}-${task}-${attempt}`;
+
+          // Persist idempotencyKey early for debugging. The workerSession will be
+          // populated by background_task with the REAL OpenCode session_id/task_id.
+          taskService.patchBackgroundFields(feature, task, { idempotencyKey });
+
+          // Return delegation instructions for the agent.
+          // Agent will call background_task tool itself.
+          return JSON.stringify({
+            worktreePath: worktree.path,
+            branch: worktree.branch,
+            mode: 'delegate',
+            agent,
+            delegationRequired: true,
+            backgroundTaskCall: {
+              agent,
+              prompt: workerPrompt,
+              description: `Hive: ${task}`,
+              sync: false,
+              workdir: worktree.path,
+              idempotencyKey,
               feature,
               task,
-              taskOrder: parseInt(taskInfo.folder.match(/^(\d+)/)?.[1] || '0', 10),
-              worktreePath: worktree.path,
-              branch: worktree.branch,
-              plan: planResult?.content || 'No plan available',
-              contextFiles,
-              spec: specContent,
-              previousTasks,
-              continueFrom: continueFrom === 'blocked' ? {
-                status: 'blocked',
-                previousSummary: (taskInfo as any).summary || 'No previous summary',
-                decision: decision || 'No decision provided',
-              } : undefined,
-            });
-
-            // Always use Forager for task execution
-            // Forager knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
-            // Forager can delegate research to explorer/librarian via background_task
-            const agent = 'forager';
-
-            // Return delegation instructions for the agent
-            // Agent will call background_task tool itself
-            return JSON.stringify({
-              worktreePath: worktree.path,
-              branch: worktree.branch,
-              mode: 'delegate',
-              agent,
-              delegationRequired: true,
-              backgroundTaskCall: {
-                agent,
-                prompt: workerPrompt,
-                description: `Hive: ${task}`,
-                sync: false,
-              },
-              instructions: `## Delegation Required
+              attempt,
+            },
+            instructions: `## Delegation Required
 
 You MUST now call background_task to spawn a Forager worker:
 
@@ -613,7 +647,12 @@ background_task({
   agent: "forager",
   prompt: <the workerPrompt below>,
   description: "Hive: ${task}",
-  sync: false
+  sync: false,
+  workdir: "${worktree.path}",
+  idempotencyKey: "${idempotencyKey}",
+  feature: "${feature}",
+  task: "${task}",
+  attempt: ${attempt}
 })
 \`\`\`
 
@@ -622,13 +661,20 @@ After spawning:
 - Handle blockers when worker exits
 - Merge completed work with hive_merge
 
-DO NOT do the work yourself. Delegate it.`,
-              workerPrompt,
-            }, null, 2);
-          }
+DO NOT do the work yourself. Delegate it.
 
-          // Inline mode (no OMO-Slim)
-          return `Worktree created at ${worktree.path}\nBranch: ${worktree.branch}\nBase commit: ${worktree.commit}\nSpec: ${task}/spec.md generated\nReminder: do all work inside this worktree and ensure any subagents do the same.`;
+## Troubleshooting
+
+If background_task rejects workdir/idempotencyKey/feature/task/attempt parameters or the worker runs in the wrong directory:
+
+**Symptom**: "Unknown parameter: workdir" or worker operates on main repo instead of worktree
+**Cause**: background_task tool is not Hive's provider (agent-hive plugin not loaded last)
+**Fix**:
+1. Ensure agent-hive loads AFTER any other plugin that registers background_* tools
+2. Confirm tool outputs include \`provider: "hive"\`
+3. Re-run hive_exec_start and then background_task`,
+            workerPrompt,
+          }, null, 2);
         },
       }),
 
@@ -776,6 +822,7 @@ Re-run with updated summary showing verification results.`;
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
           const STUCK_THRESHOLD = 10 * 60 * 1000; // 10 minutes
+          const HEARTBEAT_STALE_THRESHOLD = 5 * 60 * 1000; // 5 minutes without heartbeat
           const now = Date.now();
 
           const tasks = taskService.list(feature);
@@ -792,23 +839,42 @@ Re-run with updated summary showing verification results.`;
 
           const workers = await Promise.all(inProgressTasks.map(async (t) => {
             const worktree = await worktreeService.get(feature, t.folder);
-            const taskData = t as any;
+            // Use getRawStatus to get full TaskStatus including workerSession
+            const rawStatus = taskService.getRawStatus(feature, t.folder);
+            const workerSession = rawStatus?.workerSession;
 
-            // Calculate if stuck (if we have startedAt)
-            const startedAt = taskData.startedAt ? new Date(taskData.startedAt).getTime() : now;
-            const maybeStuck = (now - startedAt) > STUCK_THRESHOLD && t.status === 'in_progress';
+            // Calculate if stuck - prefer workerSession.lastHeartbeatAt, fall back to startedAt
+            let maybeStuck = false;
+            let lastActivityAt: number | null = null;
+
+            if (workerSession?.lastHeartbeatAt) {
+              lastActivityAt = new Date(workerSession.lastHeartbeatAt).getTime();
+              // Consider stuck if no heartbeat for threshold AND no message activity
+              const heartbeatStale = (now - lastActivityAt) > HEARTBEAT_STALE_THRESHOLD;
+              const noRecentMessages = !workerSession.messageCount || workerSession.messageCount === 0;
+              maybeStuck = heartbeatStale && t.status === 'in_progress';
+            } else if (rawStatus?.startedAt) {
+              lastActivityAt = new Date(rawStatus.startedAt).getTime();
+              maybeStuck = (now - lastActivityAt) > STUCK_THRESHOLD && t.status === 'in_progress';
+            }
 
             return {
               task: t.folder,
               name: t.name,
               status: t.status,
-              agent: taskData.agent || 'inline',
-              mode: taskData.mode || 'inline',
-              workerId: taskData.workerId || null,
+              workerSession: workerSession || null,
+              // Surface workerSession fields
+              sessionId: workerSession?.sessionId || null,
+              agent: workerSession?.agent || 'inline',
+              mode: workerSession?.mode || 'inline',
+              attempt: workerSession?.attempt || 1,
+              messageCount: workerSession?.messageCount || 0,
+              lastHeartbeatAt: workerSession?.lastHeartbeatAt || null,
+              workerId: workerSession?.workerId || null,
               worktreePath: worktree?.path || null,
               branch: worktree?.branch || null,
               maybeStuck,
-              blocker: taskData.blocker || null,
+              blocker: (rawStatus as any)?.blocker || null,
               summary: t.summary || null,
             };
           }));
@@ -817,12 +883,13 @@ Re-run with updated summary showing verification results.`;
           return JSON.stringify({
             feature,
             omoSlimEnabled,
+            backgroundTaskProvider: 'hive',
             workers,
             hint: workers.some(w => w.status === 'blocked')
               ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
               : workers.some(w => w.maybeStuck)
-                ? 'Some workers may be stuck. Check tmux panes or abort with hive_exec_abort.'
-                : 'Workers in progress. Watch tmux panes for live updates.',
+                ? 'Some workers may be stuck. Use background_output({ task_id }) to check output, or abort with hive_exec_abort.'
+                : 'Workers in progress. Use hive_worker_status and background_output for live output.',
           }, null, 2);
         },
       }),
@@ -1203,6 +1270,26 @@ Make the requested changes, then call hive_request_review again.`;
       }
 
       return existingPrompt;
+    },
+
+    // Event hook - handle session lifecycle events for background tasks
+    event: async ({ event }: { event: { type: string; properties: Record<string, unknown> } }) => {
+      // Handle session.idle - marks background tasks as completed
+      if (event.type === 'session.idle') {
+        const sessionId = event.properties.sessionID as string;
+        if (sessionId) {
+          backgroundManager.handleSessionIdle(sessionId);
+        }
+      }
+
+      // Handle message.updated - track progress for running tasks
+      if (event.type === 'message.updated') {
+        const info = event.properties.info as { sessionID?: string } | undefined;
+        const sessionId = info?.sessionID;
+        if (sessionId) {
+          backgroundManager.handleMessageEvent(sessionId);
+        }
+      }
     },
 
     // Config hook - merge agents into opencodeConfig.agent (like OMO-Slim does)

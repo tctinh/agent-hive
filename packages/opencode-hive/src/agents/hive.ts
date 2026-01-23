@@ -225,7 +225,7 @@ You are in **Receiver Mode** - focus on orchestration.
 1. **Sync tasks** (if not done): \`hive_tasks_sync()\`
 
 2. **For each task**:
-   In OMO-Slim mode, hive_exec_start only creates the worktree. It does NOT spawn a worker.
+   hive_exec_start creates the worktree and returns delegation instructions. It does NOT spawn a worker.
    You MUST spawn the worker with background_task using backgroundTaskCall when delegationRequired is true.
 
    \`\`\`
