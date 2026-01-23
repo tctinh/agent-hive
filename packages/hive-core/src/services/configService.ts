@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import stripJsonComments from 'strip-json-comments';
 import { HiveConfig, DEFAULT_HIVE_CONFIG } from '../types.js';
 
 /**
@@ -142,12 +143,7 @@ export class ConfigService {
 
       const raw = fs.readFileSync(opencodePath, 'utf-8');
       
-      // Strip JSONC comments (// and /* */) before parsing
-      const jsonWithoutComments = raw
-        .replace(/\/\/.*$/gm, '')  // Remove single-line comments
-        .replace(/\/\*[\s\S]*?\*\//g, '');  // Remove multi-line comments
-      
-      const config = JSON.parse(jsonWithoutComments);
+      const config = JSON.parse(stripJsonComments(raw));
       
       // Initialize agent section if not exists
       if (!config.agent) {

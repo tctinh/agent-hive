@@ -30,26 +30,30 @@ A beehive solves the exact problems we face with AI agents:
 When we designed Agent Hive, we asked: *"What if AI agents could work like a bee colony?"*
 The answer became this platform.
 ---
-## 🐝 Hive Terminology
+## Hive Terminology
+
 | Term | Role | Description |
 |------|------|-------------|
-| **Beekeeper** | 🧑‍🌾 You | The human operator. Observes, steers, approves. Doesn't do the work — manages the hive. |
-| **Hive** | 🏠 Platform | The Agent Hive platform itself. The structured workspace where agents operate. |
-| **Hive Queen** | 👑 Orchestrator | The planning agent (e.g., OmO Prometheus). Commands workers, designs the plan, coordinates execution. |
-| **Workers** | 🐝 Executors | Task-executing agents (e.g., Sisyphus). Do the actual coding, isolated in their cells. |
-| **Nest** | 🪹 Feature | A feature. Self-contained with its own plan, context, and tasks. (`.hive/features/<name>/`) |
-| **Comb** | 🍯 Task Structure | The organized grid of cells (tasks) within a nest. The work breakdown structure. |
-| **Cells** | ⬡ Tasks | Individual tasks within a comb. Each cell is isolated (worktree) and produces one unit of work. |
-| **Royal Jelly** | 👑🍯 Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
-| **Honey** | 🍯 Artifacts | The output — `plan.md`, `spec.md`, `report.md`, code. Persistent documentation that emerges from work. |
-| **Propolis** | 🔒 Verification | TDD subtasks that seal work as complete. Tests prove the cell is solid. |
-| **Waggle Dance** | 💃 Planning | The planning phase. Queen communicates, Beekeeper reviews, alignment before action. |
-| **Swarming** | 🐝🐝🐝 Parallelism | Batched parallel execution. Multiple workers dispatched simultaneously to their cells. |
-| **Hiving** | 🐝 Working | The act of using the Hive platform. *"Stop vibing. Start hiving."* |
+| **Beekeeper** | You | The human operator. Observes, steers, approves. Doesn't do the work — manages the hive. |
+| **Hive** | Platform | The Agent Hive platform itself. The structured workspace where agents operate. |
+| **Architect Bee** | Planner | Plans features, interviews you, writes plan.md. NEVER executes or delegates. |
+| **Swarm Bee** | Orchestrator | Coordinates execution, delegates to workers, merges results. The Hive Queen. |
+| **Scout Bee** | Researcher | Researches codebase and external docs in parallel. Uses MCP tools. |
+| **Forager Bee** | Executor | Executes tasks in isolated worktrees. Does the actual coding. |
+| **Hygienic Bee** | Reviewer | Reviews plan documentation quality. Returns OKAY/REJECT verdict. |
+| **Nest** | Feature | A feature. Self-contained with its own plan, context, and tasks. (`.hive/features/<name>/`) |
+| **Comb** | Task Structure | The organized grid of cells (tasks) within a nest. The work breakdown structure. |
+| **Cells** | Tasks | Individual tasks within a comb. Each cell is isolated (worktree) and produces one unit of work. |
+| **Royal Jelly** | Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
+| **Honey** | Artifacts | The output — `plan.md`, `spec.md`, `report.md`, code. Persistent documentation that emerges from work. |
+| **Propolis** | Verification | TDD subtasks that seal work as complete. Tests prove the cell is solid. |
+| **Waggle Dance** | Planning | The planning phase. Architect communicates, Beekeeper reviews, alignment before action. |
+| **Swarming** | Parallelism | Batched parallel execution. Multiple Foragers dispatched simultaneously to their cells. |
+| **Hiving** | Working | The act of using the Hive platform. *"Stop vibing. Start hiving."* |
 ---
 ## The Hive Mental Model
 ```
-    🧑‍🌾 BEEKEEPER (You)
+    BEEKEEPER (You)
          │
          ├── Observes the hive
          ├── Reviews the waggle dance (plan)
@@ -58,23 +62,32 @@ The answer became this platform.
          │
     ─────┴─────
          │
-    👑 HIVE QUEEN (Planner Agent)
+    ARCHITECT BEE (Planner)
          │
-         ├── Creates the nest (feature)
+         ├── Interviews you (discovery)
          ├── Produces royal jelly (context)
          ├── Designs the comb (task breakdown)
-         └── Commands the swarm (parallel execution)
+         └── Writes plan.md (NEVER executes)
+         │
+    ─────┴─────
+         │
+    SWARM BEE (Orchestrator)
+         │
+         ├── Approves plan execution
+         ├── Commands the swarm (parallel execution)
+         ├── Handles blocked workers
+         └── Merges results
          │
     ─────┼─────────────────┬─────────────────┐
          │                 │                 │
-    🐝 WORKER          🐝 WORKER         🐝 WORKER
+    FORAGER BEE       FORAGER BEE       FORAGER BEE
          │                 │                 │
     ⬡ Cell (worktree)  ⬡ Cell (worktree) ⬡ Cell (worktree)
          │                 │                 │
-    🍯 Honey           🍯 Honey          🍯 Honey
+    Honey             Honey              Honey
     (spec + report)    (spec + report)   (spec + report)
          │                 │                 │
-    🔒 Propolis        🔒 Propolis       🔒 Propolis
+    Propolis          Propolis           Propolis
     (TDD verified)     (TDD verified)    (TDD verified)
 ```
 ### The Efficiency Promise
@@ -299,6 +312,20 @@ When something goes wrong:
 - **Spawn a fix task** (agent can git revert if they decide to)
 
 Everything is a task. Even fixes. Keeps the model consistent.
+
+### Blocked workers, not infinite loops
+
+When a Forager encounters a decision it can't make:
+- Worker reports `status: "blocked"` with blocker info (reason, options, recommendation)
+- Swarm Bee asks user via `question()` tool — NEVER plain text
+- Swarm resumes with `hive_exec_start(continueFrom: "blocked", decision: answer)`
+- New worker spawns in SAME worktree with decision context
+
+This is different from "loop until done":
+- Ralph Wiggum: Keep retrying until success
+- Hive: Stop, ask, resume with clarity
+
+Workers pause for decisions. They don't guess.
 
 ### Free-form context
 
@@ -525,6 +552,18 @@ Human shapes at the top. Agent builds at the bottom. Gate in the middle. Tests v
 - Hard Gates: Tools refuse without prerequisites (discovery, verification)
 - Phase Injection: Right context at right time (discovery → delegation → TDD)
 - Inspired by Git's philosophy: simple primitives, hard enforcement
+
+### v0.10 (Bee-Only Architecture)
+- Removed legacy agents: `hive`, `scout`, `forager`, `receiver`
+- Introduced 5 specialized bee agents:
+  - `architect-bee` — Planner only, cannot execute or delegate
+  - `swarm-bee` — Orchestrator, delegates to workers
+  - `scout-bee` — Researcher, uses MCP tools
+  - `forager-bee` — Executor, works in isolated worktrees
+  - `hygienic-bee` — Reviewer, validates plan quality
+- MCP tools auto-enabled (OMO-style): grep_app, context7, websearch, ast_grep
+- Agent registration for @mention support in OpenCode
+- Blocked worker protocol: workers pause for decisions, resume with clarity
 
 ---
 

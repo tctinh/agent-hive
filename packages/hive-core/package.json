@@ -35,7 +35,8 @@
     "test": "bun test"
   },
   "dependencies": {
-    "simple-git": "^3.27.0"
+    "simple-git": "^3.27.0",
+    "strip-json-comments": "^2.0.1"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0",

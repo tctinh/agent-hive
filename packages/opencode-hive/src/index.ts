@@ -1086,10 +1086,11 @@ Make the requested changes, then call hive_request_review again.`;
         model: architectBeeUserConfig.model,
         temperature: architectBeeUserConfig.temperature ?? 0.7,
         skills: architectBeeUserConfig.skills ?? ['*'],
-        description: 'Architect Bee - Plans features, interviews, writes plans. NEVER executes.',
+        description: 'Architect Bee (Planner) - Plans features, interviews, writes plans. NEVER executes.',
         prompt: ARCHITECT_BEE_PROMPT,
         permission: {
           edit: "deny",  // Planners don't edit code
+          task: "deny",
           question: "allow",
           skill: "allow",
           todowrite: "allow",
@@ -1103,7 +1104,7 @@ Make the requested changes, then call hive_request_review again.`;
         model: swarmBeeUserConfig.model,
         temperature: swarmBeeUserConfig.temperature ?? 0.5,
         skills: swarmBeeUserConfig.skills ?? ['*'],
-        description: 'Swarm Bee - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
+        description: 'Swarm Bee (Orchestrate) - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
         prompt: SWARM_BEE_PROMPT,
         permission: {
           question: "allow",
@@ -1118,6 +1119,7 @@ Make the requested changes, then call hive_request_review again.`;
         model: scoutBeeUserConfig.model,
         temperature: scoutBeeUserConfig.temperature ?? 0.5,
         skills: scoutBeeUserConfig.skills ?? ['*'],
+        mode: 'subagent',
         description: 'Scout Bee - Researches in parallel. Codebase exploration + external docs.',
         prompt: SCOUT_BEE_PROMPT,
         permission: {
@@ -1132,6 +1134,7 @@ Make the requested changes, then call hive_request_review again.`;
         model: foragerBeeUserConfig.model,
         temperature: foragerBeeUserConfig.temperature ?? 0.3,
         skills: foragerBeeUserConfig.skills ?? [],
+        mode: 'subagent',
         description: 'Forager Bee - Executes tasks directly in isolated worktrees. Never delegates.',
         prompt: FORAGER_BEE_PROMPT,
         permission: {
@@ -1144,6 +1147,7 @@ Make the requested changes, then call hive_request_review again.`;
         model: hygienicBeeUserConfig.model,
         temperature: hygienicBeeUserConfig.temperature ?? 0.3,
         skills: hygienicBeeUserConfig.skills ?? ['*'],
+        mode: 'subagent',
         description: 'Hygienic Bee - Reviews plan documentation quality. OKAY/REJECT verdict.',
         prompt: HYGIENIC_BEE_PROMPT,
         permission: {

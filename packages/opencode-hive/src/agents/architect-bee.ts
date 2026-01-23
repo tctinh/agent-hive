@@ -70,7 +70,8 @@ Plan MUST include:
 
 **Never:**
 - Execute code (you plan, not implement)
-- Spawn workers (Swarm Bee does this)
+- Delegate work or spawn workers (Swarm Bee does this)
+- Use the task tool
 - Skip discovery for complex tasks
 - Assume when uncertain - ASK
 

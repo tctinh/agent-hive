@@ -32,12 +32,12 @@ export const hiveAgents = {
   // Bee Agents (lean, focused - recommended)
   'architect-bee': {
     name: 'architect-bee',
-    description: 'Architect Bee - Plans features, interviews, writes plans. NEVER executes.',
+    description: 'Architect Bee (Planner) - Plans features, interviews, writes plans. NEVER executes.',
     mode: 'primary' as const,
   },
   'swarm-bee': {
     name: 'swarm-bee',
-    description: 'Swarm Bee - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
+    description: 'Swarm Bee (Orchestrate) - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
     mode: 'primary' as const,
   },
   'scout-bee': {

@@ -96,15 +96,7 @@ Add `opencode-hive` to your `opencode.json`:
 
 OpenCode handles the rest — no manual npm install needed.
 
-#### Optional: Enable MCP Research Tools
-
-1. Create `.opencode/mcp-servers.json` using the template:
-   - From this repo: `packages/opencode-hive/templates/mcp-servers.json`
-   - Or from npm: `node_modules/opencode-hive/templates/mcp-servers.json`
-2. Set `EXA_API_KEY` to enable `websearch_exa` (optional).
-3. Restart OpenCode.
-
-This enables tools like `grep_app_searchGitHub`, `context7_query-docs`, `websearch_web_search_exa`, and `ast_grep_search`.
+**MCP Research Tools** are auto-enabled: `grep_app_searchGitHub`, `context7_query-docs`, `websearch_web_search_exa`, and `ast_grep_search`. Set `EXA_API_KEY` for web search (optional).
 
 ### Start Hiving
 
@@ -133,22 +125,31 @@ You: "What just happened?" 🤷
 ### The Hive Way (Orchestrated)
 
 ```
-Main Agent: Creates plan, you approve it
+Swarm Bee: Creates plan, you approve it
     │
     ├── Batch 1 (parallel):
-    │   ├── Task A (own worktree, tracked)
-    │   ├── Task B (own worktree, tracked)
-    │   └── Task C (own worktree, tracked)
+    │   ├── Forager A (own worktree, tracked)
+    │   ├── Forager B (own worktree, tracked)
+    │   └── Forager C (own worktree, tracked)
     │           ↓
     │      Context flows forward
     │           ↓
     ├── Batch 2 (parallel):
-    │   ├── Task D (uses A+B+C results)
-    │   └── Task E (uses A+B+C results)
+    │   ├── Forager D (uses A+B+C results)
+    │   └── Forager E (uses A+B+C results)
     │
 Hive: Full audit of what each agent did
 You: Clear visibility into everything ✅
 ```
+
+**The Bee Colony:**
+| Bee | Role |
+|-----|------|
+| **Architect** 🏗️ | Plans features, interviews you, writes plan.md |
+| **Swarm** 👑 | Orchestrates execution, delegates to workers |
+| **Scout** 🔍 | Researches codebase and external docs |
+| **Forager** 🐝 | Executes tasks in isolated worktrees |
+| **Hygienic** 🧹 | Reviews plan quality, OKAY/REJECT verdict |
 
 ---
 
@@ -315,8 +316,10 @@ The extension watches your `.hive/` directory and displays the current state. Al
 
 | Package | Platform | Description |
 |---------|----------|-------------|
-| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — planning, execution, tracking |
+| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 5 specialized bee agents, planning, execution, tracking |
 | **[vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive)** | VS Code | Visual management — review, comment, approve |
+
+**Agent Selection:** Use `architect-bee` or `swarm-bee` as your primary agent. Use `@scout-bee`, `@forager-bee`, or `@hygienic-bee` to mention subagents directly.
 
 ---
 
