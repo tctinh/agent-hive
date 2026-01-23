@@ -13,13 +13,13 @@ Quick reference for executing Hive tasks (Receiver Mode).
 @hive (Receiver Mode)
       │
       ▼
-hive_exec_start ──► background_task ──► Forager Worker (isolated worktree)
-      │                                │
-      │                                ▼
-      │                         background_task (research if needed)
-      │                                │
-      │                                ▼
-      │                         hive_exec_complete
+hive_exec_start ──► Forager Worker (isolated worktree)
+      │                    │
+      │                    ▼
+      │              MCP tools (research)
+      │                    │
+      │                    ▼
+      │              hive_exec_complete
       ▼
 hive_merge ──► Main branch
 ```
@@ -29,7 +29,7 @@ hive_merge ──► Main branch
 ## Workflow Summary
 
 1. **Tasks sync** → Generate from approved plan
-2. **Exec start** → Creates worktree; call background_task to spawn Forager (OMO-Slim)
+2. **Exec start** → Creates worktree, spawns Forager automatically
 3. **Worker executes** → Implements, verifies, reports
 4. **Complete** → GATE: requires verification mention
 5. **Merge** → Squash into feature branch
@@ -39,7 +39,7 @@ hive_merge ──► Main branch
 ## Task Lifecycle
 
 ```
-hive_exec_start({ task })           # Creates worktree; if delegationRequired, spawn Forager via background_task
+hive_exec_start({ task })           # Creates worktree, spawns Forager
   ↓
 [Forager implements in worktree]
   ↓
@@ -53,8 +53,6 @@ hive_merge({ task, strategy: "squash" })  # Integrates to main
 ## Parallel Execution (Swarming)
 
 For parallelizable tasks:
-
-If `delegationRequired` is returned for a task, call `background_task` to spawn that worker.
 
 ```
 hive_exec_start({ task: "02-task-a" })
@@ -93,14 +91,11 @@ If blocker suggests plan is incomplete:
 
 ## Research During Execution
 
-Workers can delegate research:
+Workers use MCP tools for research:
 
 ```
-background_task({
-  agent: "explorer",  // or librarian, oracle, designer
-  prompt: "Find usage patterns for...",
-  sync: true
-})
+grep_app_searchGitHub({ query: "usage pattern", language: ["TypeScript"] })
+context7_query-docs({ libraryId: "/...", query: "API usage" })
 ```
 
 ---
@@ -126,7 +121,8 @@ background_task({
 | hive_worker_status | Check workers/blockers |
 | hive_merge | Integrate to main |
 | hive_worktree_list | See active worktrees |
-| background_task | Research delegation |
+| grep_app_searchGitHub | Find code in OSS |
+| context7_query-docs | Library documentation |
 
 ---
 
@@ -140,7 +136,7 @@ hive_exec_start({ task })  # Fresh start
 
 ### After 3 Failures
 1. Stop all workers
-2. Consult: `background_task({ agent: "oracle", prompt: "Analyze..." })`
+2. Use MCP tools to research the problem
 3. Ask user how to proceed
 
 ### Merge Conflicts

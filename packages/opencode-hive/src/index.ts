@@ -105,14 +105,13 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 **Important:** \`hive_exec_complete\` commits changes to task branch but does NOT merge.
 Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manually removed.
 
-### Delegated Execution (OMO-Slim Integration)
+### Delegated Execution
 
-When OMO-Slim is installed, \`hive_exec_start\` returns delegation instructions. You MUST call \`background_task\` to spawn the worker:
+\`hive_exec_start\` creates worktree and spawns worker automatically:
 
-1. \`hive_exec_start(task)\` → Creates worktree + returns delegation instructions
-2. Call \`background_task\` with those instructions → Worker appears in tmux pane
-3. Worker completes → calls \`hive_exec_complete(status: "completed")\`
-4. Worker blocked → calls \`hive_exec_complete(status: "blocked", blocker: {...})\`
+1. \`hive_exec_start(task)\` → Creates worktree + spawns Forager worker
+2. Worker executes → calls \`hive_exec_complete(status: "completed")\`
+3. Worker blocked → calls \`hive_exec_complete(status: "blocked", blocker: {...})\`
 
 **Handling blocked workers:**
 1. Check blockers with \`hive_worker_status()\`
@@ -123,16 +122,10 @@ When OMO-Slim is installed, \`hive_exec_start\` returns delegation instructions.
 **CRITICAL**: When resuming, a NEW worker spawns in the SAME worktree.
 The previous worker's progress is preserved. Include the user's decision in the \`decision\` parameter.
 
-**Agent auto-selection** based on task content:
-| Pattern | Agent |
-|---------|-------|
-| find, search, explore | explorer |
-| research, docs | librarian |
-| ui, component, react | designer |
-| architect, decision | oracle |
-| (default) | general |
-
-Without OMO-Slim: \`hive_exec_start\` falls back to inline mode (work in same session).
+**For research**, use MCP tools or OpenCode Task:
+- \`grep_app_searchGitHub\` - Find code in OSS
+- \`context7_query-docs\` - Library documentation
+- \`task({ subagent_type: "scout-bee", prompt: "..." })\` - Comprehensive research
 
 ### Planning Phase - Context Management REQUIRED
 
@@ -471,7 +464,7 @@ Add this section to your plan content and try again.`;
       }),
 
       hive_exec_start: tool({
-        description: 'Create worktree and begin work on task. In OMO-Slim, returns delegation instructions; call background_task to spawn worker.',
+        description: 'Create worktree and begin work on task. Spawns Forager worker automatically.',
         args: {
           task: tool.schema.string().describe('Task folder name'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
@@ -587,33 +580,31 @@ Add this section to your plan content and try again.`;
 
             // Always use Forager for task execution
             // Forager knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
-            // Forager can delegate research to explorer/librarian via background_task
+            // Forager can research via MCP tools (grep_app, context7, etc.)
             const agent = 'forager';
 
             // Return delegation instructions for the agent
-            // Agent will call background_task tool itself
+            // Agent will call task tool itself (OpenCode native)
             return JSON.stringify({
               worktreePath: worktree.path,
               branch: worktree.branch,
               mode: 'delegate',
               agent,
               delegationRequired: true,
-              backgroundTaskCall: {
-                agent,
+              taskCall: {
+                subagent_type: agent,
                 prompt: workerPrompt,
                 description: `Hive: ${task}`,
-                sync: false,
               },
               instructions: `## Delegation Required
 
-You MUST now call background_task to spawn a Forager worker:
+You MUST now call the task tool to spawn a Forager worker:
 
 \`\`\`
-background_task({
-  agent: "forager",
+task({
+  subagent_type: "forager",
   prompt: <the workerPrompt below>,
-  description: "Hive: ${task}",
-  sync: false
+  description: "Hive: ${task}"
 })
 \`\`\`
 
