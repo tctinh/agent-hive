@@ -20,6 +20,16 @@ Hive: Plan → Review → Approve → Execute → Ship
 npm install opencode-hive
 ```
 
+## Optional: Enable MCP Research Tools
+
+1. Create `.opencode/mcp-servers.json` using the template:
+   - From this repo: `packages/opencode-hive/templates/mcp-servers.json`
+   - Or from npm: `node_modules/opencode-hive/templates/mcp-servers.json`
+2. Set `EXA_API_KEY` to enable `websearch_exa` (optional).
+3. Restart OpenCode.
+
+This enables tools like `grep_app_searchGitHub`, `context7_query-docs`, `websearch_web_search_exa`, and `ast_grep_search`.
+
 ## The Workflow
 
 1. **Create Feature** — `hive_feature_create("dark-mode")`
