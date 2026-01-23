@@ -13,13 +13,13 @@ Quick reference for executing Hive tasks (Receiver Mode).
 @hive (Receiver Mode)
       │
       ▼
-hive_exec_start ──► Forager Worker (isolated worktree)
-      │                    │
-      │                    ▼
-      │              MCP tools (research)
-      │                    │
-      │                    ▼
-      │              hive_exec_complete
+hive_exec_start ──► task ──► Forager Worker (isolated worktree)
+      │                                │
+      │                                ▼
+      │                         MCP tools / task (research if needed)
+      │                                │
+      │                                ▼
+      │                         hive_exec_complete
       ▼
 hive_merge ──► Main branch
 ```
@@ -29,7 +29,7 @@ hive_merge ──► Main branch
 ## Workflow Summary
 
 1. **Tasks sync** → Generate from approved plan
-2. **Exec start** → Creates worktree, spawns Forager automatically
+2. **Exec start** → Creates worktree; call task to spawn Forager (OpenCode)
 3. **Worker executes** → Implements, verifies, reports
 4. **Complete** → GATE: requires verification mention
 5. **Merge** → Squash into feature branch
@@ -39,7 +39,7 @@ hive_merge ──► Main branch
 ## Task Lifecycle
 
 ```
-hive_exec_start({ task })           # Creates worktree, spawns Forager
+hive_exec_start({ task })           # Creates worktree; if delegationRequired, spawn Forager via task
   ↓
 [Forager implements in worktree]
   ↓
@@ -53,6 +53,8 @@ hive_merge({ task, strategy: "squash" })  # Integrates to main
 ## Parallel Execution (Swarming)
 
 For parallelizable tasks:
+
+If `delegationRequired` is returned for a task, call `task` to spawn that worker.
 
 ```
 hive_exec_start({ task: "02-task-a" })
@@ -91,11 +93,14 @@ If blocker suggests plan is incomplete:
 
 ## Research During Execution
 
-Workers use MCP tools for research:
+Workers can delegate research:
 
 ```
-grep_app_searchGitHub({ query: "usage pattern", language: ["TypeScript"] })
-context7_query-docs({ libraryId: "/...", query: "API usage" })
+task({
+  subagent_type: "explorer",  // or librarian, oracle, designer
+  prompt: "Find usage patterns for...",
+  description: "Research patterns"
+})
 ```
 
 ---
@@ -121,8 +126,7 @@ context7_query-docs({ libraryId: "/...", query: "API usage" })
 | hive_worker_status | Check workers/blockers |
 | hive_merge | Integrate to main |
 | hive_worktree_list | See active worktrees |
-| grep_app_searchGitHub | Find code in OSS |
-| context7_query-docs | Library documentation |
+| task | Research delegation |
 
 ---
 
@@ -136,7 +140,7 @@ hive_exec_start({ task })  # Fresh start
 
 ### After 3 Failures
 1. Stop all workers
-2. Use MCP tools to research the problem
+2. Consult: `task({ subagent_type: "oracle", prompt: "Analyze..." })`
 3. Ask user how to proceed
 
 ### Merge Conflicts
