@@ -130,15 +130,8 @@ If yes → \`task({ subagent_type: "hygienic", prompt: "Review plan..." })\`
 
 ### Worker Spawning
 
-For each task, \`hive_exec_start\` creates the worktree and returns delegation instructions.
-You MUST spawn the worker with \`background_task\` using the \`backgroundTaskCall\` when \`delegationRequired\` is true.
-
 \`\`\`
-// 1. Start task - creates worktree, returns backgroundTaskCall
-result = hive_exec_start({ task: "01-task-name" })
-
-// 2. Spawn worker with background_task
-background_task({ ...result.backgroundTaskCall })
+hive_exec_start({ task: "01-task-name" })  // Creates worktree + Forager
 \`\`\`
 
 ### After Delegation

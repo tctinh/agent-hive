@@ -22,23 +22,29 @@
       "description": "Agent model configuration overrides",
       "additionalProperties": false,
       "properties": {
-        "hive": {
-          "$ref": "#/$defs/agentConfig"
+        "hive-master": {
+          "$ref": "#/$defs/agentConfig",
+          "description": "Hive Master (hybrid planner + orchestrator)"
         },
-        "architect": {
-          "$ref": "#/$defs/agentConfig"
+        "architect-planner": {
+          "$ref": "#/$defs/agentConfig",
+          "description": "Architect Planner (planning-only)"
         },
-        "swarm": {
-          "$ref": "#/$defs/agentConfig"
+        "swarm-orchestrator": {
+          "$ref": "#/$defs/agentConfig",
+          "description": "Swarm Orchestrator"
         },
-        "scout": {
-          "$ref": "#/$defs/agentConfig"
+        "scout-researcher": {
+          "$ref": "#/$defs/agentConfig",
+          "description": "Scout Researcher"
         },
-        "forager": {
-          "$ref": "#/$defs/agentConfig"
+        "forager-worker": {
+          "$ref": "#/$defs/agentConfig",
+          "description": "Forager Worker"
         },
-        "hygienic": {
-          "$ref": "#/$defs/agentConfig"
+        "hygienic-reviewer": {
+          "$ref": "#/$defs/agentConfig",
+          "description": "Hygienic Reviewer"
         }
       }
     }

@@ -45,35 +45,35 @@ export class ConfigService {
         agents: {
           ...DEFAULT_HIVE_CONFIG.agents,
           ...stored.agents,
-          // Deep merge hive agent config
-          hive: {
-            ...DEFAULT_HIVE_CONFIG.agents?.hive,
-            ...stored.agents?.hive,
+          // Deep merge hive-master agent config
+          'hive-master': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['hive-master'],
+            ...stored.agents?.['hive-master'],
           },
-          // Deep merge architect agent config
-          architect: {
-            ...DEFAULT_HIVE_CONFIG.agents?.architect,
-            ...stored.agents?.architect,
+          // Deep merge architect-planner agent config
+          'architect-planner': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['architect-planner'],
+            ...stored.agents?.['architect-planner'],
           },
-          // Deep merge swarm agent config
-          swarm: {
-            ...DEFAULT_HIVE_CONFIG.agents?.swarm,
-            ...stored.agents?.swarm,
+          // Deep merge swarm-orchestrator agent config
+          'swarm-orchestrator': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['swarm-orchestrator'],
+            ...stored.agents?.['swarm-orchestrator'],
           },
-          // Deep merge scout agent config
-          scout: {
-            ...DEFAULT_HIVE_CONFIG.agents?.scout,
-            ...stored.agents?.scout,
+          // Deep merge scout-researcher agent config
+          'scout-researcher': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['scout-researcher'],
+            ...stored.agents?.['scout-researcher'],
           },
-          // Deep merge forager agent config
-          forager: {
-            ...DEFAULT_HIVE_CONFIG.agents?.forager,
-            ...stored.agents?.forager,
+          // Deep merge forager-worker agent config
+          'forager-worker': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['forager-worker'],
+            ...stored.agents?.['forager-worker'],
           },
-          // Deep merge hygienic agent config
-          hygienic: {
-            ...DEFAULT_HIVE_CONFIG.agents?.hygienic,
-            ...stored.agents?.hygienic,
+          // Deep merge hygienic-reviewer agent config
+          'hygienic-reviewer': {
+            ...DEFAULT_HIVE_CONFIG.agents?.['hygienic-reviewer'],
+            ...stored.agents?.['hygienic-reviewer'],
           },
         },
       };
@@ -179,10 +179,10 @@ export class ConfigService {
   }
 
   /**
-   * Get agent-specific model config (hive or forager)
+   * Get agent-specific model config
    */
   getAgentConfig(
-    agent: 'hive' | 'architect' | 'swarm' | 'scout' | 'forager' | 'hygienic',
+    agent: 'hive-master' | 'architect-planner' | 'swarm-orchestrator' | 'scout-researcher' | 'forager-worker' | 'hygienic-reviewer',
   ): { model?: string; temperature?: number; skills?: string[] } {
     const config = this.get();
     return config.agents?.[agent] ?? {};

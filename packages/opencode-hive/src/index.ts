@@ -1187,7 +1187,7 @@ Make the requested changes, then call hive_request_review again.`;
       configService.init();
 
       // Hive Agents (lean, focused - new architecture with kebab-case names)
-      const hiveUserConfig = configService.getAgentConfig('hive');
+      const hiveUserConfig = configService.getAgentConfig('hive-master');
       const hiveConfig = {
         model: hiveUserConfig.model,
         temperature: hiveUserConfig.temperature ?? 0.5,
@@ -1201,7 +1201,7 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      const architectUserConfig = configService.getAgentConfig('architect');
+      const architectUserConfig = configService.getAgentConfig('architect-planner');
       const architectConfig = {
         model: architectUserConfig.model,
         temperature: architectUserConfig.temperature ?? 0.7,
@@ -1218,7 +1218,7 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      const swarmUserConfig = configService.getAgentConfig('swarm');
+      const swarmUserConfig = configService.getAgentConfig('swarm-orchestrator');
       const swarmConfig = {
         model: swarmUserConfig.model,
         temperature: swarmUserConfig.temperature ?? 0.5,
@@ -1232,7 +1232,7 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      const scoutUserConfig = configService.getAgentConfig('scout');
+      const scoutUserConfig = configService.getAgentConfig('scout-researcher');
       const scoutConfig = {
         model: scoutUserConfig.model,
         temperature: scoutUserConfig.temperature ?? 0.5,
@@ -1246,7 +1246,7 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      const foragerUserConfig = configService.getAgentConfig('forager');
+      const foragerUserConfig = configService.getAgentConfig('forager-worker');
       const foragerConfig = {
         model: foragerUserConfig.model,
         temperature: foragerUserConfig.temperature ?? 0.3,
@@ -1258,7 +1258,7 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      const hygienicUserConfig = configService.getAgentConfig('hygienic');
+      const hygienicUserConfig = configService.getAgentConfig('hygienic-reviewer');
       const hygienicConfig = {
         model: hygienicUserConfig.model,
         temperature: hygienicUserConfig.temperature ?? 0.3,

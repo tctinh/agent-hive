@@ -156,37 +156,37 @@ export interface HiveConfig {
   omoSlimEnabled?: boolean;
   /** Agent configuration */
   agents?: {
-    /** Hive (hybrid planner + orchestrator) */
-    hive?: AgentModelConfig;
-    /** Architect (planning-only) */
-    architect?: AgentModelConfig;
-    /** Swarm (orchestrator) */
-    swarm?: AgentModelConfig;
-    /** Scout (research) */
-    scout?: AgentModelConfig;
-    /** Forager (worker) */
-    forager?: AgentModelConfig;
-    /** Hygienic (plan review) */
-    hygienic?: AgentModelConfig;
+    /** Hive Master (hybrid planner + orchestrator) */
+    'hive-master'?: AgentModelConfig;
+    /** Architect Planner (planning-only) */
+    'architect-planner'?: AgentModelConfig;
+    /** Swarm Orchestrator */
+    'swarm-orchestrator'?: AgentModelConfig;
+    /** Scout Researcher */
+    'scout-researcher'?: AgentModelConfig;
+    /** Forager Worker */
+    'forager-worker'?: AgentModelConfig;
+    /** Hygienic Reviewer */
+    'hygienic-reviewer'?: AgentModelConfig;
   };
 }
 
 /** Default models for Hive agents */
 export const DEFAULT_AGENT_MODELS = {
-  hive: 'google/antigravity-claude-opus-4-5-thinking',
-  architect: 'google/antigravity-claude-opus-4-5-thinking',
-  swarm: 'github-copilot/claude-opus-4-5',
-  scout: 'zai-coding-plan/glm-4.7',
-  forager: 'github-copilot/gpt-5.2-codex',
-  hygienic: 'github-copilot/gpt-5.2-codex',
+  'hive-master': 'github-copilot/claude-opus-4.5',
+  'architect-planner': 'github-copilot/gpt-5.2-codex',
+  'swarm-orchestrator': 'github-copilot/claude-opus-4.5',
+  'scout-researcher': 'zai-coding-plan/glm-4.7',
+  'forager-worker': 'github-copilot/gpt-5.2-codex',
+  'hygienic-reviewer': 'github-copilot/gpt-5.2-codex',
 } as const;
 
 export const DEFAULT_HIVE_CONFIG: HiveConfig = {
   $schema: 'https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json',
   enableToolsFor: [],
   agents: {
-    hive: {
-      model: DEFAULT_AGENT_MODELS.hive,
+    'hive-master': {
+      model: DEFAULT_AGENT_MODELS['hive-master'],
       temperature: 0.5,
       skills: [
         'brainstorming',
@@ -195,28 +195,28 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
         'executing-plans',
       ],
     },
-    architect: {
-      model: DEFAULT_AGENT_MODELS.architect,
+    'architect-planner': {
+      model: DEFAULT_AGENT_MODELS['architect-planner'],
       temperature: 0.7,
       skills: ['brainstorming', 'writing-plans'],
     },
-    swarm: {
-      model: DEFAULT_AGENT_MODELS.swarm,
+    'swarm-orchestrator': {
+      model: DEFAULT_AGENT_MODELS['swarm-orchestrator'],
       temperature: 0.5,
       skills: ['dispatching-parallel-agents', 'executing-plans'],
     },
-    scout: {
-      model: DEFAULT_AGENT_MODELS.scout,
+    'scout-researcher': {
+      model: DEFAULT_AGENT_MODELS['scout-researcher'],
       temperature: 0.5,
       skills: [],
     },
-    forager: {
-      model: DEFAULT_AGENT_MODELS.forager,
+    'forager-worker': {
+      model: DEFAULT_AGENT_MODELS['forager-worker'],
       temperature: 0.3,
       skills: ['test-driven-development', 'verification-before-completion'],
     },
-    hygienic: {
-      model: DEFAULT_AGENT_MODELS.hygienic,
+    'hygienic-reviewer': {
+      model: DEFAULT_AGENT_MODELS['hygienic-reviewer'],
       temperature: 0.3,
       skills: ['systematic-debugging'],
     },
