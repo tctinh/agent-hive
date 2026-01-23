@@ -187,4 +187,12 @@ export class ConfigService {
     const config = this.get();
     return config.agents?.[agent] ?? {};
   }
+
+  /**
+   * Check if OMO-Slim delegation is enabled via user config.
+   */
+  isOmoSlimEnabled(): boolean {
+    const config = this.get();
+    return config.omoSlimEnabled === true;
+  }
 }

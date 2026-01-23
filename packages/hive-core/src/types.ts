@@ -10,7 +10,7 @@ export interface FeatureJson {
   completedAt?: string;
 }
 
-export type TaskStatusType = 'pending' | 'in_progress' | 'done' | 'cancelled' | 'blocked';
+export type TaskStatusType = 'pending' | 'in_progress' | 'done' | 'cancelled' | 'blocked' | 'failed' | 'partial';
 export type TaskOrigin = 'plan' | 'manual';
 export type SubtaskType = 'test' | 'implement' | 'review' | 'verify' | 'research' | 'debug' | 'custom';
 
@@ -31,7 +31,29 @@ export interface SubtaskStatus {
   completedAt?: string;
 }
 
+/** Worker session information for background task execution */
+export interface WorkerSession {
+  /** Background task ID from OMO-Slim */
+  taskId?: string;
+  /** Unique session identifier */
+  sessionId: string;
+  /** Worker instance identifier */
+  workerId?: string;
+  /** Agent type handling this task */
+  agent?: string;
+  /** Execution mode: inline (same session) or delegate (background) */
+  mode?: 'inline' | 'delegate';
+  /** ISO timestamp of last heartbeat */
+  lastHeartbeatAt?: string;
+  /** Current attempt number (1-based) */
+  attempt?: number;
+  /** Number of messages exchanged in session */
+  messageCount?: number;
+}
+
 export interface TaskStatus {
+  /** Schema version for forward compatibility (default: 1) */
+  schemaVersion?: number;
   status: TaskStatusType;
   origin: TaskOrigin;
   planTitle?: string;
@@ -40,6 +62,10 @@ export interface TaskStatus {
   completedAt?: string;
   baseCommit?: string;
   subtasks?: Subtask[];
+  /** Idempotency key for safe retries */
+  idempotencyKey?: string;
+  /** Worker session info for background execution */
+  workerSession?: WorkerSession;
 }
 
 export interface PlanComment {
@@ -126,6 +152,8 @@ export interface HiveConfig {
   $schema?: string;
   /** Enable hive tools for specific features */
   enableToolsFor?: string[];
+  /** Enable OMO-Slim delegation (optional integration) */
+  omoSlimEnabled?: boolean;
   /** Agent configuration */
   agents?: {
     /** Hive (hybrid planner + orchestrator) */

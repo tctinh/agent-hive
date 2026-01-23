@@ -14,11 +14,31 @@ import {
   ensureDir,
   readJson,
   writeJson,
+  writeJsonLockedSync,
+  patchJsonLockedSync,
+  deepMerge,
   readText,
   writeText,
   fileExists,
+  LockOptions,
 } from '../utils/paths.js';
-import { TaskStatus, TaskStatusType, TaskOrigin, TasksSyncResult, TaskInfo, Subtask, SubtaskType, SubtaskStatus } from '../types.js';
+import { TaskStatus, TaskStatusType, TaskOrigin, TasksSyncResult, TaskInfo, Subtask, SubtaskType, SubtaskStatus, WorkerSession } from '../types.js';
+
+/** Current schema version for TaskStatus */
+export const TASK_STATUS_SCHEMA_VERSION = 1;
+
+/** Fields that can be updated by background workers without clobbering completion-owned fields */
+export interface BackgroundPatchFields {
+  idempotencyKey?: string;
+  workerSession?: Partial<WorkerSession>;
+}
+
+/** Fields owned by the completion flow (not to be touched by background patches) */
+export interface CompletionFields {
+  status?: TaskStatusType;
+  summary?: string;
+  completedAt?: string;
+}
 
 interface ParsedTask {
   folder: string;
@@ -171,7 +191,22 @@ export class TaskService {
     return specPath;
   }
 
-  update(featureName: string, taskFolder: string, updates: Partial<Pick<TaskStatus, 'status' | 'summary' | 'baseCommit'>>): TaskStatus {
+  /**
+   * Update task status with locked atomic write.
+   * Uses file locking to prevent race conditions between concurrent updates.
+   * 
+   * @param featureName - Feature name
+   * @param taskFolder - Task folder name
+   * @param updates - Fields to update (status, summary, baseCommit)
+   * @param lockOptions - Optional lock configuration
+   * @returns Updated TaskStatus
+   */
+  update(
+    featureName: string,
+    taskFolder: string,
+    updates: Partial<Pick<TaskStatus, 'status' | 'summary' | 'baseCommit'>>,
+    lockOptions?: LockOptions
+  ): TaskStatus {
     const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);
     const current = readJson<TaskStatus>(statusPath);
     
@@ -182,6 +217,7 @@ export class TaskService {
     const updated: TaskStatus = {
       ...current,
       ...updates,
+      schemaVersion: TASK_STATUS_SCHEMA_VERSION,
     };
 
     if (updates.status === 'in_progress' && !current.startedAt) {
@@ -191,8 +227,56 @@ export class TaskService {
       updated.completedAt = new Date().toISOString();
     }
 
-    writeJson(statusPath, updated);
+    // Use locked atomic write to prevent race conditions
+    writeJsonLockedSync(statusPath, updated, lockOptions);
     return updated;
+  }
+
+  /**
+   * Patch only background-owned fields without clobbering completion-owned fields.
+   * Safe for concurrent use by background workers.
+   * 
+   * Uses deep merge for workerSession to allow partial updates like:
+   * - patchBackgroundFields(..., { workerSession: { lastHeartbeatAt: '...' } })
+   *   will update only lastHeartbeatAt, preserving other workerSession fields.
+   * 
+   * @param featureName - Feature name
+   * @param taskFolder - Task folder name
+   * @param patch - Background-owned fields to update
+   * @param lockOptions - Optional lock configuration
+   * @returns Updated TaskStatus
+   */
+  patchBackgroundFields(
+    featureName: string,
+    taskFolder: string,
+    patch: BackgroundPatchFields,
+    lockOptions?: LockOptions
+  ): TaskStatus {
+    const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);
+    
+    // Build the patch object, only including fields that are defined
+    const safePatch: Partial<TaskStatus> = {
+      schemaVersion: TASK_STATUS_SCHEMA_VERSION,
+    };
+    
+    if (patch.idempotencyKey !== undefined) {
+      safePatch.idempotencyKey = patch.idempotencyKey;
+    }
+    
+    if (patch.workerSession !== undefined) {
+      safePatch.workerSession = patch.workerSession as WorkerSession;
+    }
+    
+    // Use patchJsonLockedSync which does deep merge
+    return patchJsonLockedSync<TaskStatus>(statusPath, safePatch, lockOptions);
+  }
+
+  /**
+   * Get raw TaskStatus including all fields (for internal use or debugging).
+   */
+  getRawStatus(featureName: string, taskFolder: string): TaskStatus | null {
+    const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);
+    return readJson<TaskStatus>(statusPath);
   }
 
   get(featureName: string, taskFolder: string): TaskInfo | null {
