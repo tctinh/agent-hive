@@ -1272,6 +1272,26 @@ Make the requested changes, then call hive_request_review again.`;
       return existingPrompt;
     },
 
+    // Event hook - handle session lifecycle events for background tasks
+    event: async ({ event }: { event: { type: string; properties: Record<string, unknown> } }) => {
+      // Handle session.idle - marks background tasks as completed
+      if (event.type === 'session.idle') {
+        const sessionId = event.properties.sessionID as string;
+        if (sessionId) {
+          backgroundManager.handleSessionIdle(sessionId);
+        }
+      }
+
+      // Handle message.updated - track progress for running tasks
+      if (event.type === 'message.updated') {
+        const info = event.properties.info as { sessionID?: string } | undefined;
+        const sessionId = info?.sessionID;
+        if (sessionId) {
+          backgroundManager.handleMessageEvent(sessionId);
+        }
+      }
+    },
+
     // Config hook - merge agents into opencodeConfig.agent (like OMO-Slim does)
     config: async (opencodeConfig: Record<string, unknown>) => {
       // Auto-generate config file with defaults if it doesn't exist

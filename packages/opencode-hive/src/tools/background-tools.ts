@@ -167,7 +167,7 @@ export function createBackgroundTools(
         const startTime = Date.now();
 
         while (true) {
-          const current = manager.getTask(taskRecord.taskId);
+          let current = manager.getTask(taskRecord.taskId);
           if (!current) {
             return JSON.stringify({
               provider: 'hive',
@@ -180,11 +180,16 @@ export function createBackgroundTools(
 
           // Sync mode: proactively detect completion using session status.
           // This avoids waiting for the background poller/backoff loop.
+          // Note: maybeFinalizeIfIdle may update the task status via handleSessionIdle.
           if (!isTerminalStatus(current.status)) {
             await maybeFinalizeIfIdle(current.sessionId);
+            // Re-fetch task after finalization attempt - status may have changed
+            // This is critical because handleSessionIdle updates the store asynchronously
+            // and the event hook may have also updated the status
+            current = manager.getTask(taskRecord.taskId)!;
           }
 
-          if (isTerminalStatus(current.status)) {
+          if (current && isTerminalStatus(current.status)) {
             // Get output
             const outputText = await getTaskOutput(client, current.sessionId);
             const output: BackgroundTaskOutput = {
@@ -205,9 +210,9 @@ export function createBackgroundTools(
           if (Date.now() - startTime > maxWait) {
             return JSON.stringify({
               provider: 'hive',
-              task_id: current.taskId,
-              session_id: current.sessionId,
-              status: current.status,
+              task_id: current?.taskId ?? taskRecord.taskId,
+              session_id: current?.sessionId ?? taskRecord.sessionId,
+              status: current?.status ?? 'unknown',
               error: 'Sync wait timed out after 30 minutes',
               done: false,
             } satisfies BackgroundTaskOutput, null, 2);
