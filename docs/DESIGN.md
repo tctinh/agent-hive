@@ -80,9 +80,23 @@ Sessions tracked per feature in `sessions/` directory:
 
 ```
 pending -> in_progress -> done
+                      \-> blocked -> (resume) -> done
                       \-> failed
-                      \-> skipped
+                      \-> partial
+                      \-> cancelled
 ```
+
+### Status Vocabulary (TaskStatusType)
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Not started |
+| `in_progress` | Currently being worked on |
+| `done` | Completed successfully |
+| `blocked` | Waiting for user decision (blocker protocol) |
+| `failed` | Execution failed (errors, tests not passing) |
+| `partial` | Partially completed (some work done, not finished) |
+| `cancelled` | Cancelled by user |
 
 ### spec.md (generated on task sync)
 Contains task context for the executing agent:
@@ -114,3 +128,98 @@ Each task executes in an isolated git worktree:
 - **Isolation** — Each task in own worktree, safe to discard
 - **Audit trail** — Every action logged to `.hive/`
 - **Agent-friendly** — Minimal overhead during execution
+
+## Plugin Load Order (Background Tool Boundary)
+
+When using Hive with OMO-Slim for delegated execution, **agent-hive must be loaded LAST** in the OpenCode plugin configuration. This ensures that `background_task` and `background_output` tool calls resolve to Hive's implementations rather than OMO-Slim's.
+
+### Configuration
+
+In `opencode.json`:
+```json
+{
+  "plugins": [
+    "@anthropic/omos-slim",
+    "@anthropic/agent-hive"  // MUST be last
+  ]
+}
+```
+
+### Misconfiguration Symptoms
+
+If agent-hive is loaded before OMO-Slim:
+- `background_task` calls spawn generic workers instead of Foragers
+- Workers lack Hive context (spec.md, context files, prior task summaries)
+- `hive_exec_complete` never gets called (workers don't know the protocol)
+- Tasks stay stuck in `in_progress` forever
+
+### Fix
+
+Reorder plugins so agent-hive appears last. Restart OpenCode after changing.
+
+## Source of Truth Rules
+
+Hive uses file-based state with clear ownership boundaries:
+
+| File | Owner | Other Access |
+|------|-------|--------------|
+| `status.json` (feature) | Hive Master | VSCode (read-only) |
+| `status.json` (task) | Worker | Hive Master (read), Poller (read-only) |
+| `plan.md` | Hive Master | VSCode (read + comment) |
+| `comments.json` | VSCode | Hive Master (read-only) |
+| `spec.md` | `hive_exec_start` | Worker (read-only) |
+| `report.md` | Worker | All (read-only) |
+| `BLOCKED` | Beekeeper | All (read-only, blocks operations) |
+| `PENDING_REVIEW` | Worker | VSCode (delete to respond) |
+| `REVIEW_RESULT` | VSCode | Worker (read-only) |
+
+### Poller Constraints
+
+The VSCode extension poller watches `.hive/` for changes:
+- **Read-only**: Poller NEVER writes to any file
+- **Debounced**: File changes debounced to avoid thrashing
+- **Selective**: Only watches files it needs for UI
+
+## Field Ownership
+
+Task `status.json` fields and who writes them:
+
+| Field | Written By | When |
+|-------|-----------|------|
+| `status` | Worker via `hive_exec_complete` | On completion/block |
+| `origin` | `hive_tasks_sync` | On task creation |
+| `planTitle` | `hive_tasks_sync` | On task creation |
+| `summary` | Worker via `hive_exec_complete` | On completion |
+| `startedAt` | `hive_exec_start` | On task start |
+| `completedAt` | `hive_exec_complete` | On completion |
+| `baseCommit` | `hive_exec_start` | On worktree creation |
+| `blocker` | Worker via `hive_exec_complete` | When blocked |
+
+## Idempotency Expectations
+
+### Idempotent Operations
+
+These operations are safe to retry:
+- `hive_feature_list` - Pure read
+- `hive_plan_read` - Pure read
+- `hive_status` - Pure read
+- `hive_worker_status` - Pure read
+- `hive_worktree_list` - Pure read
+
+### Non-Idempotent Operations
+
+These operations have side effects:
+- `hive_feature_create` - Creates feature directory (errors if exists)
+- `hive_plan_write` - Overwrites plan.md, clears comments
+- `hive_tasks_sync` - Reconciles tasks (additive, removes orphans)
+- `hive_exec_start` - Creates worktree (reuses if exists for blocked resume)
+- `hive_exec_complete` - Commits changes, writes report (once per completion)
+- `hive_merge` - Merges branch (fails if already merged)
+
+### Recovery Patterns
+
+If a tool call fails mid-operation:
+1. Check `hive_status` to see current state
+2. Most operations leave state consistent (atomic file writes)
+3. Worktrees can be cleaned up with `hive_exec_abort`
+4. Partial merges require manual git intervention
