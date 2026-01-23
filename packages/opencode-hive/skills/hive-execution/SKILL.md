@@ -13,10 +13,10 @@ Quick reference for executing Hive tasks (Receiver Mode).
 @hive (Receiver Mode)
       │
       ▼
-hive_exec_start ──► background_task ──► Forager Worker (isolated worktree)
+hive_exec_start ──► task ──► Forager Worker (isolated worktree)
       │                                │
       │                                ▼
-      │                         background_task (research if needed)
+      │                         MCP tools / task (research if needed)
       │                                │
       │                                ▼
       │                         hive_exec_complete
@@ -29,7 +29,7 @@ hive_merge ──► Main branch
 ## Workflow Summary
 
 1. **Tasks sync** → Generate from approved plan
-2. **Exec start** → Creates worktree; call background_task to spawn Forager (OMO-Slim)
+2. **Exec start** → Creates worktree; call task to spawn Forager (OpenCode)
 3. **Worker executes** → Implements, verifies, reports
 4. **Complete** → GATE: requires verification mention
 5. **Merge** → Squash into feature branch
@@ -39,7 +39,7 @@ hive_merge ──► Main branch
 ## Task Lifecycle
 
 ```
-hive_exec_start({ task })           # Creates worktree; if delegationRequired, spawn Forager via background_task
+hive_exec_start({ task })           # Creates worktree; if delegationRequired, spawn Forager via task
   ↓
 [Forager implements in worktree]
   ↓
@@ -54,7 +54,7 @@ hive_merge({ task, strategy: "squash" })  # Integrates to main
 
 For parallelizable tasks:
 
-If `delegationRequired` is returned for a task, call `background_task` to spawn that worker.
+If `delegationRequired` is returned for a task, call `task` to spawn that worker.
 
 ```
 hive_exec_start({ task: "02-task-a" })
@@ -96,10 +96,10 @@ If blocker suggests plan is incomplete:
 Workers can delegate research:
 
 ```
-background_task({
-  agent: "explorer",  // or librarian, oracle, designer
+task({
+  subagent_type: "explorer",  // or librarian, oracle, designer
   prompt: "Find usage patterns for...",
-  sync: true
+  description: "Research patterns"
 })
 ```
 
@@ -126,7 +126,7 @@ background_task({
 | hive_worker_status | Check workers/blockers |
 | hive_merge | Integrate to main |
 | hive_worktree_list | See active worktrees |
-| background_task | Research delegation |
+| task | Research delegation |
 
 ---
 
@@ -140,7 +140,7 @@ hive_exec_start({ task })  # Fresh start
 
 ### After 3 Failures
 1. Stop all workers
-2. Consult: `background_task({ agent: "oracle", prompt: "Analyze..." })`
+2. Consult: `task({ subagent_type: "oracle", prompt: "Analyze..." })`
 3. Ask user how to proceed
 
 ### Merge Conflicts
