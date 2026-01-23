@@ -4,7 +4,6 @@
  * 
  * Reads skill markdown from:
  * - packages/opencode-hive/skills/[dir]/SKILL.md
- * - packages/hive-core/templates/skills/hive.md
  * 
  * Outputs: packages/opencode-hive/src/skills/registry.generated.ts
  */
@@ -52,12 +51,6 @@ function discoverSkillFiles(rootDir: string): string[] {
         }
       }
     }
-  }
-
-  // 2. hive-core/templates/skills/hive.md
-  const hiveCoreSkill = path.join(rootDir, 'packages/hive-core/templates/skills/hive.md');
-  if (fs.existsSync(hiveCoreSkill)) {
-    files.push(hiveCoreSkill);
   }
 
   return files;
