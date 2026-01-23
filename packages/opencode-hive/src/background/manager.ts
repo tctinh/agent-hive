@@ -188,6 +188,7 @@ export class BackgroundManager {
     // Persist to Hive task status if linked
     if (options.hiveFeature && options.hiveTaskFolder) {
       try {
+        const attempt = options.attempt ?? 1;
         this.taskService.patchBackgroundFields(
           options.hiveFeature,
           options.hiveTaskFolder,
@@ -198,7 +199,7 @@ export class BackgroundManager {
               sessionId: task.sessionId,
               agent: task.agent,
               mode: 'delegate',
-              attempt: 1,
+              attempt,
             },
           }
         );

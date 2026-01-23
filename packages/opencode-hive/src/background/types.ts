@@ -121,6 +121,12 @@ export interface SpawnOptions {
   hiveTaskFolder?: string;
   /** Whether to wait for completion (sync mode) */
   sync?: boolean;
+
+  /**
+   * Hive attempt number for this run.
+   * Used only for Hive-linked tasks to persist workerSession.attempt correctly.
+   */
+  attempt?: number;
 }
 
 /**

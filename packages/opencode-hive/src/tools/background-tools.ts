@@ -101,6 +101,7 @@ export function createBackgroundTools(
         workdir: tool.schema.string().optional().describe('Working directory for task'),
         feature: tool.schema.string().optional().describe('Hive feature name (for Hive-linked tasks)'),
         task: tool.schema.string().optional().describe('Hive task folder (for Hive-linked tasks)'),
+        attempt: tool.schema.number().optional().describe('Hive attempt number (for Hive-linked tasks)'),
       },
       async execute(
         {
@@ -112,6 +113,7 @@ export function createBackgroundTools(
           workdir,
           feature,
           task: hiveTask,
+          attempt,
         },
         toolContext
       ): Promise<string> {
@@ -131,6 +133,7 @@ export function createBackgroundTools(
           hiveFeature: feature,
           hiveTaskFolder: hiveTask,
           sync,
+          attempt,
         });
 
         // Handle spawn errors
