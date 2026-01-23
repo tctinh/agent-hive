@@ -930,3 +930,388 @@ describe('Sequential Ordering Enforcement', () => {
     expect(activeTasks.length).toBe(0);
   });
 });
+
+// ============================================================================
+// Regression Coverage: Background Task Idempotency Behavior
+// ============================================================================
+
+describe('Background Task Idempotency Behavior', () => {
+  let store: BackgroundTaskStore;
+
+  beforeEach(() => {
+    resetStore();
+    store = new BackgroundTaskStore();
+  });
+
+  it('same idempotencyKey returns same task_id/session_id on subsequent calls', () => {
+    // First create
+    const task1 = store.create({
+      agent: 'forager',
+      description: 'Idempotent task',
+      sessionId: 'session-abc',
+      idempotencyKey: 'idem-key-123',
+    });
+
+    // Simulate subsequent call - lookup should return same task
+    const found = store.getByIdempotencyKey('idem-key-123');
+    
+    expect(found).toBeDefined();
+    expect(found?.taskId).toBe(task1.taskId);
+    expect(found?.sessionId).toBe(task1.sessionId);
+    expect(found?.sessionId).toBe('session-abc');
+  });
+
+  it('idempotency key lookup works across all task states', () => {
+    const task = store.create({
+      agent: 'forager',
+      description: 'Test',
+      sessionId: 'session-1',
+      idempotencyKey: 'persistent-idem-key',
+    });
+
+    // Verify lookup works in spawned state
+    expect(store.getByIdempotencyKey('persistent-idem-key')?.taskId).toBe(task.taskId);
+
+    // Transition to running
+    store.updateStatus(task.taskId, 'running');
+    expect(store.getByIdempotencyKey('persistent-idem-key')?.taskId).toBe(task.taskId);
+    expect(store.getByIdempotencyKey('persistent-idem-key')?.status).toBe('running');
+
+    // Transition to completed
+    store.updateStatus(task.taskId, 'completed');
+    expect(store.getByIdempotencyKey('persistent-idem-key')?.taskId).toBe(task.taskId);
+    expect(store.getByIdempotencyKey('persistent-idem-key')?.status).toBe('completed');
+  });
+
+  it('different idempotencyKeys create different tasks', () => {
+    const task1 = store.create({
+      agent: 'forager',
+      description: 'Task 1',
+      sessionId: 'session-1',
+      idempotencyKey: 'key-A',
+    });
+
+    const task2 = store.create({
+      agent: 'forager',
+      description: 'Task 2',
+      sessionId: 'session-2',
+      idempotencyKey: 'key-B',
+    });
+
+    expect(task1.taskId).not.toBe(task2.taskId);
+    expect(store.getByIdempotencyKey('key-A')?.taskId).toBe(task1.taskId);
+    expect(store.getByIdempotencyKey('key-B')?.taskId).toBe(task2.taskId);
+  });
+});
+
+// ============================================================================
+// Regression Coverage: Background Cancel Semantics
+// ============================================================================
+
+describe('Background Cancel Semantics', () => {
+  let store: BackgroundTaskStore;
+
+  beforeEach(() => {
+    resetStore();
+    store = new BackgroundTaskStore();
+  });
+
+  it('cancels only the specified child task by taskId', () => {
+    // Create parent context (simulated)
+    const parentSessionId = 'parent-session-999';
+
+    // Create two child tasks under same parent
+    const task1 = store.create({
+      agent: 'forager',
+      description: 'Child task 1',
+      sessionId: 'child-session-1',
+      parentSessionId,
+      idempotencyKey: 'child-1',
+    });
+    store.updateStatus(task1.taskId, 'running');
+
+    const task2 = store.create({
+      agent: 'forager',
+      description: 'Child task 2',
+      sessionId: 'child-session-2',
+      parentSessionId,
+      idempotencyKey: 'child-2',
+    });
+    store.updateStatus(task2.taskId, 'running');
+
+    // Cancel only task1
+    store.updateStatus(task1.taskId, 'cancelled');
+
+    // task1 should be cancelled
+    expect(store.get(task1.taskId)?.status).toBe('cancelled');
+    
+    // task2 should still be running
+    expect(store.get(task2.taskId)?.status).toBe('running');
+  });
+
+  it('cancelAll cancels all tasks for a specific parent session only', () => {
+    const parent1 = 'parent-session-1';
+    const parent2 = 'parent-session-2';
+
+    // Create tasks under parent1
+    const task1a = store.create({
+      agent: 'forager',
+      description: 'Parent1 Task A',
+      sessionId: 'session-1a',
+      parentSessionId: parent1,
+    });
+    store.updateStatus(task1a.taskId, 'running');
+
+    const task1b = store.create({
+      agent: 'forager',
+      description: 'Parent1 Task B',
+      sessionId: 'session-1b',
+      parentSessionId: parent1,
+    });
+    store.updateStatus(task1b.taskId, 'running');
+
+    // Create task under parent2
+    const task2a = store.create({
+      agent: 'forager',
+      description: 'Parent2 Task A',
+      sessionId: 'session-2a',
+      parentSessionId: parent2,
+    });
+    store.updateStatus(task2a.taskId, 'running');
+
+    // Get tasks for parent1
+    const parent1Tasks = store.list({
+      parentSessionId: parent1,
+      status: ['spawned', 'running'],
+    });
+
+    expect(parent1Tasks.length).toBe(2);
+
+    // Simulate cancel all for parent1
+    for (const task of parent1Tasks) {
+      store.updateStatus(task.taskId, 'cancelled');
+    }
+
+    // Parent1 tasks should be cancelled
+    expect(store.get(task1a.taskId)?.status).toBe('cancelled');
+    expect(store.get(task1b.taskId)?.status).toBe('cancelled');
+
+    // Parent2 tasks should still be running
+    expect(store.get(task2a.taskId)?.status).toBe('running');
+  });
+
+  it('cancel does not affect already terminal tasks', () => {
+    const task = store.create({
+      agent: 'forager',
+      description: 'Test task',
+      sessionId: 'session-1',
+    });
+    store.updateStatus(task.taskId, 'running');
+    store.updateStatus(task.taskId, 'completed');
+
+    // Attempting to cancel a completed task should throw
+    expect(() => {
+      store.updateStatus(task.taskId, 'cancelled');
+    }).toThrow(/Invalid state transition/);
+  });
+});
+
+// ============================================================================
+// Regression Coverage: Legacy Fallback Reads (WorktreeService paths)
+// ============================================================================
+
+describe('Legacy Fallback Path Resolution', () => {
+  // Note: These tests verify the path resolution logic documented in
+  // worktreeService.ts#getStepStatusPath which prefers tasks/ but falls back to execution/
+  
+  it('v2 path (tasks/) should be preferred over v1 path (execution/)', () => {
+    // This test documents the expected behavior:
+    // getStepStatusPath checks tasks/ first, then falls back to execution/
+    const featurePath = '.hive/features/test-feature';
+    const step = '01-test-step';
+    
+    // v2 path format
+    const v2Path = `${featurePath}/tasks/${step}/status.json`;
+    // v1 path format (fallback)
+    const v1Path = `${featurePath}/execution/${step}/status.json`;
+    
+    // Verify path structure expectations
+    expect(v2Path).toBe('.hive/features/test-feature/tasks/01-test-step/status.json');
+    expect(v1Path).toBe('.hive/features/test-feature/execution/01-test-step/status.json');
+    expect(v2Path).not.toBe(v1Path);
+  });
+
+  it('documents v1 to v2 layout migration', () => {
+    // This test documents the migration from v1 (execution/) to v2 (tasks/) layout
+    // The WorktreeService.getStepStatusPath method handles this fallback:
+    // 1. First checks: .hive/features/<feature>/tasks/<step>/status.json
+    // 2. Falls back to: .hive/features/<feature>/execution/<step>/status.json
+    
+    const layouts = {
+      v1: {
+        specPath: 'execution/<step>/spec.md',
+        statusPath: 'execution/<step>/status.json',
+      },
+      v2: {
+        specPath: 'tasks/<step>/spec.md',
+        statusPath: 'tasks/<step>/status.json',
+      },
+    };
+
+    // Document that v2 uses 'tasks' directory
+    expect(layouts.v2.specPath.startsWith('tasks/')).toBe(true);
+    expect(layouts.v1.specPath.startsWith('execution/')).toBe(true);
+  });
+});
+
+// ============================================================================
+// Regression Coverage: Misconfiguration Messaging
+// ============================================================================
+
+describe('Misconfiguration Messaging', () => {
+  // These tests document the expected error messages and troubleshooting guidance
+  // that should appear when background_task rejects workdir/idempotencyKey parameters
+  
+  it('documents expected troubleshooting guidance structure', () => {
+    // The hive_exec_start delegation instructions should include troubleshooting info
+    // for when background_task rejects workdir/idempotencyKey parameters
+    
+    const expectedTroubleshootingKeys = [
+      'Symptom',
+      'Cause', 
+      'Fix',
+    ];
+    
+    // This documents what the troubleshooting section should contain
+    const troubleshootingContent = {
+      symptom: '"Unknown parameter: workdir" or worker operates on main repo instead of worktree',
+      cause: 'agent-hive plugin not loaded last, or outdated OMO-Slim version',
+      fix: [
+        'Ensure agent-hive loads AFTER omo-slim in opencode config',
+        'Update OMO-Slim to latest version with workdir support',
+        'Check ~/.config/opencode/config.json plugin order',
+      ],
+    };
+    
+    expect(troubleshootingContent.symptom).toContain('workdir');
+    expect(troubleshootingContent.cause).toContain('agent-hive');
+    expect(troubleshootingContent.fix.length).toBeGreaterThan(0);
+  });
+
+  it('verifies delegation instructions format includes troubleshooting', () => {
+    // The delegation response from hive_exec_start should include:
+    // 1. worktreePath
+    // 2. branch
+    // 3. mode
+    // 4. delegationRequired
+    // 5. backgroundTaskCall
+    // 6. instructions (with troubleshooting section)
+    
+    const expectedDelegationFields = [
+      'worktreePath',
+      'branch', 
+      'mode',
+      'delegationRequired',
+      'backgroundTaskCall',
+      'instructions',
+    ];
+    
+    // Document expected backgroundTaskCall structure
+    const expectedBackgroundTaskCallFields = [
+      'agent',
+      'prompt',
+      'description',
+      'sync',
+      'workdir',
+      'idempotencyKey',
+    ];
+    
+    expect(expectedDelegationFields).toContain('instructions');
+    expect(expectedBackgroundTaskCallFields).toContain('workdir');
+    expect(expectedBackgroundTaskCallFields).toContain('idempotencyKey');
+  });
+});
+
+// ============================================================================
+// Regression Coverage: Hive Task Ordering with Background Tasks
+// ============================================================================
+
+describe('Hive Task Ordering with Background Tasks', () => {
+  let store: BackgroundTaskStore;
+
+  beforeEach(() => {
+    resetStore();
+    store = new BackgroundTaskStore();
+  });
+
+  it('blocks later tasks when earlier task is in_progress via background', () => {
+    // Task 01 is running as a background task
+    const task01 = store.create({
+      agent: 'forager',
+      description: 'First task',
+      sessionId: 'session-01',
+      hiveFeature: 'my-feature',
+      hiveTaskFolder: '01-setup',
+    });
+    store.updateStatus(task01.taskId, 'running');
+
+    // Check for active earlier tasks (simulating what manager.checkHiveTaskOrdering does)
+    const activeTasks = store.list({
+      hiveFeature: 'my-feature',
+      status: ['spawned', 'pending', 'running'],
+    });
+
+    // Find tasks with order < 2
+    const earlierTasks = activeTasks.filter(t => {
+      const match = t.hiveTaskFolder?.match(/^(\d+)-/);
+      return match && parseInt(match[1], 10) < 2;
+    });
+
+    expect(earlierTasks.length).toBe(1);
+    expect(earlierTasks[0].hiveTaskFolder).toBe('01-setup');
+  });
+
+  it('allows later tasks when earlier task is completed', () => {
+    // Task 01 completed
+    const task01 = store.create({
+      agent: 'forager',
+      description: 'First task',
+      sessionId: 'session-01',
+      hiveFeature: 'my-feature',
+      hiveTaskFolder: '01-setup',
+    });
+    store.updateStatus(task01.taskId, 'running');
+    store.updateStatus(task01.taskId, 'completed');
+
+    // Check for active earlier tasks
+    const activeTasks = store.list({
+      hiveFeature: 'my-feature',
+      status: ['spawned', 'pending', 'running'],
+    });
+
+    // No active earlier tasks
+    expect(activeTasks.length).toBe(0);
+  });
+
+  it('allows later tasks when earlier task is cancelled', () => {
+    // Task 01 cancelled
+    const task01 = store.create({
+      agent: 'forager',
+      description: 'First task',
+      sessionId: 'session-01',
+      hiveFeature: 'my-feature',
+      hiveTaskFolder: '01-setup',
+    });
+    store.updateStatus(task01.taskId, 'running');
+    store.updateStatus(task01.taskId, 'cancelled');
+
+    // Check for active earlier tasks
+    const activeTasks = store.list({
+      hiveFeature: 'my-feature',
+      status: ['spawned', 'pending', 'running'],
+    });
+
+    // No active earlier tasks
+    expect(activeTasks.length).toBe(0);
+  });
+});

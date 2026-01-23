@@ -2,7 +2,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { WorktreeService } from './dist/services/worktreeService.js';
+import { WorktreeService } from 'hive-core';
 
 class IntegrationTester {
   constructor() {
@@ -25,10 +25,11 @@ class IntegrationTester {
   async setup() {
     console.log('\n=== Setup ===');
     
+    // Use v2 layout: tasks/ instead of execution/
     const featureDir = path.join('.hive', 'features', this.featureName);
-    await fs.mkdir(path.join(featureDir, 'execution'), { recursive: true });
+    await fs.mkdir(path.join(featureDir, 'tasks'), { recursive: true });
     
-    const stepDir = path.join(featureDir, 'execution', this.stepFolder);
+    const stepDir = path.join(featureDir, 'tasks', this.stepFolder);
     await fs.mkdir(stepDir, { recursive: true });
     await fs.writeFile(
       path.join(stepDir, 'spec.md'),
@@ -41,7 +42,7 @@ class IntegrationTester {
       'utf8'
     );
     
-    this.log('Setup', 'PASS', 'Feature and step created');
+    this.log('Setup', 'PASS', 'Feature and step created (v2 layout)');
   }
 
   async testWorktreeCreation() {
@@ -117,12 +118,13 @@ class IntegrationTester {
     console.log('\n=== Test 4: Apply to Main ===');
     
     try {
-      const stepDir = path.join('.hive', 'features', this.featureName, 'execution', this.stepFolder);
-      await fs.writeFile(
-        path.join(stepDir, 'output.diff'),
-        diffResult.diffContent,
-        'utf8'
-      );
+    // Use v2 layout: tasks/ instead of execution/
+    const stepDir = path.join('.hive', 'features', this.featureName, 'tasks', this.stepFolder);
+    await fs.writeFile(
+      path.join(stepDir, 'output.diff'),
+      diffResult.diffContent,
+      'utf8'
+    );
       
       const applyResult = await this.worktreeService.applyDiff(
         this.featureName,
