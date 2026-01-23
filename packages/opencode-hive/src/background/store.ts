@@ -47,6 +47,8 @@ export class BackgroundTaskStore {
     idempotencyKey?: string;
     parentSessionId?: string;
     parentMessageId?: string;
+    parentAgent?: string;
+    notifyParent?: boolean;
     hiveFeature?: string;
     hiveTaskFolder?: string;
     workdir?: string;
@@ -77,6 +79,8 @@ export class BackgroundTaskStore {
       lastActiveAt: now,
       parentSessionId: options.parentSessionId,
       parentMessageId: options.parentMessageId,
+      parentAgent: options.parentAgent,
+      notifyParent: options.notifyParent,
       hiveFeature: options.hiveFeature,
       hiveTaskFolder: options.hiveTaskFolder,
       workdir: options.workdir,

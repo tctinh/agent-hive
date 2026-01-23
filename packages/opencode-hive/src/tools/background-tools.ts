@@ -56,6 +56,36 @@ export function createBackgroundTools(
   background_output: ToolDefinition;
   background_cancel: ToolDefinition;
 } {
+  async function maybeFinalizeIfIdle(sessionId: string): Promise<void> {
+    // Fast-path: if the client exposes batch status, use it.
+    try {
+      const statusFn = (client.session as unknown as { status?: () => Promise<{ data?: unknown }> }).status;
+      if (statusFn) {
+        const statusResult = await statusFn();
+        const entry = (statusResult.data as Record<string, { type?: string }> | undefined)?.[sessionId];
+        const type = entry?.type;
+        if (type === 'idle' || type === 'completed') {
+          manager.handleSessionIdle(sessionId);
+          return;
+        }
+      }
+    } catch {
+      // Ignore and fall back to session.get
+    }
+
+    // Fallback: check the specific session.
+    try {
+      const sessionResult = await client.session.get({ path: { id: sessionId } });
+      const data = sessionResult.data as { status?: string; type?: string } | undefined;
+      const status = data?.status ?? data?.type;
+      if (status === 'idle' || status === 'completed') {
+        manager.handleSessionIdle(sessionId);
+      }
+    } catch {
+      // Best-effort only.
+    }
+  }
+
   return {
     /**
      * Spawn a new background task.
@@ -96,6 +126,8 @@ export function createBackgroundTools(
           workdir,
           parentSessionId: ctx?.sessionID,
           parentMessageId: ctx?.messageID,
+          parentAgent: ctx?.agent,
+          notifyParent: !sync,
           hiveFeature: feature,
           hiveTaskFolder: hiveTask,
           sync,
@@ -141,6 +173,12 @@ export function createBackgroundTools(
               status: 'error',
               error: 'Task disappeared from store',
             } satisfies BackgroundTaskOutput, null, 2);
+          }
+
+          // Sync mode: proactively detect completion using session status.
+          // This avoids waiting for the background poller/backoff loop.
+          if (!isTerminalStatus(current.status)) {
+            await maybeFinalizeIfIdle(current.sessionId);
           }
 
           if (isTerminalStatus(current.status)) {
@@ -204,7 +242,7 @@ export function createBackgroundTools(
         // If blocking, wait for new messages or completion
         if (block && !isTerminalStatus(task.status)) {
           const startTime = Date.now();
-          const pollInterval = 500;
+          const pollInterval = 1000;
 
           while (Date.now() - startTime < timeout) {
             const current = manager.getTask(task_id);
@@ -213,6 +251,13 @@ export function createBackgroundTools(
             // Check if we have new messages
             const currentCount = current.progress?.messageCount ?? 0;
             if (currentCount > cursorCount || isTerminalStatus(current.status)) {
+              break;
+            }
+
+            // If the session is already idle, finalize and return promptly.
+            await maybeFinalizeIfIdle(current.sessionId);
+            const afterFinalize = manager.getTask(task_id);
+            if (afterFinalize && isTerminalStatus(afterFinalize.status)) {
               break;
             }
 
@@ -229,18 +274,31 @@ export function createBackgroundTools(
           }, null, 2);
         }
 
+        // Ensure we don't report a completed session as "running".
+        if (!isTerminalStatus(current.status)) {
+          await maybeFinalizeIfIdle(current.sessionId);
+        }
+
+        const finalized = manager.getTask(task_id);
+        if (!finalized) {
+          return JSON.stringify({
+            error: `Task "${task_id}" disappeared`,
+            task_id,
+          }, null, 2);
+        }
+
         // Get messages from session
-        const output = await getTaskOutput(client, current.sessionId, cursorCount);
-        const messageCount = current.progress?.messageCount ?? 0;
+        const output = await getTaskOutput(client, finalized.sessionId, cursorCount);
+        const messageCount = finalized.progress?.messageCount ?? 0;
 
         return JSON.stringify({
-          task_id: current.taskId,
-          session_id: current.sessionId,
-          status: current.status,
-          done: isTerminalStatus(current.status),
+          task_id: finalized.taskId,
+          session_id: finalized.sessionId,
+          status: finalized.status,
+          done: isTerminalStatus(finalized.status),
           output,
           cursor: messageCount.toString(),
-          progress: current.progress,
+          progress: finalized.progress,
         }, null, 2);
       },
     }),

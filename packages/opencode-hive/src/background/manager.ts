@@ -170,6 +170,7 @@ export class BackgroundManager {
     }
 
     // Create task record
+    const notifyParent = options.notifyParent ?? !options.sync;
     const task = this.store.create({
       agent: options.agent,
       description: options.description,
@@ -177,6 +178,8 @@ export class BackgroundManager {
       idempotencyKey: options.idempotencyKey,
       parentSessionId: options.parentSessionId,
       parentMessageId: options.parentMessageId,
+      parentAgent: options.parentAgent,
+      notifyParent,
       hiveFeature: options.hiveFeature,
       hiveTaskFolder: options.hiveTaskFolder,
       workdir: options.workdir,
@@ -229,11 +232,10 @@ export class BackgroundManager {
       })
       .catch((error: Error) => {
         // Handle prompt failure
-        this.store.updateStatus(task.taskId, 'error', {
-          errorMessage: error.message,
-        });
+        this.updateStatus(task.taskId, 'error', { errorMessage: error.message });
         // Release concurrency slot on error
         this.concurrencyManager.release(concurrencyKey);
+        this.poller.cleanupTask(task.taskId);
       });
 
     return {
@@ -338,7 +340,52 @@ export class BackgroundManager {
       }
     }
 
+    // Notify parent session when task reaches terminal state (fire-and-forget).
+    // This is the primary UX mechanism for sync=false tasks.
+    if (
+      isTerminalStatus(task.status) &&
+      task.parentSessionId &&
+      task.notifyParent !== false
+    ) {
+      void this.notifyParentSession(task);
+    }
+
     return task;
+  }
+
+  /**
+   * Notify the parent session that a background task completed.
+   *
+   * This intentionally uses session.prompt() so the parent agent "wakes up"
+   * and can continue the workflow (e.g., call background_output).
+   */
+  private async notifyParentSession(task: BackgroundTaskRecord): Promise<void> {
+    if (!task.parentSessionId) return;
+
+    const statusLabel = task.status.toUpperCase();
+    const errorLine = task.errorMessage ? `\n**Error:** ${task.errorMessage}` : '';
+
+    const notification = `<system-reminder>
+[BACKGROUND TASK ${statusLabel}]
+
+**ID:** \`${task.taskId}\`
+**Description:** ${task.description}
+**Agent:** ${task.agent}${errorLine}
+
+Use \`background_output({ task_id: "${task.taskId}" })\` to retrieve the result.
+</system-reminder>`;
+
+    try {
+      await this.client.session.prompt({
+        path: { id: task.parentSessionId },
+        body: {
+          agent: task.parentAgent || 'hive',
+          parts: [{ type: 'text', text: notification }],
+        },
+      });
+    } catch {
+      // Best-effort notification only.
+    }
   }
 
   /**

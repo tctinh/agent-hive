@@ -61,6 +61,10 @@ export interface BackgroundTaskRecord {
   parentSessionId?: string;
   /** Parent message ID */
   parentMessageId?: string;
+  /** Parent agent name (used for completion notifications) */
+  parentAgent?: string;
+  /** Whether to notify the parent session when this task reaches terminal state */
+  notifyParent?: boolean;
   /** Hive feature name (if Hive-linked) */
   hiveFeature?: string;
   /** Hive task folder (if Hive-linked) */
@@ -107,6 +111,10 @@ export interface SpawnOptions {
   parentSessionId?: string;
   /** Parent message ID */
   parentMessageId?: string;
+  /** Parent agent name (used for completion notifications) */
+  parentAgent?: string;
+  /** Whether to notify parent session on terminal state (default: true for sync=false) */
+  notifyParent?: boolean;
   /** Hive feature name (if Hive-linked) */
   hiveFeature?: string;
   /** Hive task folder (if Hive-linked) */

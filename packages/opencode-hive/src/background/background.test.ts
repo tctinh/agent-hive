@@ -960,6 +960,63 @@ describe('BackgroundManager completion integration', () => {
 
     manager.shutdown();
   });
+
+  it('notifies the parent session on completion for sync=false tasks', async () => {
+    const store = new BackgroundTaskStore();
+
+    const promptCalls: Array<{ id: string; agent?: string; text: string }> = [];
+
+    const client: OpencodeClient = {
+      session: {
+        create: async () => ({ data: { id: 'session-123' } }),
+        prompt: async ({ path, body }) => {
+          const text = (body.parts?.[0] as { text?: string } | undefined)?.text ?? '';
+          promptCalls.push({ id: path.id, agent: body.agent, text });
+          return { data: {} };
+        },
+        get: async () => ({ data: { id: 'session-123', status: 'idle' } }),
+        messages: async () => ({ data: [{ info: { role: 'assistant' } }] as unknown[] }),
+        abort: async () => {},
+        status: async () => ({ data: { 'session-123': { type: 'idle' } } }),
+      },
+      app: {
+        agents: async () => ({ data: [{ name: 'explorer', mode: 'subagent' }] }),
+        log: async () => {},
+      },
+      config: {
+        get: async () => ({ data: {} }),
+      },
+    };
+
+    const manager = new BackgroundManager({
+      client,
+      projectRoot: '/tmp',
+      store,
+      concurrency: { defaultLimit: 1, minDelayBetweenStartsMs: 0 },
+    });
+
+    const spawn = await manager.spawn({
+      agent: 'explorer',
+      prompt: 'say hi',
+      description: 'test',
+      idempotencyKey: 'idem-notify-1',
+      parentSessionId: 'parent-session-1',
+      parentAgent: 'hive',
+      sync: false,
+    });
+
+    expect(spawn.error).toBeUndefined();
+    await manager.getPoller().poll();
+
+    // One prompt to start the worker session, one prompt to notify the parent session.
+    expect(promptCalls.some(c => c.id === 'parent-session-1')).toBe(true);
+    const parentCall = promptCalls.find(c => c.id === 'parent-session-1');
+    expect(parentCall?.agent).toBe('hive');
+    expect(parentCall?.text).toContain('BACKGROUND TASK');
+    expect(parentCall?.text).toContain('background_output');
+
+    manager.shutdown();
+  });
 });
 
 // ============================================================================
