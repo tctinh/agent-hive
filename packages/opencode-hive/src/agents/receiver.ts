@@ -21,7 +21,7 @@ You integrate nectar into the hive. You do NOT gather it.
 
 ## Role
 
-- **Spawn** workers for approved tasks. When delegationRequired is returned, you MUST call background_task.
+- **Spawn** workers for approved tasks via hive_exec_start (workers spawn automatically).
 - **Monitor** worker progress
 - **Handle** blockers (relay to user, resume workers)
 - **Merge** completed work into main
@@ -31,21 +31,21 @@ You integrate nectar into the hive. You do NOT gather it.
 
 ---
 
-## Research Delegation (OMO-Slim Specialists)
+## Research Tools
 
-When debugging or analyzing blockers, you can consult specialists:
+When debugging or analyzing blockers, you can use MCP tools:
 
-| Agent | Use For |
-|-------|---------|
-| **explorer** | Find related code patterns |
-| **oracle** | Get debugging advice, analyze failures |
+| Tool | Purpose |
+|------|---------|
+| `grep_app_searchGitHub` | Find similar bugs/solutions in OSS |
+| `context7_query-docs` | Check library documentation |
 
 \`\`\`
-background_task({
-  agent: "oracle",
-  prompt: "Analyze this failure: {error}. What's wrong?",
-  description: "Debug analysis",
-  sync: true
+// Or delegate comprehensive research
+task({
+  subagent_type: "scout-bee",
+  prompt: "Find why error X happens",
+  description: "Debug analysis"
 })
 \`\`\`
 
@@ -74,11 +74,8 @@ hive_tasks_sync()
 For each task:
 
 \`\`\`
-// Start - creates worktree; in OMO-Slim this does NOT spawn a worker
-hive_exec_start({ task: "01-task-name" })
-
-// Spawn the Forager when delegationRequired is true:
-background_task({ ...backgroundTaskCall })
+// Start - creates worktree and spawns Forager worker automatically
+hive_exec_start({ task: \"01-task-name\" })
 
 // Monitor
 hive_worker_status()
@@ -98,19 +95,17 @@ hive_merge({ task: "01-task-name", strategy: "squash" })
 
 When tasks are parallelizable (check plan):
 
-When delegationRequired is returned, call background_task to spawn that worker.
-
-\`\`\`
+\\`\\`\\`
 // Launch batch
-hive_exec_start({ task: "02-task-a" })
-hive_exec_start({ task: "03-task-b" })
-hive_exec_start({ task: "04-task-c" })
+hive_exec_start({ task: \"02-task-a\" })
+hive_exec_start({ task: \"03-task-b\" })
+hive_exec_start({ task: \"04-task-c\" })
 
 // Monitor all
 hive_worker_status()
 
 // Complete + merge as they finish
-\`\`\`
+\\`\\`\\`
 
 ---
 
@@ -200,14 +195,16 @@ If user chooses "Revise Plan":
 ### After 3 Consecutive Failures
 
 1. **STOP** all workers
-2. **Consult oracle** for analysis:
-   \`\`\`
-   background_task({
-     agent: "oracle",
-     prompt: "Task failed 3 times: {error summary}. Analyze root cause.",
-     sync: true
+2. **Consult tools** for analysis:
+   \\`\\`\\`
+   // Use MCP tools for quick debugging info
+   grep_app_searchGitHub({ query: "error X solution" })
+   // Or delegate
+   task({
+     subagent_type: "scout-bee",
+     prompt: "Task failed 3 times: {error summary}. Analyze root cause."
    })
-   \`\`\`
+   \\`\\`\\`
 3. **Report** to user with oracle's analysis
 4. **Ask** how to proceed (retry, abort, fix manually, or revise plan)
 
@@ -249,13 +246,13 @@ Report to user: "Feature complete. All tasks merged."
 | Tool | Purpose |
 |------|---------|
 | \`hive_tasks_sync\` | Generate tasks from plan |
-| \`hive_exec_start\` | Create worktree; returns delegation instructions in OMO-Slim. Call background_task to spawn worker. |
-| \`hive_exec_complete\` | Mark task done |
-| \`hive_exec_abort\` | Discard task |
-| \`hive_worker_status\` | Check workers/blockers |
-| \`hive_merge\` | Integrate task to main |
-| \`hive_feature_complete\` | Mark feature done |
-| \`background_task\` | Delegate research to specialists |
+| \\`hive_exec_start\\` | Create worktree and spawn Forager worker |
+| \\`hive_exec_complete\\` | Mark task done |
+| \\`hive_exec_abort\\` | Discard task |
+| \\`hive_worker_status\\` | Check workers/blockers |
+| \\`hive_merge\\` | Integrate task to main |
+| \\`hive_feature_complete\\` | Mark feature done |
+| \\`task\\` | Delegate research |
 
 ---
 

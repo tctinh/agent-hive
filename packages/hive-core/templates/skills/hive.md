@@ -17,7 +17,7 @@ Plan-first development with phase-aware orchestration.
 │  (Planning)                        (Orchestration)          │
 │      │                                   │                  │
 │      ▼                                   ▼                  │
-│  background_task                   hive_exec_start          │
+│  MCP tools                         hive_exec_start          │
 │  (research)                        (spawn worker)           │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -26,7 +26,7 @@ Plan-first development with phase-aware orchestration.
 │                    Forager (Worker)                         │
 │  - Executes in isolated worktree                            │
 │  - Reports via hive_exec_complete                           │
-│  - Can research via background_task                         │
+│  - Uses MCP tools for research                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -58,24 +58,20 @@ Check with `hive_status()`.
 
 ---
 
-## Research Delegation (OMO-Slim)
+## Research Tools
 
-All agents can delegate research to specialists:
+All agents can use MCP tools for research:
 
-| Specialist | Use For |
-|------------|---------|
-| **explorer** | Find code patterns, locate files |
-| **librarian** | External docs, API references |
-| **oracle** | Architecture advice, debugging |
-| **designer** | UI/UX guidance, component patterns |
+| Tool | Purpose |
+|------|---------|
+| `grep_app_searchGitHub` | Find code patterns in OSS |
+| `ast_grep_search` | AST pattern matching |
+| `context7_query-docs` | Library documentation |
+| `websearch_web_search_exa` | Current web info |
 
 ```
-background_task({
-  agent: "explorer",
-  prompt: "Find all API routes in src/api/",
-  description: "Find API patterns",
-  sync: true
-})
+grep_app_searchGitHub({ query: "API routes pattern", language: ["TypeScript"] })
+context7_query-docs({ libraryId: "/...", query: "authentication" })
 ```
 
 ---
@@ -109,7 +105,7 @@ Classify Intent → Discovery → Plan → Review → Execute → Merge
 ### Research First (Greenfield/Complex)
 
 ```
-background_task({ agent: "explorer", prompt: "Find patterns...", sync: true })
+grep_app_searchGitHub({ query: "auth pattern", language: ["TypeScript"] })
 hive_context_write({ name: "research", content: "# Findings\n..." })
 ```
 
@@ -248,8 +244,7 @@ hive_tasks_sync()
 ### Execute Each Task
 
 ```
-hive_exec_start({ task: "01-task-name" })  // Creates worktree; returns delegation instructions
-background_task({ ...backgroundTaskCall })  // Only when delegationRequired is true
+hive_exec_start({ task: "01-task-name" })  // Creates worktree, spawns Forager
   ↓
 [Forager implements in worktree]
   ↓
@@ -261,8 +256,6 @@ hive_merge({ task: "01-task-name", strategy: "squash" })
 ### Parallel Execution (Swarming)
 
 When tasks are parallelizable:
-
-If `delegationRequired` is returned for a task, call `background_task` to spawn that worker.
 
 ```
 hive_exec_start({ task: "02-task-a" })
@@ -312,7 +305,8 @@ If "Revise Plan":
 
 | Phase | Tool | Purpose |
 |-------|------|---------|
-| Discovery | `background_task` | Research delegation |
+| Discovery | `grep_app_searchGitHub` | Find code in OSS |
+| Discovery | `context7_query-docs` | Library docs |
 | Plan | `hive_feature_create` | Start feature |
 | Plan | `hive_context_write` | Save research |
 | Plan | `hive_plan_write` | Write plan |
@@ -357,7 +351,7 @@ hive_exec_start({ task })  # Fresh start
 
 ### After 3 Failures
 1. Stop all workers
-2. Consult oracle: `background_task({ agent: "oracle", prompt: "Analyze failure..." })`
+2. Use MCP tools to research: `grep_app_searchGitHub({ query: "error fix" })`
 3. Ask user how to proceed
 
 ### Merge Conflicts

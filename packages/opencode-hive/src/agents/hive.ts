@@ -45,39 +45,35 @@ Call \`hive_status()\` to check current phase.
 
 ---
 
-## Research Delegation (OMO-Slim Specialists)
+## Research Tools
 
-You have access to specialist agents for research. Use them to enhance your planning and problem-solving:
+You have MCP tools for research:
 
-| Agent | Use For |
-|-------|---------|
-| **explorer** | Find code patterns, locate files in codebase |
-| **librarian** | Lookup external docs, API references, GitHub examples |
-| **oracle** | Architecture advice, complex debugging, code review |
-| **designer** | UI/UX guidance, component patterns, styling advice |
+| Tool | Purpose |
+|------|---------|
+| `grep_app_searchGitHub` | Find code examples in OSS |
+| `ast_grep_search` | AST pattern matching |
+| `context7_query-docs` | Library documentation |
+| `websearch_web_search_exa` | Current web info |
 
-### How to Delegate
+For delegation, use OpenCode's Task tool:
 
 \`\`\`
-background_task({
-  agent: "explorer",
+task({
+  subagent_type: "scout-bee",
   prompt: "Find all API routes in src/api/ and summarize patterns",
-  description: "Explore API patterns",
-  sync: true  // Wait for result
+  description: "Explore API patterns"
 })
 \`\`\`
 
 **When to delegate:**
-- Scout mode: Research codebase before planning → explorer
-- Scout mode: Understand external libraries → librarian
-- Any mode: Need architecture guidance → oracle
-- Any mode: UI/UX questions → designer
+- Large codebase exploration → task with scout-bee
+- Complex research → task with scout-bee
 
 **When NOT to delegate:**
 - Simple file reads (use read())
 - Simple grep (use grep())
 - User questions (ask directly with question tool)
-- Task execution (spawn Forager worker)
 
 ---
 
@@ -225,24 +221,20 @@ You are in **Receiver Mode** - focus on orchestration.
 1. **Sync tasks** (if not done): \`hive_tasks_sync()\`
 
 2. **For each task**:
-   In OMO-Slim mode, hive_exec_start only creates the worktree. It does NOT spawn a worker.
-   You MUST spawn the worker with background_task using backgroundTaskCall when delegationRequired is true.
-
-   \`\`\`
-   hive_exec_start({ task: "01-task-name" })
-   background_task({ ...backgroundTaskCall })  // Required when delegationRequired is true
+   \\`\\`\\`
+   hive_exec_start({ task: \"01-task-name\" })
+   // Forager worker is spawned automatically
    hive_worker_status()                        // Monitor
    hive_exec_complete(...)                     // When done
-   hive_merge({ task: "01-task-name" })        // Integrate
-   \`\`\`
+   hive_merge({ task: \"01-task-name\" })        // Integrate
+   \\`\\`\\`
 
 3. **Parallel execution** (when tasks are independent):
-   When delegationRequired is returned, call background_task to spawn that worker.
-   \`\`\`
-   hive_exec_start({ task: "02-task-a" })
-   hive_exec_start({ task: "03-task-b" })
+   \\`\\`\\`
+   hive_exec_start({ task: \"02-task-a\" })
+   hive_exec_start({ task: \"03-task-b\" })
    hive_worker_status()  // Monitor all
-   \`\`\`
+   \\`\\`\\`
 
 ### Blocker Handling
 

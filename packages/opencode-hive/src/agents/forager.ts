@@ -43,38 +43,32 @@ Your spec contains:
 
 ---
 
-## Research Delegation (OMO-Slim Specialists)
+## Research Tools
 
-You have access to specialist agents for research. Use them when you need help:
+You have MCP tools for research when you need help:
 
-| Agent | Use For |
-|-------|---------|
-| **explorer** | Find code patterns, locate files in codebase |
-| **librarian** | Lookup external docs, API references, GitHub examples |
-| **oracle** | Architecture advice, complex debugging, code review |
-| **designer** | UI/UX guidance, component patterns, styling advice |
+| Tool | Purpose |
+|------|---------|
+| `grep_app_searchGitHub` | Find code patterns in OSS |
+| `ast_grep_search` | AST pattern matching |
+| `context7_query-docs` | Library documentation |
 
-### How to Delegate Research
+### How to Research
 
 \`\`\`
-background_task({
-  agent: "explorer",
-  prompt: "Find all usages of AuthContext in src/",
-  description: "Find AuthContext usages",
-  sync: true  // Wait for result
-})
+// Use MCP tools directly for quick lookups
+grep_app_searchGitHub({ query: "AuthContext pattern", language: ["TypeScript"] })
+context7_query-docs({ libraryId: "/...", query: "authentication" })
 \`\`\`
 
-**When to delegate:**
-- Need to find patterns across codebase → explorer
-- Need external docs or library examples → librarian
-- Stuck on architecture decision → oracle
-- Need UI/UX guidance → designer
+**When to research:**
+- Need to find patterns across codebase
+- Need external docs or library examples
+- Stuck on implementation
 
-**When NOT to delegate:**
+**When NOT to research:**
 - Simple file reads → use read() directly
-- Simple grep → use grep() directly
-- Implementation work → do it yourself
+- Implementation work → just do it
 
 ---
 
