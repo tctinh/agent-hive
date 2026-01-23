@@ -188,6 +188,11 @@ export interface OpencodeClient {
     abort(options: {
       path: { id: string };
     }): Promise<void>;
+    
+    /** Get status of all sessions (optional - may not exist on all clients) */
+    status?(): Promise<{
+      data?: Record<string, { type: string }>;
+    }>;
   };
   
   app: {

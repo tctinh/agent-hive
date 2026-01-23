@@ -6,11 +6,16 @@
  * - Managing task lifecycle (start, complete, cancel)
  * - Persisting Hive-linked task metadata via TaskService
  * - Querying task status
+ * - Concurrency limiting with queueing
+ * - Polling/stability detection (read-only)
+ * - Sequential ordering enforcement for Hive tasks
  */
 
 import { TaskService } from 'hive-core';
 import { BackgroundTaskStore, getStore } from './store.js';
 import { AgentGate, createAgentGate } from './agent-gate.js';
+import { ConcurrencyManager, ConcurrencyConfig, createConcurrencyManager } from './concurrency.js';
+import { BackgroundPoller, PollerConfig, createPoller, TaskObservation } from './poller.js';
 import {
   BackgroundTaskRecord,
   BackgroundTaskStatus,
@@ -30,23 +35,36 @@ export interface BackgroundManagerOptions {
   projectRoot: string;
   /** Optional custom store (defaults to global singleton) */
   store?: BackgroundTaskStore;
+  /** Concurrency configuration */
+  concurrency?: ConcurrencyConfig;
+  /** Poller configuration */
+  poller?: PollerConfig;
+  /** Enforce sequential execution for Hive tasks (default: true) */
+  enforceHiveSequential?: boolean;
 }
 
 /**
  * Background task manager.
- * Coordinates between in-memory store, agent validation, and Hive persistence.
+ * Coordinates between in-memory store, agent validation, Hive persistence,
+ * concurrency limiting, and polling/stability detection.
  */
 export class BackgroundManager {
   private store: BackgroundTaskStore;
   private agentGate: AgentGate;
   private client: OpencodeClient;
   private taskService: TaskService;
+  private concurrencyManager: ConcurrencyManager;
+  private poller: BackgroundPoller;
+  private enforceHiveSequential: boolean;
 
   constructor(options: BackgroundManagerOptions) {
     this.client = options.client;
     this.store = options.store ?? getStore();
     this.agentGate = createAgentGate(options.client);
     this.taskService = new TaskService(options.projectRoot);
+    this.concurrencyManager = createConcurrencyManager(options.concurrency);
+    this.poller = createPoller(this.store, options.client, options.poller);
+    this.enforceHiveSequential = options.enforceHiveSequential ?? true;
   }
 
   /**
@@ -57,6 +75,7 @@ export class BackgroundManager {
    * - Otherwise creates new task
    * 
    * For Hive-linked tasks (hiveFeature + hiveTaskFolder provided):
+   * - Enforces sequential ordering (blocks if earlier tasks pending)
    * - Persists idempotencyKey and workerSession to .hive task status.json
    * 
    * @param options - Spawn options
@@ -83,6 +102,18 @@ export class BackgroundManager {
           wasExisting: true,
         };
       }
+
+      // Enforce sequential ordering for Hive tasks
+      if (this.enforceHiveSequential) {
+        const orderingCheck = this.checkHiveTaskOrdering(options.hiveFeature, options.hiveTaskFolder);
+        if (!orderingCheck.allowed) {
+          return {
+            task: null as unknown as BackgroundTaskRecord,
+            wasExisting: false,
+            error: orderingCheck.error,
+          };
+        }
+      }
     }
 
     // Validate agent exists and is safe to spawn
@@ -92,6 +123,18 @@ export class BackgroundManager {
         task: null as unknown as BackgroundTaskRecord, // Will be handled by caller
         wasExisting: false,
         error: validation.error,
+      };
+    }
+
+    // Acquire concurrency slot (may wait in queue)
+    const concurrencyKey = options.agent;
+    try {
+      await this.concurrencyManager.acquire(concurrencyKey);
+    } catch (error) {
+      return {
+        task: null as unknown as BackgroundTaskRecord,
+        wasExisting: false,
+        error: `Concurrency limit reached: ${error instanceof Error ? error.message : 'Unknown error'}`,
       };
     }
 
@@ -106,6 +149,7 @@ export class BackgroundManager {
       });
 
       if (!sessionResult.data?.id) {
+        this.concurrencyManager.release(concurrencyKey);
         return {
           task: null as unknown as BackgroundTaskRecord,
           wasExisting: false,
@@ -115,6 +159,7 @@ export class BackgroundManager {
 
       sessionId = sessionResult.data.id;
     } catch (error) {
+      this.concurrencyManager.release(concurrencyKey);
       return {
         task: null as unknown as BackgroundTaskRecord,
         wasExisting: false,
@@ -163,6 +208,9 @@ export class BackgroundManager {
     // Transition to running and fire the prompt
     this.store.updateStatus(task.taskId, 'running');
 
+    // Start the poller if not already running
+    this.poller.start();
+
     // Fire prompt asynchronously (don't await)
     this.client.session
       .prompt({
@@ -182,12 +230,61 @@ export class BackgroundManager {
         this.store.updateStatus(task.taskId, 'error', {
           errorMessage: error.message,
         });
+        // Release concurrency slot on error
+        this.concurrencyManager.release(concurrencyKey);
       });
 
     return {
       task: this.store.get(task.taskId)!,
       wasExisting: false,
     };
+  }
+
+  /**
+   * Check if a Hive task can be started based on sequential ordering.
+   * Returns error if earlier tasks are still pending/in_progress.
+   */
+  private checkHiveTaskOrdering(
+    feature: string,
+    taskFolder: string
+  ): { allowed: boolean; error?: string } {
+    // Extract task order from folder name (e.g., "01-task-name" -> 1)
+    const orderMatch = taskFolder.match(/^(\d+)-/);
+    if (!orderMatch) {
+      // Can't determine order, allow execution
+      return { allowed: true };
+    }
+
+    const taskOrder = parseInt(orderMatch[1], 10);
+    if (taskOrder <= 1) {
+      // First task, always allowed
+      return { allowed: true };
+    }
+
+    // Check for any active background tasks for earlier Hive tasks in same feature
+    const activeTasks = this.store.list({
+      hiveFeature: feature,
+      status: ['spawned', 'pending', 'running'],
+    });
+
+    for (const activeTask of activeTasks) {
+      if (!activeTask.hiveTaskFolder) continue;
+      
+      const activeOrderMatch = activeTask.hiveTaskFolder.match(/^(\d+)-/);
+      if (!activeOrderMatch) continue;
+
+      const activeOrder = parseInt(activeOrderMatch[1], 10);
+      if (activeOrder < taskOrder) {
+        return {
+          allowed: false,
+          error: `Sequential ordering enforced: Task "${taskFolder}" cannot start while earlier task "${activeTask.hiveTaskFolder}" is still ${activeTask.status}. ` +
+            `Complete or cancel the earlier task first. ` +
+            `(Hive default: sequential execution for safety)`,
+        };
+      }
+    }
+
+    return { allowed: true };
   }
 
   /**
@@ -264,6 +361,12 @@ export class BackgroundManager {
       // Ignore abort errors (session may already be done)
     }
 
+    // Release concurrency slot
+    this.concurrencyManager.release(task.agent);
+
+    // Clean up poller state
+    this.poller.cleanupTask(taskId);
+
     return this.updateStatus(taskId, 'cancelled');
   }
 
@@ -315,6 +418,10 @@ export class BackgroundManager {
     const task = tasks.find(t => t.sessionId === sessionId);
     
     if (task && task.status === 'running') {
+      // Release concurrency slot
+      this.concurrencyManager.release(task.agent);
+      // Clean up poller state
+      this.poller.cleanupTask(task.taskId);
       this.updateStatus(task.taskId, 'completed');
     }
   }
@@ -343,10 +450,46 @@ export class BackgroundManager {
   }
 
   /**
+   * Get the concurrency manager for direct access.
+   */
+  getConcurrencyManager(): ConcurrencyManager {
+    return this.concurrencyManager;
+  }
+
+  /**
+   * Get the poller for direct access.
+   */
+  getPoller(): BackgroundPoller {
+    return this.poller;
+  }
+
+  /**
+   * Get observations for all active tasks from the poller.
+   */
+  getObservations(): TaskObservation[] {
+    return this.poller.getObservations();
+  }
+
+  /**
+   * Get observation for a specific task.
+   */
+  getTaskObservation(taskId: string): TaskObservation | null {
+    return this.poller.getTaskObservation(taskId);
+  }
+
+  /**
    * Get task counts by status.
    */
   getCounts(): Record<BackgroundTaskStatus, number> {
     return this.store.countByStatus();
+  }
+
+  /**
+   * Shutdown the manager and clean up resources.
+   */
+  shutdown(): void {
+    this.poller.stop();
+    this.concurrencyManager.clear();
   }
 }
 
