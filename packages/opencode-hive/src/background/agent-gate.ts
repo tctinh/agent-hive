@@ -16,6 +16,7 @@ import { OpencodeClient, AgentInfo, AgentValidationResult } from './types.js';
  */
 const BLOCKED_AGENTS = new Set([
   'orchestrator',
+  'hive',           // Legacy Hive alias - orchestrator
   'hive-master',     // Hive Master - orchestrates, shouldn't be a worker
   'swarm-orchestrator', // Swarm - orchestrator, shouldn't be a worker
   'conductor',       // OMO-Slim orchestrator
