@@ -883,8 +883,6 @@ var require_dist2 = __commonJS((exports2) => {
   exports2.default = deferred;
 });
 var DEFAULT_AGENT_MODELS = {
-  hive: "anthropic/claude-sonnet-4-20250514",
-  forager: "anthropic/claude-sonnet-4-20250514",
   "architect-bee": "anthropic/claude-sonnet-4-20250514",
   "swarm-bee": "anthropic/claude-sonnet-4-20250514",
   "scout-bee": "anthropic/claude-sonnet-4-20250514",
@@ -894,19 +892,6 @@ var DEFAULT_AGENT_MODELS = {
 var DEFAULT_HIVE_CONFIG = {
   enableToolsFor: [],
   agents: {
-    worker: {
-      visible: true
-    },
-    hive: {
-      model: DEFAULT_AGENT_MODELS.hive,
-      temperature: 0.7,
-      skills: ["*"]
-    },
-    forager: {
-      model: DEFAULT_AGENT_MODELS.forager,
-      temperature: 0.3,
-      skills: []
-    },
     "architect-bee": {
       model: DEFAULT_AGENT_MODELS["architect-bee"],
       temperature: 0.7,
@@ -932,9 +917,6 @@ var DEFAULT_HIVE_CONFIG = {
       temperature: 0.3,
       skills: ["*"]
     }
-  },
-  omoSlim: {
-    enabled: false
   }
 };
 var HIVE_DIR = ".hive";

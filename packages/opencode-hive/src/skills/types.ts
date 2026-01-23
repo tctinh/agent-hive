@@ -1,7 +1,7 @@
 /**
  * Hive Skill System Types
  * 
- * Following OMO-Slim pattern for skill definitions.
+ * Skill definitions for Hive.
  */
 
 /**

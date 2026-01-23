@@ -44,16 +44,6 @@ export class ConfigService {
         agents: {
           ...DEFAULT_HIVE_CONFIG.agents,
           ...stored.agents,
-          // Deep merge hive agent config
-          hive: {
-            ...DEFAULT_HIVE_CONFIG.agents?.hive,
-            ...stored.agents?.hive,
-          },
-          // Deep merge forager agent config
-          forager: {
-            ...DEFAULT_HIVE_CONFIG.agents?.forager,
-            ...stored.agents?.forager,
-          },
           // Deep merge architect-bee agent config
           'architect-bee': {
             ...DEFAULT_HIVE_CONFIG.agents?.['architect-bee'],
@@ -80,10 +70,6 @@ export class ConfigService {
             ...stored.agents?.['hygienic-bee'],
           },
         },
-        omoSlim: {
-          ...DEFAULT_HIVE_CONFIG.omoSlim,
-          ...stored.omoSlim,
-        },
       };
     } catch {
       return { ...DEFAULT_HIVE_CONFIG };
@@ -103,10 +89,6 @@ export class ConfigService {
         ...current.agents,
         ...updates.agents,
       } : current.agents,
-      omoSlim: updates.omoSlim ? {
-        ...current.omoSlim,
-        ...updates.omoSlim,
-      } : current.omoSlim,
     };
 
     // Ensure config directory exists
@@ -134,13 +116,6 @@ export class ConfigService {
       return this.set(DEFAULT_HIVE_CONFIG);
     }
     return this.get();
-  }
-
-  /**
-   * Check if OMO-Slim delegation is enabled.
-   */
-  isOmoSlimEnabled(): boolean {
-    return this.get().omoSlim?.enabled ?? false;
   }
 
   /**
@@ -179,6 +154,14 @@ export class ConfigService {
         config.agent = {};
       }
 
+      // Remove legacy agents (hive/forager/scout/receiver)
+      const legacyAgents = ['hive', 'forager', 'scout', 'receiver'];
+      for (const legacy of legacyAgents) {
+        if (config.agent[legacy]) {
+          delete config.agent[legacy];
+        }
+      }
+
       // Merge in our agents (don't overwrite user customizations)
       for (const [name, agentConfig] of Object.entries(agents)) {
         if (!config.agent[name]) {
@@ -201,17 +184,10 @@ export class ConfigService {
   }
 
   /**
-   * Enable or disable OMO-Slim delegation.
-   */
-  setOmoSlim(enabled: boolean): HiveConfig {
-    return this.set({ omoSlim: { enabled } });
-  }
-
-  /**
    * Get agent-specific model config (hive or forager)
    */
   getAgentConfig(
-    agent: 'hive' | 'forager' | 'architect-bee' | 'swarm-bee' | 'scout-bee' | 'forager-bee' | 'hygienic-bee',
+    agent: 'architect-bee' | 'swarm-bee' | 'scout-bee' | 'forager-bee' | 'hygienic-bee',
   ): { model?: string; temperature?: number; skills?: string[] } {
     const config = this.get();
     return config.agents?.[agent] ?? {};

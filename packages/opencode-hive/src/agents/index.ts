@@ -8,14 +8,7 @@
  * - Scout Bee (Researcher): Explores codebase and external docs
  * - Forager Bee (Worker): Executes tasks in isolation
  * - Hygienic Bee (Reviewer): Reviews plan quality
- * 
- * Legacy agents (scout, receiver, forager) kept for backward compatibility.
  */
-
-// Legacy agents (backward compatibility)
-export { scoutAgent, SCOUT_PROMPT } from './scout';
-export { receiverAgent, RECEIVER_PROMPT } from './receiver';
-export { foragerAgent, FORAGER_PROMPT } from './forager';
 
 // Bee agents (lean, focused)
 export { architectBeeAgent, ARCHITECT_BEE_PROMPT } from './architect-bee';
@@ -24,8 +17,6 @@ export { scoutBeeAgent, SCOUT_BEE_PROMPT } from './scout-bee';
 export { foragerBeeAgent, FORAGER_BEE_PROMPT } from './forager-bee';
 export { hygienicBeeAgent, HYGIENIC_BEE_PROMPT } from './hygienic-bee';
 
-// Legacy export for backward compatibility
-export { buildHiveAgentPrompt, hiveAgent } from './hive';
 
 /**
  * Agent registry for OpenCode plugin
@@ -36,11 +27,6 @@ export { buildHiveAgentPrompt, hiveAgent } from './hive';
  * - scout-bee: Researches codebase and external docs
  * - forager-bee: Executes tasks in isolated worktrees
  * - hygienic-bee: Reviews plan documentation quality
- * 
- * Legacy Agents (backward compatibility):
- * - scout: Discovery and planning
- * - receiver: Orchestrates execution
- * - forager: Executes tasks in isolation
  */
 export const hiveAgents = {
   // Bee Agents (lean, focused - recommended)
@@ -67,23 +53,6 @@ export const hiveAgents = {
   'hygienic-bee': {
     name: 'hygienic-bee',
     description: 'Hygienic Bee - Reviews plan documentation quality. OKAY/REJECT verdict.',
-    mode: 'subagent' as const,
-  },
-
-  // Legacy Agents (backward compatibility)
-  scout: {
-    name: 'scout',
-    description: 'Scout - Discovery and planning. Finds flowers, writes plans.',
-    mode: 'primary' as const,
-  },
-  receiver: {
-    name: 'receiver', 
-    description: 'Receiver - Orchestrates execution. Spawns workers, merges work.',
-    mode: 'primary' as const,
-  },
-  forager: {
-    name: 'forager',
-    description: 'Forager - Executes tasks in isolation. Implements and verifies.',
     mode: 'subagent' as const,
   },
 };

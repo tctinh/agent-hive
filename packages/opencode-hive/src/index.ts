@@ -2,15 +2,13 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { tool, type Plugin, type ToolDefinition } from "@opencode-ai/plugin";
 import { getBuiltinSkills, loadBuiltinSkill } from './skills/builtin.js';
-import { SCOUT_PROMPT } from './agents/scout.js';
-import { RECEIVER_PROMPT } from './agents/receiver.js';
-import { FORAGER_PROMPT, foragerAgent } from './agents/forager.js';
 // Bee agents (lean, focused)
 import { ARCHITECT_BEE_PROMPT } from './agents/architect-bee.js';
 import { SWARM_BEE_PROMPT } from './agents/swarm-bee.js';
 import { SCOUT_BEE_PROMPT } from './agents/scout-bee.js';
 import { FORAGER_BEE_PROMPT } from './agents/forager-bee.js';
 import { HYGIENIC_BEE_PROMPT } from './agents/hygienic-bee.js';
+import { createBuiltinMcps } from './mcp/index.js';
 
 // ============================================================================
 // Skill Tool - Uses generated registry (no file-based discovery)
@@ -75,9 +73,7 @@ import {
   detectContext,
   listFeatures,
 } from "hive-core";
-import { selectAgent, type OmoSlimAgent } from "./utils/agent-selector";
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
-import { buildHiveAgentPrompt, type FeatureContext } from "./agents/hive";
 
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development System
@@ -115,7 +111,7 @@ Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manu
 
 \`hive_exec_start\` creates worktree and spawns worker automatically:
 
-1. \`hive_exec_start(task)\` → Creates worktree + spawns Forager worker
+1. \`hive_exec_start(task)\` → Creates worktree + spawns Forager Bee worker
 2. Worker executes → calls \`hive_exec_complete(status: "completed")\`
 3. Worker blocked → calls \`hive_exec_complete(status: "blocked", blocker: {...})\`
 
@@ -131,6 +127,8 @@ The previous worker's progress is preserved. Include the user's decision in the 
 **For research**, use MCP tools or OpenCode Task:
 - \`grep_app_searchGitHub\` - Find code in OSS
 - \`context7_query-docs\` - Library documentation
+- \`websearch_web_search_exa\` - Web search via Exa
+- \`ast_grep_search\` - AST-based search
 - \`task({ subagent_type: "scout-bee", prompt: "..." })\` - Comprehensive research
 
 ### Planning Phase - Context Management REQUIRED
@@ -169,18 +167,11 @@ const plugin: Plugin = async (ctx) => {
   const taskService = new TaskService(directory);
   const contextService = new ContextService(directory);
   const configService = new ConfigService(); // User config at ~/.config/opencode/agent_hive.json
+  const builtinMcps = createBuiltinMcps();
   const worktreeService = new WorktreeService({
     baseDir: directory,
     hiveDir: path.join(directory, '.hive'),
   });
-
-  /**
-   * Check if OMO-Slim delegation is enabled via user config.
-   * Users enable this in ~/.config/opencode/agent_hive.json
-   */
-  const isOmoSlimEnabled = (): boolean => {
-    return configService.isOmoSlimEnabled();
-  };
 
   const resolveFeature = (explicit?: string): string | null => {
     if (explicit) return explicit;
@@ -247,6 +238,8 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
         }
       }
     },
+
+    mcp: builtinMcps,
 
     tool: {
       hive_skill: createHiveSkillTool(),
@@ -549,60 +542,58 @@ Add this section to your plan content and try again.`;
 
           taskService.writeSpec(feature, task, specContent);
 
-          // Check if OMO-Slim delegation is enabled in config
-          if (isOmoSlimEnabled()) {
-            // Prepare context for worker prompt
-            const contextFiles: ContextFile[] = [];
-            const contextDir = path.join(directory, '.hive', 'features', feature, 'context');
-            if (fs.existsSync(contextDir)) {
-              const files = fs.readdirSync(contextDir).filter(f => f.endsWith('.md'));
-              for (const file of files) {
-                const content = fs.readFileSync(path.join(contextDir, file), 'utf-8');
-                contextFiles.push({ name: file, content });
-              }
+          // Prepare context for worker prompt
+          const contextFiles: ContextFile[] = [];
+          const contextDir = path.join(directory, '.hive', 'features', feature, 'context');
+          if (fs.existsSync(contextDir)) {
+            const files = fs.readdirSync(contextDir).filter(f => f.endsWith('.md'));
+            for (const file of files) {
+              const content = fs.readFileSync(path.join(contextDir, file), 'utf-8');
+              contextFiles.push({ name: file, content });
             }
+          }
 
-            const previousTasks: CompletedTask[] = allTasks
-              .filter(t => t.status === 'done' && t.summary)
-              .map(t => ({ name: t.folder, summary: t.summary! }));
+          const previousTasks: CompletedTask[] = allTasks
+            .filter(t => t.status === 'done' && t.summary)
+            .map(t => ({ name: t.folder, summary: t.summary! }));
 
-            // Build worker prompt
-            const workerPrompt = buildWorkerPrompt({
-              feature,
-              task,
-              taskOrder: parseInt(taskInfo.folder.match(/^(\d+)/)?.[1] || '0', 10),
-              worktreePath: worktree.path,
-              branch: worktree.branch,
-              plan: planResult?.content || 'No plan available',
-              contextFiles,
-              spec: specContent,
-              previousTasks,
-              continueFrom: continueFrom === 'blocked' ? {
-                status: 'blocked',
-                previousSummary: (taskInfo as any).summary || 'No previous summary',
-                decision: decision || 'No decision provided',
-              } : undefined,
-            });
+          // Build worker prompt
+          const workerPrompt = buildWorkerPrompt({
+            feature,
+            task,
+            taskOrder: parseInt(taskInfo.folder.match(/^(\d+)/)?.[1] || '0', 10),
+            worktreePath: worktree.path,
+            branch: worktree.branch,
+            plan: planResult?.content || 'No plan available',
+            contextFiles,
+            spec: specContent,
+            previousTasks,
+            continueFrom: continueFrom === 'blocked' ? {
+              status: 'blocked',
+              previousSummary: (taskInfo as any).summary || 'No previous summary',
+              decision: decision || 'No decision provided',
+            } : undefined,
+          });
 
-            // Always use Forager Bee for task execution
-            // Forager Bee knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
-            // Forager Bee can research via MCP tools (grep_app, context7, etc.)
-            const agent = 'forager-bee';
+          // Always use Forager Bee for task execution
+          // Forager Bee knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
+          // Forager Bee can research via MCP tools (grep_app, context7, etc.)
+          const agent = 'forager-bee';
 
-            // Return delegation instructions for the agent
-            // Agent will call task tool itself (OpenCode native)
-            return JSON.stringify({
-              worktreePath: worktree.path,
-              branch: worktree.branch,
-              mode: 'delegate',
-              agent,
-              delegationRequired: true,
-              taskCall: {
-                subagent_type: agent,
-                prompt: workerPrompt,
-                description: `Hive: ${task}`,
-              },
-              instructions: `## Delegation Required
+          // Return delegation instructions for the agent
+          // Agent will call task tool itself (OpenCode native)
+          return JSON.stringify({
+            worktreePath: worktree.path,
+            branch: worktree.branch,
+            mode: 'delegate',
+            agent,
+            delegationRequired: true,
+            taskCall: {
+              subagent_type: agent,
+              prompt: workerPrompt,
+              description: `Hive: ${task}`,
+            },
+            instructions: `## Delegation Required
 
 You MUST now call the task tool to spawn a Forager Bee worker:
 
@@ -620,12 +611,8 @@ After spawning:
 - Merge completed work with hive_merge
 
 DO NOT do the work yourself. Delegate it.`,
-              workerPrompt,
-            }, null, 2);
-          }
-
-          // Inline mode (no OMO-Slim)
-          return `Worktree created at ${worktree.path}\nBranch: ${worktree.branch}\nBase commit: ${worktree.commit}\nSpec: ${task}/spec.md generated\nReminder: do all work inside this worktree and ensure any subagents do the same.`;
+            workerPrompt,
+          }, null, 2);
         },
       }),
 
@@ -810,10 +797,8 @@ Re-run with updated summary showing verification results.`;
             };
           }));
 
-          const omoSlimEnabled = isOmoSlimEnabled();
           return JSON.stringify({
             feature,
-            omoSlimEnabled,
             workers,
             hint: workers.some(w => w.status === 'blocked')
               ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
@@ -1090,158 +1075,17 @@ Make the requested changes, then call hive_request_review again.`;
       },
     },
 
-    // Hive Agents - Colony Model with Phase-Aware Main Agent
-    agent: {
-      // Main agent - auto-switches Scout/Receiver based on feature state
-      hive: {
-        model: undefined,
-        temperature: 0.7,
-        description: 'Hive Master - phase-aware planner+orchestrator. Auto-switches Scout/Receiver mode.',
-        prompt: buildHiveAgentPrompt(undefined, false),
-        permission: {
-          question: "allow",
-          skill: "allow",
-          todowrite: "allow",
-          todoread: "allow",
-          webfetch: "allow"
-        }
-      },
-      // Explicit Scout - use when you want planning ONLY
-      scout: {
-        model: undefined,
-        temperature: 0.7,
-        description: 'Scout (explicit) - Discovery and planning only. Use @hive for automatic mode.',
-        prompt: SCOUT_PROMPT,
-        permission: {
-          edit: "deny",
-          question: "allow",
-          skill: "allow",
-          todowrite: "allow",
-          todoread: "allow",
-          webfetch: "allow"
-        }
-      },
-      // Explicit Receiver - use when you want orchestration ONLY
-      receiver: {
-        model: undefined,
-        temperature: 0.5,
-        description: 'Receiver (explicit) - Orchestration only. Use @hive for automatic mode.',
-        prompt: RECEIVER_PROMPT,
-        permission: {
-          question: "allow",
-          skill: "allow",
-          todowrite: "allow",
-          todoread: "allow"
-        }
-      },
-      // Forager - Worker subagent (spawned by Receiver/hive_exec_start)
-      forager: {
-        model: undefined,
-        temperature: 0.3,
-        description: 'Forager - Task executor (subagent). Spawned automatically, not for direct use.',
-        prompt: FORAGER_PROMPT,
-        permission: {
-          skill: "allow"
-        }
-      },
-    },
-
-    // Dynamic context injection - this runs on every message
-    systemPrompt: (existingPrompt: string) => {
-      // Only enhance if using hive agent (check if our prompt is in there)
-      if (!existingPrompt.includes('Hive Master')) {
-        return existingPrompt;
-      }
-
-      // Build feature context if active
-      const featureNames = listFeatures(directory);
-      let featureContext: FeatureContext | undefined;
-
-      for (const featureName of featureNames) {
-        const feature = featureService.get(featureName);
-        if (feature && ['planning', 'approved', 'executing'].includes(feature.status)) {
-          const tasks = taskService.list(featureName);
-          const pendingTasks = tasks.filter(t => t.status === 'pending').map(t => t.folder);
-          const blockedTasks = tasks.filter(t => t.status === 'blocked').map(t => t.folder);
-          const inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
-          const doneCount = tasks.filter(t => t.status === 'done').length;
-
-          const contextDir = path.join(directory, '.hive', 'features', featureName, 'context');
-          const contextList = fs.existsSync(contextDir)
-            ? fs.readdirSync(contextDir).filter(f => f.endsWith('.md'))
-            : [];
-
-          const planResult = planService.read(featureName);
-          const planApproved = planResult?.status === 'approved' || planResult?.status === 'executing' || feature.status === 'approved' || feature.status === 'executing';
-
-          // Map feature status to context status
-          const status: 'none' | 'planning' | 'approved' | 'executing' | 'completed' = 
-            feature.status === 'completed' ? 'completed' :
-            feature.status === 'approved' ? 'approved' :
-            feature.status === 'executing' ? 'executing' :
-            'planning';
-
-          featureContext = {
-            name: featureName,
-            status,
-            planApproved,
-            tasksSummary: `${doneCount} done, ${inProgressCount} in progress, ${pendingTasks.length} pending`,
-            contextList,
-            pendingTasks,
-            blockedTasks,
-          };
-          break;
-        }
-      }
-
-      // If we have feature context or OMO-Slim, rebuild with dynamic content
-      if (featureContext || isOmoSlimEnabled()) {
-        return buildHiveAgentPrompt(featureContext, isOmoSlimEnabled());
-      }
-
-      return existingPrompt;
-    },
-
-    // Config hook - merge agents into opencodeConfig.agent (like OMO-Slim does)
+    // Config hook - merge agents into opencodeConfig.agent
     config: async (opencodeConfig: Record<string, unknown>) => {
       // Auto-generate config file with defaults if it doesn't exist
       configService.init();
-
-      // Get user config for agents (now merged with defaults)
-      const hiveUserConfig = configService.getAgentConfig('hive');
-      const foragerUserConfig = configService.getAgentConfig('forager');
-
-      // Define hive agent config (legacy - phase-aware main agent)
-      const hiveAgentConfig = {
-        model: hiveUserConfig.model,  // From ~/.config/opencode/agent_hive.json
-        temperature: hiveUserConfig.temperature ?? 0.7,
-        description: 'Hive Master - plan-first development with structured workflow and worker delegation',
-        prompt: buildHiveAgentPrompt(undefined, false),
-        permission: {
-          question: "allow",
-          skill: "allow",
-          todowrite: "allow",
-          todoread: "allow",
-          webfetch: "allow",
-        },
-      };
-
-      // Define forager agent config (legacy worker)
-      const foragerAgentConfig = {
-        model: foragerUserConfig.model,
-        temperature: foragerUserConfig.temperature ?? 0.3,
-        description: 'Forager - Task executor (worker). Spawned by Hive Master for isolated task execution.',
-        prompt: foragerAgent.prompt,
-        permission: {
-          skill: "allow",
-        },
-      };
 
       // Bee Agents (lean, focused - new architecture)
       const architectBeeUserConfig = configService.getAgentConfig('architect-bee');
       const architectBeeConfig = {
         model: architectBeeUserConfig.model,
         temperature: architectBeeUserConfig.temperature ?? 0.7,
+        skills: architectBeeUserConfig.skills ?? ['*'],
         description: 'Architect Bee - Plans features, interviews, writes plans. NEVER executes.',
         prompt: ARCHITECT_BEE_PROMPT,
         permission: {
@@ -1258,6 +1102,7 @@ Make the requested changes, then call hive_request_review again.`;
       const swarmBeeConfig = {
         model: swarmBeeUserConfig.model,
         temperature: swarmBeeUserConfig.temperature ?? 0.5,
+        skills: swarmBeeUserConfig.skills ?? ['*'],
         description: 'Swarm Bee - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
         prompt: SWARM_BEE_PROMPT,
         permission: {
@@ -1272,7 +1117,7 @@ Make the requested changes, then call hive_request_review again.`;
       const scoutBeeConfig = {
         model: scoutBeeUserConfig.model,
         temperature: scoutBeeUserConfig.temperature ?? 0.5,
-        hidden: true,  // Subagent - hide from @autocomplete but callable via Task
+        skills: scoutBeeUserConfig.skills ?? ['*'],
         description: 'Scout Bee - Researches in parallel. Codebase exploration + external docs.',
         prompt: SCOUT_BEE_PROMPT,
         permission: {
@@ -1286,7 +1131,7 @@ Make the requested changes, then call hive_request_review again.`;
       const foragerBeeConfig = {
         model: foragerBeeUserConfig.model,
         temperature: foragerBeeUserConfig.temperature ?? 0.3,
-        hidden: true,  // Subagent - hide from @autocomplete but callable via Task
+        skills: foragerBeeUserConfig.skills ?? [],
         description: 'Forager Bee - Executes tasks directly in isolated worktrees. Never delegates.',
         prompt: FORAGER_BEE_PROMPT,
         permission: {
@@ -1298,7 +1143,7 @@ Make the requested changes, then call hive_request_review again.`;
       const hygienicBeeConfig = {
         model: hygienicBeeUserConfig.model,
         temperature: hygienicBeeUserConfig.temperature ?? 0.3,
-        hidden: true,  // Subagent - hide from @autocomplete but callable via Task
+        skills: hygienicBeeUserConfig.skills ?? ['*'],
         description: 'Hygienic Bee - Reviews plan documentation quality. OKAY/REJECT verdict.',
         prompt: HYGIENIC_BEE_PROMPT,
         permission: {
@@ -1309,8 +1154,6 @@ Make the requested changes, then call hive_request_review again.`;
 
       // Build agents map
       const allAgents = {
-        hive: hiveAgentConfig,
-        forager: foragerAgentConfig,
         'architect-bee': architectBeeConfig,
         'swarm-bee': swarmBeeConfig,
         'scout-bee': scoutBeeConfig,
@@ -1326,11 +1169,21 @@ Make the requested changes, then call hive_request_review again.`;
       if (!configAgent) {
         opencodeConfig.agent = allAgents;
       } else {
+        delete (configAgent as Record<string, unknown>).hive;
+        delete (configAgent as Record<string, unknown>).forager;
+        delete (configAgent as Record<string, unknown>).scout;
+        delete (configAgent as Record<string, unknown>).receiver;
         Object.assign(configAgent, allAgents);
       }
 
-      // Note: Don't override default_agent if OMO-Slim is also installed
-      // Let user choose via @hive or config
+      // Merge built-in MCP servers (OMO-style remote endpoints)
+      const configMcp = opencodeConfig.mcp as Record<string, unknown> | undefined;
+      if (!configMcp) {
+        opencodeConfig.mcp = builtinMcps;
+      } else {
+        Object.assign(configMcp, builtinMcps);
+      }
+
     },
   };
 };

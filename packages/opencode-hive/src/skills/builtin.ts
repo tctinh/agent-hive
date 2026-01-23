@@ -1,7 +1,7 @@
 /**
  * Builtin Skills for Hive
  * 
- * Following OMO-Slim pattern - skills are loaded from generated registry.
+ * Skills are loaded from the generated registry.
  * This file provides the infrastructure to load builtin skills.
  */
 

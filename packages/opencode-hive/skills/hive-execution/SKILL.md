@@ -5,15 +5,15 @@ description: Execute Hive feature tasks with worktree isolation, parallel orches
 
 # Hive Execution
 
-Quick reference for executing Hive tasks (Receiver Mode).
+Quick reference for executing Hive tasks (Swarm Bee).
 
 ## Architecture
 
 ```
-@hive (Receiver Mode)
+@swarm-bee
       │
       ▼
-hive_exec_start ──► task ──► Forager Worker (isolated worktree)
+hive_exec_start ──► task ──► Forager Bee (isolated worktree)
       │                                │
       │                                ▼
       │                         MCP tools / task (research if needed)
@@ -29,7 +29,7 @@ hive_merge ──► Main branch
 ## Workflow Summary
 
 1. **Tasks sync** → Generate from approved plan
-2. **Exec start** → Creates worktree; call task to spawn Forager (OpenCode)
+2. **Exec start** → Creates worktree; call task to spawn Forager Bee
 3. **Worker executes** → Implements, verifies, reports
 4. **Complete** → GATE: requires verification mention
 5. **Merge** → Squash into feature branch
@@ -39,9 +39,9 @@ hive_merge ──► Main branch
 ## Task Lifecycle
 
 ```
-hive_exec_start({ task })           # Creates worktree; if delegationRequired, spawn Forager via task
+hive_exec_start({ task })           # Creates worktree; spawn Forager Bee via task
   ↓
-[Forager implements in worktree]
+[Forager Bee implements in worktree]
   ↓
 hive_exec_complete({ task, summary, status })  # Commits to branch
   ↓
@@ -97,7 +97,7 @@ Workers can delegate research:
 
 ```
 task({
-  subagent_type: "explorer",  // or librarian, oracle, designer
+  subagent_type: "scout-bee",
   prompt: "Find usage patterns for...",
   description: "Research patterns"
 })
@@ -120,7 +120,7 @@ task({
 |------|---------|
 | hive_status | Check overall progress + phase |
 | hive_tasks_sync | Generate tasks from plan |
-| hive_exec_start | Spawn Forager worker |
+| hive_exec_start | Spawn Forager Bee worker |
 | hive_exec_complete | Mark task done |
 | hive_exec_abort | Discard changes, restart |
 | hive_worker_status | Check workers/blockers |
@@ -140,7 +140,7 @@ hive_exec_start({ task })  # Fresh start
 
 ### After 3 Failures
 1. Stop all workers
-2. Consult: `task({ subagent_type: "oracle", prompt: "Analyze..." })`
+2. Consult: `task({ subagent_type: "scout-bee", prompt: "Analyze..." })`
 3. Ask user how to proceed
 
 ### Merge Conflicts

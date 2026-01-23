@@ -111,7 +111,7 @@ export interface TaskSpec {
   priorTasks: Array<{ folder: string; summary?: string }>;
 }
 
-/** Agent model/temperature configuration (matches OMO-Slim pattern) */
+/** Agent model/temperature configuration */
 export interface AgentModelConfig {
   /** Model to use - format: "provider/model-id" (e.g., 'anthropic/claude-sonnet-4-20250514') */
   model?: string;
@@ -126,13 +126,6 @@ export interface HiveConfig {
   enableToolsFor?: string[];
   /** Agent configuration */
   agents?: {
-    worker: {
-      visible: boolean;
-    };
-    /** Hive Master agent config */
-    hive?: AgentModelConfig;
-    /** Forager worker agent config */
-    forager?: AgentModelConfig;
     /** Architect Bee (planning-only) */
     'architect-bee'?: AgentModelConfig;
     /** Swarm Bee (orchestrator) */
@@ -144,17 +137,10 @@ export interface HiveConfig {
     /** Hygienic Bee (plan review) */
     'hygienic-bee'?: AgentModelConfig;
   };
-  /** OMO-Slim integration settings */
-  omoSlim?: {
-    /** Enable delegated execution via OMO-Slim background tasks */
-    enabled: boolean;
-  };
 }
 
-/** Default models for Hive agents (like OMO-Slim's DEFAULT_MODELS) */
+/** Default models for Hive agents */
 export const DEFAULT_AGENT_MODELS = {
-  hive: 'anthropic/claude-sonnet-4-20250514',
-  forager: 'anthropic/claude-sonnet-4-20250514',
   'architect-bee': 'anthropic/claude-sonnet-4-20250514',
   'swarm-bee': 'anthropic/claude-sonnet-4-20250514',
   'scout-bee': 'anthropic/claude-sonnet-4-20250514',
@@ -165,19 +151,6 @@ export const DEFAULT_AGENT_MODELS = {
 export const DEFAULT_HIVE_CONFIG: HiveConfig = {
   enableToolsFor: [],
   agents: {
-    worker: {
-      visible: true,
-    },
-    hive: {
-      model: DEFAULT_AGENT_MODELS.hive,
-      temperature: 0.7,
-      skills: ['*'],
-    },
-    forager: {
-      model: DEFAULT_AGENT_MODELS.forager,
-      temperature: 0.3,
-      skills: [],
-    },
     'architect-bee': {
       model: DEFAULT_AGENT_MODELS['architect-bee'],
       temperature: 0.7,
@@ -203,8 +176,5 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
       temperature: 0.3,
       skills: ['*'],
     },
-  },
-  omoSlim: {
-    enabled: false,
   },
 };
