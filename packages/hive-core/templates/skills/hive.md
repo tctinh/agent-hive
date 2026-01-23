@@ -10,10 +10,10 @@ Plan-first development with bee roles.
 ## Architecture
 
 ```
-Architect Bee (planner) -> Swarm Bee (orchestrator)
-                     \-> Scout Bee (research)
-Swarm Bee -> Forager Bee (execution)
-Swarm Bee -> Hygienic Bee (plan review)
+Architect (Planner) -> Swarm (Orchestrator)
+                           \-> Scout (Explorer/Researcher/Retrieval)
+Swarm -> Forager (Worker/Coder)
+Swarm -> Hygienic (Consultant/Reviewer/Debugger)
 ```
 
 ---
@@ -22,17 +22,17 @@ Swarm Bee -> Hygienic Bee (plan review)
 
 | Agent | Mode | Use |
 |-------|------|-----|
-| `@architect-bee` | Primary | Planning only |
-| `@swarm-bee` | Primary | Orchestration |
-| `@scout-bee` | Subagent | Research assistance |
-| `@forager-bee` | Subagent | Executes tasks in worktrees |
-| `@hygienic-bee` | Subagent | Plan quality review |
+| `@architect` | Primary | Discovery + planning |
+| `@swarm` | Primary | Orchestration |
+| `@scout` | Subagent | Exploration/research/retrieval |
+| `@forager` | Subagent | Executes tasks in worktrees |
+| `@hygienic` | Subagent | Plan quality review |
 
 ---
 
 ## Research Delegation (MCP Tools + task)
 
-Use MCP tools for focused research; use `task` to delegate to scout-bee or other specialist subagents.
+Use MCP tools for focused research; use `task` to delegate to scout or other specialist subagents.
 
 | Tool | Use For |
 |------|---------|
@@ -40,11 +40,11 @@ Use MCP tools for focused research; use `task` to delegate to scout-bee or other
 | `context7_query-docs` | Library documentation |
 | `websearch_web_search_exa` | Web search and scraping |
 | `ast_grep_search` | AST-aware code search |
-| `task` | Delegate to scout-bee or specialist | 
+| `task` | Delegate to scout or specialist | 
 
 ```
 task({
-  subagent_type: "scout-bee",
+  subagent_type: "scout",
   prompt: "Find all API routes in src/api/",
   description: "Find API patterns"
 })
@@ -76,12 +76,12 @@ Classify Intent → Discovery → Plan → Review → Execute → Merge
 
 ---
 
-## Phase 1: Discovery (Architect Bee)
+## Phase 1: Discovery (Architect)
 
 ### Research First (Greenfield/Complex)
 
 ```
-task({ subagent_type: "explorer", prompt: "Find patterns..." })
+task({ subagent_type: "scout", prompt: "Find patterns..." })
 hive_context_write({ name: "research", content: "# Findings\n..." })
 ```
 

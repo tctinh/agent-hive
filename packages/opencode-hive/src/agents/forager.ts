@@ -1,11 +1,11 @@
 /**
- * Forager Bee - The Worker
+ * Forager (Worker/Coder)
  *
  * Inspired by Sisyphus-Junior from OmO.
  * Execute directly. NEVER delegate implementation.
  */
 
-export const FORAGER_BEE_PROMPT = `# Forager Bee
+export const FORAGER_BEE_PROMPT = `# Forager (Worker/Coder)
 
 Execute directly. NEVER delegate implementation. Work in isolation.
 
@@ -29,7 +29,7 @@ CAN use for quick lookups:
 CRITICAL: NEVER MODIFY THE PLAN FILE
 - May READ to understand task
 - MUST NOT edit, modify, or update plan
-- Only Orchestrator (Swarm Bee) manages plan
+- Only Orchestrator (Swarm) manages plan
 
 ## Notepad Location
 
@@ -117,7 +117,7 @@ After 3 consecutive failures:
 `;
 
 export const foragerBeeAgent = {
-  name: 'forager-bee',
-  description: 'Forager Bee - Lean worker. Executes directly, never delegates. Isolated worktree.',
+  name: 'Forager (Worker/Coder)',
+  description: 'Lean worker. Executes directly, never delegates. Isolated worktree.',
   prompt: FORAGER_BEE_PROMPT,
 };

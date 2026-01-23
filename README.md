@@ -96,6 +96,34 @@ Add `opencode-hive` to your `opencode.json`:
 
 OpenCode handles the rest — no manual npm install needed.
 
+### Agent Hive Config (Optional)
+
+Hive reads `~/.config/opencode/agent_hive.json` for per-agent overrides. A schema asset is available in this repo:
+
+- `https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json`
+
+Example config:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
+  "agents": {
+    "hive": {
+      "skills": ["brainstorming", "writing-plans", "dispatching-parallel-agents", "executing-plans"]
+    },
+    "architect": {
+      "skills": ["brainstorming", "writing-plans"]
+    },
+    "swarm": {
+      "skills": ["dispatching-parallel-agents", "executing-plans"]
+    },
+    "forager": {
+      "skills": ["test-driven-development", "verification-before-completion"]
+    }
+  }
+}
+```
+
 **MCP Research Tools** are auto-enabled: `grep_app_searchGitHub`, `context7_query-docs`, `websearch_web_search_exa`, and `ast_grep_search`. Set `EXA_API_KEY` for web search (optional).
 
 ### Start Hiving
@@ -142,14 +170,15 @@ Hive: Full audit of what each agent did
 You: Clear visibility into everything ✅
 ```
 
-**The Bee Colony:**
-| Bee | Role |
-|-----|------|
-| **Architect** 🏗️ | Plans features, interviews you, writes plan.md |
-| **Swarm** 👑 | Orchestrates execution, delegates to workers |
-| **Scout** 🔍 | Researches codebase and external docs |
-| **Forager** 🐝 | Executes tasks in isolated worktrees |
-| **Hygienic** 🧹 | Reviews plan quality, OKAY/REJECT verdict |
+**The Hive Colony:**
+| Agent | Role |
+|-------|------|
+| **Hive (Hybrid)** 👑 | Plans + orchestrates (phase-aware, skills on-demand) |
+| **Architect (Planner)** 🏗️ | Discovers requirements, writes plans |
+| **Swarm (Orchestrator)** 🐝 | Orchestrates execution, delegates to workers |
+| **Scout (Explorer/Researcher/Retrieval)** 🔍 | Explores codebase + external docs/data |
+| **Forager (Worker/Coder)** 🍯 | Executes tasks in isolated worktrees |
+| **Hygienic (Consultant/Reviewer/Debugger)** 🧹 | Reviews plan quality, OKAY/REJECT verdict |
 
 ---
 
@@ -319,7 +348,7 @@ The extension watches your `.hive/` directory and displays the current state. Al
 | **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 5 specialized bee agents, planning, execution, tracking |
 | **[vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive)** | VS Code | Visual management — review, comment, approve |
 
-**Agent Selection:** Use `architect-bee` or `swarm-bee` as your primary agent. Use `@scout-bee`, `@forager-bee`, or `@hygienic-bee` to mention subagents directly.
+**Agent Selection:** Use `hive`, `architect`, or `swarm` as your primary agent. Use `@scout`, `@forager`, or `@hygienic` to mention subagents directly.
 
 ---
 

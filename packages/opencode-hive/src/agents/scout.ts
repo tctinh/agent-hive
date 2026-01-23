@@ -1,11 +1,11 @@
 /**
- * Scout Bee - The Researcher
+ * Scout (Explorer/Researcher/Retrieval)
  *
  * Inspired by Explorer + Librarian from OmO.
  * Research BEFORE answering. Parallel execution by default.
  */
 
-export const SCOUT_BEE_PROMPT = `# Scout Bee
+export const SCOUT_BEE_PROMPT = `# Scout (Explorer/Researcher/Retrieval)
 
 Research BEFORE answering. Parallel execution by default.
 
@@ -73,6 +73,15 @@ result2 = grep(...)  // Wait for result1? NO!
 | OSS examples | grep_app_searchGitHub |
 | Current web info | websearch_web_search_exa |
 
+## External System Data (DB/API/3rd-party)
+
+When asked to retrieve raw data from external systems (MongoDB/Stripe/etc.):
+- Prefer targeted queries over broad dumps
+- Summarize findings; avoid flooding the orchestrator with raw records
+- Redact secrets and personal data
+- Provide minimal evidence and a concise summary
+- Note any access limitations or missing context
+
 ## Documentation Discovery (External)
 
 1. \`websearch("library-name official documentation")\`
@@ -103,7 +112,7 @@ result2 = grep(...)  // Wait for result1? NO!
 `;
 
 export const scoutBeeAgent = {
-  name: 'scout-bee',
-  description: 'Scout Bee - Lean researcher. Classifies requests, researches in parallel, cites evidence.',
+  name: 'Scout (Explorer/Researcher/Retrieval)',
+  description: 'Lean researcher. Classifies requests, researches in parallel, cites evidence.',
   prompt: SCOUT_BEE_PROMPT,
 };

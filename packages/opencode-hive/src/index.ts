@@ -3,11 +3,12 @@ import * as fs from 'fs';
 import { tool, type Plugin, type ToolDefinition } from "@opencode-ai/plugin";
 import { getBuiltinSkills, loadBuiltinSkill } from './skills/builtin.js';
 // Bee agents (lean, focused)
-import { ARCHITECT_BEE_PROMPT } from './agents/architect-bee.js';
-import { SWARM_BEE_PROMPT } from './agents/swarm-bee.js';
-import { SCOUT_BEE_PROMPT } from './agents/scout-bee.js';
-import { FORAGER_BEE_PROMPT } from './agents/forager-bee.js';
-import { HYGIENIC_BEE_PROMPT } from './agents/hygienic-bee.js';
+import { QUEEN_BEE_PROMPT } from './agents/hive.js';
+import { ARCHITECT_BEE_PROMPT } from './agents/architect.js';
+import { SWARM_BEE_PROMPT } from './agents/swarm.js';
+import { SCOUT_BEE_PROMPT } from './agents/scout.js';
+import { FORAGER_BEE_PROMPT } from './agents/forager.js';
+import { HYGIENIC_BEE_PROMPT } from './agents/hygienic.js';
 import { createBuiltinMcps } from './mcp/index.js';
 
 // ============================================================================
@@ -111,7 +112,7 @@ Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manu
 
 \`hive_exec_start\` creates worktree and spawns worker automatically:
 
-1. \`hive_exec_start(task)\` → Creates worktree + spawns Forager Bee worker
+1. \`hive_exec_start(task)\` → Creates worktree + spawns Forager (Worker/Coder) worker
 2. Worker executes → calls \`hive_exec_complete(status: "completed")\`
 3. Worker blocked → calls \`hive_exec_complete(status: "blocked", blocker: {...})\`
 
@@ -129,7 +130,7 @@ The previous worker's progress is preserved. Include the user's decision in the 
 - \`context7_query-docs\` - Library documentation
 - \`websearch_web_search_exa\` - Web search via Exa
 - \`ast_grep_search\` - AST-based search
-- \`task({ subagent_type: "scout-bee", prompt: "..." })\` - Comprehensive research
+- \`task({ subagent_type: "scout", prompt: "..." })\` - Comprehensive research
 
 ### Planning Phase - Context Management REQUIRED
 
@@ -575,10 +576,10 @@ Add this section to your plan content and try again.`;
             } : undefined,
           });
 
-          // Always use Forager Bee for task execution
-          // Forager Bee knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
-          // Forager Bee can research via MCP tools (grep_app, context7, etc.)
-          const agent = 'forager-bee';
+          // Always use Forager (Worker/Coder) for task execution
+          // Forager knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
+          // Forager can research via MCP tools (grep_app, context7, etc.)
+          const agent = 'forager';
 
           // Return delegation instructions for the agent
           // Agent will call task tool itself (OpenCode native)
@@ -595,11 +596,11 @@ Add this section to your plan content and try again.`;
             },
             instructions: `## Delegation Required
 
-You MUST now call the task tool to spawn a Forager Bee worker:
+You MUST now call the task tool to spawn a Forager (Worker/Coder) worker:
 
 \`\`\`
 task({
-  subagent_type: "forager-bee",
+  subagent_type: "forager",
   prompt: <the workerPrompt below>,
   description: "Hive: ${task}"
 })
@@ -1080,13 +1081,30 @@ Make the requested changes, then call hive_request_review again.`;
       // Auto-generate config file with defaults if it doesn't exist
       configService.init();
 
-      // Bee Agents (lean, focused - new architecture)
-      const architectBeeUserConfig = configService.getAgentConfig('architect-bee');
-      const architectBeeConfig = {
-        model: architectBeeUserConfig.model,
-        temperature: architectBeeUserConfig.temperature ?? 0.7,
-        skills: architectBeeUserConfig.skills ?? ['*'],
-        description: 'Architect Bee (Planner) - Plans features, interviews, writes plans. NEVER executes.',
+      // Hive Agents (lean, focused - new architecture)
+      const hiveUserConfig = configService.getAgentConfig('hive');
+      const hiveConfig = {
+        name: 'Hive (Hybrid)',
+        model: hiveUserConfig.model,
+        temperature: hiveUserConfig.temperature ?? 0.5,
+        skills: hiveUserConfig.skills ?? [],
+        description: 'Hive (Hybrid) - Plans + orchestrates. Detects phase, loads skills on-demand.',
+        prompt: QUEEN_BEE_PROMPT,
+        permission: {
+          question: "allow",
+          skill: "allow",
+          todowrite: "allow",
+          todoread: "allow",
+        },
+      };
+
+      const architectUserConfig = configService.getAgentConfig('architect');
+      const architectConfig = {
+        name: 'Architect (Planner)',
+        model: architectUserConfig.model,
+        temperature: architectUserConfig.temperature ?? 0.7,
+        skills: architectUserConfig.skills ?? ['*'],
+        description: 'Architect (Planner) - Plans features, interviews, writes plans. NEVER executes.',
         prompt: ARCHITECT_BEE_PROMPT,
         permission: {
           edit: "deny",  // Planners don't edit code
@@ -1099,12 +1117,13 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      const swarmBeeUserConfig = configService.getAgentConfig('swarm-bee');
-      const swarmBeeConfig = {
-        model: swarmBeeUserConfig.model,
-        temperature: swarmBeeUserConfig.temperature ?? 0.5,
-        skills: swarmBeeUserConfig.skills ?? ['*'],
-        description: 'Swarm Bee (Orchestrate) - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
+      const swarmUserConfig = configService.getAgentConfig('swarm');
+      const swarmConfig = {
+        name: 'Swarm (Orchestrator)',
+        model: swarmUserConfig.model,
+        temperature: swarmUserConfig.temperature ?? 0.5,
+        skills: swarmUserConfig.skills ?? ['*'],
+        description: 'Swarm (Orchestrator) - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
         prompt: SWARM_BEE_PROMPT,
         permission: {
           question: "allow",
@@ -1114,13 +1133,14 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      const scoutBeeUserConfig = configService.getAgentConfig('scout-bee');
-      const scoutBeeConfig = {
-        model: scoutBeeUserConfig.model,
-        temperature: scoutBeeUserConfig.temperature ?? 0.5,
-        skills: scoutBeeUserConfig.skills ?? ['*'],
+      const scoutUserConfig = configService.getAgentConfig('scout');
+      const scoutConfig = {
+        name: 'Scout (Explorer/Researcher/Retrieval)',
+        model: scoutUserConfig.model,
+        temperature: scoutUserConfig.temperature ?? 0.5,
+        skills: scoutUserConfig.skills ?? ['*'],
         mode: 'subagent',
-        description: 'Scout Bee - Researches in parallel. Codebase exploration + external docs.',
+        description: 'Scout (Explorer/Researcher/Retrieval) - Researches codebase + external docs/data.',
         prompt: SCOUT_BEE_PROMPT,
         permission: {
           edit: "deny",  // Researchers don't edit code
@@ -1129,26 +1149,28 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      const foragerBeeUserConfig = configService.getAgentConfig('forager-bee');
-      const foragerBeeConfig = {
-        model: foragerBeeUserConfig.model,
-        temperature: foragerBeeUserConfig.temperature ?? 0.3,
-        skills: foragerBeeUserConfig.skills ?? [],
+      const foragerUserConfig = configService.getAgentConfig('forager');
+      const foragerConfig = {
+        name: 'Forager (Worker/Coder)',
+        model: foragerUserConfig.model,
+        temperature: foragerUserConfig.temperature ?? 0.3,
+        skills: foragerUserConfig.skills ?? [],
         mode: 'subagent',
-        description: 'Forager Bee - Executes tasks directly in isolated worktrees. Never delegates.',
+        description: 'Forager (Worker/Coder) - Executes tasks directly in isolated worktrees. Never delegates.',
         prompt: FORAGER_BEE_PROMPT,
         permission: {
           skill: "allow",
         },
       };
 
-      const hygienicBeeUserConfig = configService.getAgentConfig('hygienic-bee');
-      const hygienicBeeConfig = {
-        model: hygienicBeeUserConfig.model,
-        temperature: hygienicBeeUserConfig.temperature ?? 0.3,
-        skills: hygienicBeeUserConfig.skills ?? ['*'],
+      const hygienicUserConfig = configService.getAgentConfig('hygienic');
+      const hygienicConfig = {
+        name: 'Hygienic (Consultant/Reviewer/Debugger)',
+        model: hygienicUserConfig.model,
+        temperature: hygienicUserConfig.temperature ?? 0.3,
+        skills: hygienicUserConfig.skills ?? ['*'],
         mode: 'subagent',
-        description: 'Hygienic Bee - Reviews plan documentation quality. OKAY/REJECT verdict.',
+        description: 'Hygienic (Consultant/Reviewer/Debugger) - Reviews plan documentation quality. OKAY/REJECT verdict.',
         prompt: HYGIENIC_BEE_PROMPT,
         permission: {
           edit: "deny",  // Reviewers don't edit
@@ -1158,11 +1180,12 @@ Make the requested changes, then call hive_request_review again.`;
 
       // Build agents map
       const allAgents = {
-        'architect-bee': architectBeeConfig,
-        'swarm-bee': swarmBeeConfig,
-        'scout-bee': scoutBeeConfig,
-        'forager-bee': foragerBeeConfig,
-        'hygienic-bee': hygienicBeeConfig,
+        hive: hiveConfig,
+        architect: architectConfig,
+        swarm: swarmConfig,
+        scout: scoutConfig,
+        forager: foragerConfig,
+        hygienic: hygienicConfig,
       };
 
       // Register agents directly in opencode.json (required for Task tool to find them)
@@ -1174,8 +1197,11 @@ Make the requested changes, then call hive_request_review again.`;
         opencodeConfig.agent = allAgents;
       } else {
         delete (configAgent as Record<string, unknown>).hive;
-        delete (configAgent as Record<string, unknown>).forager;
+        delete (configAgent as Record<string, unknown>).architect;
+        delete (configAgent as Record<string, unknown>).swarm;
         delete (configAgent as Record<string, unknown>).scout;
+        delete (configAgent as Record<string, unknown>).forager;
+        delete (configAgent as Record<string, unknown>).hygienic;
         delete (configAgent as Record<string, unknown>).receiver;
         Object.assign(configAgent, allAgents);
       }

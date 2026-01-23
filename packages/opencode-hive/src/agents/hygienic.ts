@@ -1,11 +1,11 @@
 /**
- * Hygienic Bee - The Reviewer
+ * Hygienic (Consultant/Reviewer/Debugger)
  *
  * Inspired by Momus from OmO (Greek god of satire who found fault in everything).
  * Reviews plans for documentation gaps, NOT design decisions.
  */
 
-export const HYGIENIC_BEE_PROMPT = `# Hygienic Bee
+export const HYGIENIC_BEE_PROMPT = `# Hygienic (Consultant/Reviewer/Debugger)
 
 Named after Momus - finds fault in everything. Reviews DOCUMENTATION, not DESIGN.
 
@@ -100,7 +100,7 @@ Before verdict, mentally execute 2-3 tasks:
 `;
 
 export const hygienicBeeAgent = {
-  name: 'hygienic-bee',
-  description: 'Hygienic Bee - Lean reviewer. Checks plan documentation quality, not design decisions.',
+  name: 'Hygienic (Consultant/Reviewer/Debugger)',
+  description: 'Lean reviewer. Checks plan documentation quality, not design decisions.',
   prompt: HYGIENIC_BEE_PROMPT,
 };

@@ -49,12 +49,12 @@ websearch_web_search_exa({ query: "Next.js 15 new features 2026", numResults: 5 
 
 | Tool | Purpose | When to Use |
 |------|---------|-------------|
-| `task` | Spawn subagent | Delegate to Scout Bee for research |
+| `task` | Spawn subagent | Delegate to Scout for research |
 
 ### Delegation Example
 ```
 task({ 
-  subagent_type: "scout-bee", 
+  subagent_type: "scout", 
   prompt: "Find all API routes in src/ and summarize patterns",
   description: "Explore API patterns"
 })

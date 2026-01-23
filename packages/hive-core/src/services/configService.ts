@@ -45,30 +45,35 @@ export class ConfigService {
         agents: {
           ...DEFAULT_HIVE_CONFIG.agents,
           ...stored.agents,
-          // Deep merge architect-bee agent config
-          'architect-bee': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['architect-bee'],
-            ...stored.agents?.['architect-bee'],
+          // Deep merge hive agent config
+          hive: {
+            ...DEFAULT_HIVE_CONFIG.agents?.hive,
+            ...stored.agents?.hive,
           },
-          // Deep merge swarm-bee agent config
-          'swarm-bee': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['swarm-bee'],
-            ...stored.agents?.['swarm-bee'],
+          // Deep merge architect agent config
+          architect: {
+            ...DEFAULT_HIVE_CONFIG.agents?.architect,
+            ...stored.agents?.architect,
           },
-          // Deep merge scout-bee agent config
-          'scout-bee': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['scout-bee'],
-            ...stored.agents?.['scout-bee'],
+          // Deep merge swarm agent config
+          swarm: {
+            ...DEFAULT_HIVE_CONFIG.agents?.swarm,
+            ...stored.agents?.swarm,
           },
-          // Deep merge forager-bee agent config
-          'forager-bee': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['forager-bee'],
-            ...stored.agents?.['forager-bee'],
+          // Deep merge scout agent config
+          scout: {
+            ...DEFAULT_HIVE_CONFIG.agents?.scout,
+            ...stored.agents?.scout,
           },
-          // Deep merge hygienic-bee agent config
-          'hygienic-bee': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['hygienic-bee'],
-            ...stored.agents?.['hygienic-bee'],
+          // Deep merge forager agent config
+          forager: {
+            ...DEFAULT_HIVE_CONFIG.agents?.forager,
+            ...stored.agents?.forager,
+          },
+          // Deep merge hygienic agent config
+          hygienic: {
+            ...DEFAULT_HIVE_CONFIG.agents?.hygienic,
+            ...stored.agents?.hygienic,
           },
         },
       };
@@ -150,13 +155,7 @@ export class ConfigService {
         config.agent = {};
       }
 
-      // Remove legacy agents (hive/forager/scout/receiver)
-      const legacyAgents = ['hive', 'forager', 'scout', 'receiver'];
-      for (const legacy of legacyAgents) {
-        if (config.agent[legacy]) {
-          delete config.agent[legacy];
-        }
-      }
+       // Initialize agent section (no legacy cleanup)
 
       // Merge in our agents (don't overwrite user customizations)
       for (const [name, agentConfig] of Object.entries(agents)) {
@@ -183,7 +182,7 @@ export class ConfigService {
    * Get agent-specific model config (hive or forager)
    */
   getAgentConfig(
-    agent: 'architect-bee' | 'swarm-bee' | 'scout-bee' | 'forager-bee' | 'hygienic-bee',
+    agent: 'hive' | 'architect' | 'swarm' | 'scout' | 'forager' | 'hygienic',
   ): { model?: string; temperature?: number; skills?: string[] } {
     const config = this.get();
     return config.agents?.[agent] ?? {};

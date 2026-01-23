@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
+  "title": "Agent Hive Configuration",
+  "description": "Configuration schema for ~/.config/opencode/agent_hive.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Schema reference for this config file"
+    },
+    "enableToolsFor": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Enable hive tools for specific features"
+    },
+    "agents": {
+      "type": "object",
+      "description": "Agent model configuration overrides",
+      "additionalProperties": false,
+      "properties": {
+        "hive": {
+          "$ref": "#/$defs/agentConfig"
+        },
+        "architect": {
+          "$ref": "#/$defs/agentConfig"
+        },
+        "swarm": {
+          "$ref": "#/$defs/agentConfig"
+        },
+        "scout": {
+          "$ref": "#/$defs/agentConfig"
+        },
+        "forager": {
+          "$ref": "#/$defs/agentConfig"
+        },
+        "hygienic": {
+          "$ref": "#/$defs/agentConfig"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "agentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "type": "string",
+          "description": "Model to use (provider/model-id)"
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Sampling temperature"
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skills enabled for this agent"
+        }
+      }
+    }
+  }
+}

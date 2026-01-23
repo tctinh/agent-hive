@@ -553,14 +553,14 @@ Human shapes at the top. Agent builds at the bottom. Gate in the middle. Tests v
 - Phase Injection: Right context at right time (discovery → delegation → TDD)
 - Inspired by Git's philosophy: simple primitives, hard enforcement
 
-### v0.10 (Bee-Only Architecture)
-- Removed legacy agents: `hive`, `scout`, `forager`, `receiver`
-- Introduced 5 specialized bee agents:
-  - `architect-bee` — Planner only, cannot execute or delegate
-  - `swarm-bee` — Orchestrator, delegates to workers
-  - `scout-bee` — Researcher, uses MCP tools
-  - `forager-bee` — Executor, works in isolated worktrees
-  - `hygienic-bee` — Reviewer, validates plan quality
+### v0.10 (Hive Agent Architecture)
+- Introduced specialized hive agents:
+  - `hive` — Hybrid planner + orchestrator
+  - `architect` — Planner only, cannot execute or delegate
+  - `swarm` — Orchestrator, delegates to workers
+  - `scout` — Explorer/Researcher/Retrieval, uses MCP tools
+  - `forager` — Executor, works in isolated worktrees
+  - `hygienic` — Consultant/Reviewer/Debugger, validates plan quality
 - MCP tools auto-enabled (OMO-style): grep_app, context7, websearch, ast_grep
 - Agent registration for @mention support in OpenCode
 - Blocked worker protocol: workers pause for decisions, resume with clarity
