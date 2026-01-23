@@ -11,6 +11,7 @@
 export { scoutAgent, SCOUT_PROMPT } from './scout';
 export { receiverAgent, RECEIVER_PROMPT } from './receiver';
 export { foragerAgent, FORAGER_PROMPT } from './forager';
+export { architectBeeAgent, ARCHITECT_BEE_PROMPT } from './architect-bee';
 
 // Legacy export for backward compatibility
 export { buildHiveAgentPrompt, hiveAgent } from './hive';
@@ -19,6 +20,11 @@ export { buildHiveAgentPrompt, hiveAgent } from './hive';
  * Agent registry for OpenCode plugin
  */
 export const hiveAgents = {
+  'architect-bee': {
+    name: 'architect-bee',
+    description: 'Architect Bee - Lean planner. Classifies intent, interviews, writes plans.',
+    mode: 'primary' as const,
+  },
   scout: {
     name: 'scout',
     description: 'Scout - Discovery and planning. Finds flowers, writes plans.',
