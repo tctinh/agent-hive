@@ -17,6 +17,19 @@ interface SkillEntry {
   template: string;
 }
 
+/**
+ * Strip surrounding quotes from a string value (handles YAML quoted strings).
+ */
+function stripQuotes(value: string): string {
+  const trimmed = value.trim();
+  // Handle both single and double quotes
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
 function parseFrontmatter(content: string): { name: string; description: string; body: string } | null {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!match) return null;
@@ -30,8 +43,8 @@ function parseFrontmatter(content: string): { name: string; description: string;
   if (!nameMatch || !descMatch) return null;
 
   return {
-    name: nameMatch[1].trim(),
-    description: descMatch[1].trim(),
+    name: stripQuotes(nameMatch[1]),
+    description: stripQuotes(descMatch[1]),
     body,
   };
 }

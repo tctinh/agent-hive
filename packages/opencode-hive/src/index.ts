@@ -32,7 +32,9 @@ function formatSkillsXml(): string {
 }
 
 function createHiveSkillTool(): ToolDefinition {
-  const base = 'Load a Hive skill to get detailed instructions for a specific workflow.';
+  const base = `Load a Hive skill to get detailed instructions for a specific workflow.
+
+Use this when a task matches an available skill's description. The descriptions below ("Use when...", "Use before...") are triggers; when one applies, you MUST load that skill before proceeding.`;
   const skills = getBuiltinSkills();
   const description = skills.length === 0
     ? base + '\n\nNo Hive skills available.'

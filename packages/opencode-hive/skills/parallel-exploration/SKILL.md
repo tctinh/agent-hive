@@ -11,21 +11,29 @@ When you need to answer "where/how does X work?" across multiple domains (codeba
 
 **Core principle:** Decompose into independent sub-questions, spawn one `background_task` per sub-question, collect results asynchronously.
 
+**Safe in Planning mode:** This is read-only exploration. It is OK to use during exploratory research even when there is no feature, no plan, and no approved tasks.
+
 **This skill is for read-only research.** For parallel implementation work, use `hive_skill("dispatching-parallel-agents")` with `hive_exec_start`.
 
 ## When to Use
 
+**Default to this skill when:**
 **Use when:**
 - Investigation spans multiple domains (code + tests + docs)
+- User asks **2+ questions across different domains** (e.g., code + tests, code + docs/OSS, code + config/runtime)
 - Questions are independent (answer to A doesn't affect B)
+- User asks **3+ independent questions** (often as a numbered list or separate bullets)
 - No edits needed (read-only exploration)
-- Time matters (parallel is faster than sequential)
+- User asks for an explorationthat likely spans multiple files/packages
+- The work is read-only and the questions can be investigated independently
 
-**Don't use when:**
+**Only skip this skill when:**
 - Investigation requires shared state or context between questions
+- It's a single focused question that is genuinely answerable with **one quick grep + one file read**
+- Questions are dependent (answer A materially changes what to ask for B)
 - Work involves file edits (use Hive tasks / Forager instead)
-- Single focused question (just use one Scout)
-- Questions depend on each other (answer A before asking B)
+
+**Important:** Do not treat "this is exploratory" as a reason to avoid delegation. This skill is specifically for exploratory research when fan-out makes it faster and cleaner.
 
 ## The Pattern
 
