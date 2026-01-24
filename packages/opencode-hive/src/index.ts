@@ -1,7 +1,8 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { tool, type Plugin, type ToolDefinition } from "@opencode-ai/plugin";
-import { getBuiltinSkills, loadBuiltinSkill } from './skills/builtin.js';
+import { getBuiltinSkills, getFilteredSkills, loadBuiltinSkill } from './skills/builtin.js';
+import type { SkillDefinition } from './skills/types.js';
 // Bee agents (lean, focused)
 import { QUEEN_BEE_PROMPT } from './agents/hive.js';
 import { ARCHITECT_BEE_PROMPT } from './agents/architect.js';
@@ -15,8 +16,7 @@ import { createBuiltinMcps } from './mcp/index.js';
 // Skill Tool - Uses generated registry (no file-based discovery)
 // ============================================================================
 
-function formatSkillsXml(): string {
-  const skills = getBuiltinSkills();
+function formatSkillsXml(skills: SkillDefinition[]): string {
   if (skills.length === 0) return '';
 
   const skillsXml = skills.map(skill => {
@@ -31,12 +31,14 @@ function formatSkillsXml(): string {
   return `\n\n<available_skills>\n${skillsXml}\n</available_skills>`;
 }
 
-function createHiveSkillTool(): ToolDefinition {
+function createHiveSkillTool(filteredSkills: SkillDefinition[]): ToolDefinition {
   const base = 'Load a Hive skill to get detailed instructions for a specific workflow.';
-  const skills = getBuiltinSkills();
-  const description = skills.length === 0
+  const description = filteredSkills.length === 0
     ? base + '\n\nNo Hive skills available.'
-    : base + formatSkillsXml();
+    : base + formatSkillsXml(filteredSkills);
+
+  // Build a set of available skill names for validation
+  const availableNames = new Set(filteredSkills.map(s => s.name));
 
   return tool({
     description,
@@ -44,10 +46,16 @@ function createHiveSkillTool(): ToolDefinition {
       name: tool.schema.string().describe('The skill name from available_skills'),
     },
     async execute({ name }) {
+      // Check if skill is available (not filtered out)
+      if (!availableNames.has(name)) {
+        const available = filteredSkills.map(s => s.name).join(', ');
+        throw new Error(`Skill "${name}" not available. Available Hive skills: ${available || 'none'}`);
+      }
+
       const result = loadBuiltinSkill(name);
 
       if (!result.found || !result.skill) {
-        const available = skills.map(s => s.name).join(', ');
+        const available = filteredSkills.map(s => s.name).join(', ');
         throw new Error(`Skill "${name}" not found. Available Hive skills: ${available || 'none'}`);
       }
 
@@ -170,7 +178,13 @@ const plugin: Plugin = async (ctx) => {
   const taskService = new TaskService(directory);
   const contextService = new ContextService(directory);
   const configService = new ConfigService(); // User config at ~/.config/opencode/agent_hive.json
-  const builtinMcps = createBuiltinMcps();
+  const disabledMcps = configService.getDisabledMcps();
+  const disabledSkills = configService.getDisabledSkills();
+  const builtinMcps = createBuiltinMcps(disabledMcps);
+  
+  // Get filtered skills (globally disabled skills removed)
+  // Per-agent skill filtering could be added here based on agent context
+  const filteredSkills = getFilteredSkills(disabledSkills);
   const worktreeService = new WorktreeService({
     baseDir: directory,
     hiveDir: path.join(directory, '.hive'),
@@ -265,7 +279,7 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
     mcp: builtinMcps,
 
     tool: {
-      hive_skill: createHiveSkillTool(),
+      hive_skill: createHiveSkillTool(filteredSkills),
 
       // Background task tools for delegated execution
       background_task: backgroundTools.background_task,

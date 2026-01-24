@@ -152,6 +152,10 @@ export interface HiveConfig {
   $schema?: string;
   /** Enable hive tools for specific features */
   enableToolsFor?: string[];
+  /** Globally disable specific skills (won't appear in hive_skill tool) */
+  disableSkills?: string[];
+  /** Globally disable specific MCP servers. Available: websearch, context7, grep_app, ast_grep */
+  disableMcps?: string[];
   /** Enable OMO-Slim delegation (optional integration) */
   omoSlimEnabled?: boolean;
   /** Agent configuration */
@@ -184,6 +188,8 @@ export const DEFAULT_AGENT_MODELS = {
 export const DEFAULT_HIVE_CONFIG: HiveConfig = {
   $schema: 'https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json',
   enableToolsFor: [],
+  disableSkills: [],
+  disableMcps: [],
   agents: {
     'hive-master': {
       model: DEFAULT_AGENT_MODELS['hive-master'],

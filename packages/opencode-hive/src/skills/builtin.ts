@@ -44,6 +44,35 @@ export function getBuiltinSkills(): SkillDefinition[] {
 }
 
 /**
+ * Get filtered skills based on global disable list and optional per-agent enable list.
+ * 
+ * Logic:
+ * 1. Start with all builtin skills
+ * 2. Remove globally disabled skills
+ * 3. If agentSkills is provided and non-empty, intersect with that list
+ * 
+ * @param disabledSkills - Skills to globally disable
+ * @param agentSkills - If provided, only these skills are enabled for the agent (intersection)
+ */
+export function getFilteredSkills(
+  disabledSkills: string[] = [],
+  agentSkills?: string[]
+): SkillDefinition[] {
+  const disabled = new Set(disabledSkills);
+  
+  // Filter out globally disabled skills
+  let filtered = BUILTIN_SKILLS.filter(s => !disabled.has(s.name));
+  
+  // If agent has specific skills configured, only allow those
+  if (agentSkills && agentSkills.length > 0) {
+    const enabled = new Set(agentSkills);
+    filtered = filtered.filter(s => enabled.has(s.name));
+  }
+  
+  return filtered;
+}
+
+/**
  * Get skill metadata for tool description (XML format).
  * Uses (hive - Skill) prefix for consistency with formatSkillsXml in index.ts.
  */

@@ -195,4 +195,20 @@ export class ConfigService {
     const config = this.get();
     return config.omoSlimEnabled === true;
   }
+
+  /**
+   * Get list of globally disabled skills.
+   */
+  getDisabledSkills(): string[] {
+    const config = this.get();
+    return config.disableSkills ?? [];
+  }
+
+  /**
+   * Get list of globally disabled MCPs.
+   */
+  getDisabledMcps(): string[] {
+    const config = this.get();
+    return config.disableMcps ?? [];
+  }
 }

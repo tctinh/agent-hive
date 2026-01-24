@@ -17,6 +17,20 @@
       },
       "description": "Enable hive tools for specific features"
     },
+    "disableSkills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Globally disable specific skills (e.g., ['brainstorming', 'writing-plans']). Disabled skills won't appear in hive_skill tool."
+    },
+    "disableMcps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Globally disable specific MCP servers (e.g., ['websearch', 'ast_grep']). Available: websearch, context7, grep_app, ast_grep"
+    },
     "agents": {
       "type": "object",
       "description": "Agent model configuration overrides",

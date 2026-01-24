@@ -86,6 +86,83 @@ Description of what to do.
 Description.
 ```
 
+## Configuration
+
+Hive uses a config file at `~/.config/opencode/agent_hive.json`. You can customize agent models, disable skills, and disable MCP servers.
+
+### Disable Skills or MCPs
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
+  "disableSkills": ["brainstorming", "writing-plans"],
+  "disableMcps": ["websearch", "ast_grep"]
+}
+```
+
+#### Available Skills
+
+| ID | Description |
+|----|-------------|
+| `brainstorming` | Use before any creative work. Explores user intent, requirements, and design through collaborative dialogue before implementation. |
+| `writing-plans` | Use when you have a spec or requirements for a multi-step task. Creates detailed implementation plans with bite-sized tasks. |
+| `executing-plans` | Use when you have a written implementation plan. Executes tasks in batches with review checkpoints. |
+| `dispatching-parallel-agents` | Use when facing 2+ independent tasks. Dispatches multiple agents to work concurrently on unrelated problems. |
+| `test-driven-development` | Use when implementing any feature or bugfix. Enforces write-test-first, red-green-refactor cycle. |
+| `systematic-debugging` | Use when encountering any bug or test failure. Requires root cause investigation before proposing fixes. |
+| `verification-before-completion` | Use before claiming work is complete. Requires running verification commands and confirming output before success claims. |
+
+#### Available MCPs
+
+| ID | Description | Requirements |
+|----|-------------|--------------|
+| `websearch` | Web search via [Exa AI](https://exa.ai). Real-time web searches and content scraping. | Set `EXA_API_KEY` env var |
+| `context7` | Library documentation lookup via [Context7](https://context7.com). Query up-to-date docs for any programming library. | None |
+| `grep_app` | GitHub code search via [grep.app](https://grep.app). Find real-world code examples from public repositories. | None |
+| `ast_grep` | AST-aware code search and replace via [ast-grep](https://ast-grep.github.io). Pattern matching across 25+ languages. | None (runs via npx) |
+
+### Per-Agent Skills
+
+Each agent can have specific skills enabled. If configured, only those skills are available:
+
+```json
+{
+  "agents": {
+    "hive-master": {
+      "skills": ["brainstorming", "writing-plans", "executing-plans"]
+    },
+    "forager-worker": {
+      "skills": ["test-driven-development", "verification-before-completion"]
+    }
+  }
+}
+```
+
+**How `skills` filtering works:**
+
+| Config | Result |
+|--------|--------|
+| `skills` omitted | All skills enabled (minus global `disableSkills`) |
+| `skills: []` | All skills enabled (minus global `disableSkills`) |
+| `skills: ["tdd", "debug"]` | Only those skills enabled |
+
+Note: Wildcards like `["*"]` are **not supported** - use explicit skill names or omit the field entirely for all skills.
+
+### Custom Models
+
+Override models for specific agents:
+
+```json
+{
+  "agents": {
+    "hive-master": {
+      "model": "anthropic/claude-sonnet-4-20250514",
+      "temperature": 0.5
+    }
+  }
+}
+```
+
 ## Pair with VS Code
 
 For the full experience, install [vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive) to review plans inline with comments.

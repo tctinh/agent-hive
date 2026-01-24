@@ -8,7 +8,8 @@ export type { SkillDefinition, SkillLoadResult } from './types.js';
 export { 
   BUILTIN_SKILLS, 
   loadBuiltinSkill, 
-  getBuiltinSkills, 
+  getBuiltinSkills,
+  getFilteredSkills,
   getBuiltinSkillsXml,
   type BuiltinSkillName 
 } from './builtin.js';

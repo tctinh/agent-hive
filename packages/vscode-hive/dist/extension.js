@@ -957,6 +957,8 @@ var DEFAULT_AGENT_MODELS = {
 var DEFAULT_HIVE_CONFIG = {
   $schema: "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
   enableToolsFor: [],
+  disableSkills: [],
+  disableMcps: [],
   agents: {
     "hive-master": {
       model: DEFAULT_AGENT_MODELS["hive-master"],

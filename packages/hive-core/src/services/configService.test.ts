@@ -79,3 +79,41 @@ describe("ConfigService defaults", () => {
     expect(agentConfig.model).toBe("github-copilot/claude-opus-4.5");
   });
 });
+
+describe("ConfigService disabled skills/mcps", () => {
+  it("returns empty arrays when not configured", () => {
+    const service = new ConfigService();
+    expect(service.getDisabledSkills()).toEqual([]);
+    expect(service.getDisabledMcps()).toEqual([]);
+  });
+
+  it("returns configured disabled skills", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        disableSkills: ["brainstorming", "writing-plans"],
+      }),
+    );
+
+    expect(service.getDisabledSkills()).toEqual(["brainstorming", "writing-plans"]);
+  });
+
+  it("returns configured disabled MCPs", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        disableMcps: ["websearch", "ast_grep"],
+      }),
+    );
+
+    expect(service.getDisabledMcps()).toEqual(["websearch", "ast_grep"]);
+  });
+});
