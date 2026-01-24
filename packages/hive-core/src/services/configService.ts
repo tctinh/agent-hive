@@ -183,7 +183,7 @@ export class ConfigService {
    */
   getAgentConfig(
     agent: 'hive-master' | 'architect-planner' | 'swarm-orchestrator' | 'scout-researcher' | 'forager-worker' | 'hygienic-reviewer',
-  ): { model?: string; temperature?: number; skills?: string[] } {
+  ): { model?: string; temperature?: number; skills?: string[]; variant?: string } {
     const config = this.get();
     return config.agents?.[agent] ?? {};
   }

@@ -145,6 +145,8 @@ export interface AgentModelConfig {
   temperature?: number;
   /** Skills to enable for this agent */
   skills?: string[];
+  /** Variant key for model reasoning/effort level (e.g., 'low', 'medium', 'high', 'max') */
+  variant?: string;
 }
 
 export interface HiveConfig {

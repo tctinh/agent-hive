@@ -70,6 +70,10 @@
             "type": "string"
           },
           "description": "Skills enabled for this agent"
+        },
+        "variant": {
+          "type": "string",
+          "description": "Variant key for model reasoning/effort level (e.g., 'low', 'medium', 'high', 'max'). Must match a key in opencode.json provider.<provider>.models.<model>.variants"
         }
       }
     }
