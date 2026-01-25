@@ -201,7 +201,7 @@ Do it
       JSON.stringify({
         agents: {
           "hive-master": {
-            autoLoadSkills: ["onboarding"],
+            autoLoadSkills: ["brainstorming"],
           },
         },
       }),
@@ -226,13 +226,18 @@ Do it
     const joined = output.system.join("\n");
     expect(joined).toContain("## Hive - Feature Development System");
     expect(joined).toContain("hive_feature_create");
-    const onboardingSkill = BUILTIN_SKILLS.find((skill) => skill.name === "onboarding");
-    expect(onboardingSkill).toBeDefined();
+    
+    // Verify auto-load skill injection: brainstorming skill content should be present
+    const brainstormingSkill = BUILTIN_SKILLS.find((skill) => skill.name === "brainstorming");
+    expect(brainstormingSkill).toBeDefined();
+    expect(joined).toContain(brainstormingSkill!.template.slice(0, 50)); // Check first 50 chars of template
+    
+    // Verify ordering: HIVE_SYSTEM_PROMPT → autoLoad skills → status hint → base agent prompt
     const hiveSystemIndex = output.system.findIndex((entry) =>
       entry.includes("## Hive - Feature Development System"),
     );
-    const onboardingIndex = output.system.findIndex(
-      (entry) => onboardingSkill && entry.includes(onboardingSkill.template),
+    const brainstormingIndex = output.system.findIndex(
+      (entry) => brainstormingSkill && entry.includes(brainstormingSkill.template.slice(0, 50)),
     );
     const statusHintIndex = output.system.findIndex((entry) =>
       entry.includes("### Current Hive Status"),
@@ -242,8 +247,8 @@ Do it
     );
 
     expect(hiveSystemIndex).toBeGreaterThanOrEqual(0);
-    expect(onboardingIndex).toBeGreaterThan(hiveSystemIndex);
-    expect(statusHintIndex).toBeGreaterThan(onboardingIndex);
+    expect(brainstormingIndex).toBeGreaterThan(hiveSystemIndex);
+    expect(statusHintIndex).toBeGreaterThan(brainstormingIndex);
     expect(agentPromptIndex).toBeGreaterThan(statusHintIndex);
   });
 });
