@@ -47,7 +47,7 @@ packages/
 
 - `spec.md` is the single source for plan/context/prior task summaries in worker prompts to avoid duplication.
 - `hive_exec_start` writes the full prompt to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` and returns `workerPromptPath` plus a short preview.
-- Prompt budgets default to last 10 tasks, 500 chars per summary, 5KB per context file, 20KB total; `promptMeta`, `payloadMeta`, and `warnings` report sizes.
+- Prompt budgets default to last 10 tasks, 2000 chars per summary, 20KB per context file, 60KB total; `promptMeta`, `payloadMeta`, and `warnings` report sizes.
 
 ## Feature Resolution (v0.5.0)
 

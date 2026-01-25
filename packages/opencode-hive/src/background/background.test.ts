@@ -2153,16 +2153,16 @@ describe('Deterministic Prompt Budgeting - Integration', () => {
       expect(DEFAULT_BUDGET.maxTasks).toBe(10);
     });
 
-    it('allows useful summaries (500 chars ~125 words)', () => {
-      expect(DEFAULT_BUDGET.maxSummaryChars).toBe(500);
+    it('allows useful summaries (2000 chars ~500 words)', () => {
+      expect(DEFAULT_BUDGET.maxSummaryChars).toBe(2000);
     });
 
-    it('bounds total context to 20KB', () => {
-      expect(DEFAULT_BUDGET.maxTotalContextChars).toBe(20000);
+    it('bounds total context to 60KB', () => {
+      expect(DEFAULT_BUDGET.maxTotalContextChars).toBe(60000);
     });
 
-    it('bounds individual context files to 5KB', () => {
-      expect(DEFAULT_BUDGET.maxContextChars).toBe(5000);
+    it('bounds individual context files to 20KB', () => {
+      expect(DEFAULT_BUDGET.maxContextChars).toBe(20000);
     });
   });
 });

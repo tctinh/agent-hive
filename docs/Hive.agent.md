@@ -236,8 +236,8 @@ Hive automatically bounds worker prompt sizes to prevent context overflow:
 ### Budgeting
 
 - **Task history**: Last 10 completed tasks included (older tasks referenced by path)
-- **Task summaries**: Truncated to 500 chars each with `...[truncated]` marker
-- **Context files**: Individual files capped at 5KB, total at 20KB
+- **Task summaries**: Truncated to 2000 chars each with `...[truncated]` marker
+- **Context files**: Individual files capped at 20KB, total at 60KB
 - **Full access**: Workers can always read full content from `.hive/` file paths
 
 ### Observability

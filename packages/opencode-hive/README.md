@@ -95,9 +95,9 @@ Hive automatically bounds worker prompt sizes to prevent context overflow and to
 | Limit | Default | Description |
 |-------|---------|-------------|
 | `maxTasks` | 10 | Number of previous tasks included |
-| `maxSummaryChars` | 500 | Max chars per task summary |
-| `maxContextChars` | 5,000 | Max chars per context file |
-| `maxTotalContextChars` | 20,000 | Total context budget |
+| `maxSummaryChars` | 2,000 | Max chars per task summary |
+| `maxContextChars` | 20,000 | Max chars per context file |
+| `maxTotalContextChars` | 60,000 | Total context budget |
 
 When limits are exceeded, content is truncated with `...[truncated]` markers and file path hints are provided so workers can read the full content.
 

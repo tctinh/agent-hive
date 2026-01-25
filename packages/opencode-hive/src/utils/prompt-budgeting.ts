@@ -69,11 +69,11 @@ export interface TruncationEvent {
 export interface BudgetConfig {
   /** Max number of previous tasks to include (default: 10) */
   maxTasks?: number;
-  /** Max chars per task summary (default: 500) */
+  /** Max chars per task summary (default: 2000) */
   maxSummaryChars?: number;
-  /** Max chars per context file (default: 5000) */
+  /** Max chars per context file (default: 20000) */
   maxContextChars?: number;
-  /** Max total chars for all context files combined (default: 20000) */
+  /** Max total chars for all context files combined (default: 60000) */
   maxTotalContextChars?: number;
   /** Feature name for generating file path hints */
   feature?: string;
@@ -109,17 +109,17 @@ export interface ContextBudgetResult {
  * Conservative defaults that balance context richness with bounded growth.
  */
 export const DEFAULT_BUDGET: Required<Omit<BudgetConfig, 'feature'>> = {
-  // Include last 10 completed tasks (enough context without overwhelming)
+  // Include last 10 completed tasks (typical feature scale)
   maxTasks: 10,
 
-  // 500 chars per summary (~125 words, a solid paragraph)
-  maxSummaryChars: 500,
+  // 2000 chars per summary (~500 words)
+  maxSummaryChars: 2000,
 
-  // 5KB per context file (encourages focused context files)
-  maxContextChars: 5000,
+  // 20KB per context file
+  maxContextChars: 20000,
 
-  // 20KB total context (keeps prompt bounded even with many files)
-  maxTotalContextChars: 20000,
+  // 60KB total context
+  maxTotalContextChars: 60000,
 };
 
 // ============================================================================
