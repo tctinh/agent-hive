@@ -183,9 +183,22 @@ export class ConfigService {
    */
   getAgentConfig(
     agent: 'hive-master' | 'architect-planner' | 'swarm-orchestrator' | 'scout-researcher' | 'forager-worker' | 'hygienic-reviewer',
-  ): { model?: string; temperature?: number; skills?: string[]; variant?: string } {
+  ): { model?: string; temperature?: number; skills?: string[]; autoLoadSkills?: string[]; variant?: string } {
     const config = this.get();
-    return config.agents?.[agent] ?? {};
+    const agentConfig = config.agents?.[agent] ?? {};
+    const defaultAutoLoadSkills = DEFAULT_HIVE_CONFIG.agents?.[agent]?.autoLoadSkills ?? [];
+    const userAutoLoadSkills = agentConfig.autoLoadSkills ?? [];
+    const combinedAutoLoadSkills = [...defaultAutoLoadSkills, ...userAutoLoadSkills];
+    const uniqueAutoLoadSkills = Array.from(new Set(combinedAutoLoadSkills));
+    const disabledSkills = config.disableSkills ?? [];
+    const effectiveAutoLoadSkills = uniqueAutoLoadSkills.filter(
+      (skill) => !disabledSkills.includes(skill),
+    );
+
+    return {
+      ...agentConfig,
+      autoLoadSkills: effectiveAutoLoadSkills,
+    };
   }
 
   /**

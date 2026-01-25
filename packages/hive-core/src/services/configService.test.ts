@@ -118,6 +118,59 @@ describe("ConfigService defaults", () => {
     expect(scoutConfig.temperature).toBe(0.2);
   });
 
+  it("merges autoLoadSkills defaults and overrides", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          agents: {
+            "forager-worker": {
+              autoLoadSkills: ["custom-skill", "verification-before-completion"],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const config = service.getAgentConfig("forager-worker");
+    expect(config.autoLoadSkills).toEqual([
+      "test-driven-development",
+      "verification-before-completion",
+      "custom-skill",
+    ]);
+  });
+
+  it("removes autoLoadSkills via disableSkills", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          disableSkills: ["onboarding", "custom-skill"],
+          agents: {
+            "hive-master": {
+              autoLoadSkills: ["custom-skill"],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const config = service.getAgentConfig("hive-master");
+    expect(config.autoLoadSkills).toEqual([]);
+  });
+
   it("defaults have no variant set", () => {
     const service = new ConfigService();
     const config = service.get();
