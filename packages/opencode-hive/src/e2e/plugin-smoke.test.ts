@@ -4,6 +4,7 @@ import * as path from "path";
 import type { PluginInput } from "@opencode-ai/plugin";
 import { createOpencodeClient } from "@opencode-ai/sdk";
 import plugin from "../index";
+import { BUILTIN_SKILLS } from "../skills/registry.generated.js";
 
 const OPENCODE_CLIENT = createOpencodeClient({ baseUrl: "http://localhost:1" });
 
@@ -90,15 +91,23 @@ function createProject(worktree: string): PluginInput["project"] {
 
 describe("e2e: opencode-hive plugin (in-process)", () => {
   let testRoot: string;
+  let originalHome: string | undefined;
 
   beforeEach(() => {
+    originalHome = process.env.HOME;
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
     fs.mkdirSync(TEST_ROOT_BASE, { recursive: true });
     testRoot = fs.mkdtempSync(path.join(TEST_ROOT_BASE, "project-"));
+    process.env.HOME = testRoot;
   });
 
   afterEach(() => {
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
   });
 
   it("registers expected tools and basic workflow works", async () => {
@@ -185,6 +194,18 @@ Do it
   });
 
   it("system prompt hook injects Hive instructions", async () => {
+    const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agents: {
+          "hive-master": {
+            autoLoadSkills: ["onboarding"],
+          },
+        },
+      }),
+    );
     const ctx: PluginInput = {
       directory: testRoot,
       worktree: testRoot,
@@ -200,9 +221,29 @@ Do it
 
     const output = { system: [] as string[] };
     await hooks["experimental.chat.system.transform"]?.({}, output);
+    output.system.push("## Base Agent Prompt");
 
     const joined = output.system.join("\n");
     expect(joined).toContain("## Hive - Feature Development System");
     expect(joined).toContain("hive_feature_create");
+    const onboardingSkill = BUILTIN_SKILLS.find((skill) => skill.name === "onboarding");
+    expect(onboardingSkill).toBeDefined();
+    const hiveSystemIndex = output.system.findIndex((entry) =>
+      entry.includes("## Hive - Feature Development System"),
+    );
+    const onboardingIndex = output.system.findIndex(
+      (entry) => onboardingSkill && entry.includes(onboardingSkill.template),
+    );
+    const statusHintIndex = output.system.findIndex((entry) =>
+      entry.includes("### Current Hive Status"),
+    );
+    const agentPromptIndex = output.system.findIndex((entry) =>
+      entry.includes("## Base Agent Prompt"),
+    );
+
+    expect(hiveSystemIndex).toBeGreaterThanOrEqual(0);
+    expect(onboardingIndex).toBeGreaterThan(hiveSystemIndex);
+    expect(statusHintIndex).toBeGreaterThan(onboardingIndex);
+    expect(agentPromptIndex).toBeGreaterThan(statusHintIndex);
   });
 });
