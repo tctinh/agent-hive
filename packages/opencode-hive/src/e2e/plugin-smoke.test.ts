@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import type { PluginInput } from "@opencode-ai/plugin";
@@ -95,6 +96,13 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
     fs.mkdirSync(TEST_ROOT_BASE, { recursive: true });
     testRoot = fs.mkdtempSync(path.join(TEST_ROOT_BASE, "project-"));
+
+    execSync("git init", { cwd: testRoot });
+    execSync('git config user.email "test@example.com"', { cwd: testRoot });
+    execSync('git config user.name "Test"', { cwd: testRoot });
+    fs.writeFileSync(path.join(testRoot, "README.md"), "smoke test");
+    execSync("git add README.md", { cwd: testRoot });
+    execSync('git commit -m "init"', { cwd: testRoot });
   });
 
   afterEach(() => {
@@ -182,6 +190,33 @@ Do it
     };
 
     expect(featureJson.sessionId).toBe(sessionID);
+
+    const execStartOutput = await hooks.tool!.hive_exec_start.execute(
+      { feature: "smoke-feature", task: "01-first-task" },
+      toolContext
+    );
+    const execStart = JSON.parse(execStartOutput as string) as {
+      instructions?: string;
+    };
+
+    expect(execStart.instructions).toContain(
+      "Wait for the completion notification (no polling required)."
+    );
+    expect(execStart.instructions).toContain(
+      "Use hive_worker_status only for spot checks or diagnosing stuck tasks."
+    );
+    expect(execStart.instructions).toContain(
+      "Use background_output only if interim output is explicitly needed, or after the completion notification arrives."
+    );
+
+    const statusOutput = await hooks.tool!.hive_worker_status.execute(
+      { feature: "smoke-feature" },
+      toolContext
+    );
+    const status = JSON.parse(statusOutput as string) as { hint?: string };
+
+    expect(status.hint).toContain("Wait for the completion notification");
+    expect(status.hint).toContain("spot checks");
   });
 
   it("system prompt hook injects Hive instructions", async () => {

@@ -715,7 +715,11 @@ background_task({
 \`\`\`
 
 After spawning:
-- Monitor with hive_worker_status
+- Wait for the completion notification (no polling required).
+- Use hive_worker_status only for spot checks or diagnosing stuck tasks.
+- Use background_output only if interim output is explicitly needed, or after the completion notification arrives.
+- After receiving the <system-reminder> with the worker task_id, call background_output({ task_id: "<id>", block: false }) to fetch the final result.
+- If you suspect notifications did not deliver, do a single hive_worker_status() spot check.
 - Handle blockers when worker exits
 - Merge completed work with hive_merge
 
@@ -946,7 +950,7 @@ Re-run with updated summary showing verification results.`;
               ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
               : workers.some(w => w.maybeStuck)
                 ? 'Some workers may be stuck. Use background_output({ task_id }) to check output, or abort with hive_exec_abort.'
-                : 'Workers in progress. Use hive_worker_status and background_output for live output.',
+                : 'Workers in progress. Wait for the completion notification (no polling required). Use hive_worker_status for spot checks; use background_output only if interim output is explicitly needed.',
           }, null, 2);
         },
       }),
