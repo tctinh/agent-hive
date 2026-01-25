@@ -148,6 +148,34 @@ Each agent can have specific skills enabled. If configured, only those skills ar
 
 Note: Wildcards like `["*"]` are **not supported** - use explicit skill names or omit the field entirely for all skills.
 
+### Auto-load Skills
+
+Use `autoLoadSkills` to automatically inject skills into an agent's system prompt (in addition to any skills selected by the agent).
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
+  "agents": {
+    "hive-master": {
+      "autoLoadSkills": ["onboarding"]
+    },
+    "forager-worker": {
+      "autoLoadSkills": ["test-driven-development", "verification-before-completion"]
+    }
+  }
+}
+```
+
+**Default auto-load skills by agent:**
+
+| Agent | autoLoadSkills default |
+|-------|------------------------|
+| `hive-master` | `onboarding` |
+| `forager-worker` | `test-driven-development`, `verification-before-completion` |
+| `scout-researcher` | `parallel-exploration` |
+| `architect-planner` | `onboarding` |
+| `swarm-orchestrator` | (none) |
+
 ### Per-Agent Model Variants
 
 You can set a `variant` for each Hive agent to control model reasoning/effort level. Variants are keys that map to model-specific option overrides defined in your `opencode.json`.
