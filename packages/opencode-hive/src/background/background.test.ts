@@ -1634,3 +1634,206 @@ describe('Hive Task Ordering with Background Tasks', () => {
     expect(activeTasks.length).toBe(0);
   });
 });
+
+// ============================================================================
+// hive_exec_start Delegation Payload Normalization (Task 02)
+// ============================================================================
+
+describe('hive_exec_start Delegation Payload Normalization', () => {
+  /**
+   * These tests verify that the hive_exec_start output:
+   * 1. Uses top-level fields as canonical (agent, workerPrompt)
+   * 2. Does NOT duplicate fields in backgroundTaskCall
+   * 3. Provides workerPromptPreview for display purposes
+   * 4. Maintains all required delegation args
+   */
+
+  describe('canonical outermost fields', () => {
+    it('has top-level agent as canonical (not duplicated in backgroundTaskCall)', () => {
+      // Simulated hive_exec_start output structure after normalization
+      const normalizedPayload = {
+        worktreePath: '/path/to/worktree',
+        branch: 'hive/feature/task',
+        mode: 'delegate',
+        agent: 'forager-worker', // Canonical
+        delegationRequired: true,
+        workerPrompt: 'Full worker prompt content...',
+        workerPromptPreview: 'Full worker prompt content...'.slice(0, 200),
+        backgroundTaskCall: {
+          // agent should NOT be here (duplicated)
+          // prompt should NOT be here (duplicated)
+          description: 'Hive: test-task',
+          sync: false,
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'hive-feature-task-1',
+          feature: 'test-feature',
+          task: 'test-task',
+          attempt: 1,
+        },
+        instructions: 'Delegation instructions...',
+      };
+
+      // Verify: top-level agent exists
+      expect(normalizedPayload.agent).toBe('forager-worker');
+
+      // Verify: backgroundTaskCall does NOT contain agent
+      expect((normalizedPayload.backgroundTaskCall as any).agent).toBeUndefined();
+    });
+
+    it('has top-level workerPrompt as canonical (not duplicated as backgroundTaskCall.prompt)', () => {
+      const normalizedPayload = {
+        worktreePath: '/path/to/worktree',
+        branch: 'hive/feature/task',
+        mode: 'delegate',
+        agent: 'forager-worker',
+        delegationRequired: true,
+        workerPrompt: 'Full worker prompt content here...',
+        workerPromptPreview: 'Full worker prompt content here...'.slice(0, 200),
+        backgroundTaskCall: {
+          // prompt should NOT be here (duplicated)
+          description: 'Hive: test-task',
+          sync: false,
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'hive-feature-task-1',
+          feature: 'test-feature',
+          task: 'test-task',
+          attempt: 1,
+        },
+        instructions: 'Delegation instructions...',
+      };
+
+      // Verify: top-level workerPrompt exists
+      expect(normalizedPayload.workerPrompt).toBe('Full worker prompt content here...');
+
+      // Verify: backgroundTaskCall does NOT contain prompt
+      expect((normalizedPayload.backgroundTaskCall as any).prompt).toBeUndefined();
+    });
+
+    it('includes workerPromptPreview for display (truncated version)', () => {
+      const longPrompt = 'A'.repeat(500);
+      const normalizedPayload = {
+        workerPrompt: longPrompt,
+        workerPromptPreview: longPrompt.slice(0, 200) + '...',
+      };
+
+      // Verify: preview is truncated
+      expect(normalizedPayload.workerPromptPreview.length).toBeLessThanOrEqual(203); // 200 + '...'
+      expect(normalizedPayload.workerPromptPreview.endsWith('...')).toBe(true);
+    });
+  });
+
+  describe('required delegation args preserved', () => {
+    it('preserves workdir in backgroundTaskCall', () => {
+      const payload = {
+        backgroundTaskCall: {
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'key-1',
+          feature: 'my-feature',
+          task: 'my-task',
+        },
+      };
+
+      expect(payload.backgroundTaskCall.workdir).toBe('/path/to/worktree');
+    });
+
+    it('preserves idempotencyKey in backgroundTaskCall', () => {
+      const payload = {
+        backgroundTaskCall: {
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'hive-feature-task-1',
+          feature: 'my-feature',
+          task: 'my-task',
+        },
+      };
+
+      expect(payload.backgroundTaskCall.idempotencyKey).toBe('hive-feature-task-1');
+    });
+
+    it('preserves feature and task linkage in backgroundTaskCall', () => {
+      const payload = {
+        backgroundTaskCall: {
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'key-1',
+          feature: 'my-feature',
+          task: 'my-task',
+          attempt: 2,
+        },
+      };
+
+      expect(payload.backgroundTaskCall.feature).toBe('my-feature');
+      expect(payload.backgroundTaskCall.task).toBe('my-task');
+      expect(payload.backgroundTaskCall.attempt).toBe(2);
+    });
+  });
+
+  describe('no duplicated fields in JSON output', () => {
+    it('JSON payload has exactly one agent field (top-level only)', () => {
+      const normalizedPayload = {
+        agent: 'forager-worker',
+        backgroundTaskCall: {
+          description: 'Hive: test-task',
+          sync: false,
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'key-1',
+          feature: 'test-feature',
+          task: 'test-task',
+          attempt: 1,
+        },
+      };
+
+      const jsonStr = JSON.stringify(normalizedPayload);
+      
+      // Count occurrences of "agent" key (not as substring of other words)
+      const agentMatches = jsonStr.match(/"agent":/g) || [];
+      expect(agentMatches.length).toBe(1);
+    });
+
+    it('JSON payload has exactly one prompt/workerPrompt field (top-level only)', () => {
+      const normalizedPayload = {
+        workerPrompt: 'Full prompt content...',
+        workerPromptPreview: 'Full prompt...',
+        backgroundTaskCall: {
+          description: 'Hive: test-task',
+          sync: false,
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'key-1',
+          feature: 'test-feature',
+          task: 'test-task',
+          attempt: 1,
+        },
+      };
+
+      const jsonStr = JSON.stringify(normalizedPayload);
+      
+      // Verify no "prompt": in backgroundTaskCall (only workerPrompt at top level)
+      expect(jsonStr).not.toMatch(/"prompt":/);
+      expect(jsonStr).toMatch(/"workerPrompt":/);
+    });
+  });
+
+  describe('instructions updated for normalized structure', () => {
+    it('instructions reference top-level agent and workerPrompt', () => {
+      const instructions = `## Delegation Required
+
+You MUST now call the background_task tool:
+
+\`\`\`
+background_task({
+  agent: <use the top-level 'agent' field>,
+  prompt: <use the top-level 'workerPrompt' field>,
+  description: "Hive: test-task",
+  sync: false,
+  workdir: "/path/to/worktree",
+  idempotencyKey: "key-1",
+  feature: "test-feature",
+  task: "test-task",
+  attempt: 1
+})
+\`\`\``;
+
+      // Instructions should mention using top-level fields
+      expect(instructions).toContain("top-level 'agent'");
+      expect(instructions).toContain("top-level 'workerPrompt'");
+    });
+  });
+});

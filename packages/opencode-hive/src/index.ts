@@ -689,16 +689,26 @@ Add this section to your plan content and try again.`;
             workerPrompt,
           });
 
-          // Build the response object (without workerPrompt for payload size calculation)
+          // Build workerPromptPreview (truncated for display, max 200 chars)
+          const PREVIEW_MAX_LENGTH = 200;
+          const workerPromptPreview = workerPrompt.length > PREVIEW_MAX_LENGTH
+            ? workerPrompt.slice(0, PREVIEW_MAX_LENGTH) + '...'
+            : workerPrompt;
+
+          // Build the response object with canonical outermost fields
+          // - agent: top-level only (NOT duplicated in backgroundTaskCall)
+          // - workerPrompt: top-level only (NOT duplicated as backgroundTaskCall.prompt)
+          // - backgroundTaskCall: contains only delegation-specific args (workdir, idempotencyKey, etc.)
           const responseBase = {
             worktreePath: worktree.path,
             branch: worktree.branch,
             mode: 'delegate',
-            agent,
+            agent, // Canonical: top-level only
             delegationRequired: true,
+            workerPrompt, // Canonical: top-level only (full prompt)
+            workerPromptPreview, // Truncated preview for display
             backgroundTaskCall: {
-              agent,
-              prompt: workerPrompt,
+              // NOTE: agent and prompt are NOT duplicated here - use top-level fields
               description: `Hive: ${task}`,
               sync: false,
               workdir: worktree.path,
@@ -713,8 +723,8 @@ You MUST now call the background_task tool to spawn a Forager (Worker/Coder) wor
 
 \`\`\`
 background_task({
-  agent: "forager-worker",
-  prompt: <the workerPrompt below>,
+  agent: <use the top-level 'agent' field: "${agent}">,
+  prompt: <use the top-level 'workerPrompt' field>,
   description: "Hive: ${task}",
   sync: false,
   workdir: "${worktree.path}",
@@ -724,6 +734,9 @@ background_task({
   attempt: ${attempt}
 })
 \`\`\`
+
+**Note**: The 'agent' and 'workerPrompt' are provided as top-level fields.
+Do NOT look for them inside backgroundTaskCall.
 
 After spawning:
 - Monitor with hive_worker_status
@@ -742,7 +755,6 @@ If background_task rejects workdir/idempotencyKey/feature/task/attempt parameter
 1. Ensure agent-hive loads AFTER any other plugin that registers background_* tools
 2. Confirm tool outputs include \`provider: "hive"\`
 3. Re-run hive_exec_start and then background_task`,
-            workerPrompt,
           };
 
           // Calculate payload meta (JSON size with inlined prompt)
