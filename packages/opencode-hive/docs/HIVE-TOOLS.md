@@ -30,6 +30,14 @@
 | `hive_exec_complete` | Commit changes, write report (does NOT merge) |
 | `hive_exec_abort` | Discard changes, reset status |
 
+#### hive_exec_start output
+
+- `workerPromptPath`: file path to `.hive/features/<feature>/tasks/<task>/worker-prompt.md`
+- `workerPromptPreview`: short preview of the prompt
+- `promptMeta`, `payloadMeta`, `budgetApplied`, `warnings`: size and budget observability
+
+Delegation uses `background_task` with `promptFile` pointing at `workerPromptPath` to avoid inlining large prompts.
+
 ### Merge (2 tools)
 | Tool | Purpose |
 |------|---------|
