@@ -1,7 +1,8 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { tool, type Plugin, type ToolDefinition } from "@opencode-ai/plugin";
-import { getBuiltinSkills, getFilteredSkills, loadBuiltinSkill } from './skills/builtin.js';
+import { getFilteredSkills, loadBuiltinSkill } from './skills/builtin.js';
+import { BUILTIN_SKILLS } from './skills/registry.generated.js';
 import type { SkillDefinition } from './skills/types.js';
 // Bee agents (lean, focused)
 import { QUEEN_BEE_PROMPT } from './agents/hive.js';
@@ -188,6 +189,7 @@ const plugin: Plugin = async (ctx) => {
   // Get filtered skills (globally disabled skills removed)
   // Per-agent skill filtering could be added here based on agent context
   const filteredSkills = getFilteredSkills(disabledSkills);
+  const effectiveAutoLoadSkills = configService.getAgentConfig('hive-master').autoLoadSkills ?? [];
   const worktreeService = new WorktreeService({
     baseDir: directory,
     hiveDir: path.join(directory, '.hive'),
@@ -262,6 +264,17 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
   return {
     "experimental.chat.system.transform": async (_input: unknown, output: { system: string[] }) => {
       output.system.push(HIVE_SYSTEM_PROMPT);
+
+      if (effectiveAutoLoadSkills.length > 0) {
+        for (const skillId of effectiveAutoLoadSkills) {
+          const skill = BUILTIN_SKILLS.find((entry) => entry.name === skillId);
+          if (!skill) {
+            console.warn("Unknown skill id", skillId);
+            continue;
+          }
+          output.system.push(skill.template);
+        }
+      }
 
       const activeFeature = resolveFeature();
       if (activeFeature) {
