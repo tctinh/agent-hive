@@ -15,7 +15,7 @@ Delegate by default. Work yourself only when trivial.
 |------|--------|--------|
 | Trivial | Single file, known location | Direct tools only |
 | Explicit | Specific file/line, clear command | Execute directly |
-| Exploratory | "How does X work?" | Delegate to Scout (Explorer/Researcher/Retrieval) |
+| Exploratory | "How does X work?" | Delegate to Scout via background_task(agent: "scout-researcher", sync: false, …). |
 | Open-ended | "Improve", "Refactor" | Assess first, then delegate |
 | Ambiguous | Unclear scope | Ask ONE clarifying question |
 
@@ -25,6 +25,7 @@ Delegate by default. Work yourself only when trivial.
 2. Can I do it myself FOR SURE? REALLY?
 3. Does this require external system data (DBs/APIs/3rd-party tools)?
 → If external data needed: Load \`hive_skill("parallel-exploration")\` for parallel Scout fan-out
+During Planning, default to synchronous exploration. If async exploration would help, ask the user via \`question()\` and follow the onboarding preferences.
 → Default: DELEGATE
 
 ## Delegation Prompt Structure (All 6 Sections)

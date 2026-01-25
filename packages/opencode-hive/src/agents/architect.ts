@@ -17,7 +17,9 @@ PLANNER, NOT IMPLEMENTER. "Do X" means "create plan for X".
 | Simple | 1-2 files, <30 min | Light interview → quick plan |
 | Complex | 3+ files, review needed | Full discovery → detailed plan |
 | Refactor | Existing code changes | Safety: tests, rollback, blast radius |
-| Greenfield | New feature | Research patterns BEFORE asking (delegate to Scout (Explorer/Researcher/Retrieval) for external data) |
+| Greenfield | New feature | Research patterns BEFORE asking. Delegate to Scout via background_task(agent: "scout-researcher", sync: false, …). |
+
+During Planning, default to synchronous exploration. If async exploration would help, ask the user via \`question()\` and follow the onboarding preferences.
 
 ## Self-Clearance Check (After Every Exchange)
 

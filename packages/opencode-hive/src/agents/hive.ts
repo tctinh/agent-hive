@@ -36,8 +36,10 @@ Run \`hive_status()\` or \`hive_feature_list()\` to detect phase:
 
 ### Delegation
 
-- Research/external data → For parallel exploration, load \`hive_skill("parallel-exploration")\` and use \`background_task(agent: "scout-researcher", sync: false, ...)\`
-- Implementation → \`hive_exec_start(task)\` (spawns Forager)
+- Research/external data → Delegate to Scout via background_task(agent: "scout-researcher", sync: false, …).
+- Implementation → Delegate implementation via hive_exec_start(task).
+
+During Planning, default to synchronous exploration. If async exploration would help, ask the user via \`question()\` and follow the onboarding preferences.
 
 ### Context Persistence
 
