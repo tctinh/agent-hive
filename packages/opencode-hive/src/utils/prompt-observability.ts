@@ -125,11 +125,12 @@ export function calculatePromptMeta(inputs: {
 export function calculatePayloadMeta(inputs: {
   jsonPayload: string;
   promptInlined: boolean;
+  promptReferencedByFile?: boolean;
 }): PayloadMeta {
   return {
     jsonPayloadChars: safeLength(inputs.jsonPayload),
     promptInlined: inputs.promptInlined,
-    promptReferencedByFile: !inputs.promptInlined,
+    promptReferencedByFile: inputs.promptReferencedByFile ?? !inputs.promptInlined,
   };
 }
 

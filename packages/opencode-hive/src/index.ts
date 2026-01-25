@@ -87,6 +87,7 @@ import {
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
 import { calculatePromptMeta, calculatePayloadMeta, checkWarnings } from "./utils/prompt-observability";
 import { applyTaskBudget, applyContextBudget, DEFAULT_BUDGET, type TruncationEvent } from "./utils/prompt-budgeting";
+import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { createBackgroundManager, type OpencodeClient } from "./background/index.js";
 import { createBackgroundTools } from "./tools/background-tools.js";
 import { HIVE_AGENT_NAMES, isHiveAgent, normalizeVariant } from "./hooks/variant-hook.js";
@@ -718,6 +719,14 @@ Add this section to your plan content and try again.`;
             workerPrompt,
           });
 
+          // Write worker prompt to file to prevent tool output truncation (Task 05)
+          // This keeps the tool output small while preserving full prompt content
+          const hiveDir = path.join(directory, '.hive');
+          const workerPromptPath = writeWorkerPromptFile(feature, task, workerPrompt, hiveDir);
+          
+          // Convert to relative path for portability in output
+          const relativePromptPath = path.relative(directory, workerPromptPath);
+
           // Build workerPromptPreview (truncated for display, max 200 chars)
           const PREVIEW_MAX_LENGTH = 200;
           const workerPromptPreview = workerPrompt.length > PREVIEW_MAX_LENGTH
@@ -726,18 +735,19 @@ Add this section to your plan content and try again.`;
 
           // Build the response object with canonical outermost fields
           // - agent: top-level only (NOT duplicated in backgroundTaskCall)
-          // - workerPrompt: top-level only (NOT duplicated as backgroundTaskCall.prompt)
-          // - backgroundTaskCall: contains only delegation-specific args (workdir, idempotencyKey, etc.)
+          // - workerPromptPath: file reference (NOT inlined prompt to prevent truncation)
+          // - backgroundTaskCall: contains promptFile reference, NOT inline prompt
           const responseBase = {
             worktreePath: worktree.path,
             branch: worktree.branch,
             mode: 'delegate',
             agent, // Canonical: top-level only
             delegationRequired: true,
-            workerPrompt, // Canonical: top-level only (full prompt)
+            workerPromptPath: relativePromptPath, // File reference (canonical)
             workerPromptPreview, // Truncated preview for display
             backgroundTaskCall: {
-              // NOTE: agent and prompt are NOT duplicated here - use top-level fields
+              // NOTE: Uses promptFile instead of prompt to prevent truncation
+              promptFile: workerPromptPath, // Absolute path for background_task
               description: `Hive: ${task}`,
               sync: false,
               workdir: worktree.path,
@@ -752,8 +762,8 @@ You MUST now call the background_task tool to spawn a Forager (Worker/Coder) wor
 
 \`\`\`
 background_task({
-  agent: <use the top-level 'agent' field: "${agent}">,
-  prompt: <use the top-level 'workerPrompt' field>,
+  agent: "${agent}",
+  promptFile: "${workerPromptPath}",
   description: "Hive: ${task}",
   sync: false,
   workdir: "${worktree.path}",
@@ -764,8 +774,8 @@ background_task({
 })
 \`\`\`
 
-**Note**: The 'agent' and 'workerPrompt' are provided as top-level fields.
-Do NOT look for them inside backgroundTaskCall.
+**Note**: The prompt is stored in a file (workerPromptPath) to prevent tool output truncation.
+Use 'promptFile' parameter instead of 'prompt' for large prompts.
 
 After spawning:
 - Monitor with hive_worker_status
@@ -786,11 +796,12 @@ If background_task rejects workdir/idempotencyKey/feature/task/attempt parameter
 3. Re-run hive_exec_start and then background_task`,
           };
 
-          // Calculate payload meta (JSON size with inlined prompt)
+          // Calculate payload meta (JSON size WITHOUT inlined prompt - file reference only)
           const jsonPayload = JSON.stringify(responseBase, null, 2);
           const payloadMeta = calculatePayloadMeta({
             jsonPayload,
-            promptInlined: true,
+            promptInlined: false, // Prompt is in file, not inlined
+            promptReferencedByFile: true,
           });
 
           // Check for warnings about threshold exceedance

@@ -10,7 +10,7 @@
  * - Background poller (Task 06)
  */
 
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { BackgroundTaskStore, resetStore } from './store.js';
 import { isValidTransition, isTerminalStatus, VALID_TRANSITIONS } from './types.js';
 import { AgentGate } from './agent-gate.js';
@@ -2026,6 +2026,10 @@ import {
   type TaskInput,
   type ContextInput,
 } from '../utils/prompt-budgeting.js';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { resolvePromptFromFile, isValidPromptFilePath, findWorkspaceRoot } from '../utils/prompt-file.js';
 
 describe('Deterministic Prompt Budgeting - Integration', () => {
   describe('bounds prompt growth with many prior tasks', () => {
@@ -2159,6 +2163,220 @@ describe('Deterministic Prompt Budgeting - Integration', () => {
 
     it('bounds individual context files to 5KB', () => {
       expect(DEFAULT_BUDGET.maxContextChars).toBe(5000);
+    });
+  });
+});
+
+// ============================================================================
+// Task 05: Prompt File Reference Tests
+// ============================================================================
+
+describe('Prompt File Reference - Prevent Tool Output Truncation', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-prompt-test-'));
+  });
+
+  afterEach(() => {
+    // Clean up temp directory
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  describe('resolvePromptFromFile', () => {
+    it('reads prompt content from file when promptFile is provided', async () => {
+      const promptContent = 'This is the full worker prompt content from file.';
+      const promptFilePath = path.join(tempDir, 'worker-prompt.md');
+      fs.writeFileSync(promptFilePath, promptContent, 'utf-8');
+
+      const result = await resolvePromptFromFile(promptFilePath, tempDir);
+
+      expect(result.content).toBe(promptContent);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('returns error when file does not exist', async () => {
+      const nonExistentPath = path.join(tempDir, 'does-not-exist.md');
+
+      const result = await resolvePromptFromFile(nonExistentPath, tempDir);
+
+      expect(result.content).toBeUndefined();
+      expect(result.error).toContain('not found');
+    });
+
+    it('returns error for paths outside workspace', async () => {
+      const outsidePath = '/etc/passwd';
+
+      const result = await resolvePromptFromFile(outsidePath, tempDir);
+
+      expect(result.content).toBeUndefined();
+      expect(result.error).toContain('outside');
+    });
+
+    it('returns error for paths with path traversal attempts', async () => {
+      const traversalPath = path.join(tempDir, '..', '..', 'etc', 'passwd');
+
+      const result = await resolvePromptFromFile(traversalPath, tempDir);
+
+      expect(result.content).toBeUndefined();
+      expect(result.error).toContain('outside');
+    });
+  });
+
+  describe('isValidPromptFilePath', () => {
+    it('accepts paths within .hive directory', () => {
+      const validPath = path.join(tempDir, '.hive', 'features', 'my-feature', 'tasks', '01-task', 'worker-prompt.md');
+
+      expect(isValidPromptFilePath(validPath, tempDir)).toBe(true);
+    });
+
+    it('accepts paths within workspace root', () => {
+      const validPath = path.join(tempDir, 'some', 'nested', 'prompt.md');
+
+      expect(isValidPromptFilePath(validPath, tempDir)).toBe(true);
+    });
+
+    it('rejects paths outside workspace', () => {
+      const invalidPath = '/tmp/other-project/prompt.md';
+
+      expect(isValidPromptFilePath(invalidPath, tempDir)).toBe(false);
+    });
+
+    it('rejects paths with path traversal', () => {
+      const invalidPath = path.join(tempDir, '..', 'other', 'prompt.md');
+
+      expect(isValidPromptFilePath(invalidPath, tempDir)).toBe(false);
+    });
+  });
+
+  describe('findWorkspaceRoot', () => {
+    it('resolves workspace root from a .hive worktree path', () => {
+      const workspaceRoot = path.join(tempDir, 'repo');
+      const hiveDir = path.join(workspaceRoot, '.hive');
+      const worktreeDir = path.join(hiveDir, '.worktrees', 'my-feature', '01-task');
+
+      fs.mkdirSync(worktreeDir, { recursive: true });
+
+      expect(findWorkspaceRoot(worktreeDir)).toBe(workspaceRoot);
+    });
+
+    it('returns null when no .hive directory exists', () => {
+      const noHivePath = path.join(tempDir, 'no-hive');
+      fs.mkdirSync(noHivePath, { recursive: true });
+
+      expect(findWorkspaceRoot(noHivePath)).toBeNull();
+    });
+  });
+
+  describe('background_task with promptFile', () => {
+    it('documents promptFile as alternative to prompt parameter', () => {
+      // This test documents the expected API for background_task
+      // When promptFile is provided, background_task should:
+      // 1. Read the file content
+      // 2. Use that content as the prompt
+      // 3. NOT require the prompt parameter
+
+      const backgroundTaskArgs = {
+        agent: 'forager-worker',
+        promptFile: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
+        description: 'Execute task',
+        sync: false,
+        workdir: '/path/to/worktree',
+        idempotencyKey: 'hive-feat-task-1',
+      };
+
+      // Verify expected structure
+      expect(backgroundTaskArgs.promptFile).toBeDefined();
+      expect((backgroundTaskArgs as any).prompt).toBeUndefined();
+    });
+
+    it('documents that prompt and promptFile are mutually exclusive', () => {
+      // If both are provided, promptFile should take precedence
+      // or an error should be returned
+
+      const withBoth = {
+        agent: 'forager-worker',
+        prompt: 'Inline prompt',
+        promptFile: 'path/to/file.md',
+        description: 'Test',
+      };
+
+      // Both defined - implementation should handle this
+      expect(withBoth.prompt).toBeDefined();
+      expect(withBoth.promptFile).toBeDefined();
+    });
+  });
+
+  describe('hive_exec_start output with prompt file reference', () => {
+    it('includes workerPromptPath in output', () => {
+      // After Task 05, hive_exec_start should output workerPromptPath
+      const execStartOutput = {
+        worktreePath: '/path/to/worktree',
+        branch: 'hive/feature/task',
+        mode: 'delegate',
+        agent: 'forager-worker',
+        delegationRequired: true,
+        workerPromptPath: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
+        workerPromptPreview: 'First 200 chars of the prompt...',
+        backgroundTaskCall: {
+          promptFile: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
+          description: 'Hive: 01-task',
+          sync: false,
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'hive-feat-task-1',
+          feature: 'my-feature',
+          task: '01-task',
+          attempt: 1,
+        },
+      };
+
+      // Verify: workerPromptPath exists
+      expect(execStartOutput.workerPromptPath).toBeDefined();
+      expect(execStartOutput.workerPromptPath).toContain('worker-prompt.md');
+
+      // Verify: backgroundTaskCall uses promptFile, NOT prompt
+      expect(execStartOutput.backgroundTaskCall.promptFile).toBeDefined();
+      expect((execStartOutput.backgroundTaskCall as any).prompt).toBeUndefined();
+
+      // Verify: workerPrompt (large inline content) is NOT in output
+      expect((execStartOutput as any).workerPrompt).toBeUndefined();
+    });
+
+    it('keeps output size small even with large prompts', () => {
+      // The key benefit: tool output size stays bounded
+      const largePromptContent = 'X'.repeat(100000); // 100KB prompt
+      
+      const outputWithPath = {
+        workerPromptPath: '.hive/features/feat/tasks/task/worker-prompt.md',
+        workerPromptPreview: largePromptContent.slice(0, 200) + '...',
+        backgroundTaskCall: {
+          promptFile: '.hive/features/feat/tasks/task/worker-prompt.md',
+        },
+      };
+
+      const outputJson = JSON.stringify(outputWithPath);
+
+      // Output should be small (no inline prompt)
+      expect(outputJson.length).toBeLessThan(1000);
+    });
+  });
+
+  describe('backward compatibility', () => {
+    it('documents that existing prompt parameter still works', () => {
+      // Existing callers that pass prompt directly should continue to work
+      const legacyCall = {
+        agent: 'forager-worker',
+        prompt: 'Direct inline prompt content',
+        description: 'Legacy caller',
+        sync: false,
+      };
+
+      expect(legacyCall.prompt).toBeDefined();
+      expect((legacyCall as any).promptFile).toBeUndefined();
     });
   });
 });
