@@ -205,17 +205,17 @@ Do it
     );
     const execStart = JSON.parse(execStartOutput as string) as {
       instructions?: string;
+      backgroundTaskCall?: Record<string, unknown>;
     };
+
+    expect(execStart.backgroundTaskCall).toBeTruthy();
+    expect('sync' in (execStart.backgroundTaskCall as Record<string, unknown>)).toBe(false);
 
     expect(execStart.instructions).toContain(
       "Wait for the completion notification (no polling required)."
     );
-    expect(execStart.instructions).toContain(
-      "Use hive_worker_status only for spot checks or diagnosing stuck tasks."
-    );
-    expect(execStart.instructions).toContain(
-      "Use background_output only if interim output is explicitly needed, or after the completion notification arrives."
-    );
+    expect(execStart.instructions).toContain("sync: true");
+    expect(execStart.instructions).not.toContain("sync: false");
 
     const statusOutput = await hooks.tool!.hive_worker_status.execute(
       { feature: "smoke-feature" },

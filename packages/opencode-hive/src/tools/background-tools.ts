@@ -109,7 +109,7 @@ export function createBackgroundTools(
      * Spawn a new background task.
      */
     background_task: tool({
-      description: 'Spawn a background agent task. Returns task_id for tracking. Use sync=true to wait for completion.',
+      description: 'Spawn a background agent task. Use sync=true to wait for completion (returns output). If sync=false (default), the parent session receives a completion <system-reminder> and you can call background_output to fetch the result.',
       args: {
         agent: tool.schema.string().describe('Agent to use (e.g., "forager-worker", "scout-researcher")'),
         prompt: tool.schema.string().optional().describe('Task instructions/prompt (required if promptFile not provided)'),
@@ -290,7 +290,7 @@ export function createBackgroundTools(
      * Get output from a background task.
      */
     background_output: tool({
-      description: 'Get output from background task. Use block=true to wait for new output.',
+      description: 'Get output from a background task. For sync=false tasks, wait for the completion <system-reminder> and then call with block=false to fetch the result; use block=true only when you need interim output.',
       args: {
         task_id: tool.schema.string().describe('Task ID to get output from'),
         block: tool.schema.boolean().optional().describe('Block waiting for new output (default: false)'),

@@ -781,7 +781,6 @@ Add this section to your plan content and try again.`;
               // NOTE: Uses promptFile instead of prompt to prevent truncation
               promptFile: workerPromptPath, // Absolute path for background_task
               description: `Hive: ${task}`,
-              sync: false,
               workdir: worktree.path,
               idempotencyKey,
               feature,
@@ -790,46 +789,14 @@ Add this section to your plan content and try again.`;
             },
             instructions: `## Delegation Required
 
-You MUST now call the background_task tool to spawn a Forager (Worker/Coder) worker:
+Call the background_task tool to spawn a Forager (Worker/Coder) worker.
 
-\`\`\`
-background_task({
-  agent: "${agent}",
-  promptFile: "${workerPromptPath}",
-  description: "Hive: ${task}",
-  sync: false,
-  workdir: "${worktree.path}",
-  idempotencyKey: "${idempotencyKey}",
-  feature: "${feature}",
-  task: "${task}",
-  attempt: ${attempt}
-})
-\`\`\`
+\`backgroundTaskCall\` contains the canonical tool arguments.
 
-**Note**: The prompt is stored in a file (workerPromptPath) to prevent tool output truncation.
-Use 'promptFile' parameter instead of 'prompt' for large prompts.
+- Add \`sync: true\` if you need the result in this session.
+- Otherwise omit \`sync\`. Wait for the completion notification (no polling required). After the <system-reminder> arrives, call \`background_output({ task_id: "<id>", block: false })\` once to fetch the final result.
 
-After spawning:
-- Wait for the completion notification (no polling required).
-- Use hive_worker_status only for spot checks or diagnosing stuck tasks.
-- Use background_output only if interim output is explicitly needed, or after the completion notification arrives.
-- After receiving the <system-reminder> with the worker task_id, call background_output({ task_id: "<id>", block: false }) to fetch the final result.
-- If you suspect notifications did not deliver, do a single hive_worker_status() spot check.
-- Handle blockers when worker exits
-- Merge completed work with hive_merge
-
-DO NOT do the work yourself. Delegate it.
-
-## Troubleshooting
-
-If background_task rejects workdir/idempotencyKey/feature/task/attempt parameters or the worker runs in the wrong directory:
-
-**Symptom**: "Unknown parameter: workdir" or worker operates on main repo instead of worktree
-**Cause**: background_task tool is not Hive's provider (agent-hive plugin not loaded last)
-**Fix**:
-1. Ensure agent-hive loads AFTER any other plugin that registers background_* tools
-2. Confirm tool outputs include \`provider: "hive"\`
-3. Re-run hive_exec_start and then background_task`,
+Troubleshooting: if you see "Unknown parameter: workdir", your background_task tool is not Hive's provider. Ensure agent-hive loads after other background_* tool providers, then re-run hive_exec_start.`,
           };
 
           // Calculate payload meta (JSON size WITHOUT inlined prompt - file reference only)
@@ -1441,6 +1408,9 @@ Make the requested changes, then call hive_request_review again.`;
           skill: "allow",
           todowrite: "allow",
           todoread: "allow",
+          background_task: "allow",
+          background_output: "allow",
+          background_cancel: "allow",
         },
       };
 
@@ -1458,6 +1428,9 @@ Make the requested changes, then call hive_request_review again.`;
           todowrite: "allow",
           todoread: "allow",
           webfetch: "allow",
+          background_task: "allow",
+          background_output: "allow",
+          background_cancel: "allow",
         },
       };
 
@@ -1472,6 +1445,9 @@ Make the requested changes, then call hive_request_review again.`;
           skill: "allow",
           todowrite: "allow",
           todoread: "allow",
+          background_task: "allow",
+          background_output: "allow",
+          background_cancel: "allow",
         },
       };
 

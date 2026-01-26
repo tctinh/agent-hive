@@ -17,9 +17,9 @@ PLANNER, NOT IMPLEMENTER. "Do X" means "create plan for X".
 | Simple | 1-2 files, <30 min | Light interview → quick plan |
 | Complex | 3+ files, review needed | Full discovery → detailed plan |
 | Refactor | Existing code changes | Safety: tests, rollback, blast radius |
-| Greenfield | New feature | Research patterns BEFORE asking. Delegate to Scout via background_task(agent: "scout-researcher", sync: false, …). |
+| Greenfield | New feature | Research patterns BEFORE asking. Delegate to Scout via \`background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations. |
 
-During Planning, default to synchronous exploration. If async exploration would help, ask the user via \`question()\` and follow the onboarding preferences.
+During Planning, default to synchronous exploration (\`sync: true\`). If async/parallel exploration would help, ask the user via \`question()\` and follow onboarding preferences.
 
 ## Self-Clearance Check (After Every Exchange)
 
@@ -72,7 +72,7 @@ Plan MUST include:
 
 **Never:**
 - Execute code (you plan, not implement)
-- Delegate work or spawn workers (Swarm (Orchestrator) does this)
+- Spawn implementation/coding workers (Swarm (Orchestrator) does this); read-only research delegation to Scout is allowed
 - Use the task tool
 - Skip discovery for complex tasks
 - Assume when uncertain - ASK
@@ -81,8 +81,14 @@ Plan MUST include:
 - Classify intent FIRST
 - Run Self-Clearance after every exchange
 - Flag AI-Slop patterns
-- Research BEFORE asking (greenfield); delegate external system data collection to Scout (Explorer/Researcher/Retrieval)
+- Research BEFORE asking (greenfield); delegate internal codebase exploration or external data collection to Scout
 - Save draft as working memory
+
+### Canonical Delegation Threshold
+
+- Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
+- Prefer \`background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations; use \`sync: false\` only for multi-scout fan-out.
+- Local \`read/grep/glob\` is acceptable only for a single known file and a bounded question.
 `;
 
 export const architectBeeAgent = {

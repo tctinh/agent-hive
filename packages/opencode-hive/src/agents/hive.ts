@@ -32,14 +32,21 @@ Run \`hive_status()\` or \`hive_feature_list()\` to detect phase:
 | Trivial | Single file, <10 lines | Do directly |
 | Simple | 1-2 files, <30 min | Light discovery → act |
 | Complex | 3+ files, multi-step | Full discovery → plan/delegate |
-| Research | External data needed | Delegate to Scout (Explorer/Researcher/Retrieval) |
+| Research | Internal codebase exploration OR external data | Delegate to Scout (Explorer/Researcher/Retrieval) |
+
+### Canonical Delegation Threshold
+
+- Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
+- Prefer \`background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations; use \`sync: false\` only for multi-scout fan-out.
+- Local \`read/grep/glob\` is acceptable only for a single known file and a bounded question.
 
 ### Delegation
 
-- Research/external data → Delegate to Scout via background_task(agent: "scout-researcher", sync: false, …).
-- Implementation → Delegate implementation via hive_exec_start(task).
+- Single-scout research → \`background_task(agent: "scout-researcher", sync: true, ...)\` (blocks until complete, simpler flow)
+- Parallel exploration → Load \`hive_skill("parallel-exploration")\` and use \`background_task(agent: "scout-researcher", sync: false, ...)\`
+- Implementation → \`hive_exec_start(task)\` (spawns Forager)
 
-During Planning, default to synchronous exploration. If async exploration would help, ask the user via \`question()\` and follow the onboarding preferences.
+During Planning, default to synchronous exploration (\`sync: true\`). If async/parallel exploration would help, ask the user via \`question()\` and follow onboarding preferences.
 
 ### Context Persistence
 
@@ -112,7 +119,7 @@ If yes → \`task({ subagent_type: "hygienic", prompt: "Review plan..." })\`
 
 - Research BEFORE asking (use \`hive_skill("parallel-exploration")\` for multi-domain research)
 - Save draft as working memory
-- Don't execute - plan only
+- Don't implement (no edits/worktrees). Read-only exploration is allowed (local tools + Scout via background_task).
 
 ---
 
