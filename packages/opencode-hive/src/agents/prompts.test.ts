@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { QUEEN_BEE_PROMPT } from './hive';
 import { ARCHITECT_BEE_PROMPT } from './architect';
+import { SWARM_BEE_PROMPT } from './swarm';
 
 describe('Hive (Hybrid) prompt', () => {
   describe('delegation planning alignment', () => {
@@ -50,6 +51,26 @@ describe('Architect (Planner) prompt', () => {
 
     it('broadens research to include internal repo exploration', () => {
       expect(ARCHITECT_BEE_PROMPT).toContain('internal codebase');
+    });
+  });
+});
+
+describe('Swarm (Orchestrator) prompt', () => {
+  describe('delegation planning alignment', () => {
+    it('does NOT contain "Cancel background tasks before completion"', () => {
+      expect(SWARM_BEE_PROMPT).not.toContain('Cancel background tasks before completion');
+    });
+
+    it('contains the replacement cancel rule about stale tasks', () => {
+      expect(SWARM_BEE_PROMPT).toContain('Cancel background tasks only when stale or no longer needed');
+    });
+
+    it('contains sync: true guidance for single-scout research', () => {
+      expect(SWARM_BEE_PROMPT).toContain('sync: true');
+    });
+
+    it('contains sync: false guidance for fan-out', () => {
+      expect(SWARM_BEE_PROMPT).toContain('sync: false');
     });
   });
 });
