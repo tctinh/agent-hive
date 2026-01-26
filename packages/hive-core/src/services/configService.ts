@@ -188,7 +188,14 @@ export class ConfigService {
     const agentConfig = config.agents?.[agent] ?? {};
     const defaultAutoLoadSkills = DEFAULT_HIVE_CONFIG.agents?.[agent]?.autoLoadSkills ?? [];
     const userAutoLoadSkills = agentConfig.autoLoadSkills ?? [];
-    const combinedAutoLoadSkills = [...defaultAutoLoadSkills, ...userAutoLoadSkills];
+    const isPlannerAgent = agent === 'hive-master' || agent === 'architect-planner';
+    const effectiveUserAutoLoadSkills = isPlannerAgent
+      ? userAutoLoadSkills
+      : userAutoLoadSkills.filter((skill) => skill !== 'onboarding');
+    const effectiveDefaultAutoLoadSkills = isPlannerAgent
+      ? defaultAutoLoadSkills
+      : defaultAutoLoadSkills.filter((skill) => skill !== 'onboarding');
+    const combinedAutoLoadSkills = [...effectiveDefaultAutoLoadSkills, ...effectiveUserAutoLoadSkills];
     const uniqueAutoLoadSkills = Array.from(new Set(combinedAutoLoadSkills));
     const disabledSkills = config.disableSkills ?? [];
     const effectiveAutoLoadSkills = uniqueAutoLoadSkills.filter(

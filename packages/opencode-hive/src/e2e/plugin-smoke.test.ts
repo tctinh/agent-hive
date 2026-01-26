@@ -285,4 +285,58 @@ Do it
     expect(statusHintIndex).toBeGreaterThan(brainstormingIndex);
     expect(agentPromptIndex).toBeGreaterThan(statusHintIndex);
   });
+
+  it("auto-loads onboarding only for planner agents", async () => {
+    const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agents: {
+          "hive-master": {
+            autoLoadSkills: ["onboarding"],
+          },
+          "architect-planner": {
+            autoLoadSkills: ["onboarding"],
+          },
+          "forager-worker": {
+            autoLoadSkills: ["onboarding", "test-driven-development"],
+          },
+        },
+      }),
+    );
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+
+    const onboardingSnippet = "# Onboarding Preferences";
+
+    const masterOutput = { system: [] as string[] };
+    await hooks["experimental.chat.system.transform"]?.(
+      { agent: "hive-master" },
+      masterOutput,
+    );
+    expect(masterOutput.system.join("\n")).toContain(onboardingSnippet);
+
+    const architectOutput = { system: [] as string[] };
+    await hooks["experimental.chat.system.transform"]?.(
+      { agent: "architect-planner" },
+      architectOutput,
+    );
+    expect(architectOutput.system.join("\n")).toContain(onboardingSnippet);
+
+    const foragerOutput = { system: [] as string[] };
+    await hooks["experimental.chat.system.transform"]?.(
+      { agent: "forager-worker" },
+      foragerOutput,
+    );
+    expect(foragerOutput.system.join("\n")).not.toContain(onboardingSnippet);
+  });
 });

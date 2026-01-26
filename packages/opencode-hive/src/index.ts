@@ -265,17 +265,28 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
   };
 
   return {
-    "experimental.chat.system.transform": async (_input: unknown, output: { system: string[] }) => {
+    "experimental.chat.system.transform": async (
+      input: { agent?: string } | unknown,
+      output: { system: string[] },
+    ) => {
       output.system.push(HIVE_SYSTEM_PROMPT);
 
-      if (effectiveAutoLoadSkills.length > 0) {
-        for (const skillId of effectiveAutoLoadSkills) {
-          const skill = BUILTIN_SKILLS.find((entry) => entry.name === skillId);
-          if (!skill) {
-            console.warn("Unknown skill id", skillId);
-            continue;
+      const agentInput = input as { agent?: string };
+      const agentName = agentInput?.agent;
+
+      if (agentName && isHiveAgent(agentName)) {
+        const agentConfig = configService.getAgentConfig(agentName);
+        const autoLoadSkills = agentConfig.autoLoadSkills ?? [];
+
+        if (autoLoadSkills.length > 0) {
+          for (const skillId of autoLoadSkills) {
+            const skill = BUILTIN_SKILLS.find((entry) => entry.name === skillId);
+            if (!skill) {
+              console.warn("Unknown skill id", skillId);
+              continue;
+            }
+            output.system.push(skill.template);
           }
-          output.system.push(skill.template);
         }
       }
 
