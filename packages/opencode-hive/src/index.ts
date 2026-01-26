@@ -90,6 +90,7 @@ import { calculatePromptMeta, calculatePayloadMeta, checkWarnings } from "./util
 import { applyTaskBudget, applyContextBudget, DEFAULT_BUDGET, type TruncationEvent } from "./utils/prompt-budgeting";
 import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { createBackgroundManager, type OpencodeClient } from "./background/index.js";
+import { formatElapsed, formatRelativeTime } from "./utils/format";
 import { createBackgroundTools } from "./tools/background-tools.js";
 import { HIVE_AGENT_NAMES, isHiveAgent, normalizeVariant } from "./hooks/variant-hook.js";
 
@@ -1019,6 +1020,7 @@ Re-run with updated summary showing verification results.`;
           const STUCK_THRESHOLD = 10 * 60 * 1000; // 10 minutes
           const HEARTBEAT_STALE_THRESHOLD = 5 * 60 * 1000; // 5 minutes without heartbeat
           const now = Date.now();
+          const PREVIEW_MAX_LENGTH = 200;
 
           const tasks = taskService.list(feature);
           const inProgressTasks = tasks.filter(t =>
@@ -1037,12 +1039,18 @@ Re-run with updated summary showing verification results.`;
             // Use getRawStatus to get full TaskStatus including workerSession
             const rawStatus = taskService.getRawStatus(feature, t.folder);
             const workerSession = rawStatus?.workerSession;
+            const backgroundRecord = backgroundManager.getTaskByHiveTask(feature, t.folder);
+            const observation = backgroundRecord
+              ? backgroundManager.getTaskObservation(backgroundRecord.taskId)
+              : null;
 
             // Calculate if stuck - prefer workerSession.lastHeartbeatAt, fall back to startedAt
             let maybeStuck = false;
             let lastActivityAt: number | null = null;
 
-            if (workerSession?.lastHeartbeatAt) {
+            if (observation?.lastActivityAt) {
+              lastActivityAt = new Date(observation.lastActivityAt).getTime();
+            } else if (workerSession?.lastHeartbeatAt) {
               lastActivityAt = new Date(workerSession.lastHeartbeatAt).getTime();
               // Consider stuck if no heartbeat for threshold AND no message activity
               const heartbeatStale = (now - lastActivityAt) > HEARTBEAT_STALE_THRESHOLD;
@@ -1053,10 +1061,35 @@ Re-run with updated summary showing verification results.`;
               maybeStuck = (now - lastActivityAt) > STUCK_THRESHOLD && t.status === 'in_progress';
             }
 
+            if (typeof observation?.maybeStuck === 'boolean') {
+              maybeStuck = observation.maybeStuck;
+            }
+
+            const startedAtIso = backgroundRecord?.startedAt || rawStatus?.startedAt || null;
+            const startedAtMs = startedAtIso ? new Date(startedAtIso).getTime() : null;
+            const elapsedMs = startedAtMs ? Math.max(0, now - startedAtMs) : 0;
+            const lastActivityIso = observation?.lastActivityAt
+              || workerSession?.lastHeartbeatAt
+              || rawStatus?.startedAt
+              || null;
+            const lastActivityAgo = lastActivityIso
+              ? formatRelativeTime(lastActivityIso)
+              : 'never';
+            const messageCount = observation?.messageCount
+              ?? backgroundRecord?.progress?.messageCount
+              ?? workerSession?.messageCount
+              ?? 0;
+            const lastMessagePreview = backgroundRecord?.progress?.lastMessage
+              ? backgroundRecord.progress.lastMessage.slice(0, PREVIEW_MAX_LENGTH)
+              : null;
+
             return {
               task: t.folder,
               name: t.name,
               status: t.status,
+              taskId: backgroundRecord?.taskId || workerSession?.taskId || null,
+              description: backgroundRecord?.description || null,
+              startedAt: startedAtIso,
               workerSession: workerSession || null,
               // Surface workerSession fields
               sessionId: workerSession?.sessionId || null,
@@ -1069,21 +1102,38 @@ Re-run with updated summary showing verification results.`;
               worktreePath: worktree?.path || null,
               branch: worktree?.branch || null,
               maybeStuck,
+              activity: {
+                elapsedMs,
+                elapsedFormatted: formatElapsed(elapsedMs),
+                messageCount,
+                lastActivityAgo,
+                lastMessagePreview,
+                maybeStuck,
+              },
               blocker: (rawStatus as any)?.blocker || null,
               summary: t.summary || null,
             };
           }));
+
+          const stuckWorkers = workers.filter(worker => worker.activity?.maybeStuck).length;
+          const hint = workers.some(w => w.status === 'blocked')
+            ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
+            : workers.some(w => w.maybeStuck)
+              ? 'Some workers may be stuck. Use background_output({ task_id }) to check output, or abort with hive_exec_abort.'
+              : 'Workers in progress. Wait for the completion notification (no polling required). Use hive_worker_status for spot checks; use background_output only if interim output is explicitly needed.';
+          const guidance = stuckWorkers > 0
+            ? `\n\n⚠️ ${stuckWorkers} worker(s) may be stuck (no activity for 10+ minutes). Consider cancelling or investigating.`
+            : '';
 
           return JSON.stringify({
             feature,
             omoSlimEnabled: isOmoSlimEnabled(),
             backgroundTaskProvider: 'hive',
             workers,
-            hint: workers.some(w => w.status === 'blocked')
-              ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
-              : workers.some(w => w.maybeStuck)
-                ? 'Some workers may be stuck. Use background_output({ task_id }) to check output, or abort with hive_exec_abort.'
-                : 'Workers in progress. Wait for the completion notification (no polling required). Use hive_worker_status for spot checks; use background_output only if interim output is explicitly needed.',
+            summary: {
+              stuckWorkers,
+            },
+            hint: hint + guidance,
           }, null, 2);
         },
       }),
