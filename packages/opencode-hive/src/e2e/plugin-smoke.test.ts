@@ -221,10 +221,37 @@ Do it
       { feature: "smoke-feature" },
       toolContext
     );
-    const status = JSON.parse(statusOutput as string) as { hint?: string };
+    const status = JSON.parse(statusOutput as string) as {
+      hint?: string;
+      summary?: { stuckWorkers?: number };
+      workers?: Array<{
+        activity?: {
+          elapsedMs: number;
+          elapsedFormatted: string;
+          messageCount: number;
+          lastActivityAgo: string;
+          lastMessagePreview: string | null;
+          maybeStuck: boolean;
+        };
+      }>;
+    };
 
     expect(status.hint).toContain("Wait for the completion notification");
     expect(status.hint).toContain("spot checks");
+    expect(status.workers?.length).toBeGreaterThan(0);
+
+    const workerActivity = status.workers?.[0]?.activity;
+    expect(workerActivity).toBeDefined();
+    expect(typeof workerActivity?.elapsedMs).toBe("number");
+    expect(typeof workerActivity?.elapsedFormatted).toBe("string");
+    expect(typeof workerActivity?.messageCount).toBe("number");
+    expect(typeof workerActivity?.lastActivityAgo).toBe("string");
+    expect(typeof workerActivity?.maybeStuck).toBe("boolean");
+    expect(
+      workerActivity?.lastMessagePreview === null ||
+        typeof workerActivity?.lastMessagePreview === "string"
+    ).toBe(true);
+    expect(typeof status.summary?.stuckWorkers).toBe("number");
   });
 
   it("system prompt hook injects Hive instructions", async () => {
