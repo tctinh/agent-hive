@@ -162,6 +162,8 @@ export interface HiveConfig {
   disableMcps?: string[];
   /** Enable OMO-Slim delegation (optional integration) */
   omoSlimEnabled?: boolean;
+  /** Choose between unified or dedicated agent modes */
+  agentMode?: 'unified' | 'dedicated';
   /** Agent configuration */
   agents?: {
     /** Hive Master (hybrid planner + orchestrator) */
@@ -194,6 +196,7 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
   enableToolsFor: [],
   disableSkills: [],
   disableMcps: [],
+  agentMode: 'unified',
   agents: {
     'hive-master': {
       model: DEFAULT_AGENT_MODELS['hive-master'],
