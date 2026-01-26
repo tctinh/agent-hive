@@ -142,6 +142,13 @@ Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manu
 **CRITICAL**: When resuming, a NEW worker spawns in the SAME worktree.
 The previous worker's progress is preserved. Include the user's decision in the \`decision\` parameter.
 
+**Observation Polling (Recommended):**
+- Prefer completion notifications over polling
+- Use \`hive_worker_status()\` for observation-based spot checks
+- Avoid tight loops with \`background_output\`; if needed, wait 30-60s between checks
+- If you suspect notifications did not deliver, do a single \`hive_worker_status()\` check first
+- If you need final results, call \`background_output({ task_id, block: false })\` after the completion notice
+
 **For research**, use MCP tools or parallel exploration:
 - \`grep_app_searchGitHub\` - Find code in OSS
 - \`context7_query-docs\` - Library documentation
