@@ -229,6 +229,32 @@ Description.
 Description.
 ```
 
+## Prompt Budgeting & Observability
+
+Hive automatically bounds worker prompt sizes to prevent context overflow:
+
+### Budgeting
+
+- **Task history**: Last 10 completed tasks included (older tasks referenced by path)
+- **Task summaries**: Truncated to 2000 chars each with `...[truncated]` marker
+- **Context files**: Individual files capped at 20KB, total at 60KB
+- **Full access**: Workers can always read full content from `.hive/` file paths
+
+### Observability
+
+`hiveExecStart` output includes metadata for visibility:
+
+| Field | Description |
+|-------|-------------|
+| `promptMeta` | Char counts for plan, context, previousTasks, spec, workerPrompt |
+| `payloadMeta` | JSON payload size, whether prompt is inlined vs file-referenced |
+| `budgetApplied` | Budget limits used, tasks included/dropped, path hints |
+| `warnings` | Threshold exceedances with severity (info/warning/critical) |
+
+### Prompt Files
+
+Large prompts are written to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` and passed by reference rather than inlined, preventing tool output truncation.
+
 ## Rules
 
 1. **Never skip planning** - Create feature, write plan first

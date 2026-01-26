@@ -86,6 +86,9 @@ import {
   listFeatures,
 } from "hive-core";
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
+import { calculatePromptMeta, calculatePayloadMeta, checkWarnings } from "./utils/prompt-observability";
+import { applyTaskBudget, applyContextBudget, DEFAULT_BUDGET, type TruncationEvent } from "./utils/prompt-budgeting";
+import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { createBackgroundManager, type OpencodeClient } from "./background/index.js";
 import { createBackgroundTools } from "./tools/background-tools.js";
 import { HIVE_AGENT_NAMES, isHiveAgent, normalizeVariant } from "./hooks/variant-hook.js";
@@ -598,12 +601,52 @@ Add this section to your plan content and try again.`;
           });
 
           // Generate spec.md with context for task
+          // NOTE: Use services once and derive all needed formats from the result (no duplicate reads)
           const planResult = planService.read(feature);
-          const contextCompiled = contextService.compile(feature);
           const allTasks = taskService.list(feature);
-          const priorTasks = allTasks
-            .filter(t => t.status === 'done')
-            .map(t => `- ${t.folder}: ${t.summary || 'No summary'}`);
+          
+          // Use contextService.list() instead of manual fs reads (Task 03 deduplication)
+          // This replaces: fs.existsSync/readdirSync/readFileSync pattern
+          const rawContextFiles = contextService.list(feature).map(f => ({
+            name: f.name,
+            content: f.content,
+          }));
+          
+          // Collect previous tasks ONCE and derive both formats from it
+          const rawPreviousTasks = allTasks
+            .filter(t => t.status === 'done' && t.summary)
+            .map(t => ({ name: t.folder, summary: t.summary! }));
+          
+          // Apply deterministic budgeting to bound prompt growth (Task 04)
+          // - Limits to last N tasks with truncated summaries
+          // - Truncates context files exceeding budget
+          // - Emits truncation events for warnings
+          const taskBudgetResult = applyTaskBudget(rawPreviousTasks, { ...DEFAULT_BUDGET, feature });
+          const contextBudgetResult = applyContextBudget(rawContextFiles, { ...DEFAULT_BUDGET, feature });
+          
+          // Use budgeted versions for prompt construction
+          const contextFiles: ContextFile[] = contextBudgetResult.files.map(f => ({
+            name: f.name,
+            content: f.content,
+          }));
+          const previousTasks: CompletedTask[] = taskBudgetResult.tasks.map(t => ({
+            name: t.name,
+            summary: t.summary,
+          }));
+          
+          // Collect all truncation events for warnings
+          const truncationEvents: TruncationEvent[] = [
+            ...taskBudgetResult.truncationEvents,
+            ...contextBudgetResult.truncationEvents,
+          ];
+          
+          // Format previous tasks for spec (derived from budgeted previousTasks)
+          const priorTasksFormatted = previousTasks
+            .map(t => `- ${t.name}: ${t.summary}`)
+            .join('\n');
+          
+          // Add hint about dropped tasks if any were omitted
+          const droppedTasksHint = taskBudgetResult.droppedTasksHint;
 
           let specContent = `# Task: ${task}\n\n`;
           specContent += `## Feature: ${feature}\n\n`;
@@ -629,33 +672,21 @@ Add this section to your plan content and try again.`;
             }
           }
 
-          if (contextCompiled) {
+          // Build context section from contextFiles (already loaded via contextService.list)
+          if (contextFiles.length > 0) {
+            const contextCompiled = contextFiles.map(f => `## ${f.name}\n\n${f.content}`).join('\n\n---\n\n');
             specContent += `## Context\n\n${contextCompiled}\n\n`;
           }
 
-          if (priorTasks.length > 0) {
-            specContent += `## Completed Tasks\n\n${priorTasks.join('\n')}\n\n`;
+          if (priorTasksFormatted) {
+            specContent += `## Completed Tasks\n\n${priorTasksFormatted}\n\n`;
           }
           
           taskService.writeSpec(feature, task, specContent);
 
           // Delegated execution is always available via Hive-owned background_task tools.
           // OMO-Slim is optional and should not gate delegation.
-
-          // Prepare context for worker prompt
-          const contextFiles: ContextFile[] = [];
-          const contextDir = path.join(directory, '.hive', 'features', feature, 'context');
-          if (fs.existsSync(contextDir)) {
-            const files = fs.readdirSync(contextDir).filter(f => f.endsWith('.md'));
-            for (const file of files) {
-              const content = fs.readFileSync(path.join(contextDir, file), 'utf-8');
-              contextFiles.push({ name: file, content });
-            }
-          }
-
-          const previousTasks: CompletedTask[] = allTasks
-            .filter(t => t.status === 'done' && t.summary)
-            .map(t => ({ name: t.folder, summary: t.summary! }));
+          // NOTE: contextFiles and previousTasks are already collected above (no duplicate reads)
 
           // Build worker prompt
           const workerPrompt = buildWorkerPrompt({
@@ -690,17 +721,46 @@ Add this section to your plan content and try again.`;
           // populated by background_task with the REAL OpenCode session_id/task_id.
           taskService.patchBackgroundFields(feature, task, { idempotencyKey });
 
-          // Return delegation instructions for the agent.
-          // Agent will call background_task tool itself.
-          return JSON.stringify({
+          // Calculate observability metadata for prompt/payload sizes
+          const contextContent = contextFiles.map(f => f.content).join('\n\n');
+          const previousTasksContent = previousTasks.map(t => `- **${t.name}**: ${t.summary}`).join('\n');
+          const promptMeta = calculatePromptMeta({
+            plan: planResult?.content || '',
+            context: contextContent,
+            previousTasks: previousTasksContent,
+            spec: specContent,
+            workerPrompt,
+          });
+
+          // Write worker prompt to file to prevent tool output truncation (Task 05)
+          // This keeps the tool output small while preserving full prompt content
+          const hiveDir = path.join(directory, '.hive');
+          const workerPromptPath = writeWorkerPromptFile(feature, task, workerPrompt, hiveDir);
+          
+          // Convert to relative path for portability in output
+          const relativePromptPath = path.relative(directory, workerPromptPath);
+
+          // Build workerPromptPreview (truncated for display, max 200 chars)
+          const PREVIEW_MAX_LENGTH = 200;
+          const workerPromptPreview = workerPrompt.length > PREVIEW_MAX_LENGTH
+            ? workerPrompt.slice(0, PREVIEW_MAX_LENGTH) + '...'
+            : workerPrompt;
+
+          // Build the response object with canonical outermost fields
+          // - agent: top-level only (NOT duplicated in backgroundTaskCall)
+          // - workerPromptPath: file reference (NOT inlined prompt to prevent truncation)
+          // - backgroundTaskCall: contains promptFile reference, NOT inline prompt
+          const responseBase = {
             worktreePath: worktree.path,
             branch: worktree.branch,
             mode: 'delegate',
-            agent,
+            agent, // Canonical: top-level only
             delegationRequired: true,
+            workerPromptPath: relativePromptPath, // File reference (canonical)
+            workerPromptPreview, // Truncated preview for display
             backgroundTaskCall: {
-              agent,
-              prompt: workerPrompt,
+              // NOTE: Uses promptFile instead of prompt to prevent truncation
+              promptFile: workerPromptPath, // Absolute path for background_task
               description: `Hive: ${task}`,
               sync: false,
               workdir: worktree.path,
@@ -715,8 +775,8 @@ You MUST now call the background_task tool to spawn a Forager (Worker/Coder) wor
 
 \`\`\`
 background_task({
-  agent: "forager-worker",
-  prompt: <the workerPrompt below>,
+  agent: "${agent}",
+  promptFile: "${workerPromptPath}",
   description: "Hive: ${task}",
   sync: false,
   workdir: "${worktree.path}",
@@ -727,8 +787,15 @@ background_task({
 })
 \`\`\`
 
+**Note**: The prompt is stored in a file (workerPromptPath) to prevent tool output truncation.
+Use 'promptFile' parameter instead of 'prompt' for large prompts.
+
 After spawning:
-- Monitor with hive_worker_status
+- Wait for the completion notification (no polling required).
+- Use hive_worker_status only for spot checks or diagnosing stuck tasks.
+- Use background_output only if interim output is explicitly needed, or after the completion notification arrives.
+- After receiving the <system-reminder> with the worker task_id, call background_output({ task_id: "<id>", block: false }) to fetch the final result.
+- If you suspect notifications did not deliver, do a single hive_worker_status() spot check.
 - Handle blockers when worker exits
 - Merge completed work with hive_merge
 
@@ -744,7 +811,46 @@ If background_task rejects workdir/idempotencyKey/feature/task/attempt parameter
 1. Ensure agent-hive loads AFTER any other plugin that registers background_* tools
 2. Confirm tool outputs include \`provider: "hive"\`
 3. Re-run hive_exec_start and then background_task`,
-            workerPrompt,
+          };
+
+          // Calculate payload meta (JSON size WITHOUT inlined prompt - file reference only)
+          const jsonPayload = JSON.stringify(responseBase, null, 2);
+          const payloadMeta = calculatePayloadMeta({
+            jsonPayload,
+            promptInlined: false, // Prompt is in file, not inlined
+            promptReferencedByFile: true,
+          });
+
+          // Check for warnings about threshold exceedance
+          const sizeWarnings = checkWarnings(promptMeta, payloadMeta);
+          
+          // Convert truncation events to warnings format for unified output
+          const budgetWarnings = truncationEvents.map(event => ({
+            type: event.type as string,
+            severity: 'info' as const,
+            message: event.message,
+            affected: event.affected,
+            count: event.count,
+          }));
+          
+          // Combine all warnings
+          const allWarnings = [...sizeWarnings, ...budgetWarnings];
+
+          // Return delegation instructions with observability data
+          return JSON.stringify({
+            ...responseBase,
+            promptMeta,
+            payloadMeta,
+            budgetApplied: {
+              maxTasks: DEFAULT_BUDGET.maxTasks,
+              maxSummaryChars: DEFAULT_BUDGET.maxSummaryChars,
+              maxContextChars: DEFAULT_BUDGET.maxContextChars,
+              maxTotalContextChars: DEFAULT_BUDGET.maxTotalContextChars,
+              tasksIncluded: previousTasks.length,
+              tasksDropped: rawPreviousTasks.length - previousTasks.length,
+              droppedTasksHint,
+            },
+            warnings: allWarnings.length > 0 ? allWarnings : undefined,
           }, null, 2);
         },
       }),
@@ -959,7 +1065,7 @@ Re-run with updated summary showing verification results.`;
               ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
               : workers.some(w => w.maybeStuck)
                 ? 'Some workers may be stuck. Use background_output({ task_id }) to check output, or abort with hive_exec_abort.'
-                : 'Workers in progress. Use hive_worker_status and background_output for live output.',
+                : 'Workers in progress. Wait for the completion notification (no polling required). Use hive_worker_status for spot checks; use background_output only if interim output is explicitly needed.',
           }, null, 2);
         },
       }),

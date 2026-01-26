@@ -69,6 +69,51 @@ This enables tools like `grep_app_searchGitHub`, `context7_query-docs`, `websear
 | `hive_exec_complete` | Complete task (applies changes) |
 | `hive_exec_abort` | Abort task (discard changes) |
 
+### Background Tasks
+| Tool | Description |
+|------|-------------|
+| `background_task` | Spawn a background agent task |
+| `background_output` | Get output from a running/completed task |
+| `background_cancel` | Cancel running background task(s) |
+
+The `background_task` tool supports `promptFile` as an alternative to inline `prompt`:
+```typescript
+background_task({
+  agent: "forager-worker",
+  promptFile: ".hive/features/my-feature/tasks/01-task/worker-prompt.md",
+  description: "Execute task 01",
+  workdir: "/path/to/worktree"
+})
+```
+
+## Prompt Budgeting & Observability
+
+Hive automatically bounds worker prompt sizes to prevent context overflow and tool output truncation.
+
+### Budgeting Defaults
+
+| Limit | Default | Description |
+|-------|---------|-------------|
+| `maxTasks` | 10 | Number of previous tasks included |
+| `maxSummaryChars` | 2,000 | Max chars per task summary |
+| `maxContextChars` | 20,000 | Max chars per context file |
+| `maxTotalContextChars` | 60,000 | Total context budget |
+
+When limits are exceeded, content is truncated with `...[truncated]` markers and file path hints are provided so workers can read the full content.
+
+### Observability
+
+`hive_exec_start` output includes metadata fields:
+
+- **`promptMeta`**: Character counts for plan, context, previousTasks, spec, workerPrompt
+- **`payloadMeta`**: JSON payload size, whether prompt is inlined or referenced by file
+- **`budgetApplied`**: Budget limits, tasks included/dropped, path hints for dropped content
+- **`warnings`**: Array of threshold exceedances with severity levels (info/warning/critical)
+
+### Prompt Files
+
+Large prompts are written to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` and passed by file reference (`workerPromptPath`) rather than inlined in tool output. This prevents truncation of large prompts.
+
 ## Plan Format
 
 ```markdown

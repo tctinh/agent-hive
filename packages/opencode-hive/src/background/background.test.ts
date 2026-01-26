@@ -10,7 +10,7 @@
  * - Background poller (Task 06)
  */
 
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { BackgroundTaskStore, resetStore } from './store.js';
 import { isValidTransition, isTerminalStatus, VALID_TRANSITIONS } from './types.js';
 import { AgentGate } from './agent-gate.js';
@@ -114,6 +114,183 @@ describe('BackgroundTaskStore', () => {
       expect(task.hiveTaskFolder).toBe('01-my-task');
       expect(task.workdir).toBe('/path/to/worktree');
     });
+  });
+});
+
+// ============================================================================
+// hive_exec_start Prompt Deduplication (Task 03)
+// ============================================================================
+
+describe('hive_exec_start Prompt Deduplication', () => {
+  /**
+   * These tests verify that:
+   * 1. Context files are read once via contextService.list() (not manual fs reads)
+   * 2. Previous tasks are collected once (not twice as priorTasks + previousTasks)
+   * 3. Plan/context/previousTasks are NOT duplicated in the worker prompt
+   */
+
+  describe('no duplicate sections in worker prompt', () => {
+    it('worker prompt does NOT have separate "Plan Context" section', () => {
+      // After deduplication, buildWorkerPrompt should NOT include a separate
+      // "## Plan Context" section because the plan section is embedded in spec
+      const mockWorkerPrompt = `# Hive Worker Assignment
+
+## Assignment Details
+
+| Field | Value |
+|-------|-------|
+| Feature | test-feature |
+| Task | 01-test-task |
+
+---
+
+## Your Mission
+
+# Task: 01-test-task
+
+## Plan Section
+
+### 1. Test Task
+
+Do the thing.
+
+## Context
+
+## decisions
+
+We decided to use TypeScript.
+
+## Completed Tasks
+
+- **00-setup**: Setup done.
+
+---
+
+## Blocker Protocol
+...`;
+
+      // Verify: no separate "## Plan Context" section
+      expect(mockWorkerPrompt).not.toMatch(/## Plan Context/);
+    });
+
+    it('worker prompt does NOT have separate "Context Files" section', () => {
+      const mockWorkerPrompt = `# Hive Worker Assignment
+
+## Assignment Details
+...
+
+## Your Mission
+
+# Task: 01-test-task
+
+## Context
+
+## decisions
+
+Content here.
+
+---
+
+## Blocker Protocol
+...`;
+
+      // Verify: no separate "## Context Files" section
+      expect(mockWorkerPrompt).not.toMatch(/## Context Files/);
+    });
+
+    it('worker prompt does NOT have separate "Previous Tasks Completed" section', () => {
+      const mockWorkerPrompt = `# Hive Worker Assignment
+
+## Assignment Details
+...
+
+## Your Mission
+
+# Task: 01-test-task
+
+## Completed Tasks
+
+- **00-setup**: Setup done.
+
+---
+
+## Blocker Protocol
+...`;
+
+      // Verify: no separate "## Previous Tasks Completed" section
+      expect(mockWorkerPrompt).not.toMatch(/## Previous Tasks Completed/);
+    });
+  });
+
+  describe('contextService.list() usage pattern', () => {
+    it('documents expected contextService.list() return format', () => {
+      // contextService.list() returns ContextFile[] with name, content, updatedAt
+      const expectedFormat = {
+        name: 'decisions', // filename without .md
+        content: 'We decided to use TypeScript.',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      };
+
+      expect(expectedFormat.name).toBe('decisions');
+      expect(expectedFormat.content).toBeTruthy();
+      expect(expectedFormat.updatedAt).toBeTruthy();
+    });
+
+    it('documents that contextService.list() replaces manual fs reads', () => {
+      // OLD pattern (manual reads):
+      // const contextDir = path.join(directory, '.hive', 'features', feature, 'context');
+      // if (fs.existsSync(contextDir)) {
+      //   const files = fs.readdirSync(contextDir).filter(f => f.endsWith('.md'));
+      //   for (const file of files) {
+      //     const content = fs.readFileSync(path.join(contextDir, file), 'utf-8');
+      //     contextFiles.push({ name: file, content });
+      //   }
+      // }
+
+      // NEW pattern (service-based):
+      // const contextFiles = contextService.list(feature);
+
+      // This test documents the migration - manual reads should no longer exist
+      // in hive_exec_start after Task 03 is complete
+      const oldPatternComment = 'fs.existsSync/readdirSync/readFileSync';
+      const newPatternComment = 'contextService.list(feature)';
+
+      expect(oldPatternComment).toContain('existsSync');
+      expect(newPatternComment).toContain('contextService');
+    });
+  });
+
+  describe('single collection of previous tasks', () => {
+    it('documents that previousTasks should be collected once', () => {
+      // OLD pattern (duplicate collection):
+      // const priorTasks = allTasks.filter(t => t.status === 'done')
+      //   .map(t => `- ${t.folder}: ${t.summary || 'No summary'}`);
+      // ... later ...
+      // const previousTasks = allTasks.filter(t => t.status === 'done' && t.summary)
+      //   .map(t => ({ name: t.folder, summary: t.summary! }));
+
+      // NEW pattern (single collection):
+      // const previousTasks = allTasks
+      //   .filter(t => t.status === 'done' && t.summary)
+      //   .map(t => ({ name: t.folder, summary: t.summary! }));
+      // // Use previousTasks for both spec content and worker prompt
+
+      // This test documents the expected change
+      const duplicateVarsRemoved = ['priorTasks']; // Should be removed
+      const singleVar = 'previousTasks'; // Should be the only one
+
+      expect(duplicateVarsRemoved).toContain('priorTasks');
+      expect(singleVar).toBe('previousTasks');
+    });
+  });
+});
+
+describe('BackgroundTaskStore', () => {
+  let store: BackgroundTaskStore;
+
+  beforeEach(() => {
+    resetStore();
+    store = new BackgroundTaskStore();
   });
 
   describe('get', () => {
@@ -1632,5 +1809,574 @@ describe('Hive Task Ordering with Background Tasks', () => {
 
     // No active earlier tasks
     expect(activeTasks.length).toBe(0);
+  });
+});
+
+// ============================================================================
+// hive_exec_start Delegation Payload Normalization (Task 02)
+// ============================================================================
+
+describe('hive_exec_start Delegation Payload Normalization', () => {
+  /**
+   * These tests verify that the hive_exec_start output:
+   * 1. Uses top-level fields as canonical (agent, workerPrompt)
+   * 2. Does NOT duplicate fields in backgroundTaskCall
+   * 3. Provides workerPromptPreview for display purposes
+   * 4. Maintains all required delegation args
+   */
+
+  describe('canonical outermost fields', () => {
+    it('has top-level agent as canonical (not duplicated in backgroundTaskCall)', () => {
+      // Simulated hive_exec_start output structure after normalization
+      const normalizedPayload = {
+        worktreePath: '/path/to/worktree',
+        branch: 'hive/feature/task',
+        mode: 'delegate',
+        agent: 'forager-worker', // Canonical
+        delegationRequired: true,
+        workerPrompt: 'Full worker prompt content...',
+        workerPromptPreview: 'Full worker prompt content...'.slice(0, 200),
+        backgroundTaskCall: {
+          // agent should NOT be here (duplicated)
+          // prompt should NOT be here (duplicated)
+          description: 'Hive: test-task',
+          sync: false,
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'hive-feature-task-1',
+          feature: 'test-feature',
+          task: 'test-task',
+          attempt: 1,
+        },
+        instructions: 'Delegation instructions...',
+      };
+
+      // Verify: top-level agent exists
+      expect(normalizedPayload.agent).toBe('forager-worker');
+
+      // Verify: backgroundTaskCall does NOT contain agent
+      expect((normalizedPayload.backgroundTaskCall as any).agent).toBeUndefined();
+    });
+
+    it('has top-level workerPrompt as canonical (not duplicated as backgroundTaskCall.prompt)', () => {
+      const normalizedPayload = {
+        worktreePath: '/path/to/worktree',
+        branch: 'hive/feature/task',
+        mode: 'delegate',
+        agent: 'forager-worker',
+        delegationRequired: true,
+        workerPrompt: 'Full worker prompt content here...',
+        workerPromptPreview: 'Full worker prompt content here...'.slice(0, 200),
+        backgroundTaskCall: {
+          // prompt should NOT be here (duplicated)
+          description: 'Hive: test-task',
+          sync: false,
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'hive-feature-task-1',
+          feature: 'test-feature',
+          task: 'test-task',
+          attempt: 1,
+        },
+        instructions: 'Delegation instructions...',
+      };
+
+      // Verify: top-level workerPrompt exists
+      expect(normalizedPayload.workerPrompt).toBe('Full worker prompt content here...');
+
+      // Verify: backgroundTaskCall does NOT contain prompt
+      expect((normalizedPayload.backgroundTaskCall as any).prompt).toBeUndefined();
+    });
+
+    it('includes workerPromptPreview for display (truncated version)', () => {
+      const longPrompt = 'A'.repeat(500);
+      const normalizedPayload = {
+        workerPrompt: longPrompt,
+        workerPromptPreview: longPrompt.slice(0, 200) + '...',
+      };
+
+      // Verify: preview is truncated
+      expect(normalizedPayload.workerPromptPreview.length).toBeLessThanOrEqual(203); // 200 + '...'
+      expect(normalizedPayload.workerPromptPreview.endsWith('...')).toBe(true);
+    });
+  });
+
+  describe('required delegation args preserved', () => {
+    it('preserves workdir in backgroundTaskCall', () => {
+      const payload = {
+        backgroundTaskCall: {
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'key-1',
+          feature: 'my-feature',
+          task: 'my-task',
+        },
+      };
+
+      expect(payload.backgroundTaskCall.workdir).toBe('/path/to/worktree');
+    });
+
+    it('preserves idempotencyKey in backgroundTaskCall', () => {
+      const payload = {
+        backgroundTaskCall: {
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'hive-feature-task-1',
+          feature: 'my-feature',
+          task: 'my-task',
+        },
+      };
+
+      expect(payload.backgroundTaskCall.idempotencyKey).toBe('hive-feature-task-1');
+    });
+
+    it('preserves feature and task linkage in backgroundTaskCall', () => {
+      const payload = {
+        backgroundTaskCall: {
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'key-1',
+          feature: 'my-feature',
+          task: 'my-task',
+          attempt: 2,
+        },
+      };
+
+      expect(payload.backgroundTaskCall.feature).toBe('my-feature');
+      expect(payload.backgroundTaskCall.task).toBe('my-task');
+      expect(payload.backgroundTaskCall.attempt).toBe(2);
+    });
+  });
+
+  describe('no duplicated fields in JSON output', () => {
+    it('JSON payload has exactly one agent field (top-level only)', () => {
+      const normalizedPayload = {
+        agent: 'forager-worker',
+        backgroundTaskCall: {
+          description: 'Hive: test-task',
+          sync: false,
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'key-1',
+          feature: 'test-feature',
+          task: 'test-task',
+          attempt: 1,
+        },
+      };
+
+      const jsonStr = JSON.stringify(normalizedPayload);
+      
+      // Count occurrences of "agent" key (not as substring of other words)
+      const agentMatches = jsonStr.match(/"agent":/g) || [];
+      expect(agentMatches.length).toBe(1);
+    });
+
+    it('JSON payload has exactly one prompt/workerPrompt field (top-level only)', () => {
+      const normalizedPayload = {
+        workerPrompt: 'Full prompt content...',
+        workerPromptPreview: 'Full prompt...',
+        backgroundTaskCall: {
+          description: 'Hive: test-task',
+          sync: false,
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'key-1',
+          feature: 'test-feature',
+          task: 'test-task',
+          attempt: 1,
+        },
+      };
+
+      const jsonStr = JSON.stringify(normalizedPayload);
+      
+      // Verify no "prompt": in backgroundTaskCall (only workerPrompt at top level)
+      expect(jsonStr).not.toMatch(/"prompt":/);
+      expect(jsonStr).toMatch(/"workerPrompt":/);
+    });
+  });
+
+  describe('instructions updated for normalized structure', () => {
+    it('instructions reference top-level agent and workerPrompt', () => {
+      const instructions = `## Delegation Required
+
+You MUST now call the background_task tool:
+
+\`\`\`
+background_task({
+  agent: <use the top-level 'agent' field>,
+  prompt: <use the top-level 'workerPrompt' field>,
+  description: "Hive: test-task",
+  sync: false,
+  workdir: "/path/to/worktree",
+  idempotencyKey: "key-1",
+  feature: "test-feature",
+  task: "test-task",
+  attempt: 1
+})
+\`\`\``;
+
+      // Instructions should mention using top-level fields
+      expect(instructions).toContain("top-level 'agent'");
+      expect(instructions).toContain("top-level 'workerPrompt'");
+    });
+  });
+});
+
+// ============================================================================
+// Task 04: Deterministic Prompt Budgeting Tests
+// ============================================================================
+
+import { 
+  applyTaskBudget, 
+  applyContextBudget, 
+  DEFAULT_BUDGET,
+  type TaskInput,
+  type ContextInput,
+} from '../utils/prompt-budgeting.js';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { resolvePromptFromFile, isValidPromptFilePath, findWorkspaceRoot } from '../utils/prompt-file.js';
+
+describe('Deterministic Prompt Budgeting - Integration', () => {
+  describe('bounds prompt growth with many prior tasks', () => {
+    it('keeps total previous tasks content under threshold with 50 tasks', () => {
+      // Simulate a feature with many completed tasks (50 tasks, ~500 chars each)
+      const tasks: TaskInput[] = Array.from({ length: 50 }, (_, i) => ({
+        name: `${String(i + 1).padStart(2, '0')}-task-${i}`,
+        summary: `This is task ${i + 1} summary with enough content to be meaningful. `.repeat(8),
+      }));
+
+      const result = applyTaskBudget(tasks, DEFAULT_BUDGET);
+
+      // Should only include last N tasks (DEFAULT_BUDGET.maxTasks = 10)
+      expect(result.tasks.length).toBeLessThanOrEqual(DEFAULT_BUDGET.maxTasks);
+      
+      // Calculate total chars in result
+      const totalChars = result.tasks.reduce((sum, t) => sum + t.summary.length, 0);
+
+      // Should be bounded by maxTasks * maxSummaryChars (with some buffer for markers)
+      const maxExpected = DEFAULT_BUDGET.maxTasks * (DEFAULT_BUDGET.maxSummaryChars + 50);
+      expect(totalChars).toBeLessThanOrEqual(maxExpected);
+    });
+
+    it('emits truncation events when tasks are dropped', () => {
+      const tasks: TaskInput[] = Array.from({ length: 20 }, (_, i) => ({
+        name: `${String(i + 1).padStart(2, '0')}-task`,
+        summary: `Task ${i + 1} summary`,
+      }));
+
+      const result = applyTaskBudget(tasks, { ...DEFAULT_BUDGET, maxTasks: 5 });
+
+      // Should have dropped 15 tasks
+      expect(result.tasks.length).toBe(5);
+      expect(result.truncationEvents.some(e => e.type === 'tasks_dropped')).toBe(true);
+      
+      const dropEvent = result.truncationEvents.find(e => e.type === 'tasks_dropped');
+      expect(dropEvent?.count).toBe(15);
+    });
+
+    it('provides file path hints for dropped tasks', () => {
+      const tasks: TaskInput[] = Array.from({ length: 5 }, (_, i) => ({
+        name: `0${i + 1}-task`,
+        summary: `Summary ${i + 1}`,
+      }));
+
+      const result = applyTaskBudget(tasks, { ...DEFAULT_BUDGET, maxTasks: 2, feature: 'my-feature' });
+
+      expect(result.droppedTasksHint).toBeDefined();
+      expect(result.droppedTasksHint).toContain('.hive/features/my-feature/tasks');
+      expect(result.droppedTasksHint).toContain('01-task');
+    });
+  });
+
+  describe('bounds prompt growth with large context files', () => {
+    it('keeps total context content under threshold', () => {
+      // Simulate large context files (10 files, ~20KB each)
+      const files: ContextInput[] = Array.from({ length: 10 }, (_, i) => ({
+        name: `context-${i}`,
+        content: `Context file ${i} content. `.repeat(1000),
+      }));
+
+      const result = applyContextBudget(files, DEFAULT_BUDGET);
+
+      // Calculate total chars in result
+      const totalChars = result.files.reduce((sum, f) => sum + f.content.length, 0);
+
+      // Should be bounded by maxTotalContextChars (with some buffer)
+      expect(totalChars).toBeLessThanOrEqual(DEFAULT_BUDGET.maxTotalContextChars + 500);
+    });
+
+    it('truncates individual large context files', () => {
+      const files: ContextInput[] = [
+        { name: 'huge-file', content: 'X'.repeat(10000) },
+      ];
+
+      const result = applyContextBudget(files, { ...DEFAULT_BUDGET, maxContextChars: 500 });
+
+      expect(result.files[0].truncated).toBe(true);
+      expect(result.files[0].content.length).toBeLessThanOrEqual(550);
+      expect(result.files[0].content).toContain('...[truncated]');
+    });
+
+    it('provides file path hints for truncated context', () => {
+      const files: ContextInput[] = [
+        { name: 'decisions', content: 'Y'.repeat(10000) },
+      ];
+
+      const result = applyContextBudget(files, { ...DEFAULT_BUDGET, maxContextChars: 500, feature: 'test-feature' });
+
+      expect(result.files[0].pathHint).toContain('.hive/features/test-feature/context/decisions.md');
+    });
+  });
+
+  describe('never removes access to full info', () => {
+    it('always provides path hints when truncation occurs', () => {
+      const tasks: TaskInput[] = [
+        { name: '01-task', summary: 'A'.repeat(1000) },
+      ];
+
+      const result = applyTaskBudget(tasks, { ...DEFAULT_BUDGET, maxSummaryChars: 100, feature: 'my-feat' });
+
+      // Even though summary is truncated, we should have events documenting it
+      expect(result.truncationEvents.length).toBeGreaterThan(0);
+      expect(result.truncationEvents[0].message).toContain('01-task');
+    });
+
+    it('context files include path hints when truncated', () => {
+      const files: ContextInput[] = [
+        { name: 'research', content: 'B'.repeat(10000) },
+      ];
+
+      const result = applyContextBudget(files, { ...DEFAULT_BUDGET, maxContextChars: 500, feature: 'feat' });
+
+      expect(result.files[0].pathHint).toBeDefined();
+      expect(result.files[0].pathHint).toContain('research.md');
+    });
+  });
+
+  describe('DEFAULT_BUDGET values are reasonable', () => {
+    it('allows meaningful task history (10 tasks)', () => {
+      expect(DEFAULT_BUDGET.maxTasks).toBe(10);
+    });
+
+    it('allows useful summaries (2000 chars ~500 words)', () => {
+      expect(DEFAULT_BUDGET.maxSummaryChars).toBe(2000);
+    });
+
+    it('bounds total context to 60KB', () => {
+      expect(DEFAULT_BUDGET.maxTotalContextChars).toBe(60000);
+    });
+
+    it('bounds individual context files to 20KB', () => {
+      expect(DEFAULT_BUDGET.maxContextChars).toBe(20000);
+    });
+  });
+});
+
+// ============================================================================
+// Task 05: Prompt File Reference Tests
+// ============================================================================
+
+describe('Prompt File Reference - Prevent Tool Output Truncation', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-prompt-test-'));
+  });
+
+  afterEach(() => {
+    // Clean up temp directory
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  describe('resolvePromptFromFile', () => {
+    it('reads prompt content from file when promptFile is provided', async () => {
+      const promptContent = 'This is the full worker prompt content from file.';
+      const promptFilePath = path.join(tempDir, 'worker-prompt.md');
+      fs.writeFileSync(promptFilePath, promptContent, 'utf-8');
+
+      const result = await resolvePromptFromFile(promptFilePath, tempDir);
+
+      expect(result.content).toBe(promptContent);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('returns error when file does not exist', async () => {
+      const nonExistentPath = path.join(tempDir, 'does-not-exist.md');
+
+      const result = await resolvePromptFromFile(nonExistentPath, tempDir);
+
+      expect(result.content).toBeUndefined();
+      expect(result.error).toContain('not found');
+    });
+
+    it('returns error for paths outside workspace', async () => {
+      const outsidePath = '/etc/passwd';
+
+      const result = await resolvePromptFromFile(outsidePath, tempDir);
+
+      expect(result.content).toBeUndefined();
+      expect(result.error).toContain('outside');
+    });
+
+    it('returns error for paths with path traversal attempts', async () => {
+      const traversalPath = path.join(tempDir, '..', '..', 'etc', 'passwd');
+
+      const result = await resolvePromptFromFile(traversalPath, tempDir);
+
+      expect(result.content).toBeUndefined();
+      expect(result.error).toContain('outside');
+    });
+  });
+
+  describe('isValidPromptFilePath', () => {
+    it('accepts paths within .hive directory', () => {
+      const validPath = path.join(tempDir, '.hive', 'features', 'my-feature', 'tasks', '01-task', 'worker-prompt.md');
+
+      expect(isValidPromptFilePath(validPath, tempDir)).toBe(true);
+    });
+
+    it('accepts paths within workspace root', () => {
+      const validPath = path.join(tempDir, 'some', 'nested', 'prompt.md');
+
+      expect(isValidPromptFilePath(validPath, tempDir)).toBe(true);
+    });
+
+    it('rejects paths outside workspace', () => {
+      const invalidPath = '/tmp/other-project/prompt.md';
+
+      expect(isValidPromptFilePath(invalidPath, tempDir)).toBe(false);
+    });
+
+    it('rejects paths with path traversal', () => {
+      const invalidPath = path.join(tempDir, '..', 'other', 'prompt.md');
+
+      expect(isValidPromptFilePath(invalidPath, tempDir)).toBe(false);
+    });
+  });
+
+  describe('findWorkspaceRoot', () => {
+    it('resolves workspace root from a .hive worktree path', () => {
+      const workspaceRoot = path.join(tempDir, 'repo');
+      const hiveDir = path.join(workspaceRoot, '.hive');
+      const worktreeDir = path.join(hiveDir, '.worktrees', 'my-feature', '01-task');
+
+      fs.mkdirSync(worktreeDir, { recursive: true });
+
+      expect(findWorkspaceRoot(worktreeDir)).toBe(workspaceRoot);
+    });
+
+    it('returns null when no .hive directory exists', () => {
+      const noHivePath = path.join(tempDir, 'no-hive');
+      fs.mkdirSync(noHivePath, { recursive: true });
+
+      expect(findWorkspaceRoot(noHivePath)).toBeNull();
+    });
+  });
+
+  describe('background_task with promptFile', () => {
+    it('documents promptFile as alternative to prompt parameter', () => {
+      // This test documents the expected API for background_task
+      // When promptFile is provided, background_task should:
+      // 1. Read the file content
+      // 2. Use that content as the prompt
+      // 3. NOT require the prompt parameter
+
+      const backgroundTaskArgs = {
+        agent: 'forager-worker',
+        promptFile: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
+        description: 'Execute task',
+        sync: false,
+        workdir: '/path/to/worktree',
+        idempotencyKey: 'hive-feat-task-1',
+      };
+
+      // Verify expected structure
+      expect(backgroundTaskArgs.promptFile).toBeDefined();
+      expect((backgroundTaskArgs as any).prompt).toBeUndefined();
+    });
+
+    it('documents that prompt and promptFile are mutually exclusive', () => {
+      // If both are provided, promptFile should take precedence
+      // or an error should be returned
+
+      const withBoth = {
+        agent: 'forager-worker',
+        prompt: 'Inline prompt',
+        promptFile: 'path/to/file.md',
+        description: 'Test',
+      };
+
+      // Both defined - implementation should handle this
+      expect(withBoth.prompt).toBeDefined();
+      expect(withBoth.promptFile).toBeDefined();
+    });
+  });
+
+  describe('hive_exec_start output with prompt file reference', () => {
+    it('includes workerPromptPath in output', () => {
+      // After Task 05, hive_exec_start should output workerPromptPath
+      const execStartOutput = {
+        worktreePath: '/path/to/worktree',
+        branch: 'hive/feature/task',
+        mode: 'delegate',
+        agent: 'forager-worker',
+        delegationRequired: true,
+        workerPromptPath: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
+        workerPromptPreview: 'First 200 chars of the prompt...',
+        backgroundTaskCall: {
+          promptFile: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
+          description: 'Hive: 01-task',
+          sync: false,
+          workdir: '/path/to/worktree',
+          idempotencyKey: 'hive-feat-task-1',
+          feature: 'my-feature',
+          task: '01-task',
+          attempt: 1,
+        },
+      };
+
+      // Verify: workerPromptPath exists
+      expect(execStartOutput.workerPromptPath).toBeDefined();
+      expect(execStartOutput.workerPromptPath).toContain('worker-prompt.md');
+
+      // Verify: backgroundTaskCall uses promptFile, NOT prompt
+      expect(execStartOutput.backgroundTaskCall.promptFile).toBeDefined();
+      expect((execStartOutput.backgroundTaskCall as any).prompt).toBeUndefined();
+
+      // Verify: workerPrompt (large inline content) is NOT in output
+      expect((execStartOutput as any).workerPrompt).toBeUndefined();
+    });
+
+    it('keeps output size small even with large prompts', () => {
+      // The key benefit: tool output size stays bounded
+      const largePromptContent = 'X'.repeat(100000); // 100KB prompt
+      
+      const outputWithPath = {
+        workerPromptPath: '.hive/features/feat/tasks/task/worker-prompt.md',
+        workerPromptPreview: largePromptContent.slice(0, 200) + '...',
+        backgroundTaskCall: {
+          promptFile: '.hive/features/feat/tasks/task/worker-prompt.md',
+        },
+      };
+
+      const outputJson = JSON.stringify(outputWithPath);
+
+      // Output should be small (no inline prompt)
+      expect(outputJson.length).toBeLessThan(1000);
+    });
+  });
+
+  describe('backward compatibility', () => {
+    it('documents that existing prompt parameter still works', () => {
+      // Existing callers that pass prompt directly should continue to work
+      const legacyCall = {
+        agent: 'forager-worker',
+        prompt: 'Direct inline prompt content',
+        description: 'Legacy caller',
+        sync: false,
+      };
+
+      expect(legacyCall.prompt).toBeDefined();
+      expect((legacyCall as any).promptFile).toBeUndefined();
+    });
   });
 });

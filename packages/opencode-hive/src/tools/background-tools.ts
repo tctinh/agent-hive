@@ -19,6 +19,7 @@ import {
   type OpencodeClient,
 } from '../background/index.js';
 import { isHiveAgent, normalizeVariant } from '../hooks/variant-hook.js';
+import { resolvePromptFromFile, findWorkspaceRoot } from '../utils/prompt-file.js';
 
 /**
  * Output format for background_task tool.
@@ -110,7 +111,8 @@ export function createBackgroundTools(
       description: 'Spawn a background agent task. Returns task_id for tracking. Use sync=true to wait for completion.',
       args: {
         agent: tool.schema.string().describe('Agent to use (e.g., "forager-worker", "scout-researcher")'),
-        prompt: tool.schema.string().describe('Task instructions/prompt'),
+        prompt: tool.schema.string().optional().describe('Task instructions/prompt (required if promptFile not provided)'),
+        promptFile: tool.schema.string().optional().describe('Path to file containing prompt (alternative to inline prompt)'),
         description: tool.schema.string().describe('Human-readable task description'),
         sync: tool.schema.boolean().optional().describe('Wait for completion (default: false)'),
         idempotencyKey: tool.schema.string().optional().describe('Key for safe retries'),
@@ -123,6 +125,7 @@ export function createBackgroundTools(
         {
           agent,
           prompt,
+          promptFile,
           description,
           sync = false,
           idempotencyKey,
@@ -135,6 +138,40 @@ export function createBackgroundTools(
       ): Promise<string> {
         const ctx = toolContext as ToolContext;
 
+        // Resolve prompt from file if promptFile is provided
+        let resolvedPrompt = prompt;
+        if (promptFile) {
+          // Determine workspace root for security validation
+          const baseDir = workdir || process.cwd();
+          const workspaceRoot = findWorkspaceRoot(baseDir) ?? baseDir;
+          const fileResult = await resolvePromptFromFile(promptFile, workspaceRoot);
+          
+          if (fileResult.error) {
+            const output: BackgroundTaskOutput = {
+              provider: 'hive',
+              task_id: '',
+              session_id: '',
+              status: 'error',
+              error: `Failed to read prompt file: ${fileResult.error}`,
+            };
+            return JSON.stringify(output, null, 2);
+          }
+          
+          resolvedPrompt = fileResult.content;
+        }
+
+        // Validate that we have a prompt (either inline or from file)
+        if (!resolvedPrompt) {
+          const output: BackgroundTaskOutput = {
+            provider: 'hive',
+            task_id: '',
+            session_id: '',
+            status: 'error',
+            error: 'Either prompt or promptFile is required',
+          };
+          return JSON.stringify(output, null, 2);
+        }
+
         // Resolve configured variant for Hive agents
         let variant: string | undefined;
         if (configService && isHiveAgent(agent)) {
@@ -145,7 +182,7 @@ export function createBackgroundTools(
         // Spawn the task
         const result = await manager.spawn({
           agent,
-          prompt,
+          prompt: resolvedPrompt,
           description,
           idempotencyKey,
           workdir,

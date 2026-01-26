@@ -37,12 +37,13 @@ export interface WorkerPromptParams {
  * 
  * Includes:
  * - Assignment details (feature, task, worktree, branch)
- * - Plan context
- * - Context files (royal jelly)
- * - Previous task summaries
- * - Mission (spec)
+ * - Mission (spec) - contains plan section, context, and completed tasks
  * - Blocker protocol (NOT question tool)
  * - Completion protocol
+ * 
+ * NOTE: Plan, context files, and previous tasks are NOT included separately
+ * because they are already embedded in the spec. This prevents duplication
+ * and keeps the prompt size bounded.
  */
 export function buildWorkerPrompt(params: WorkerPromptParams): string {
   const {
@@ -51,22 +52,10 @@ export function buildWorkerPrompt(params: WorkerPromptParams): string {
     taskOrder,
     worktreePath,
     branch,
-    plan,
-    contextFiles,
+    // plan, contextFiles, previousTasks - NOT used separately (embedded in spec)
     spec,
-    previousTasks,
     continueFrom,
   } = params;
-
-  // Build context files section
-  const contextSection = contextFiles.length > 0
-    ? contextFiles.map(f => `### ${f.name}\n${f.content}`).join('\n\n')
-    : '_No context files available._';
-
-  // Build previous tasks section
-  const previousSection = previousTasks?.length
-    ? previousTasks.map(t => `- **${t.name}**: ${t.summary}`).join('\n')
-    : '_This is the first task._';
 
   // Build continuation section if resuming from blocked
   const continuationSection = continueFrom ? `
@@ -101,24 +90,6 @@ You are a worker agent executing a task in an isolated git worktree.
 
 Do NOT modify files outside this directory.
 ${continuationSection}
----
-
-## Plan Context
-
-${plan}
-
----
-
-## Context Files (Royal Jelly)
-
-${contextSection}
-
----
-
-## Previous Tasks Completed
-
-${previousSection}
-
 ---
 
 ## Your Mission
