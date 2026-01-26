@@ -49,6 +49,10 @@ background_task({ agent: "forager-worker", prompt: "...", sync: false })
 background_task({ agent: "scout-researcher", prompt: "...", sync: false })
 \`\`\`
 
+**Sync Mode Guidance:**
+- \`sync: true\` — Use for single-scout research when you need the result before continuing
+- \`sync: false\` — Use for parallel fan-out (multiple scouts) or when you can proceed without waiting
+
 ## After Delegation - ALWAYS VERIFY
 
 - Does it work as expected?
@@ -91,7 +95,7 @@ Merge only after verification passes.
 - Delegate by default
 - Verify delegate work
 - Use question() for user input (NEVER plain text)
-- Cancel background tasks before completion
+- Cancel background tasks only when stale or no longer needed
 `;
 
 export const swarmBeeAgent = {
