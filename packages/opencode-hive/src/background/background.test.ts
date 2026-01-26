@@ -1534,7 +1534,7 @@ describe('Misconfiguration Messaging', () => {
     // 3. mode
     // 4. delegationRequired
     // 5. backgroundTaskCall
-    // 6. instructions (with troubleshooting section)
+    // 6. instructions (includes minimal troubleshooting)
     
     const expectedDelegationFields = [
       'worktreePath',
@@ -1547,12 +1547,13 @@ describe('Misconfiguration Messaging', () => {
     
     // Document expected backgroundTaskCall structure
     const expectedBackgroundTaskCallFields = [
-      'agent',
-      'prompt',
+      'promptFile',
       'description',
-      'sync',
       'workdir',
       'idempotencyKey',
+      'feature',
+      'task',
+      'attempt',
     ];
     
     expect(expectedDelegationFields).toContain('instructions');
@@ -1840,7 +1841,6 @@ describe('hive_exec_start Delegation Payload Normalization', () => {
           // agent should NOT be here (duplicated)
           // prompt should NOT be here (duplicated)
           description: 'Hive: test-task',
-          sync: false,
           workdir: '/path/to/worktree',
           idempotencyKey: 'hive-feature-task-1',
           feature: 'test-feature',
@@ -1869,7 +1869,6 @@ describe('hive_exec_start Delegation Payload Normalization', () => {
         backgroundTaskCall: {
           // prompt should NOT be here (duplicated)
           description: 'Hive: test-task',
-          sync: false,
           workdir: '/path/to/worktree',
           idempotencyKey: 'hive-feature-task-1',
           feature: 'test-feature',
@@ -1949,7 +1948,6 @@ describe('hive_exec_start Delegation Payload Normalization', () => {
         agent: 'forager-worker',
         backgroundTaskCall: {
           description: 'Hive: test-task',
-          sync: false,
           workdir: '/path/to/worktree',
           idempotencyKey: 'key-1',
           feature: 'test-feature',
@@ -1971,7 +1969,6 @@ describe('hive_exec_start Delegation Payload Normalization', () => {
         workerPromptPreview: 'Full prompt...',
         backgroundTaskCall: {
           description: 'Hive: test-task',
-          sync: false,
           workdir: '/path/to/worktree',
           idempotencyKey: 'key-1',
           feature: 'test-feature',
@@ -1999,7 +1996,6 @@ background_task({
   agent: <use the top-level 'agent' field>,
   prompt: <use the top-level 'workerPrompt' field>,
   description: "Hive: test-task",
-  sync: false,
   workdir: "/path/to/worktree",
   idempotencyKey: "key-1",
   feature: "test-feature",
@@ -2284,7 +2280,6 @@ describe('Prompt File Reference - Prevent Tool Output Truncation', () => {
         agent: 'forager-worker',
         promptFile: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
         description: 'Execute task',
-        sync: false,
         workdir: '/path/to/worktree',
         idempotencyKey: 'hive-feat-task-1',
       };
@@ -2325,7 +2320,6 @@ describe('Prompt File Reference - Prevent Tool Output Truncation', () => {
         backgroundTaskCall: {
           promptFile: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
           description: 'Hive: 01-task',
-          sync: false,
           workdir: '/path/to/worktree',
           idempotencyKey: 'hive-feat-task-1',
           feature: 'my-feature',
