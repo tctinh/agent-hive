@@ -207,13 +207,13 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
         'dispatching-parallel-agents',
         'executing-plans',
       ],
-      autoLoadSkills: ['onboarding'],
+      autoLoadSkills: ['parallel-exploration'],
     },
     'architect-planner': {
       model: DEFAULT_AGENT_MODELS['architect-planner'],
       temperature: 0.7,
       skills: ['brainstorming', 'writing-plans'],
-      autoLoadSkills: ['onboarding'],
+      autoLoadSkills: ['parallel-exploration'],
     },
     'swarm-orchestrator': {
       model: DEFAULT_AGENT_MODELS['swarm-orchestrator'],
