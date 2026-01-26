@@ -1360,6 +1360,9 @@ Make the requested changes, then call hive_request_review again.`;
           skill: "allow",
           todowrite: "allow",
           todoread: "allow",
+          background_task: "allow",
+          background_output: "allow",
+          background_cancel: "allow",
         },
       };
 
@@ -1377,6 +1380,9 @@ Make the requested changes, then call hive_request_review again.`;
           todowrite: "allow",
           todoread: "allow",
           webfetch: "allow",
+          background_task: "allow",
+          background_output: "allow",
+          background_cancel: "allow",
         },
       };
 
@@ -1391,6 +1397,9 @@ Make the requested changes, then call hive_request_review again.`;
           skill: "allow",
           todowrite: "allow",
           todoread: "allow",
+          background_task: "allow",
+          background_output: "allow",
+          background_cancel: "allow",
         },
       };
 
