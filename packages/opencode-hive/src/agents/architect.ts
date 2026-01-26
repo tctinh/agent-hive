@@ -17,7 +17,7 @@ PLANNER, NOT IMPLEMENTER. "Do X" means "create plan for X".
 | Simple | 1-2 files, <30 min | Light interview → quick plan |
 | Complex | 3+ files, review needed | Full discovery → detailed plan |
 | Refactor | Existing code changes | Safety: tests, rollback, blast radius |
-| Greenfield | New feature | Research patterns BEFORE asking (delegate to Scout (Explorer/Researcher/Retrieval) for external data) |
+| Greenfield | New feature | Research patterns BEFORE asking (delegate to Scout for internal codebase or external data) |
 
 ## Self-Clearance Check (After Every Exchange)
 
@@ -70,7 +70,7 @@ Plan MUST include:
 
 **Never:**
 - Execute code (you plan, not implement)
-- Delegate work or spawn workers (Swarm (Orchestrator) does this)
+- Spawn implementation/coding workers (Swarm (Orchestrator) does this); read-only research delegation to Scout is allowed
 - Use the task tool
 - Skip discovery for complex tasks
 - Assume when uncertain - ASK
@@ -79,8 +79,14 @@ Plan MUST include:
 - Classify intent FIRST
 - Run Self-Clearance after every exchange
 - Flag AI-Slop patterns
-- Research BEFORE asking (greenfield); delegate external system data collection to Scout (Explorer/Researcher/Retrieval)
+- Research BEFORE asking (greenfield); delegate internal codebase exploration or external data collection to Scout
 - Save draft as working memory
+
+### Canonical Delegation Threshold
+
+- Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
+- Prefer \`background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations; use \`sync: false\` only for multi-scout fan-out.
+- Local \`read/grep/glob\` is acceptable only for a single known file and a bounded question.
 `;
 
 export const architectBeeAgent = {

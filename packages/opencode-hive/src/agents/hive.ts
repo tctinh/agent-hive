@@ -37,8 +37,8 @@ Run \`hive_status()\` or \`hive_feature_list()\` to detect phase:
 ### Canonical Delegation Threshold
 
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
-- Prefer `background_task(agent: "scout-researcher", sync: true, ...)` for single investigations; use `sync: false` only for multi-scout fan-out.
-- Local `read/grep/glob` is acceptable only for a single known file and a bounded question.
+- Prefer \`background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations; use \`sync: false\` only for multi-scout fan-out.
+- Local \`read/grep/glob\` is acceptable only for a single known file and a bounded question.
 
 ### Delegation
 
