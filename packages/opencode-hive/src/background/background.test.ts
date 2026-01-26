@@ -10,13 +10,14 @@
  * - Background poller (Task 06)
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'bun:test';
 import { BackgroundTaskStore, resetStore } from './store.js';
 import { isValidTransition, isTerminalStatus, VALID_TRANSITIONS } from './types.js';
 import { AgentGate } from './agent-gate.js';
 import { ConcurrencyManager, createConcurrencyManager } from './concurrency.js';
 import { BackgroundPoller, createPoller } from './poller.js';
 import { BackgroundManager } from './manager.js';
+import { createBackgroundTools } from '../tools/background-tools.js';
 import type { OpencodeClient } from './types.js';
 
 // ============================================================================
@@ -1192,6 +1193,118 @@ describe('BackgroundManager completion integration', () => {
     expect(parentCall?.text).toContain('BACKGROUND TASK');
     expect(parentCall?.text).toContain('background_output');
 
+    manager.shutdown();
+  });
+});
+
+// =========================================================================
+// background_output observation data (Task 07)
+// =========================================================================
+
+describe('background_output observation data', () => {
+  it('hive_background_output includes observation object', async () => {
+    const store = new BackgroundTaskStore();
+    const client = createMockClient([{ name: 'forager' }]);
+    const manager = new BackgroundManager({
+      client,
+      projectRoot: '/tmp',
+      store,
+      concurrency: { defaultLimit: 1, minDelayBetweenStartsMs: 0 },
+    });
+
+    const tools = createBackgroundTools(manager, client);
+
+    const spawn = await manager.spawn({
+      agent: 'forager',
+      prompt: 'test prompt',
+      description: 'test',
+      sync: false,
+    });
+
+    const taskId = spawn.task.taskId;
+    const raw = await tools.background_output.execute({ task_id: taskId }, {} as any);
+    const result = JSON.parse(raw) as Record<string, unknown>;
+    const observation = result.observation as Record<string, unknown> | undefined;
+
+    expect(observation).toBeDefined();
+    expect(observation?.taskId).toBe(taskId);
+    expect(typeof observation?.elapsedMs).toBe('number');
+    expect(typeof observation?.maybeStuck).toBe('boolean');
+    expect('lastActivityAt' in (observation ?? {})).toBe(true);
+    expect('lastMessagePreview' in (observation ?? {})).toBe(true);
+    expect('messageCount' in (observation ?? {})).toBe(true);
+
+    manager.shutdown();
+  });
+
+  it('observation.lastMessagePreview truncates at 200 chars', async () => {
+    const store = new BackgroundTaskStore();
+    const client = createMockClient([{ name: 'forager' }]);
+    const manager = new BackgroundManager({
+      client,
+      projectRoot: '/tmp',
+      store,
+      concurrency: { defaultLimit: 1, minDelayBetweenStartsMs: 0 },
+    });
+
+    const tools = createBackgroundTools(manager, client);
+
+    const spawn = await manager.spawn({
+      agent: 'forager',
+      prompt: 'test prompt',
+      description: 'test',
+      sync: false,
+    });
+
+    const taskId = spawn.task.taskId;
+    const longMessage = 'x'.repeat(300);
+    manager.handleMessageEvent(spawn.task.sessionId, longMessage);
+
+    const raw = await tools.background_output.execute({ task_id: taskId }, {} as any);
+    const result = JSON.parse(raw) as Record<string, unknown>;
+    const observation = result.observation as Record<string, unknown> | undefined;
+    const preview = observation?.lastMessagePreview as string;
+
+    expect(preview.length).toBe(203);
+    expect(preview.endsWith('...')).toBe(true);
+
+    manager.shutdown();
+  });
+
+  it('maybeStuck true after 10 minute threshold', async () => {
+    const store = new BackgroundTaskStore();
+    const client = createMockClient([{ name: 'forager' }]);
+    client.session.get = async () => ({ data: { id: 'test-session-123', status: 'running' } });
+    const manager = new BackgroundManager({
+      client,
+      projectRoot: '/tmp',
+      store,
+      concurrency: { defaultLimit: 1, minDelayBetweenStartsMs: 0 },
+      poller: { stuckThresholdMs: 10 * 60 * 1000, minRuntimeBeforeStuckMs: 0 },
+    });
+
+    const tools = createBackgroundTools(manager, client);
+
+    const spawn = await manager.spawn({
+      agent: 'forager',
+      prompt: 'test prompt',
+      description: 'test',
+      sync: false,
+    });
+
+    const task = manager.getTask(spawn.task.taskId)!;
+    const startedAtMs = new Date(task.startedAt ?? new Date().toISOString()).getTime();
+    const now = startedAtMs + 11 * 60 * 1000;
+
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    const raw = await tools.background_output.execute({ task_id: task.taskId }, {} as any);
+    const result = JSON.parse(raw) as Record<string, unknown>;
+    const observation = result.observation as Record<string, unknown> | undefined;
+
+    expect(observation?.maybeStuck).toBe(true);
+
+    nowSpy.mockRestore();
     manager.shutdown();
   });
 });
