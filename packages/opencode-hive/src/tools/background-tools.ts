@@ -290,14 +290,14 @@ export function createBackgroundTools(
      * Get output from a background task.
      */
     hive_background_output: tool({
-      description: 'Get output from a background task. For sync=false tasks, wait for the completion <system-reminder> and then call with block=false to fetch the result; use block=true only when you need interim output.',
+      description: 'Get output from a background task. For sync=false tasks, wait for the completion <system-reminder> and then call with block=false to fetch the result; use block=true only when you need interim output. When blocking, pick a timeout based on task complexity (typically 30-120s).',
       args: {
         task_id: tool.schema.string().describe('Task ID to get output from'),
         block: tool.schema.boolean().optional().describe('Block waiting for new output (default: false)'),
-        timeout: tool.schema.number().optional().describe('Timeout in ms when blocking (default: 45000)'),
+        timeout: tool.schema.number().optional().describe('Timeout in ms when blocking (default: 60000)'),
         cursor: tool.schema.string().optional().describe('Cursor for incremental output (message count)'),
       },
-      async execute({ task_id, block = false, timeout = 45000, cursor }): Promise<string> {
+      async execute({ task_id, block = false, timeout = 60000, cursor }): Promise<string> {
         const task = manager.getTask(task_id);
         if (!task) {
           return JSON.stringify({
