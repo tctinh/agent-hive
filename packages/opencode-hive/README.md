@@ -39,6 +39,16 @@ This enables tools like `grep_app_searchGitHub`, `context7_query-docs`, `websear
 5. **Execute** — Tasks run in isolated git worktrees
 6. **Ship** — Clean commits, full audit trail
 
+### Planning-mode delegation
+
+During planning, "don't execute" means "don't implement" (no code edits, no worktrees). Read-only exploration is explicitly allowed and encouraged, both via local tools and by delegating to Scout.
+
+#### Canonical Delegation Threshold
+
+- Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
+- Prefer `background_task(agent: "scout-researcher", sync: true, ...)` for single investigations; use `sync: false` only for multi-scout fan-out.
+- Local `read`/`grep`/`glob` is acceptable only for a single known file and a bounded question.
+
 ## Tools
 
 ### Feature Management

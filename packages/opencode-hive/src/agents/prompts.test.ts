@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'fs';
+import * as path from 'path';
 import { QUEEN_BEE_PROMPT } from './hive';
 import { ARCHITECT_BEE_PROMPT } from './architect';
 import { SWARM_BEE_PROMPT } from './swarm';
@@ -71,6 +73,34 @@ describe('Swarm (Orchestrator) prompt', () => {
 
     it('contains sync: false guidance for fan-out', () => {
       expect(SWARM_BEE_PROMPT).toContain('sync: false');
+    });
+  });
+});
+
+describe('README.md documentation', () => {
+  const README_PATH = path.resolve(import.meta.dir, '..', '..', 'README.md');
+  const readmeContent = readFileSync(README_PATH, 'utf-8');
+
+  describe('delegation planning alignment', () => {
+    it('contains the heading "### Planning-mode delegation"', () => {
+      expect(readmeContent).toContain('### Planning-mode delegation');
+    });
+
+    it('contains sync: true string', () => {
+      expect(readmeContent).toContain('sync: true');
+    });
+
+    it('contains sync: false string', () => {
+      expect(readmeContent).toContain('sync: false');
+    });
+
+    it('clarifies that "don\'t execute" means "don\'t implement"', () => {
+      expect(readmeContent).toContain("don't implement");
+    });
+
+    it('contains the Canonical Delegation Threshold content', () => {
+      expect(readmeContent).toContain('cannot name the file path upfront');
+      expect(readmeContent).toContain('2+ files');
     });
   });
 });
