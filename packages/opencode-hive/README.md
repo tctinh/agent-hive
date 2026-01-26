@@ -212,7 +212,7 @@ Use `autoLoadSkills` to automatically inject skills into an agent's system promp
   "$schema": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
   "agents": {
     "hive-master": {
-      "autoLoadSkills": ["onboarding"]
+      "autoLoadSkills": ["parallel-exploration"]
     },
     "forager-worker": {
       "autoLoadSkills": ["test-driven-development", "verification-before-completion"]
@@ -225,10 +225,10 @@ Use `autoLoadSkills` to automatically inject skills into an agent's system promp
 
 | Agent | autoLoadSkills default |
 |-------|------------------------|
-| `hive-master` | `onboarding` |
+| `hive-master` | `parallel-exploration` |
 | `forager-worker` | `test-driven-development`, `verification-before-completion` |
 | `scout-researcher` | `parallel-exploration` |
-| `architect-planner` | `onboarding` |
+| `architect-planner` | `parallel-exploration` |
 | `swarm-orchestrator` | (none) |
 
 ### Per-Agent Model Variants

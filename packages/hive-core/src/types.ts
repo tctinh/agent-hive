@@ -230,7 +230,6 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
     'forager-worker': {
       model: DEFAULT_AGENT_MODELS['forager-worker'],
       temperature: 0.3,
-      skills: ['test-driven-development', 'verification-before-completion'],
       autoLoadSkills: ['test-driven-development', 'verification-before-completion'],
     },
     'hygienic-reviewer': {
