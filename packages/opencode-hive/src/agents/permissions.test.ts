@@ -60,7 +60,7 @@ function createStubClient(): unknown {
 }
 
 describe('Agent permissions for background task delegation', () => {
-  it('registers background_* tools as allow for primary agents', async () => {
+  it('registers hive_background_* tools as allow for primary agents', async () => {
     const originalHome = process.env.HOME;
     const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-permissions-'));
 
@@ -99,9 +99,9 @@ describe('Agent permissions for background task delegation', () => {
       expect(architectPerm).toBeTruthy();
 
       for (const perm of [hivePerm!, swarmPerm!, architectPerm!]) {
-        expect(perm.background_task).toBe('allow');
-        expect(perm.background_output).toBe('allow');
-        expect(perm.background_cancel).toBe('allow');
+        expect(perm.hive_background_task).toBe('allow');
+        expect(perm.hive_background_output).toBe('allow');
+        expect(perm.hive_background_cancel).toBe('allow');
       }
 
       expect(architectPerm!.edit).toBe('deny');

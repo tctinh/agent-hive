@@ -146,16 +146,16 @@ The previous worker's progress is preserved. Include the user's decision in the 
 **Observation Polling (Recommended):**
 - Prefer completion notifications over polling
 - Use \`hive_worker_status()\` for observation-based spot checks
-- Avoid tight loops with \`background_output\`; if needed, wait 30-60s between checks
+- Avoid tight loops with \`hive_background_output\`; if needed, wait 30-60s between checks
 - If you suspect notifications did not deliver, do a single \`hive_worker_status()\` check first
-- If you need final results, call \`background_output({ task_id, block: false })\` after the completion notice
+- If you need final results, call \`hive_background_output({ task_id, block: false })\` after the completion notice
 
 **For research**, use MCP tools or parallel exploration:
 - \`grep_app_searchGitHub\` - Find code in OSS
 - \`context7_query-docs\` - Library documentation
 - \`websearch_web_search_exa\` - Web search via Exa
 - \`ast_grep_search\` - AST-based search
-- For exploratory fan-out, load \`hive_skill("parallel-exploration")\` and use \`background_task(agent: "scout-researcher", sync: false, ...)\`
+- For exploratory fan-out, load \`hive_skill("parallel-exploration")\` and use \`hive_background_task(agent: "scout-researcher", sync: false, ...)\`
 
 ### Planning Phase - Context Management REQUIRED
 
@@ -359,9 +359,9 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       hive_skill: createHiveSkillTool(filteredSkills),
 
       // Background task tools for delegated execution
-      background_task: backgroundTools.background_task,
-      background_output: backgroundTools.background_output,
-      background_cancel: backgroundTools.background_cancel,
+      hive_background_task: backgroundTools.hive_background_task,
+      hive_background_output: backgroundTools.hive_background_output,
+      hive_background_cancel: backgroundTools.hive_background_cancel,
 
       hive_feature_create: tool({
         description: 'Create a new feature and set it as active',
@@ -703,7 +703,7 @@ Add this section to your plan content and try again.`;
           
           taskService.writeSpec(feature, task, specContent);
 
-          // Delegated execution is always available via Hive-owned background_task tools.
+          // Delegated execution is always available via Hive-owned hive_background_task tools.
           // OMO-Slim is optional and should not gate delegation.
           // NOTE: contextFiles and previousTasks are already collected above (no duplicate reads)
 
@@ -737,7 +737,7 @@ Add this section to your plan content and try again.`;
           const idempotencyKey = `hive-${feature}-${task}-${attempt}`;
 
           // Persist idempotencyKey early for debugging. The workerSession will be
-          // populated by background_task with the REAL OpenCode session_id/task_id.
+          // populated by hive_background_task with the REAL OpenCode session_id/task_id.
           taskService.patchBackgroundFields(feature, task, { idempotencyKey });
 
           // Calculate observability metadata for prompt/payload sizes
@@ -779,7 +779,7 @@ Add this section to your plan content and try again.`;
             workerPromptPreview, // Truncated preview for display
             backgroundTaskCall: {
               // NOTE: Uses promptFile instead of prompt to prevent truncation
-              promptFile: workerPromptPath, // Absolute path for background_task
+              promptFile: workerPromptPath, // Absolute path for hive_background_task
               description: `Hive: ${task}`,
               workdir: worktree.path,
               idempotencyKey,
@@ -789,14 +789,14 @@ Add this section to your plan content and try again.`;
             },
             instructions: `## Delegation Required
 
-Call the background_task tool to spawn a Forager (Worker/Coder) worker.
+Call the hive_background_task tool to spawn a Forager (Worker/Coder) worker.
 
 \`backgroundTaskCall\` contains the canonical tool arguments.
 
 - Add \`sync: true\` if you need the result in this session.
-- Otherwise omit \`sync\`. Wait for the completion notification (no polling required). After the <system-reminder> arrives, call \`background_output({ task_id: "<id>", block: false })\` once to fetch the final result.
+- Otherwise omit \`sync\`. Wait for the completion notification (no polling required). After the <system-reminder> arrives, call \`hive_background_output({ task_id: "<id>", block: false })\` once to fetch the final result.
 
-Troubleshooting: if you see "Unknown parameter: workdir", your background_task tool is not Hive's provider. Ensure agent-hive loads after other background_* tool providers, then re-run hive_exec_start.`,
+Troubleshooting: if you see "Unknown parameter: workdir", your hive_background_task tool is not Hive's provider. Ensure agent-hive loads after other background_* tool providers, then re-run hive_exec_start.`,
           };
 
           // Calculate payload meta (JSON size WITHOUT inlined prompt - file reference only)
@@ -1086,8 +1086,8 @@ Re-run with updated summary showing verification results.`;
           const hint = workers.some(w => w.status === 'blocked')
             ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
             : workers.some(w => w.maybeStuck)
-              ? 'Some workers may be stuck. Use background_output({ task_id }) to check output, or abort with hive_exec_abort.'
-              : 'Workers in progress. Wait for the completion notification (no polling required). Use hive_worker_status for spot checks; use background_output only if interim output is explicitly needed.';
+              ? 'Some workers may be stuck. Use hive_background_output({ task_id }) to check output, or abort with hive_exec_abort.'
+              : 'Workers in progress. Wait for the completion notification (no polling required). Use hive_worker_status for spot checks; use hive_background_output only if interim output is explicitly needed.';
           const guidance = stuckWorkers > 0
             ? `\n\n⚠️ ${stuckWorkers} worker(s) may be stuck (no activity for 10+ minutes). Consider cancelling or investigating.`
             : '';
@@ -1408,9 +1408,9 @@ Make the requested changes, then call hive_request_review again.`;
           skill: "allow",
           todowrite: "allow",
           todoread: "allow",
-          background_task: "allow",
-          background_output: "allow",
-          background_cancel: "allow",
+          hive_background_task: "allow",
+          hive_background_output: "allow",
+          hive_background_cancel: "allow",
         },
       };
 
@@ -1428,9 +1428,9 @@ Make the requested changes, then call hive_request_review again.`;
           todowrite: "allow",
           todoread: "allow",
           webfetch: "allow",
-          background_task: "allow",
-          background_output: "allow",
-          background_cancel: "allow",
+          hive_background_task: "allow",
+          hive_background_output: "allow",
+          hive_background_cancel: "allow",
         },
       };
 
@@ -1445,9 +1445,9 @@ Make the requested changes, then call hive_request_review again.`;
           skill: "allow",
           todowrite: "allow",
           todoread: "allow",
-          background_task: "allow",
-          background_output: "allow",
-          background_cancel: "allow",
+          hive_background_task: "allow",
+          hive_background_output: "allow",
+          hive_background_cancel: "allow",
         },
       };
 

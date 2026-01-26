@@ -1,6 +1,6 @@
 ---
 name: parallel-exploration
-description: Use when you need parallel, read-only exploration via background_task (Scout fan-out)
+description: Use when you need parallel, read-only exploration via hive_hive_background_task (Scout fan-out)
 ---
 
 # Parallel Exploration (Background Scout Fan-Out)
@@ -9,7 +9,7 @@ description: Use when you need parallel, read-only exploration via background_ta
 
 When you need to answer "where/how does X work?" across multiple domains (codebase, tests, docs, OSS), investigating sequentially wastes time. Each investigation is independent and can happen in parallel.
 
-**Core principle:** Decompose into independent sub-questions, spawn one `background_task` per sub-question, collect results asynchronously.
+**Core principle:** Decompose into independent sub-questions, spawn one `hive_hive_background_task` per sub-question, collect results asynchronously.
 
 **Safe in Planning mode:** This is read-only exploration. It is OK to use during exploratory research even when there is no feature, no plan, and no approved tasks.
 
@@ -58,17 +58,17 @@ Launch all tasks before waiting for any results:
 
 ```typescript
 // Fan-out: spawn all tasks first
-background_task({
+hive_background_task({
   agent: "scout-researcher",
-  description: "Find background_task implementation",
-  prompt: `Where is background_task implemented and registered?
+  description: "Find hive_background_task implementation",
+  prompt: `Where is hive_background_task implemented and registered?
     - Find the tool definition
     - Find the plugin registration
     - Return file paths with line numbers`,
   sync: false
 })
 
-background_task({
+hive_background_task({
   agent: "scout-researcher",
   description: "Analyze background task concurrency",
   prompt: `How does background task concurrency/queueing work?
@@ -78,7 +78,7 @@ background_task({
   sync: false
 })
 
-background_task({
+hive_background_task({
   agent: "scout-researcher",
   description: "Find parent notification mechanism",
   prompt: `How does parent notification work for background tasks?
@@ -110,7 +110,7 @@ When notified of completion, retrieve results:
 
 ```typescript
 // Get output from completed task
-background_output({
+hive_background_output({
   task_id: "task-abc123",
   block: false  // Don't wait, task already done
 })
@@ -120,7 +120,7 @@ background_output({
 
 ```typescript
 // First call - get initial output
-background_output({
+hive_background_output({
   task_id: "task-abc123",
   block: true,      // Wait for output
   timeout: 30000    // 30 second timeout
@@ -128,7 +128,7 @@ background_output({
 // Returns: { output: "...", cursor: "5" }
 
 // Later call - get new output since cursor
-background_output({
+hive_background_output({
   task_id: "task-abc123",
   cursor: "5",      // Resume from message 5
   block: true
@@ -148,10 +148,10 @@ Cancel tasks that are no longer needed:
 
 ```typescript
 // Cancel specific task
-background_cancel({ task_id: "task-abc123" })
+hive_background_cancel({ task_id: "task-abc123" })
 
 // Cancel all your background tasks
-background_cancel({ all: true })
+hive_background_cancel({ all: true })
 ```
 
 ## Prompt Templates
@@ -203,22 +203,22 @@ Return:
 **Investigation:** "How does the background task system work?"
 
 **Decomposition:**
-1. Implementation: Where is `background_task` tool defined?
+1. Implementation: Where is `hive_background_task` tool defined?
 2. Concurrency: How does task scheduling/queueing work?
 3. Notifications: How does parent session get notified?
 
 **Fan-out:**
 ```typescript
 // Task 1: Implementation
-background_task({
+hive_background_task({
   agent: "scout-researcher",
-  description: "Find background_task implementation",
-  prompt: "Where is background_task implemented? Find tool definition and registration.",
+  description: "Find hive_background_task implementation",
+  prompt: "Where is hive_background_task implemented? Find tool definition and registration.",
   sync: false
 })
 
 // Task 2: Concurrency
-background_task({
+hive_background_task({
   agent: "scout-researcher",
   description: "Analyze concurrency model",
   prompt: "How does background task concurrency work? Find the manager/scheduler.",
@@ -226,7 +226,7 @@ background_task({
 })
 
 // Task 3: Notifications
-background_task({
+hive_background_task({
   agent: "scout-researcher",
   description: "Find notification mechanism",
   prompt: "How are parent sessions notified of task completion?",
@@ -246,16 +246,16 @@ background_task({
 **Spawning sequentially (defeats the purpose):**
 ```typescript
 // BAD: Wait for each before spawning next
-const result1 = await background_task({ ..., sync: true })
-const result2 = await background_task({ ..., sync: true })
+const result1 = await hive_background_task({ ..., sync: true })
+const result2 = await hive_background_task({ ..., sync: true })
 ```
 
 ```typescript
 // GOOD: Spawn all, then collect
-background_task({ ..., sync: false })  // Returns immediately
-background_task({ ..., sync: false })  // Returns immediately
-background_task({ ..., sync: false })  // Returns immediately
-// ... later, collect results with background_output
+hive_background_task({ ..., sync: false })  // Returns immediately
+hive_background_task({ ..., sync: false })  // Returns immediately
+hive_background_task({ ..., sync: false })  // Returns immediately
+// ... later, collect results with hive_background_output
 ```
 
 **Too many tasks (diminishing returns):**
@@ -282,5 +282,5 @@ background_task({ ..., sync: false })  // Returns immediately
 After using this pattern, verify:
 - [ ] All tasks spawned before collecting any results (true fan-out)
 - [ ] Received notifications for completed tasks
-- [ ] Successfully retrieved output with `background_output`
+- [ ] Successfully retrieved output with `hive_background_output`
 - [ ] Synthesized findings into coherent answer

@@ -17,7 +17,7 @@ PLANNER, NOT IMPLEMENTER. "Do X" means "create plan for X".
 | Simple | 1-2 files, <30 min | Light interview → quick plan |
 | Complex | 3+ files, review needed | Full discovery → detailed plan |
 | Refactor | Existing code changes | Safety: tests, rollback, blast radius |
-| Greenfield | New feature | Research patterns BEFORE asking. Delegate to Scout via \`background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations. |
+| Greenfield | New feature | Research patterns BEFORE asking. Delegate to Scout via \`hive_background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations. |
 
 During Planning, default to synchronous exploration (\`sync: true\`). If async/parallel exploration would help, ask the user via \`question()\` and follow onboarding preferences.
 
@@ -87,7 +87,7 @@ Plan MUST include:
 ### Canonical Delegation Threshold
 
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
-- Prefer \`background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations; use \`sync: false\` only for multi-scout fan-out.
+- Prefer \`hive_background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations; use \`sync: false\` only for multi-scout fan-out.
 - Local \`read/grep/glob\` is acceptable only for a single known file and a bounded question.
 `;
 

@@ -3,7 +3,7 @@ import type { BackgroundManager, OpencodeClient } from '../background/index.js';
 import type { BackgroundTaskRecord } from '../background/types.js';
 import { createBackgroundTools } from './background-tools.js';
 
-describe('background_output observation metadata', () => {
+describe('hive_background_output observation metadata', () => {
   const realNow = Date.now;
 
   afterEach(() => {
@@ -58,7 +58,7 @@ describe('background_output observation metadata', () => {
 
     const tools = createBackgroundTools(manager, client);
 
-    const result = await tools.background_output.execute({ task_id: 'task-1' });
+    const result = await tools.hive_background_output.execute({ task_id: 'task-1' });
     const parsed = JSON.parse(result as string) as {
       observation?: {
         elapsedMs: number;
@@ -131,7 +131,7 @@ describe('background_output observation metadata', () => {
     } as unknown as OpencodeClient;
 
     const tools = createBackgroundTools(manager, client);
-    const result = await tools.background_output.execute({ task_id: 'task-2' });
+    const result = await tools.hive_background_output.execute({ task_id: 'task-2' });
     const parsed = JSON.parse(result as string) as {
       observation?: {
         lastActivityAgo: string;

@@ -35,9 +35,9 @@ const EXPECTED_TOOLS = [
   "hive_context_write",
   "hive_status",
   "hive_skill",
-  "background_task",
-  "background_output",
-  "background_cancel",
+  "hive_background_task",
+  "hive_background_output",
+  "hive_background_cancel",
 ] as const;
 
 const TEST_ROOT_BASE = "/tmp/hive-e2e-plugin";

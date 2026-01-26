@@ -1222,7 +1222,7 @@ describe('background_output observation data', () => {
     });
 
     const taskId = spawn.task.taskId;
-    const raw = await tools.background_output.execute({ task_id: taskId }, {} as any);
+    const raw = await tools.hive_background_output.execute({ task_id: taskId }, {} as any);
     const result = JSON.parse(raw) as Record<string, unknown>;
     const observation = result.observation as Record<string, unknown> | undefined;
 
@@ -1261,7 +1261,7 @@ describe('background_output observation data', () => {
     const longMessage = 'x'.repeat(300);
     manager.handleMessageEvent(spawn.task.sessionId, longMessage);
 
-    const raw = await tools.background_output.execute({ task_id: taskId }, {} as any);
+    const raw = await tools.hive_background_output.execute({ task_id: taskId }, {} as any);
     const result = JSON.parse(raw) as Record<string, unknown>;
     const observation = result.observation as Record<string, unknown> | undefined;
     const preview = observation?.lastMessagePreview as string;
@@ -1301,7 +1301,7 @@ describe('background_output observation data', () => {
 
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
 
-    const raw = await tools.background_output.execute({ task_id: task.taskId }, {} as any);
+    const raw = await tools.hive_background_output.execute({ task_id: task.taskId }, {} as any);
     const result = JSON.parse(raw) as Record<string, unknown>;
     const observation = result.observation as Record<string, unknown> | undefined;
 

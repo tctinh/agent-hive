@@ -5,9 +5,9 @@
  * background tasks that execute in separate OpenCode sessions.
  * 
  * Tools:
- * - background_task: Spawn a new background task
- * - background_output: Get output from a running/completed task
- * - background_cancel: Cancel running task(s)
+ * - hive_background_task: Spawn a new background task
+ * - hive_background_output: Get output from a running/completed task
+ * - hive_background_cancel: Cancel running task(s)
  */
 
 import { tool, type ToolDefinition } from '@opencode-ai/plugin';
@@ -23,7 +23,7 @@ import { resolvePromptFromFile, findWorkspaceRoot } from '../utils/prompt-file.j
 import { formatElapsed, formatRelativeTime } from '../utils/format.js';
 
 /**
- * Output format for background_task tool.
+ * Output format for hive_background_task tool.
  */
 interface BackgroundTaskOutput {
   provider: 'hive';
@@ -70,9 +70,9 @@ export function createBackgroundTools(
   client: OpencodeClient,
   configService?: ConfigService
 ): {
-  background_task: ToolDefinition;
-  background_output: ToolDefinition;
-  background_cancel: ToolDefinition;
+  hive_background_task: ToolDefinition;
+  hive_background_output: ToolDefinition;
+  hive_background_cancel: ToolDefinition;
 } {
   async function maybeFinalizeIfIdle(sessionId: string): Promise<void> {
     // Fast-path: if the client exposes batch status, use it.
@@ -108,8 +108,8 @@ export function createBackgroundTools(
     /**
      * Spawn a new background task.
      */
-    background_task: tool({
-      description: 'Spawn a background agent task. Use sync=true to wait for completion (returns output). If sync=false (default), the parent session receives a completion <system-reminder> and you can call background_output to fetch the result.',
+    hive_background_task: tool({
+      description: 'Spawn a background agent task. Use sync=true to wait for completion (returns output). If sync=false (default), the parent session receives a completion <system-reminder> and you can call hive_background_output to fetch the result.',
       args: {
         agent: tool.schema.string().describe('Agent to use (e.g., "forager-worker", "scout-researcher")'),
         prompt: tool.schema.string().optional().describe('Task instructions/prompt (required if promptFile not provided)'),
@@ -289,7 +289,7 @@ export function createBackgroundTools(
     /**
      * Get output from a background task.
      */
-    background_output: tool({
+    hive_background_output: tool({
       description: 'Get output from a background task. For sync=false tasks, wait for the completion <system-reminder> and then call with block=false to fetch the result; use block=true only when you need interim output.',
       args: {
         task_id: tool.schema.string().describe('Task ID to get output from'),
@@ -394,7 +394,7 @@ export function createBackgroundTools(
     /**
      * Cancel background task(s).
      */
-    background_cancel: tool({
+    hive_background_cancel: tool({
       description: 'Cancel running background task(s). Use all=true to cancel all tasks for current session.',
       args: {
         task_id: tool.schema.string().optional().describe('Specific task ID to cancel'),

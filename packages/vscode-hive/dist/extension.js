@@ -959,6 +959,7 @@ var DEFAULT_HIVE_CONFIG = {
   enableToolsFor: [],
   disableSkills: [],
   disableMcps: [],
+  agentMode: "unified",
   agents: {
     "hive-master": {
       model: DEFAULT_AGENT_MODELS["hive-master"],

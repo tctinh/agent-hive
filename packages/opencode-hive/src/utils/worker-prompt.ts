@@ -206,7 +206,7 @@ After 3 failed attempts at same fix: STOP and report blocker.
 - \`question\` - Escalate via blocker protocol instead
 - \`hive_exec_start\` - No spawning sub-workers
 - \`hive_merge\` - Only Hive Master merges
-- \`background_task\` / \`task\` - No recursive delegation
+- \`hive_background_task\` / \`task\` - No recursive delegation
 
 ---
 
