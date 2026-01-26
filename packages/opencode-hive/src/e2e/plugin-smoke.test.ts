@@ -285,4 +285,106 @@ Do it
     expect(statusHintIndex).toBeGreaterThan(brainstormingIndex);
     expect(agentPromptIndex).toBeGreaterThan(statusHintIndex);
   });
+
+  it("hive-master receives onboarding skill in system output", async () => {
+    const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agents: {
+          "hive-master": {
+            autoLoadSkills: ["onboarding"],
+          },
+        },
+      }),
+    );
+
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const output = { system: [] as string[] };
+
+    await hooks["experimental.chat.system.transform"]?.({ agent: "hive-master" }, output);
+
+    const hasOnboarding = output.system.some(
+      (entry) => entry.includes("Preferences") || entry.toLowerCase().includes("onboarding"),
+    );
+
+    expect(hasOnboarding).toBe(true);
+  });
+
+  it("architect-planner receives onboarding skill in system output", async () => {
+    const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agents: {
+          "architect-planner": {
+            autoLoadSkills: ["onboarding"],
+          },
+        },
+      }),
+    );
+
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const output = { system: [] as string[] };
+
+    await hooks["experimental.chat.system.transform"]?.({ agent: "architect-planner" }, output);
+
+    const hasPreferences = output.system.some((entry) => entry.includes("Preferences"));
+
+    expect(hasPreferences).toBe(true);
+  });
+
+  it("forager-worker does NOT receive onboarding skill", async () => {
+    const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agents: {
+          "forager-worker": {
+            autoLoadSkills: [],
+          },
+        },
+      }),
+    );
+
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const output = { system: [] as string[] };
+
+    await hooks["experimental.chat.system.transform"]?.({ agent: "forager-worker" }, output);
+
+    const joined = output.system.join("\n");
+
+    expect(joined.toLowerCase().includes("onboarding")).toBe(false);
+    expect(joined.includes("Preferences")).toBe(false);
+  });
 });
