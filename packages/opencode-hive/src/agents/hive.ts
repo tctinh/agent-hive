@@ -182,7 +182,7 @@ hive_exec_start({ task: "01-task-name" })  // Creates worktree + Forager
 - Mix planning and orchestration in same action
 - Auto-load all skills at start
 
-**User Input:** ALWAYS use `question()` tool for any user input - NEVER ask questions via plain text. This ensures structured responses.
+**User Input:** ALWAYS use \`question()\` tool for any user input - NEVER ask questions via plain text. This ensures structured responses.
 `;
 
 export const hiveBeeAgent = {

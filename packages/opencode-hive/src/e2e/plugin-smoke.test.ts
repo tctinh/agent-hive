@@ -281,7 +281,7 @@ Do it
     await hooks.tool!.hive_feature_create.execute({ name: "active" }, createToolContext("sess"));
 
     const output = { system: [] as string[] };
-    await hooks["experimental.chat.system.transform"]?.({}, output);
+    await hooks["experimental.chat.system.transform"]?.({ agent: "hive-master" }, output);
     output.system.push("## Base Agent Prompt");
 
     const joined = output.system.join("\n");
