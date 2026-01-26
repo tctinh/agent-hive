@@ -20,6 +20,7 @@ import {
 } from '../background/index.js';
 import { isHiveAgent, normalizeVariant } from '../hooks/variant-hook.js';
 import { resolvePromptFromFile, findWorkspaceRoot } from '../utils/prompt-file.js';
+import { formatElapsed, formatRelativeTime } from '../utils/format.js';
 
 /**
  * Output format for background_task tool.
@@ -293,10 +294,10 @@ export function createBackgroundTools(
       args: {
         task_id: tool.schema.string().describe('Task ID to get output from'),
         block: tool.schema.boolean().optional().describe('Block waiting for new output (default: false)'),
-        timeout: tool.schema.number().optional().describe('Timeout in ms when blocking (default: 30000)'),
+        timeout: tool.schema.number().optional().describe('Timeout in ms when blocking (default: 45000)'),
         cursor: tool.schema.string().optional().describe('Cursor for incremental output (message count)'),
       },
-      async execute({ task_id, block = false, timeout = 30000, cursor }): Promise<string> {
+      async execute({ task_id, block = false, timeout = 45000, cursor }): Promise<string> {
         const task = manager.getTask(task_id);
         if (!task) {
           return JSON.stringify({
@@ -359,6 +360,23 @@ export function createBackgroundTools(
         // Get messages from session
         const output = await getTaskOutput(client, finalized.sessionId, cursorCount);
         const messageCount = finalized.progress?.messageCount ?? 0;
+        const observationSnapshot = manager.getTaskObservation(task_id);
+        const lastActivityAt = observationSnapshot?.lastActivityAt ?? null;
+        const startedAt = finalized.startedAt ? new Date(finalized.startedAt).getTime() : Date.now();
+        const elapsedMs = Date.now() - startedAt;
+        const lastMessage = finalized.progress?.lastMessage;
+        const lastMessagePreview = lastMessage
+          ? `${lastMessage.slice(0, 200)}${lastMessage.length > 200 ? '...' : ''}`
+          : null;
+        const observation = {
+          elapsedMs,
+          elapsedFormatted: formatElapsed(elapsedMs),
+          messageCount: observationSnapshot?.messageCount ?? 0,
+          lastActivityAgo: lastActivityAt ? formatRelativeTime(lastActivityAt) : 'never',
+          lastActivityAt,
+          lastMessagePreview,
+          maybeStuck: observationSnapshot?.maybeStuck ?? false,
+        };
 
         return JSON.stringify({
           task_id: finalized.taskId,
@@ -368,6 +386,7 @@ export function createBackgroundTools(
           output,
           cursor: messageCount.toString(),
           progress: finalized.progress,
+          observation,
         }, null, 2);
       },
     }),
