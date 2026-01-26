@@ -220,6 +220,10 @@ After 3 failed attempts at same fix: STOP and report blocker.
 
 ---
 
+**User Input:** ALWAYS use `question()` tool for any user input - NEVER ask questions via plain text. This ensures structured responses.
+
+---
+
 Begin your task now.
 `;
 }

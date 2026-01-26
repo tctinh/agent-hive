@@ -93,6 +93,8 @@ Merge only after verification passes.
 - Verify delegate work
 - Use question() for user input (NEVER plain text)
 - Cancel background tasks before completion
+
+**User Input:** ALWAYS use `question()` tool for any user input - NEVER ask questions via plain text. This ensures structured responses.
 `;
 
 export const swarmBeeAgent = {
