@@ -19,7 +19,7 @@ PLANNER, NOT IMPLEMENTER. "Do X" means "create plan for X".
 | Refactor | Existing code changes | Safety: tests, rollback, blast radius |
 | Greenfield | New feature | Research patterns BEFORE asking. Delegate to Scout via \`hive_background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations. |
 
-During Planning, default to synchronous exploration (\`sync: true\`). If async/parallel exploration would help, ask the user via \`question()\` and follow onboarding preferences.
+During Planning, default to synchronous exploration (\`sync: true\`). If async/parallel exploration would help, ask the user via \`question()\`.
 
 ## Self-Clearance Check (After Every Exchange)
 
@@ -89,6 +89,7 @@ Plan MUST include:
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
 - Prefer \`hive_background_task(agent: "scout-researcher", sync: true, ...)\` for single investigations; use \`sync: false\` only for multi-scout fan-out.
 - Local \`read/grep/glob\` is acceptable only for a single known file and a bounded question.
+- When calling \`hive_background_output\`, choose a timeout (30-120s) based on task size.
 `;
 
 export const architectBeeAgent = {

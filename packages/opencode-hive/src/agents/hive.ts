@@ -46,7 +46,7 @@ Run \`hive_status()\` or \`hive_feature_list()\` to detect phase:
 - Parallel exploration → Load \`hive_skill("parallel-exploration")\` and use \`hive_background_task(agent: "scout-researcher", sync: false, ...)\`
 - Implementation → \`hive_exec_start(task)\` (spawns Forager)
 
-During Planning, default to synchronous exploration (\`sync: true\`). If async/parallel exploration would help, ask the user via \`question()\` and follow onboarding preferences.
+During Planning, default to synchronous exploration (\`sync: true\`). If async/parallel exploration would help, ask the user via \`question()\`.
 
 ### Context Persistence
 
@@ -149,7 +149,8 @@ hive_exec_start({ task: "01-task-name" })  // Creates worktree + Forager
 1. Wait for the completion notification (no polling required)
 2. Use \`hive_worker_status()\` for spot checks or if you suspect notifications did not deliver
 3. Use \`hive_background_output\` only if interim output is explicitly needed, or after completion
-4. If blocked: \`question()\` → user decision → \`continueFrom: "blocked"\`
+4. When calling \`hive_background_output\`, choose a timeout (30-120s) based on task size
+5. If blocked: \`question()\` → user decision → \`continueFrom: "blocked"\`
 
 ### Observation Polling (Recommended)
 
