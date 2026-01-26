@@ -313,25 +313,7 @@ Do it
     expect(agentPromptIndex).toBeGreaterThan(statusHintIndex);
   });
 
-  it("auto-loads onboarding only for planner agents", async () => {
-    const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
-    fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(
-      configPath,
-      JSON.stringify({
-        agents: {
-          "hive-master": {
-            autoLoadSkills: ["onboarding"],
-          },
-          "architect-planner": {
-            autoLoadSkills: ["onboarding"],
-          },
-          "forager-worker": {
-            autoLoadSkills: ["onboarding", "test-driven-development"],
-          },
-        },
-      }),
-    );
+  it("auto-loads parallel exploration for planner agents by default", async () => {
     const ctx: PluginInput = {
       directory: testRoot,
       worktree: testRoot,
@@ -344,25 +326,38 @@ Do it
     const hooks = await plugin(ctx);
 
     const onboardingSnippet = "# Onboarding Preferences";
+    const parallelExplorationSkill = BUILTIN_SKILLS.find(
+      (skill) => skill.name === "parallel-exploration",
+    );
+    expect(parallelExplorationSkill).toBeDefined();
 
     const masterOutput = { system: [] as string[] };
     await hooks["experimental.chat.system.transform"]?.(
       { agent: "hive-master" },
       masterOutput,
     );
-    expect(masterOutput.system.join("\n")).toContain(onboardingSnippet);
+    expect(masterOutput.system.join("\n")).toContain(
+      parallelExplorationSkill!.template.slice(0, 50),
+    );
+    expect(masterOutput.system.join("\n")).not.toContain(onboardingSnippet);
 
     const architectOutput = { system: [] as string[] };
     await hooks["experimental.chat.system.transform"]?.(
       { agent: "architect-planner" },
       architectOutput,
     );
-    expect(architectOutput.system.join("\n")).toContain(onboardingSnippet);
+    expect(architectOutput.system.join("\n")).toContain(
+      parallelExplorationSkill!.template.slice(0, 50),
+    );
+    expect(architectOutput.system.join("\n")).not.toContain(onboardingSnippet);
 
     const foragerOutput = { system: [] as string[] };
     await hooks["experimental.chat.system.transform"]?.(
       { agent: "forager-worker" },
       foragerOutput,
+    );
+    expect(foragerOutput.system.join("\n")).not.toContain(
+      parallelExplorationSkill!.template.slice(0, 50),
     );
     expect(foragerOutput.system.join("\n")).not.toContain(onboardingSnippet);
   });
