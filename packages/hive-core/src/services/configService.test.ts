@@ -155,7 +155,7 @@ describe("ConfigService defaults", () => {
       configPath,
       JSON.stringify(
         {
-          disableSkills: ["onboarding", "custom-skill"],
+          disableSkills: ["parallel-exploration", "custom-skill"],
           agents: {
             "hive-master": {
               autoLoadSkills: ["custom-skill"],
