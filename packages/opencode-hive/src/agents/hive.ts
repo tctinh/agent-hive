@@ -139,9 +139,18 @@ hive_exec_start({ task: "01-task-name" })  // Creates worktree + Forager
 
 ### After Delegation
 
-1. \`hive_worker_status()\` - check progress
-2. Read reports for blockers
-3. If blocked: \`question()\` → user decision → \`continueFrom: "blocked"\`
+1. Wait for the completion notification (no polling required)
+2. Use \`hive_worker_status()\` for spot checks or if you suspect notifications did not deliver
+3. Use \`background_output\` only if interim output is explicitly needed, or after completion
+4. If blocked: \`question()\` → user decision → \`continueFrom: "blocked"\`
+
+### Observation Polling (Recommended)
+
+- Prefer completion notifications over polling
+- Use \`hive_worker_status()\` for observation-based spot checks
+- Avoid tight loops with \`background_output\`; if needed, wait 30-60s between checks
+- If you suspect notifications did not deliver, do a single \`hive_worker_status()\` check first
+- If you need to fetch final results, call \`background_output({ task_id, block: false })\` after the completion notice
 
 ### Failure Recovery
 
