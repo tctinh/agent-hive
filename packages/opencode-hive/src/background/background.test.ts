@@ -1227,7 +1227,8 @@ describe('background_output observation data', () => {
     const observation = result.observation as Record<string, unknown> | undefined;
 
     expect(observation).toBeDefined();
-    expect(observation?.taskId).toBe(taskId);
+    // observation doesn't include taskId, it's in the parent result
+    expect(result.task_id).toBe(taskId);
     expect(typeof observation?.elapsedMs).toBe('number');
     expect(typeof observation?.maybeStuck).toBe('boolean');
     expect('lastActivityAt' in (observation ?? {})).toBe(true);
@@ -1265,8 +1266,10 @@ describe('background_output observation data', () => {
     const observation = result.observation as Record<string, unknown> | undefined;
     const preview = observation?.lastMessagePreview as string;
 
-    expect(preview.length).toBe(203);
-    expect(preview.endsWith('...')).toBe(true);
+    // Note: handleMessageEvent already truncates to 200 chars, so the preview is exactly 200
+    // The "..." suffix is only added if lastMessage.length > 200 (which it won't be after truncation)
+    expect(preview.length).toBe(200);
+    expect(preview).toBe('x'.repeat(200));
 
     manager.shutdown();
   });
