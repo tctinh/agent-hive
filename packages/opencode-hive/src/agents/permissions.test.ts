@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn, afterEach, mock } from 'bun:test';
+import { ConfigService } from 'hive-core';
 import * as path from 'path';
 import plugin from '../index';
 
@@ -58,7 +59,19 @@ function createStubClient(): unknown {
 }
 
 describe('Agent permissions for background task delegation', () => {
-  it('registers hive_background_* tools as allow for primary agents', async () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  it('registers only hive-master in unified mode', async () => {
+    // Mock ConfigService to return unified mode
+    spyOn(ConfigService.prototype, 'get').mockReturnValue({
+      agentMode: 'unified',
+      agents: {
+        'hive-master': {},
+      }
+    } as any);
+
     const repoRoot = path.resolve(import.meta.dir, '..', '..', '..', '..');
 
     const ctx: PluginInput = {
@@ -72,19 +85,65 @@ describe('Agent permissions for background task delegation', () => {
 
     const hooks = await plugin(ctx as any);
     
-    // Config hook returns the merged config - agents are registered via config hook, not file write
-    const opencodeConfig: { agent?: Record<string, { permission?: Record<string, string> }> } = {};
+    const opencodeConfig: { 
+      agent?: Record<string, { permission?: Record<string, string> }>,
+      default_agent?: string 
+    } = {};
     await hooks.config?.(opencodeConfig);
 
+    expect(opencodeConfig.agent?.['hive-master']).toBeTruthy();
+    expect(opencodeConfig.agent?.['swarm-orchestrator']).toBeUndefined();
+    expect(opencodeConfig.agent?.['architect-planner']).toBeUndefined();
+    expect(opencodeConfig.default_agent).toBe('hive-master');
+
     const hivePerm = opencodeConfig.agent?.['hive-master']?.permission;
+    expect(hivePerm).toBeTruthy();
+    expect(hivePerm!.hive_background_task).toBe('allow');
+    expect(hivePerm!.hive_background_output).toBe('allow');
+    expect(hivePerm!.hive_background_cancel).toBe('allow');
+  });
+
+  it('registers dedicated agents in dedicated mode', async () => {
+    // Mock ConfigService to return dedicated mode
+    spyOn(ConfigService.prototype, 'get').mockReturnValue({
+      agentMode: 'dedicated',
+      agents: {
+        'architect-planner': {},
+        'swarm-orchestrator': {},
+      }
+    } as any);
+
+    const repoRoot = path.resolve(import.meta.dir, '..', '..', '..', '..');
+
+    const ctx: PluginInput = {
+      directory: repoRoot,
+      worktree: repoRoot,
+      serverUrl: new URL('http://localhost:1'),
+      project: { id: 'test', worktree: repoRoot, time: { created: Date.now() } },
+      client: createStubClient(),
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx as any);
+    
+    const opencodeConfig: { 
+      agent?: Record<string, { permission?: Record<string, string> }>,
+      default_agent?: string 
+    } = {};
+    await hooks.config?.(opencodeConfig);
+
+    expect(opencodeConfig.agent?.['hive-master']).toBeUndefined();
+    expect(opencodeConfig.agent?.['swarm-orchestrator']).toBeTruthy();
+    expect(opencodeConfig.agent?.['architect-planner']).toBeTruthy();
+    expect(opencodeConfig.default_agent).toBe('architect-planner');
+
     const swarmPerm = opencodeConfig.agent?.['swarm-orchestrator']?.permission;
     const architectPerm = opencodeConfig.agent?.['architect-planner']?.permission;
 
-    expect(hivePerm).toBeTruthy();
     expect(swarmPerm).toBeTruthy();
     expect(architectPerm).toBeTruthy();
 
-    for (const perm of [hivePerm!, swarmPerm!, architectPerm!]) {
+    for (const perm of [swarmPerm!, architectPerm!]) {
       expect(perm.hive_background_task).toBe('allow');
       expect(perm.hive_background_output).toBe('allow');
       expect(perm.hive_background_cancel).toBe('allow');
