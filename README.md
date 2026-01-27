@@ -96,33 +96,9 @@ Add `opencode-hive` to your `opencode.json`:
 
 OpenCode handles the rest — no manual npm install needed.
 
-### Agent Hive Config (Optional)
+### Agent Hive Config
 
-Hive reads `~/.config/opencode/agent_hive.json` for per-agent overrides. A schema asset is available in this repo:
-
-- `https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json`
-
-Example config:
-
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
-  "agents": {
-    "hive": {
-      "skills": ["brainstorming", "writing-plans", "dispatching-parallel-agents", "executing-plans"]
-    },
-    "architect": {
-      "skills": ["brainstorming", "writing-plans"]
-    },
-    "swarm": {
-      "skills": ["dispatching-parallel-agents", "executing-plans"]
-    },
-    "forager": {
-      "skills": ["test-driven-development", "verification-before-completion"]
-    }
-  }
-}
-```
+Run Agent Hive once to auto-generate default configuration at `~/.config/opencode/agent_hive.json`. You can then edit this file to adjust values.
 
 **MCP Research Tools** are auto-enabled: `grep_app_searchGitHub`, `context7_query-docs`, `websearch_web_search_exa`, and `ast_grep_search`. Set `EXA_API_KEY` for web search (optional).
 
