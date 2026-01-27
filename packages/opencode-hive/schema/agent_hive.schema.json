@@ -31,6 +31,24 @@
       },
       "description": "Globally disable specific MCP servers (e.g., ['websearch', 'ast_grep']). Available: websearch, context7, grep_app, ast_grep"
     },
+    "delegateMode": {
+      "type": "string",
+      "enum": [
+        "hive",
+        "task"
+      ],
+      "default": "task",
+      "description": "Granularity of worker delegation. 'hive' delegates the entire feature to a single worker; 'task' (default) delegates each task to a separate worker."
+    },
+    "agentMode": {
+      "type": "string",
+      "enum": [
+        "unified",
+        "dedicated"
+      ],
+      "default": "unified",
+      "description": "Agent specialization mode. 'unified' (default) uses a single hybrid agent for all roles; 'dedicated' uses specialized agents for each role."
+    },
     "agents": {
       "type": "object",
       "description": "Agent model configuration overrides",
