@@ -98,9 +98,20 @@ OpenCode handles the rest — no manual npm install needed.
 
 ### Agent Hive Config
 
-Run Agent Hive once to auto-generate default configuration at `~/.config/opencode/agent_hive.json`. You can then edit this file to adjust values.
+Run Agent Hive once to auto-generate a default configuration at `~/.config/opencode/agent_hive.json`. The default configuration is a good starting point, but you should review it to ensure it matches your local setup.
 
-**MCP Research Tools** are auto-enabled: `grep_app_searchGitHub`, `context7_query-docs`, `websearch_web_search_exa`, and `ast_grep_search`. Set `EXA_API_KEY` for web search (optional).
+**Key Configuration Options:**
+
+- **`agentMode`**: 
+  - `unified`: (Default) Combines Planning (Architect) and Orchestration (Swarm) into a single primary agent (`hive-master`). Specialized workers (Scout, Forager) are still used for execution.
+  - `dedicated`: Tools and roles are distributed across separate specialized agents (Architect, Swarm, Scout, Forager, etc.).
+- **`delegateMode`**: 
+  - `task`: (Default) Use OpenCode's built-in `task()` tool for background execution.
+  - `hive`: Use Hive's specialized background task tools (`hive_background_task`).
+- **`agents`**: This section maps agent roles to specific models. **You should always update these to use models available on your system** (e.g., `gpt-4o`, `claude-3-5-sonnet`, or local models).
+- **`skills`**: A list of enabled skills. To remove extra agent features or reduce context usage, simply remove the unwanted skills from this list.
+
+**MCP Research Tools** are auto-enabled: `grep_app_searchGitHub`, `context7_query-docs`, `websearch_web_search_exa`, and `ast_grep_search`.
 
 ### Start Hiving
 

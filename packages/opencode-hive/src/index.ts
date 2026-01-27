@@ -212,6 +212,10 @@ const plugin: Plugin = async (ctx) => {
     projectRoot: directory,
   });
 
+  // Get delegate mode to determine which background tools to expose
+  const delegateMode = configService.getDelegateMode();
+  const useHiveBackground = delegateMode === 'hive';
+
   // Create background tools with ConfigService for per-agent variant resolution
   const backgroundTools = createBackgroundTools(
     backgroundManager,
@@ -358,10 +362,12 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
     tool: {
       hive_skill: createHiveSkillTool(filteredSkills),
 
-      // Background task tools for delegated execution
-      hive_background_task: backgroundTools.hive_background_task,
-      hive_background_output: backgroundTools.hive_background_output,
-      hive_background_cancel: backgroundTools.hive_background_cancel,
+      // Background task tools for delegated execution (only when delegateMode='hive')
+      ...(useHiveBackground && {
+        hive_background_task: backgroundTools.hive_background_task,
+        hive_background_output: backgroundTools.hive_background_output,
+        hive_background_cancel: backgroundTools.hive_background_cancel,
+      }),
 
       hive_feature_create: tool({
         description: 'Create a new feature and set it as active',
@@ -765,29 +771,8 @@ Add this section to your plan content and try again.`;
             ? workerPrompt.slice(0, PREVIEW_MAX_LENGTH) + '...'
             : workerPrompt;
 
-          // Build the response object with canonical outermost fields
-          // - agent: top-level only (NOT duplicated in backgroundTaskCall)
-          // - workerPromptPath: file reference (NOT inlined prompt to prevent truncation)
-          // - backgroundTaskCall: contains promptFile reference, NOT inline prompt
-          const responseBase = {
-            worktreePath: worktree.path,
-            branch: worktree.branch,
-            mode: 'delegate',
-            agent, // Canonical: top-level only
-            delegationRequired: true,
-            workerPromptPath: relativePromptPath, // File reference (canonical)
-            workerPromptPreview, // Truncated preview for display
-            backgroundTaskCall: {
-              // NOTE: Uses promptFile instead of prompt to prevent truncation
-              promptFile: workerPromptPath, // Absolute path for hive_background_task
-              description: `Hive: ${task}`,
-              workdir: worktree.path,
-              idempotencyKey,
-              feature,
-              task,
-              attempt,
-            },
-            instructions: `## Delegation Required
+          // Build delegation instructions based on delegate mode
+          const hiveBackgroundInstructions = `## Delegation Required
 
 Call the hive_background_task tool to spawn a Forager (Worker/Coder) worker.
 
@@ -796,7 +781,59 @@ Call the hive_background_task tool to spawn a Forager (Worker/Coder) worker.
 - Add \`sync: true\` if you need the result in this session.
 - Otherwise omit \`sync\`. Wait for the completion notification (no polling required). After the <system-reminder> arrives, call \`hive_background_output({ task_id: "<id>", block: false })\` once to fetch the final result.
 
-Troubleshooting: if you see "Unknown parameter: workdir", your hive_background_task tool is not Hive's provider. Ensure agent-hive loads after other background_* tool providers, then re-run hive_exec_start.`,
+Troubleshooting: if you see "Unknown parameter: workdir", your hive_background_task tool is not Hive's provider. Ensure agent-hive loads after other background_* tool providers, then re-run hive_exec_start.`;
+
+          const taskToolInstructions = `## Delegation Required
+
+Use OpenCode's built-in \`task\` tool to spawn a Forager (Worker/Coder) worker.
+
+\`\`\`
+task({
+  subagent_type: "${agent}",
+  description: "Hive: ${task}",
+  prompt: <read the file at ${relativePromptPath}>
+})
+\`\`\`
+
+Read the prompt file at \`${relativePromptPath}\` and pass its content to the task tool.
+
+Note: delegateMode is set to 'task' in agent_hive.json. To use Hive's background tools instead, set delegateMode to 'hive'.`;
+
+          const delegationInstructions = useHiveBackground ? hiveBackgroundInstructions : taskToolInstructions;
+
+          // Build the response object with canonical outermost fields
+          // - agent: top-level only (NOT duplicated in backgroundTaskCall)
+          // - workerPromptPath: file reference (NOT inlined prompt to prevent truncation)
+          // - backgroundTaskCall: contains promptFile reference, NOT inline prompt
+          const responseBase = {
+            worktreePath: worktree.path,
+            branch: worktree.branch,
+            mode: 'delegate',
+            delegateMode,
+            agent, // Canonical: top-level only
+            delegationRequired: true,
+            workerPromptPath: relativePromptPath, // File reference (canonical)
+            workerPromptPreview, // Truncated preview for display
+            ...(useHiveBackground && {
+              backgroundTaskCall: {
+                // NOTE: Uses promptFile instead of prompt to prevent truncation
+                promptFile: workerPromptPath, // Absolute path for hive_background_task
+                description: `Hive: ${task}`,
+                workdir: worktree.path,
+                idempotencyKey,
+                feature,
+                task,
+                attempt,
+              },
+            }),
+            ...(!useHiveBackground && {
+              taskToolCall: {
+                subagent_type: agent,
+                description: `Hive: ${task}`,
+                promptFile: relativePromptPath, // Relative path for reading
+              },
+            }),
+            instructions: delegationInstructions,
           };
 
           // Calculate payload meta (JSON size WITHOUT inlined prompt - file reference only)
@@ -1094,8 +1131,9 @@ Re-run with updated summary showing verification results.`;
 
           return JSON.stringify({
             feature,
+            delegateMode,
             omoSlimEnabled: isOmoSlimEnabled(),
-            backgroundTaskProvider: 'hive',
+            backgroundTaskProvider: useHiveBackground ? 'hive' : 'task',
             workers,
             summary: {
               stuckWorkers,

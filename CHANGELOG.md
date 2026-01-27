@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-01-27
+
+### Added
+- `agentMode` and `delegateMode` configuration for unified or dedicated agent orchestration.
+- Gated agent registration based on `agentMode`.
+
+### Changed
+- Improved package-wide build scripts and build order using `bun --filter`.
+- Updated default configuration generation and accessors.
+
+### Fixed
+- Resolved issues with `opencode.json` registration in unified mode.
+
 ## [1.0.1] - 2026-01-27
 
 ### Added

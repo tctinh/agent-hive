@@ -164,8 +164,12 @@ export interface HiveConfig {
   omoSlimEnabled?: boolean;
   /** Choose between unified or dedicated agent modes */
   agentMode?: 'unified' | 'dedicated';
-  /** Delegation mode: 'task' (default) or 'hive' */
-  delegateMode?: 'task' | 'hive';
+  /**
+   * Delegate mode for background task execution:
+   * - 'hive': Use hive_background_task tools
+   * - 'task': Use OpenCode's built-in task() tool (default)
+   */
+  delegateMode?: 'hive' | 'task';
   /** Agent configuration */
   agents?: {
     /** Hive Master (hybrid planner + orchestrator) */
