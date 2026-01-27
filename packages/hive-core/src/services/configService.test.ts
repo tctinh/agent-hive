@@ -50,6 +50,16 @@ describe("ConfigService defaults", () => {
     );
   });
 
+  it("returns 'task' as default delegateMode", () => {
+    const service = new ConfigService();
+    expect(service.getDelegateMode()).toBe('task');
+  });
+
+  it("returns 'unified' as default agentMode", () => {
+    const service = new ConfigService();
+    expect(service.get().agentMode).toBe('unified');
+  });
+
   it("deep-merges agent overrides with defaults", () => {
     const service = new ConfigService();
     const configPath = service.getPath();
