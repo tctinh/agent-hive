@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import stripJsonComments from 'strip-json-comments';
 import { HiveConfig, DEFAULT_HIVE_CONFIG } from '../types.js';
 
 /**
@@ -137,45 +136,10 @@ export class ConfigService {
     hidden?: boolean;
     permission?: Record<string, string>;
   }>): void {
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-    const opencodePath = path.join(homeDir, '.config', 'opencode', 'opencode.json');
-    
-    try {
-      if (!fs.existsSync(opencodePath)) {
-        // No opencode.json, skip registration
-        return;
-      }
-
-      const raw = fs.readFileSync(opencodePath, 'utf-8');
-      
-      const config = JSON.parse(stripJsonComments(raw));
-      
-      // Initialize agent section if not exists
-      if (!config.agent) {
-        config.agent = {};
-      }
-
-       // Initialize agent section (no legacy cleanup)
-
-      // Merge in our agents (don't overwrite user customizations)
-      for (const [name, agentConfig] of Object.entries(agents)) {
-        if (!config.agent[name]) {
-          config.agent[name] = agentConfig;
-        } else {
-          // Preserve user's model/temperature overrides, but update prompt and description
-          config.agent[name] = {
-            ...agentConfig,
-            model: config.agent[name].model || agentConfig.model,
-            temperature: config.agent[name].temperature ?? agentConfig.temperature,
-          };
-        }
-      }
-
-      fs.writeFileSync(opencodePath, JSON.stringify(config, null, 2));
-    } catch (err) {
-      // Silent fail - don't break plugin if we can't write
-      console.error('[Hive] Failed to register agents in opencode.json:', err);
-    }
+    // Registration in opencode.json is disabled.
+    // Users should now manage their own agents in opencode.json if needed,
+    // or rely on the plugin's dynamic registration via opencodeConfig.agent.
+    return;
   }
 
   /**
