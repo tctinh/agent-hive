@@ -10,7 +10,7 @@
     "build": "bun --filter '*' build",
     "dev": "bun --filter '*' dev",
     "release:prepare": "node scripts/release/prepare.mjs",
-    "release:check": "bun install && bun run build && bun --filter '*' test"
+    "release:check": "bun install && bun run build && npm -ws --if-present run test"
   },
   "license": "MIT"
 }
