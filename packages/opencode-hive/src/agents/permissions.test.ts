@@ -84,9 +84,10 @@ describe('Agent permissions for background task delegation', () => {
       };
 
       const hooks = await plugin(ctx as any);
-      await hooks.config?.({});
+      const opencodeConfig: any = {};
+      await hooks.config?.(opencodeConfig);
 
-      const config = JSON.parse(fs.readFileSync(opencodePath, 'utf-8')) as {
+      const config = opencodeConfig as {
         agent?: Record<string, { permission?: Record<string, string> }>;
       };
 

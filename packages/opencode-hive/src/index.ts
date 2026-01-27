@@ -1501,7 +1501,7 @@ Make the requested changes, then call hive_request_review again.`;
       };
 
       // Register agents directly in opencode.json (required for Task tool to find them)
-      configService.registerAgentsInOpenCode(allAgents);
+      // configService.registerAgentsInOpenCode(allAgents);
 
       // Also merge into opencodeConfig.agent (in case config hook works in future)
       const configAgent = opencodeConfig.agent as Record<string, unknown> | undefined;
