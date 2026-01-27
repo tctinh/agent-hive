@@ -7,10 +7,10 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "dev": "npm run dev --workspaces",
+    "build": "bun --filter '*' build",
+    "dev": "bun --filter '*' dev",
     "release:prepare": "node scripts/release/prepare.mjs",
-    "release:check": "bun install && npm run build --workspaces && npm -ws --if-present run test"
+    "release:check": "bun install && bun run build && bun --filter '*' test"
   },
   "license": "MIT"
 }
