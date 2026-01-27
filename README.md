@@ -108,7 +108,7 @@ Run Agent Hive once to auto-generate a default configuration at `~/.config/openc
 - **`delegateMode`**: 
   - `task`: (Default) Use OpenCode's built-in `task()` tool for background execution.
   - `hive`: Use Hive's specialized background task tools (`hive_background_task`).
-- **`agents`**: This section maps agent roles to specific models. **You should always update these to use models available on your system** (e.g., `gpt-4o`, `claude-3-5-sonnet`, or local models).
+- **`agents`**: This section maps agent roles to specific models. **You should always update these to use models available on your system** (e.g., `openai/gpt-5.2-codex`, `google/gemini-3-pro-preview`, `github-copilot/claude-opus-4.5` or local models).
 - **`skills`**: A list of enabled skills. To remove extra agent features or reduce context usage, simply remove the unwanted skills from this list.
 
 **MCP Research Tools** are auto-enabled: `grep_app_searchGitHub`, `context7_query-docs`, `websearch_web_search_exa`, and `ast_grep_search`.
