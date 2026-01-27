@@ -882,70 +882,6 @@ var require_dist2 = __commonJS((exports2) => {
   exports2.createDeferred = deferred;
   exports2.default = deferred;
 });
-var require_strip_json_comments = __commonJS((exports2, module2) => {
-  var singleComment = 1;
-  var multiComment = 2;
-  function stripWithoutWhitespace() {
-    return "";
-  }
-  function stripWithWhitespace(str, start, end) {
-    return str.slice(start, end).replace(/\S/g, " ");
-  }
-  module2.exports = function(str, opts) {
-    opts = opts || {};
-    var currentChar;
-    var nextChar;
-    var insideString = false;
-    var insideComment = false;
-    var offset = 0;
-    var ret = "";
-    var strip = opts.whitespace === false ? stripWithoutWhitespace : stripWithWhitespace;
-    for (var i = 0; i < str.length; i++) {
-      currentChar = str[i];
-      nextChar = str[i + 1];
-      if (!insideComment && currentChar === '"') {
-        var escaped = str[i - 1] === "\\" && str[i - 2] !== "\\";
-        if (!escaped) {
-          insideString = !insideString;
-        }
-      }
-      if (insideString) {
-        continue;
-      }
-      if (!insideComment && currentChar + nextChar === "//") {
-        ret += str.slice(offset, i);
-        offset = i;
-        insideComment = singleComment;
-        i++;
-      } else if (insideComment === singleComment && currentChar + nextChar === `\r
-`) {
-        i++;
-        insideComment = false;
-        ret += strip(str, offset, i);
-        offset = i;
-        continue;
-      } else if (insideComment === singleComment && currentChar === `
-`) {
-        insideComment = false;
-        ret += strip(str, offset, i);
-        offset = i;
-      } else if (!insideComment && currentChar + nextChar === "/*") {
-        ret += str.slice(offset, i);
-        offset = i;
-        insideComment = multiComment;
-        i++;
-        continue;
-      } else if (insideComment === multiComment && currentChar + nextChar === "*/") {
-        i++;
-        insideComment = false;
-        ret += strip(str, offset, i + 1);
-        offset = i + 1;
-        continue;
-      }
-    }
-    return ret + (insideComment ? strip(str.substr(offset)) : str.substr(offset));
-  };
-});
 var DEFAULT_AGENT_MODELS = {
   "hive-master": "github-copilot/claude-opus-4.5",
   "architect-planner": "github-copilot/gpt-5.2-codex",
@@ -960,6 +896,7 @@ var DEFAULT_HIVE_CONFIG = {
   disableSkills: [],
   disableMcps: [],
   agentMode: "unified",
+  delegateMode: "task",
   agents: {
     "hive-master": {
       model: DEFAULT_AGENT_MODELS["hive-master"],
@@ -993,7 +930,6 @@ var DEFAULT_HIVE_CONFIG = {
     "forager-worker": {
       model: DEFAULT_AGENT_MODELS["forager-worker"],
       temperature: 0.3,
-      skills: ["test-driven-development", "verification-before-completion"],
       autoLoadSkills: ["test-driven-development", "verification-before-completion"]
     },
     "hygienic-reviewer": {
@@ -6331,7 +6267,6 @@ ${f.content}`);
     return `${normalized}.md`;
   }
 };
-var import_strip_json_comments = __toESM2(require_strip_json_comments(), 1);
 
 // src/services/watcher.ts
 var vscode = __toESM(require("vscode"));

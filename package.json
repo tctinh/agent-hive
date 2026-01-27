@@ -7,10 +7,10 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "dev": "npm run dev --workspaces",
+    "build": "bun run --filter hive-core build && bun run --filter opencode-hive build && bun run --filter vscode-hive build",
+    "dev": "bun run --filter hive-core build && bun run --filter '*' dev",
     "release:prepare": "node scripts/release/prepare.mjs",
-    "release:check": "bun install && npm run build --workspaces && npm -ws --if-present run test"
+    "release:check": "bun install && bun run build && bun run --filter '*' test"
   },
   "license": "MIT"
 }

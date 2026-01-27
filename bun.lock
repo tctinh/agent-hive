@@ -1,16 +1,14 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 1,
   "workspaces": {
     "": {
       "name": "agent-hive",
     },
     "packages/hive-core": {
       "name": "hive-core",
-      "version": "0.9.1",
+      "version": "1.0.1",
       "dependencies": {
         "simple-git": "^3.27.0",
-        "strip-json-comments": "^2.0.1",
       },
       "devDependencies": {
         "@types/bun": "^1.2.0",
@@ -20,7 +18,7 @@
     },
     "packages/opencode-hive": {
       "name": "opencode-hive",
-      "version": "0.9.1",
+      "version": "1.0.1",
       "dependencies": {
         "simple-git": "^3.27.0",
       },
@@ -44,7 +42,7 @@
     },
     "packages/vscode-hive": {
       "name": "vscode-hive",
-      "version": "0.9.1",
+      "version": "1.0.1",
       "dependencies": {
         "@opencode-ai/sdk": "^1.1.1",
         "hive-core": "workspace:*",
