@@ -124,25 +124,6 @@ export class ConfigService {
   }
 
   /**
-   * Register Hive agents in OpenCode's opencode.json.
-   * This is required because OpenCode doesn't support dynamic agent registration via plugin hooks.
-   * Agents are written to ~/.config/opencode/opencode.json under the 'agent' key.
-   */
-  registerAgentsInOpenCode(agents: Record<string, {
-    model?: string;
-    temperature?: number;
-    description: string;
-    prompt: string;
-    hidden?: boolean;
-    permission?: Record<string, string>;
-  }>): void {
-    // Registration in opencode.json is disabled.
-    // Users should now manage their own agents in opencode.json if needed,
-    // or rely on the plugin's dynamic registration via opencodeConfig.agent.
-    return;
-  }
-
-  /**
    * Get agent-specific model config
    */
   getAgentConfig(

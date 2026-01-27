@@ -1500,10 +1500,7 @@ Make the requested changes, then call hive_request_review again.`;
         'hygienic-reviewer': hygienicConfig,
       };
 
-      // Register agents directly in opencode.json (required for Task tool to find them)
-      // configService.registerAgentsInOpenCode(allAgents);
-
-      // Also merge into opencodeConfig.agent (in case config hook works in future)
+      // Merge agents into opencodeConfig.agent (config hook is sufficient for agent discovery)
       const configAgent = opencodeConfig.agent as Record<string, unknown> | undefined;
       if (!configAgent) {
         opencodeConfig.agent = allAgents;
