@@ -100,6 +100,15 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
     fs.mkdirSync(TEST_ROOT_BASE, { recursive: true });
     testRoot = fs.mkdtempSync(path.join(TEST_ROOT_BASE, "project-"));
     process.env.HOME = testRoot;
+    
+    // Ensure delegateMode is 'hive' so all tools are registered for testing
+    const configDir = path.join(testRoot, ".config", "opencode");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "agent_hive.json"),
+      JSON.stringify({ delegateMode: "hive" })
+    );
+
     execSync("git init", { cwd: testRoot });
     execSync('git config user.email "test@example.com"', { cwd: testRoot });
     execSync('git config user.name "Test"', { cwd: testRoot });
