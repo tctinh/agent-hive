@@ -103,7 +103,7 @@ Run Agent Hive once to auto-generate a default configuration at `~/.config/openc
 **Key Configuration Options:**
 
 - **`agentMode`**: 
-  - `unified`: (Default) Combines Planning (Architect) and Orchestration (Swarm) into a single primary agent (`hive-master`). Specialized workers (Scout, Forager) are still used for execution.
+  - `unified`: (Default) Combines Planning (Architect) and Orchestration (Swarm) into a single primary agent (`hive-master`). Specialized agents (Scout, Forager, Hygienic) are still available.
   - `dedicated`: Tools and roles are distributed across separate specialized agents (Architect, Swarm, Scout, Forager, etc.).
 - **`delegateMode`**: 
   - `task`: (Default) Use OpenCode's built-in `task()` tool for background execution.
