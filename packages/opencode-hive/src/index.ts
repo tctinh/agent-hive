@@ -1396,7 +1396,6 @@ Make the requested changes, then call hive_request_review again.`;
       // Auto-generate config file with defaults if it doesn't exist
       configService.init();
 
-      // Hive Agents (lean, focused - new architecture with kebab-case names)
       const hiveUserConfig = configService.getAgentConfig('hive-master');
       const hiveConfig = {
         model: hiveUserConfig.model,
@@ -1490,15 +1489,21 @@ Make the requested changes, then call hive_request_review again.`;
         },
       };
 
-      // Build agents map with kebab-case names
-      const allAgents = {
-        'hive-master': hiveConfig,
-        'architect-planner': architectConfig,
-        'swarm-orchestrator': swarmConfig,
-        'scout-researcher': scoutConfig,
-        'forager-worker': foragerConfig,
-        'hygienic-reviewer': hygienicConfig,
-      };
+      // Build agents map based on agentMode
+      const hiveConfigData = configService.get();
+      const agentMode = hiveConfigData.agentMode ?? 'unified';
+      
+      const allAgents: Record<string, unknown> = {};
+      
+      if (agentMode === 'unified') {
+        allAgents['hive-master'] = hiveConfig;
+      } else {
+        allAgents['architect-planner'] = architectConfig;
+        allAgents['swarm-orchestrator'] = swarmConfig;
+        allAgents['scout-researcher'] = scoutConfig;
+        allAgents['forager-worker'] = foragerConfig;
+        allAgents['hygienic-reviewer'] = hygienicConfig;
+      }
 
       // Merge agents into opencodeConfig.agent (config hook is sufficient for agent discovery)
       const configAgent = opencodeConfig.agent as Record<string, unknown> | undefined;
@@ -1523,8 +1528,9 @@ Make the requested changes, then call hive_request_review again.`;
         Object.assign(configAgent, allAgents);
       }
 
-      // Set default agent
-      (opencodeConfig as Record<string, unknown>).default_agent = 'hive-master';
+      // Set default agent based on mode
+      (opencodeConfig as Record<string, unknown>).default_agent = 
+        agentMode === 'unified' ? 'hive-master' : 'architect-planner';
 
       // Merge built-in MCP servers (OMO-style remote endpoints)
       const configMcp = opencodeConfig.mcp as Record<string, unknown> | undefined;
