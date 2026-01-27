@@ -231,4 +231,12 @@ export class ConfigService {
     const config = this.get();
     return config.disableMcps ?? [];
   }
+
+  /**
+   * Get delegation mode.
+   */
+  getDelegateMode(): 'task' | 'hive' {
+    const config = this.get();
+    return config.delegateMode ?? 'task';
+  }
 }
