@@ -242,7 +242,7 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
     'hygienic-reviewer': {
       model: DEFAULT_AGENT_MODELS['hygienic-reviewer'],
       temperature: 0.3,
-      skills: ['systematic-debugging'],
+      skills: ['systematic-debugging', 'code-reviewer'],
       autoLoadSkills: [],
     },
   },

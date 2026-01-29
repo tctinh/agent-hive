@@ -165,6 +165,7 @@ Hive uses a config file at `~/.config/opencode/agent_hive.json`. You can customi
 | `dispatching-parallel-agents` | Use when facing 2+ independent tasks. Dispatches multiple agents to work concurrently on unrelated problems. |
 | `test-driven-development` | Use when implementing any feature or bugfix. Enforces write-test-first, red-green-refactor cycle. |
 | `systematic-debugging` | Use when encountering any bug or test failure. Requires root cause investigation before proposing fixes. |
+| `code-reviewer` | Use when reviewing implementation changes against an approved plan or task to catch missing requirements, YAGNI, dead code, and risky patterns. |
 | `verification-before-completion` | Use before claiming work is complete. Requires running verification commands and confirming output before success claims. |
 
 #### Available MCPs
