@@ -289,6 +289,7 @@ Do it
 
     await hooks.tool!.hive_feature_create.execute({ name: "active" }, createToolContext("sess"));
 
+    // system.transform should still inject HIVE_SYSTEM_PROMPT and status hint
     const output = { system: [] as string[] };
     await hooks["experimental.chat.system.transform"]?.({ agent: "hive-master" }, output);
     output.system.push("## Base Agent Prompt");
@@ -297,32 +298,25 @@ Do it
     expect(joined).toContain("## Hive - Feature Development System");
     expect(joined).toContain("hive_feature_create");
     
-    // Verify auto-load skill injection: brainstorming skill content should be present
+    // Auto-loaded skills are now injected via config hook (prompt field), NOT system.transform
+    // Verify by checking the agent's prompt field in config
+    const opencodeConfig: Record<string, unknown> = { agent: {} };
+    await hooks.config!(opencodeConfig);
+    
+    const agentConfig = (opencodeConfig.agent as Record<string, { prompt?: string }>)["hive-master"];
+    expect(agentConfig).toBeDefined();
+    expect(agentConfig.prompt).toBeDefined();
+    
     const brainstormingSkill = BUILTIN_SKILLS.find((skill) => skill.name === "brainstorming");
     expect(brainstormingSkill).toBeDefined();
-    expect(joined).toContain(brainstormingSkill!.template.slice(0, 50)); // Check first 50 chars of template
+    expect(agentConfig.prompt).toContain(brainstormingSkill!.template);
     
-    // Verify ordering: HIVE_SYSTEM_PROMPT → autoLoad skills → status hint → base agent prompt
-    const hiveSystemIndex = output.system.findIndex((entry) =>
-      entry.includes("## Hive - Feature Development System"),
-    );
-    const brainstormingIndex = output.system.findIndex(
-      (entry) => brainstormingSkill && entry.includes(brainstormingSkill.template.slice(0, 50)),
-    );
-    const statusHintIndex = output.system.findIndex((entry) =>
-      entry.includes("### Current Hive Status"),
-    );
-    const agentPromptIndex = output.system.findIndex((entry) =>
-      entry.includes("## Base Agent Prompt"),
-    );
-
-    expect(hiveSystemIndex).toBeGreaterThanOrEqual(0);
-    expect(brainstormingIndex).toBeGreaterThan(hiveSystemIndex);
-    expect(statusHintIndex).toBeGreaterThan(brainstormingIndex);
-    expect(agentPromptIndex).toBeGreaterThan(statusHintIndex);
+    // Verify status hint is in system.transform (this is still there)
+    expect(joined).toContain("### Current Hive Status");
   });
 
   it("auto-loads parallel exploration for planner agents by default", async () => {
+    // Test unified mode agents
     const ctx: PluginInput = {
       directory: testRoot,
       worktree: testRoot,
@@ -340,34 +334,31 @@ Do it
     );
     expect(parallelExplorationSkill).toBeDefined();
 
-    const masterOutput = { system: [] as string[] };
-    await hooks["experimental.chat.system.transform"]?.(
-      { agent: "hive-master" },
-      masterOutput,
-    );
-    expect(masterOutput.system.join("\n")).toContain(
-      parallelExplorationSkill!.template.slice(0, 50),
-    );
-    expect(masterOutput.system.join("\n")).not.toContain(onboardingSnippet);
+    // Skills are now injected via config hook's prompt field, NOT system.transform
+    // Default mode is 'unified' which includes hive-master, scout, forager, hygienic
+    const opencodeConfig: Record<string, unknown> = { agent: {} };
+    await hooks.config!(opencodeConfig);
+    const agents = opencodeConfig.agent as Record<string, { prompt?: string }>;
 
-    const architectOutput = { system: [] as string[] };
-    await hooks["experimental.chat.system.transform"]?.(
-      { agent: "architect-planner" },
-      architectOutput,
+    // hive-master should have parallel-exploration in prompt (unified mode)
+    expect(agents["hive-master"]?.prompt).toBeDefined();
+    expect(agents["hive-master"]?.prompt).toContain(
+      parallelExplorationSkill!.template,
     );
-    expect(architectOutput.system.join("\n")).toContain(
-      parallelExplorationSkill!.template.slice(0, 50),
-    );
-    expect(architectOutput.system.join("\n")).not.toContain(onboardingSnippet);
+    expect(agents["hive-master"]?.prompt).not.toContain(onboardingSnippet);
 
-    const foragerOutput = { system: [] as string[] };
-    await hooks["experimental.chat.system.transform"]?.(
-      { agent: "forager-worker" },
-      foragerOutput,
+    // scout-researcher should have parallel-exploration in prompt (unified mode)
+    expect(agents["scout-researcher"]?.prompt).toBeDefined();
+    expect(agents["scout-researcher"]?.prompt).toContain(
+      parallelExplorationSkill!.template,
     );
-    expect(foragerOutput.system.join("\n")).not.toContain(
-      parallelExplorationSkill!.template.slice(0, 50),
+    expect(agents["scout-researcher"]?.prompt).not.toContain(onboardingSnippet);
+
+    // forager-worker should NOT have parallel-exploration in prompt
+    expect(agents["forager-worker"]?.prompt).toBeDefined();
+    expect(agents["forager-worker"]?.prompt).not.toContain(
+      parallelExplorationSkill!.template,
     );
-    expect(foragerOutput.system.join("\n")).not.toContain(onboardingSnippet);
+    expect(agents["forager-worker"]?.prompt).not.toContain(onboardingSnippet);
   });
 });

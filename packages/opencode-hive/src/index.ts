@@ -32,6 +32,39 @@ function formatSkillsXml(skills: SkillDefinition[]): string {
   return `\n\n<available_skills>\n${skillsXml}\n</available_skills>`;
 }
 
+/**
+ * Build auto-loaded skill templates for an agent.
+ * Returns a string containing all skill templates to append to the agent's prompt.
+ * Unknown skill IDs are logged as warnings and skipped.
+ */
+function buildAutoLoadedSkillsContent(
+  agentName: 'hive-master' | 'architect-planner' | 'swarm-orchestrator' | 'scout-researcher' | 'forager-worker' | 'hygienic-reviewer',
+  configService: ConfigService,
+): string {
+  const agentConfig = configService.getAgentConfig(agentName);
+  const autoLoadSkills = agentConfig.autoLoadSkills ?? [];
+
+  if (autoLoadSkills.length === 0) {
+    return '';
+  }
+
+  const skillTemplates: string[] = [];
+  for (const skillId of autoLoadSkills) {
+    const skill = BUILTIN_SKILLS.find((entry) => entry.name === skillId);
+    if (!skill) {
+      console.warn(`[hive] Unknown skill id "${skillId}" for agent "${agentName}"`);
+      continue;
+    }
+    skillTemplates.push(skill.template);
+  }
+
+  if (skillTemplates.length === 0) {
+    return '';
+  }
+
+  return '\n\n' + skillTemplates.join('\n\n');
+}
+
 function createHiveSkillTool(filteredSkills: SkillDefinition[]): ToolDefinition {
   const base = `Load a Hive skill to get detailed instructions for a specific workflow.
 
@@ -283,24 +316,9 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
     ) => {
       output.system.push(HIVE_SYSTEM_PROMPT);
 
-      const agentInput = input as { agent?: string };
-      const agentName = agentInput?.agent;
-
-      if (agentName && isHiveAgent(agentName)) {
-        const agentConfig = configService.getAgentConfig(agentName);
-        const autoLoadSkills = agentConfig.autoLoadSkills ?? [];
-
-        if (autoLoadSkills.length > 0) {
-          for (const skillId of autoLoadSkills) {
-            const skill = BUILTIN_SKILLS.find((entry) => entry.name === skillId);
-            if (!skill) {
-              console.warn("Unknown skill id", skillId);
-              continue;
-            }
-            output.system.push(skill.template);
-          }
-        }
-      }
+      // NOTE: autoLoadSkills injection is now done in the config hook (prompt field)
+      // to ensure skills are present from the first message. The system.transform hook
+      // may not receive the agent name at runtime, so we removed legacy auto-load here.
 
       const activeFeature = resolveFeature();
       if (activeFeature) {
@@ -1434,12 +1452,14 @@ Make the requested changes, then call hive_request_review again.`;
       // Auto-generate config file with defaults if it doesn't exist
       configService.init();
 
+      // Build auto-loaded skill content for each agent
       const hiveUserConfig = configService.getAgentConfig('hive-master');
+      const hiveAutoLoadedSkills = buildAutoLoadedSkillsContent('hive-master', configService);
       const hiveConfig = {
         model: hiveUserConfig.model,
         temperature: hiveUserConfig.temperature ?? 0.5,
         description: 'Hive (Hybrid) - Plans + orchestrates. Detects phase, loads skills on-demand.',
-        prompt: QUEEN_BEE_PROMPT,
+        prompt: QUEEN_BEE_PROMPT + hiveAutoLoadedSkills,
         permission: {
           question: "allow",
           skill: "allow",
@@ -1452,11 +1472,12 @@ Make the requested changes, then call hive_request_review again.`;
       };
 
       const architectUserConfig = configService.getAgentConfig('architect-planner');
+      const architectAutoLoadedSkills = buildAutoLoadedSkillsContent('architect-planner', configService);
       const architectConfig = {
         model: architectUserConfig.model,
         temperature: architectUserConfig.temperature ?? 0.7,
         description: 'Architect (Planner) - Plans features, interviews, writes plans. NEVER executes.',
-        prompt: ARCHITECT_BEE_PROMPT,
+        prompt: ARCHITECT_BEE_PROMPT + architectAutoLoadedSkills,
         permission: {
           edit: "deny",  // Planners don't edit code
           task: "deny",
@@ -1472,11 +1493,12 @@ Make the requested changes, then call hive_request_review again.`;
       };
 
       const swarmUserConfig = configService.getAgentConfig('swarm-orchestrator');
+      const swarmAutoLoadedSkills = buildAutoLoadedSkillsContent('swarm-orchestrator', configService);
       const swarmConfig = {
         model: swarmUserConfig.model,
         temperature: swarmUserConfig.temperature ?? 0.5,
         description: 'Swarm (Orchestrator) - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
-        prompt: SWARM_BEE_PROMPT,
+        prompt: SWARM_BEE_PROMPT + swarmAutoLoadedSkills,
         permission: {
           question: "allow",
           skill: "allow",
@@ -1489,12 +1511,13 @@ Make the requested changes, then call hive_request_review again.`;
       };
 
       const scoutUserConfig = configService.getAgentConfig('scout-researcher');
+      const scoutAutoLoadedSkills = buildAutoLoadedSkillsContent('scout-researcher', configService);
       const scoutConfig = {
         model: scoutUserConfig.model,
         temperature: scoutUserConfig.temperature ?? 0.5,
         mode: 'subagent' as const,
         description: 'Scout (Explorer/Researcher/Retrieval) - Researches codebase + external docs/data.',
-        prompt: SCOUT_BEE_PROMPT,
+        prompt: SCOUT_BEE_PROMPT + scoutAutoLoadedSkills,
         permission: {
           edit: "deny",  // Researchers don't edit code
           skill: "allow",
@@ -1503,24 +1526,26 @@ Make the requested changes, then call hive_request_review again.`;
       };
 
       const foragerUserConfig = configService.getAgentConfig('forager-worker');
+      const foragerAutoLoadedSkills = buildAutoLoadedSkillsContent('forager-worker', configService);
       const foragerConfig = {
         model: foragerUserConfig.model,
         temperature: foragerUserConfig.temperature ?? 0.3,
         mode: 'subagent' as const,
         description: 'Forager (Worker/Coder) - Executes tasks directly in isolated worktrees. Never delegates.',
-        prompt: FORAGER_BEE_PROMPT,
+        prompt: FORAGER_BEE_PROMPT + foragerAutoLoadedSkills,
         permission: {
           skill: "allow",
         },
       };
 
       const hygienicUserConfig = configService.getAgentConfig('hygienic-reviewer');
+      const hygienicAutoLoadedSkills = buildAutoLoadedSkillsContent('hygienic-reviewer', configService);
       const hygienicConfig = {
         model: hygienicUserConfig.model,
         temperature: hygienicUserConfig.temperature ?? 0.3,
         mode: 'subagent' as const,
         description: 'Hygienic (Consultant/Reviewer/Debugger) - Reviews plan documentation quality. OKAY/REJECT verdict.',
-        prompt: HYGIENIC_BEE_PROMPT,
+        prompt: HYGIENIC_BEE_PROMPT + hygienicAutoLoadedSkills,
         permission: {
           edit: "deny",  // Reviewers don't edit
           skill: "allow",
