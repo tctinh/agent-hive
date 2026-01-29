@@ -103,7 +103,8 @@ export class PlanCommentController {
 
   private getFeatureMatch(filePath: string): string | null {
     const normalized = this.normalizePath(filePath)
-    if (!normalized.startsWith(this.normalizedWorkspaceRoot + '/')) return null
+    const normalizedWorkspace = this.normalizedWorkspaceRoot.replace(/\/+$/, '')
+    if (!normalized.startsWith(`${normalizedWorkspace}/`)) return null
     const match = normalized.match(/\.hive\/features\/([^/]+)\/(?:plan\.md|comments\.json)$/)
     return match ? match[1] : null
   }
