@@ -10,6 +10,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 interface SkillEntry {
   name: string;
@@ -71,7 +72,7 @@ function discoverSkillFiles(rootDir: string): string[] {
 
 function main() {
   // Find the monorepo root (go up from scripts/ to opencode-hive/ to packages/ to root/)
-  const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+  const scriptDir = path.dirname(fileURLToPath(import.meta.url));
   const rootDir = path.resolve(scriptDir, '../../..');
 
   console.log('[generate-skills] Root directory:', rootDir);
@@ -142,6 +143,7 @@ ${skillsArray}
 ];
 `;
 
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, output, 'utf-8');
   console.log(`[generate-skills] Generated: ${outputPath}`);
   console.log(`[generate-skills] Total skills: ${skills.length}`);
