@@ -117,6 +117,7 @@ import {
   ConfigService,
   detectContext,
   listFeatures,
+  normalizePath,
 } from "hive-core";
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
 import { calculatePromptMeta, calculatePayloadMeta, checkWarnings } from "./utils/prompt-observability";
@@ -781,7 +782,7 @@ Add this section to your plan content and try again.`;
           const workerPromptPath = writeWorkerPromptFile(feature, task, workerPrompt, hiveDir);
           
           // Convert to relative path for portability in output
-          const relativePromptPath = path.relative(directory, workerPromptPath).replace(/\\/g, '/');
+          const relativePromptPath = normalizePath(path.relative(directory, workerPromptPath));
 
           // Build workerPromptPreview (truncated for display, max 200 chars)
           const PREVIEW_MAX_LENGTH = 200;

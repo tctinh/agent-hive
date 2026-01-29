@@ -2346,6 +2346,13 @@ describe('Prompt File Reference - Prevent Tool Output Truncation', () => {
       expect(isValidPromptFilePath(validPath, tempDir)).toBe(true);
     });
 
+    it('accepts Windows-style paths within workspace', () => {
+      const workspaceRoot = 'C:\\Users\\test\\repo';
+      const validPath = 'C:\\Users\\test\\repo\\.hive\\features\\my-feature\\tasks\\01-task\\worker-prompt.md';
+
+      expect(isValidPromptFilePath(validPath, workspaceRoot)).toBe(true);
+    });
+
     it('accepts paths within workspace root', () => {
       const validPath = path.join(tempDir, 'some', 'nested', 'prompt.md');
 
