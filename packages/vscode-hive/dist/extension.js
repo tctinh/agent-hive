@@ -935,7 +935,7 @@ var DEFAULT_HIVE_CONFIG = {
     "hygienic-reviewer": {
       model: DEFAULT_AGENT_MODELS["hygienic-reviewer"],
       temperature: 0.3,
-      skills: ["systematic-debugging"],
+      skills: ["systematic-debugging", "code-reviewer"],
       autoLoadSkills: []
     }
   }
