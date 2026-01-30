@@ -6673,13 +6673,14 @@ var path6 = __toESM(require("path"));
 var PlanCommentController = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
+    this.normalizedWorkspaceRoot = this.normalizePath(workspaceRoot);
     this.controller = vscode4.comments.createCommentController(
       "hive-plan-review",
       "Plan Review"
     );
     this.controller.commentingRangeProvider = {
       provideCommentingRanges: (document2) => {
-        if (!document2.fileName.endsWith("plan.md")) return [];
+        if (path6.basename(document2.fileName) !== "plan.md") return [];
         return [new vscode4.Range(0, 0, document2.lineCount - 1, 0)];
       }
     };
@@ -6694,11 +6695,12 @@ var PlanCommentController = class {
   controller;
   threads = /* @__PURE__ */ new Map();
   commentsWatcher;
+  normalizedWorkspaceRoot;
   onCommentsFileChanged(commentsUri) {
-    const featureDir = path6.dirname(commentsUri.fsPath);
-    const planPath = path6.join(featureDir, "plan.md");
-    const planUri = vscode4.Uri.file(planPath);
-    this.loadComments(planUri);
+    const featureMatch = this.getFeatureMatch(commentsUri.fsPath);
+    if (!featureMatch) return;
+    const planPath = path6.join(this.workspaceRoot, ".hive", "features", featureMatch, "plan.md");
+    this.loadComments(vscode4.Uri.file(planPath));
   }
   registerCommands(context) {
     context.subscriptions.push(
@@ -6728,21 +6730,41 @@ var PlanCommentController = class {
         }
       }),
       vscode4.workspace.onDidOpenTextDocument((doc) => {
-        if (doc.fileName.endsWith("plan.md")) {
+        if (path6.basename(doc.fileName) === "plan.md") {
           this.loadComments(doc.uri);
         }
       }),
       vscode4.workspace.onDidSaveTextDocument((doc) => {
-        if (doc.fileName.endsWith("plan.md")) {
+        if (path6.basename(doc.fileName) === "plan.md") {
           this.saveComments(doc.uri);
         }
       })
     );
     vscode4.workspace.textDocuments.forEach((doc) => {
-      if (doc.fileName.endsWith("plan.md")) {
+      if (path6.basename(doc.fileName) === "plan.md") {
         this.loadComments(doc.uri);
       }
     });
+  }
+  getFeatureMatch(filePath) {
+    const normalized = this.normalizePath(filePath);
+    const normalizedWorkspace = this.normalizedWorkspaceRoot.replace(/\/+$/, "");
+    const compareNormalized = process.platform === "win32" ? normalized.toLowerCase() : normalized;
+    const compareWorkspace = process.platform === "win32" ? normalizedWorkspace.toLowerCase() : normalizedWorkspace;
+    if (!compareNormalized.startsWith(`${compareWorkspace}/`)) return null;
+    const match = filePath.replace(/\\/g, "/").match(/\.hive\/features\/([^/]+)\/(?:plan\.md|comments\.json)$/);
+    return match ? match[1] : null;
+  }
+  normalizePath(filePath) {
+    return filePath.replace(/\\/g, "/");
+  }
+  isSamePath(left, right) {
+    const normalizedLeft = this.normalizePath(left);
+    const normalizedRight = this.normalizePath(right);
+    if (process.platform === "win32") {
+      return normalizedLeft.toLowerCase() === normalizedRight.toLowerCase();
+    }
+    return normalizedLeft === normalizedRight;
   }
   createComment(reply) {
     const range = reply.thread.range ?? new vscode4.Range(0, 0, 0, 0);
@@ -6772,9 +6794,9 @@ var PlanCommentController = class {
     this.saveComments(reply.thread.uri);
   }
   getCommentsPath(uri) {
-    const match = uri.fsPath.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
-    if (!match) return null;
-    return path6.join(this.workspaceRoot, ".hive", "features", match[1], "comments.json");
+    const featureMatch = this.getFeatureMatch(uri.fsPath);
+    if (!featureMatch) return null;
+    return path6.join(this.workspaceRoot, ".hive", "features", featureMatch, "comments.json");
   }
   loadComments(uri) {
     const commentsPath = this.getCommentsPath(uri);
@@ -6782,7 +6804,7 @@ var PlanCommentController = class {
     try {
       const data = JSON.parse(fs6.readFileSync(commentsPath, "utf-8"));
       this.threads.forEach((thread, id) => {
-        if (thread.uri.fsPath === uri.fsPath) {
+        if (this.isSamePath(thread.uri.fsPath, uri.fsPath)) {
           thread.dispose();
           this.threads.delete(id);
         }
@@ -6818,7 +6840,7 @@ var PlanCommentController = class {
     if (!commentsPath) return;
     const threads = [];
     this.threads.forEach((thread, id) => {
-      if (thread.uri.fsPath !== uri.fsPath) return;
+      if (!this.isSamePath(thread.uri.fsPath, uri.fsPath)) return;
       if (thread.comments.length === 0) return;
       const [first2, ...rest] = thread.comments;
       const line = thread.range?.start.line ?? 0;
@@ -7946,7 +7968,8 @@ var HiveExtension = class {
           return;
         }
         const filePath = editor.document.uri.fsPath;
-        const featureMatch = filePath.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
+        const normalized = filePath.replace(/\\/g, "/");
+        const featureMatch = normalized.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
         if (!featureMatch) {
           vscode7.window.showErrorMessage("Not a plan.md file");
           return;
