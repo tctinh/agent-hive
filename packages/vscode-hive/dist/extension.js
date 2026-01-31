@@ -1424,10 +1424,12 @@ var TaskService = class {
   createFromPlan(featureName, task, allTasks) {
     const taskPath = getTaskPath(this.projectRoot, featureName, task.folder);
     ensureDir(taskPath);
+    const dependsOn = this.resolveDependencies(task, allTasks);
     const status = {
       status: "pending",
       origin: "plan",
-      planTitle: task.name
+      planTitle: task.name,
+      dependsOn
     };
     writeJson(getTaskStatusPath(this.projectRoot, featureName, task.folder), status);
     const specLines = [
@@ -1438,12 +1440,22 @@ var TaskService = class {
       `**Status:** pending`,
       "",
       "---",
-      "",
-      "## Description",
-      "",
-      task.description || "_No description provided in plan_",
       ""
     ];
+    if (dependsOn.length > 0) {
+      specLines.push("## Dependencies", "");
+      for (const dep of dependsOn) {
+        const depTask = allTasks.find((t) => t.folder === dep);
+        if (depTask) {
+          specLines.push(`- **${depTask.order}. ${depTask.name}** (${dep})`);
+        } else {
+          specLines.push(`- ${dep}`);
+        }
+      }
+      specLines.push("", "---", "");
+    }
+    specLines.push("## Description", "");
+    specLines.push(task.description || "_No description provided in plan_", "");
     if (task.order > 1) {
       const priorTasks = allTasks.filter((t) => t.order < task.order);
       if (priorTasks.length > 0) {
@@ -1464,6 +1476,19 @@ var TaskService = class {
     }
     writeText(getTaskSpecPath(this.projectRoot, featureName, task.folder), specLines.join(`
 `));
+  }
+  resolveDependencies(task, allTasks) {
+    if (task.dependsOnNumbers !== null && task.dependsOnNumbers.length === 0) {
+      return [];
+    }
+    if (task.dependsOnNumbers !== null) {
+      return task.dependsOnNumbers.map((num) => allTasks.find((t) => t.order === num)?.folder).filter((folder) => folder !== void 0);
+    }
+    if (task.order === 1) {
+      return [];
+    }
+    const previousTask = allTasks.find((t) => t.order === task.order - 1);
+    return previousTask ? [previousTask.folder] : [];
   }
   writeSpec(featureName, taskFolder, content) {
     const specPath = getTaskSpecPath(this.projectRoot, featureName, taskFolder);
@@ -1554,6 +1579,7 @@ var TaskService = class {
 `);
     let currentTask = null;
     let descriptionLines = [];
+    const dependsOnRegex = /^\s*\*{0,2}Depends\s+on\*{0,2}\s*:\s*(.+)$/i;
     for (const line of lines) {
       const taskMatch = line.match(/^###\s+(\d+)\.\s+(.+)$/);
       if (taskMatch) {
@@ -1570,7 +1596,8 @@ var TaskService = class {
           folder,
           order,
           name: rawName,
-          description: ""
+          description: "",
+          dependsOnNumbers: null
         };
         descriptionLines = [];
       } else if (currentTask) {
@@ -1581,6 +1608,16 @@ var TaskService = class {
           currentTask = null;
           descriptionLines = [];
         } else {
+          const dependsMatch = line.match(dependsOnRegex);
+          if (dependsMatch) {
+            const value = dependsMatch[1].trim().toLowerCase();
+            if (value === "none") {
+              currentTask.dependsOnNumbers = [];
+            } else {
+              const numbers = value.split(/[,\s]+/).map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+              currentTask.dependsOnNumbers = numbers;
+            }
+          }
           descriptionLines.push(line);
         }
       }

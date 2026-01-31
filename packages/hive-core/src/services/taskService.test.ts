@@ -342,6 +342,216 @@ describe("TaskService", () => {
     });
   });
 
+  describe("sync() - dependency parsing", () => {
+    it("parses explicit Depends on: annotations and resolves to folder names", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Plan with explicit dependencies
+      const planContent = `# Plan
+
+### 1. Setup Base
+
+Base setup task.
+
+### 2. Build Core
+
+**Depends on**: 1
+
+Build the core module.
+
+### 3. Build UI
+
+**Depends on**: 1, 2
+
+Build the UI layer.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      const result = service.sync(featureName);
+
+      expect(result.created).toContain("01-setup-base");
+      expect(result.created).toContain("02-build-core");
+      expect(result.created).toContain("03-build-ui");
+
+      // Check status.json for dependencies
+      const task1Status = service.getRawStatus(featureName, "01-setup-base");
+      const task2Status = service.getRawStatus(featureName, "02-build-core");
+      const task3Status = service.getRawStatus(featureName, "03-build-ui");
+
+      // Task 1 has no dependencies (first task, implicit none)
+      expect(task1Status?.dependsOn).toEqual([]);
+
+      // Task 2 depends on task 1
+      expect(task2Status?.dependsOn).toEqual(["01-setup-base"]);
+
+      // Task 3 depends on tasks 1 and 2
+      expect(task3Status?.dependsOn).toEqual(["01-setup-base", "02-build-core"]);
+    });
+
+    it("parses Depends on: none and produces empty dependency list", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      const planContent = `# Plan
+
+### 1. Independent Task A
+
+**Depends on**: none
+
+Can run independently.
+
+### 2. Independent Task B
+
+Depends on: none
+
+Also independent.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      const result = service.sync(featureName);
+
+      const task1Status = service.getRawStatus(featureName, "01-independent-task-a");
+      const task2Status = service.getRawStatus(featureName, "02-independent-task-b");
+
+      expect(task1Status?.dependsOn).toEqual([]);
+      expect(task2Status?.dependsOn).toEqual([]);
+    });
+
+    it("applies implicit sequential dependencies when Depends on: is missing", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Plan without any dependency annotations - should use implicit sequential
+      const planContent = `# Plan
+
+### 1. First Task
+
+Do the first thing.
+
+### 2. Second Task
+
+Do the second thing.
+
+### 3. Third Task
+
+Do the third thing.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      const result = service.sync(featureName);
+
+      const task1Status = service.getRawStatus(featureName, "01-first-task");
+      const task2Status = service.getRawStatus(featureName, "02-second-task");
+      const task3Status = service.getRawStatus(featureName, "03-third-task");
+
+      // Task 1 - no dependencies (first task)
+      expect(task1Status?.dependsOn).toEqual([]);
+
+      // Task 2 - implicit dependency on task 1
+      expect(task2Status?.dependsOn).toEqual(["01-first-task"]);
+
+      // Task 3 - implicit dependency on task 2
+      expect(task3Status?.dependsOn).toEqual(["02-second-task"]);
+    });
+
+    it("generates spec.md with dependency section", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      const planContent = `# Plan
+
+### 1. Setup
+
+Setup task.
+
+### 2. Build
+
+**Depends on**: 1
+
+Build task.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      service.sync(featureName);
+
+      // Read spec.md for task 2
+      const specPath = path.join(featurePath, "tasks", "02-build", "spec.md");
+      const specContent = fs.readFileSync(specPath, "utf-8");
+
+      expect(specContent).toContain("## Dependencies");
+      expect(specContent).toContain("01-setup");
+    });
+
+    it("handles mixed explicit and implicit dependencies", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      const planContent = `# Plan
+
+### 1. Base
+
+Base task.
+
+### 2. Core
+
+No dependency annotation - implicit sequential.
+
+### 3. UI
+
+**Depends on**: 1
+
+Explicitly depends only on 1, not 2.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      service.sync(featureName);
+
+      const task1Status = service.getRawStatus(featureName, "01-base");
+      const task2Status = service.getRawStatus(featureName, "02-core");
+      const task3Status = service.getRawStatus(featureName, "03-ui");
+
+      // Task 1 - no dependencies
+      expect(task1Status?.dependsOn).toEqual([]);
+
+      // Task 2 - implicit dependency on task 1
+      expect(task2Status?.dependsOn).toEqual(["01-base"]);
+
+      // Task 3 - explicit dependency on task 1 only (not 2)
+      expect(task3Status?.dependsOn).toEqual(["01-base"]);
+    });
+  });
+
   describe("concurrent access safety", () => {
     it("handles rapid sequential updates without corruption", () => {
       const featureName = "test-feature";

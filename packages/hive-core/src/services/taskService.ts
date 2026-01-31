@@ -45,6 +45,8 @@ interface ParsedTask {
   order: number;
   name: string;
   description: string;
+  /** Raw dependency numbers parsed from plan. null = not specified (use implicit), [] = explicit none */
+  dependsOnNumbers: number[] | null;
 }
 
 export class TaskService {
@@ -137,10 +139,14 @@ export class TaskService {
     const taskPath = getTaskPath(this.projectRoot, featureName, task.folder);
     ensureDir(taskPath);
 
+    // Resolve dependencies: numbers -> folder names
+    const dependsOn = this.resolveDependencies(task, allTasks);
+
     const status: TaskStatus = {
       status: 'pending',
       origin: 'plan',
       planTitle: task.name,
+      dependsOn,
     };
     writeJson(getTaskStatusPath(this.projectRoot, featureName, task.folder), status);
 
@@ -154,11 +160,24 @@ export class TaskService {
       '',
       '---',
       '',
-      '## Description',
-      '',
-      task.description || '_No description provided in plan_',
-      '',
     ];
+
+    // Add dependencies section
+    if (dependsOn.length > 0) {
+      specLines.push('## Dependencies', '');
+      for (const dep of dependsOn) {
+        const depTask = allTasks.find(t => t.folder === dep);
+        if (depTask) {
+          specLines.push(`- **${depTask.order}. ${depTask.name}** (${dep})`);
+        } else {
+          specLines.push(`- ${dep}`);
+        }
+      }
+      specLines.push('', '---', '');
+    }
+
+    specLines.push('## Description', '');
+    specLines.push(task.description || '_No description provided in plan_', '');
 
     // Add prior tasks section if not first task
     if (task.order > 1) {
@@ -183,6 +202,34 @@ export class TaskService {
     }
 
     writeText(getTaskSpecPath(this.projectRoot, featureName, task.folder), specLines.join('\n'));
+  }
+
+  /**
+   * Resolve dependency numbers to folder names.
+   * - If dependsOnNumbers is null (not specified), apply implicit sequential default (N-1 for N > 1).
+   * - If dependsOnNumbers is [] (explicit "none"), return empty array.
+   * - Otherwise, map numbers to corresponding task folders.
+   */
+  private resolveDependencies(task: ParsedTask, allTasks: ParsedTask[]): string[] {
+    // Explicit "none" - no dependencies
+    if (task.dependsOnNumbers !== null && task.dependsOnNumbers.length === 0) {
+      return [];
+    }
+
+    // Explicit dependency numbers provided
+    if (task.dependsOnNumbers !== null) {
+      return task.dependsOnNumbers
+        .map(num => allTasks.find(t => t.order === num)?.folder)
+        .filter((folder): folder is string => folder !== undefined);
+    }
+
+    // Implicit sequential default: depend on previous task (N-1)
+    if (task.order === 1) {
+      return [];
+    }
+
+    const previousTask = allTasks.find(t => t.order === task.order - 1);
+    return previousTask ? [previousTask.folder] : [];
   }
 
   writeSpec(featureName: string, taskFolder: string, content: string): string {
@@ -342,6 +389,10 @@ export class TaskService {
     let currentTask: ParsedTask | null = null;
     let descriptionLines: string[] = [];
     
+    // Regex to match "Depends on:" or "**Depends on**:" with optional markdown
+    // Strips markdown formatting (**, *, etc.) and captures the value
+    const dependsOnRegex = /^\s*\*{0,2}Depends\s+on\*{0,2}\s*:\s*(.+)$/i;
+    
     for (const line of lines) {
       // Check for task header: ### N. Task Name
       const taskMatch = line.match(/^###\s+(\d+)\.\s+(.+)$/);
@@ -363,6 +414,7 @@ export class TaskService {
           order,
           name: rawName,
           description: '',
+          dependsOnNumbers: null,  // null = not specified, use implicit
         };
         descriptionLines = [];
       } else if (currentTask) {
@@ -373,6 +425,21 @@ export class TaskService {
           currentTask = null;
           descriptionLines = [];
         } else {
+          // Check for Depends on: annotation within task section
+          const dependsMatch = line.match(dependsOnRegex);
+          if (dependsMatch) {
+            const value = dependsMatch[1].trim().toLowerCase();
+            if (value === 'none') {
+              currentTask.dependsOnNumbers = [];
+            } else {
+              // Parse comma-separated numbers
+              const numbers = value
+                .split(/[,\s]+/)
+                .map(s => parseInt(s.trim(), 10))
+                .filter(n => !isNaN(n));
+              currentTask.dependsOnNumbers = numbers;
+            }
+          }
           descriptionLines.push(line);
         }
       }
