@@ -7,3 +7,5 @@ export type { WorktreeInfo, DiffResult, ApplyResult, CommitResult, MergeResult, 
 export { ContextService } from './contextService.js';
 export { SessionService } from './sessionService.js';
 export { ConfigService } from './configService.js';
+export { computeRunnableAndBlocked } from './taskDependencyGraph.js';
+export type { TaskWithDeps, RunnableBlockedResult } from './taskDependencyGraph.js';

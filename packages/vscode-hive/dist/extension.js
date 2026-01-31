@@ -6364,6 +6364,30 @@ ${f.content}`);
     return `${normalized}.md`;
   }
 };
+function computeRunnableAndBlocked(tasks) {
+  const statusByFolder = /* @__PURE__ */ new Map();
+  for (const task of tasks) {
+    statusByFolder.set(task.folder, task.status);
+  }
+  const runnable = [];
+  const blocked = {};
+  for (const task of tasks) {
+    if (task.status !== "pending") {
+      continue;
+    }
+    const deps = task.dependsOn ?? [];
+    const unmetDeps = deps.filter((dep) => {
+      const depStatus = statusByFolder.get(dep);
+      return depStatus !== "done";
+    });
+    if (unmetDeps.length === 0) {
+      runnable.push(task.folder);
+    } else {
+      blocked[task.folder] = unmetDeps;
+    }
+  }
+  return { runnable, blocked };
+}
 
 // src/services/watcher.ts
 var vscode = __toESM(require("vscode"));
@@ -7550,13 +7574,23 @@ function getStatusTools(workspaceRoot) {
     const plan = planService.read(feature);
     const tasks = taskService.list(feature);
     const contextFiles = contextService.list(feature);
-    const tasksSummary = tasks.map((t) => ({
+    const tasksSummary = tasks.map((t) => {
+      const rawStatus = taskService.getRawStatus(feature, t.folder);
+      return {
+        folder: t.folder,
+        name: t.folder.replace(/^\d+-/, ""),
+        status: t.status,
+        summary: t.summary || null,
+        origin: t.origin,
+        dependsOn: rawStatus?.dependsOn ?? null
+      };
+    });
+    const tasksWithDeps = tasksSummary.map((t) => ({
       folder: t.folder,
-      name: t.folder.replace(/^\d+-/, ""),
       status: t.status,
-      summary: t.summary || null,
-      origin: t.origin
+      dependsOn: t.dependsOn ?? void 0
     }));
+    const { runnable, blocked } = computeRunnableAndBlocked(tasksWithDeps);
     const contextSummary = contextFiles.map((c) => ({
       name: c.name,
       chars: c.content.length,
@@ -7583,13 +7617,15 @@ function getStatusTools(workspaceRoot) {
         pending: pendingTasks.length,
         inProgress: inProgressTasks.length,
         done: doneTasks.length,
-        list: tasksSummary
+        list: tasksSummary,
+        runnable,
+        blockedBy: blocked
       },
       context: {
         fileCount: contextFiles.length,
         files: contextSummary
       },
-      nextAction: getNextAction(planStatus, tasksSummary)
+      nextAction: getNextAction(planStatus, tasksSummary, runnable)
     });
   };
   const baseStatusTool = {
@@ -7618,7 +7654,7 @@ function getStatusTools(workspaceRoot) {
     }
   ];
 }
-function getNextAction(planStatus, tasks) {
+function getNextAction(planStatus, tasks, runnable) {
   if (!planStatus || planStatus === "draft") {
     return "Write or revise plan with hive_plan_write, then get approval";
   }
@@ -7632,9 +7668,15 @@ function getNextAction(planStatus, tasks) {
   if (inProgress) {
     return `Continue work on task: ${inProgress.folder}`;
   }
+  if (runnable.length > 1) {
+    return `${runnable.length} tasks are ready to start in parallel: ${runnable.join(", ")}`;
+  }
+  if (runnable.length === 1) {
+    return `Start next task with hive_exec_start: ${runnable[0]}`;
+  }
   const pending = tasks.find((t) => t.status === "pending");
   if (pending) {
-    return `Start next task with hive_exec_start: ${pending.folder}`;
+    return `Pending tasks exist but are blocked by dependencies. Check blockedBy for details.`;
   }
   return "All tasks complete. Review and merge or complete feature.";
 }

@@ -1,4 +1,5 @@
-import { FeatureService, TaskService, PlanService, ContextService } from 'hive-core';
+import { FeatureService, TaskService, PlanService, ContextService, computeRunnableAndBlocked } from 'hive-core';
+import type { TaskWithDeps } from 'hive-core';
 import type { ToolRegistration } from './base';
 
 export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
@@ -30,13 +31,26 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
     const tasks = taskService.list(feature);
     const contextFiles = contextService.list(feature);
 
-    const tasksSummary = tasks.map(t => ({
+    // Build task summaries with dependency info from raw status
+    const tasksSummary = tasks.map(t => {
+      const rawStatus = taskService.getRawStatus(feature, t.folder);
+      return {
+        folder: t.folder,
+        name: t.folder.replace(/^\d+-/, ''),
+        status: t.status,
+        summary: t.summary || null,
+        origin: t.origin,
+        dependsOn: rawStatus?.dependsOn ?? null,
+      };
+    });
+
+    // Compute runnable and blocked tasks for orchestrators
+    const tasksWithDeps: TaskWithDeps[] = tasksSummary.map(t => ({
       folder: t.folder,
-      name: t.folder.replace(/^\d+-/, ''),
       status: t.status,
-      summary: t.summary || null,
-      origin: t.origin,
+      dependsOn: t.dependsOn ?? undefined,
     }));
+    const { runnable, blocked } = computeRunnableAndBlocked(tasksWithDeps);
 
     const contextSummary = contextFiles.map(c => ({
       name: c.name,
@@ -70,12 +84,14 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
         inProgress: inProgressTasks.length,
         done: doneTasks.length,
         list: tasksSummary,
+        runnable,
+        blockedBy: blocked,
       },
       context: {
         fileCount: contextFiles.length,
         files: contextSummary,
       },
-      nextAction: getNextAction(planStatus, tasksSummary),
+      nextAction: getNextAction(planStatus, tasksSummary, runnable),
     });
   };
 
@@ -107,7 +123,7 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
   ];
 }
 
-function getNextAction(planStatus: string | null, tasks: Array<{ status: string; folder: string }>): string {
+function getNextAction(planStatus: string | null, tasks: Array<{ status: string; folder: string }>, runnable: string[]): string {
   if (!planStatus || planStatus === 'draft') {
     return 'Write or revise plan with hive_plan_write, then get approval';
   }
@@ -121,9 +137,16 @@ function getNextAction(planStatus: string | null, tasks: Array<{ status: string;
   if (inProgress) {
     return `Continue work on task: ${inProgress.folder}`;
   }
+  // Use runnable list to suggest tasks that can actually start
+  if (runnable.length > 1) {
+    return `${runnable.length} tasks are ready to start in parallel: ${runnable.join(', ')}`;
+  }
+  if (runnable.length === 1) {
+    return `Start next task with hive_exec_start: ${runnable[0]}`;
+  }
   const pending = tasks.find(t => t.status === 'pending');
   if (pending) {
-    return `Start next task with hive_exec_start: ${pending.folder}`;
+    return `Pending tasks exist but are blocked by dependencies. Check blockedBy for details.`;
   }
   return 'All tasks complete. Review and merge or complete feature.';
 }
