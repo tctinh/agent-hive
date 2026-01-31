@@ -127,6 +127,13 @@ If yes → \`task({ subagent_type: "hygienic", prompt: "Review plan..." })\`
 
 *Active when: plan approved, tasks exist*
 
+### Task Dependencies (Always Check)
+
+Use \`hive_status()\` to see **runnable** tasks (dependencies satisfied) and **blockedBy** info.
+- Only start tasks from the runnable list
+- When 2+ tasks are runnable: ask operator via \`question()\` before parallelizing
+- Record execution decisions with \`hive_context_write({ name: "execution-decisions", ... })\`
+
 ### When to Load Skills
 
 - Multiple independent tasks → \`hive_skill("dispatching-parallel-agents")\`

@@ -21,28 +21,37 @@ Load plan, review critically, execute tasks in batches, report for review betwee
 3. If concerns: Raise them with your human partner before starting
 4. If no concerns: Create TodoWrite and proceed
 
-### Step 2: Execute Batch
-**Default: First 3 tasks**
+### Step 2: Identify Runnable Tasks
 
-For each task:
-1. Mark as in_progress
+Use `hive_status()` to get the **runnable** list — tasks with all dependencies satisfied.
+
+**When 2+ tasks are runnable:**
+- **Ask the operator** via `question()`: "Multiple tasks are runnable: [list]. Run in parallel, sequential, or a specific subset?"
+- Record the decision with `hive_context_write({ name: "execution-decisions", content: "..." })` for future reference
+
+**When 1 task is runnable:** Proceed directly.
+
+### Step 3: Execute Batch
+
+For each task in the batch:
+1. Mark as in_progress via `hive_exec_start()`
 2. Follow each step exactly (plan has bite-sized steps)
 3. Run verifications as specified
 4. Mark as completed
 
-### Step 3: Report
+### Step 4: Report
 When batch complete:
 - Show what was implemented
 - Show verification output
 - Say: "Ready for feedback."
 
-### Step 4: Continue
+### Step 5: Continue
 Based on feedback:
 - Apply changes if needed
 - Execute next batch
 - Repeat until complete
 
-### Step 5: Complete Development
+### Step 6: Complete Development
 
 After all tasks complete and verified:
 - Announce: "I'm using the finishing-a-development-branch skill to complete this work."

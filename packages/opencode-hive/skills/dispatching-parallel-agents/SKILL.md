@@ -11,6 +11,17 @@ When you have multiple unrelated failures (different test files, different subsy
 
 **Core principle:** Dispatch one agent per independent problem domain. Let them work concurrently.
 
+## Prerequisite: Check Runnable Tasks
+
+Before dispatching, use `hive_status()` to get the **runnable** list — tasks whose dependencies are all satisfied.
+
+**Only dispatch tasks that are runnable.** Never start tasks with unmet dependencies.
+
+**Ask the operator first:**
+- Use `question()`: "These tasks are runnable and independent: [list]. Execute in parallel?"
+- Record the decision with `hive_context_write({ name: "execution-decisions", content: "..." })`
+- Proceed only after operator approval
+
 ## When to Use
 
 ```dot
