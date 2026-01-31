@@ -276,6 +276,72 @@ describe("TaskService", () => {
     });
   });
 
+  describe("dependsOn field", () => {
+    it("existing tasks without dependsOn continue to load and display", () => {
+      const featureName = "test-feature";
+      setupFeature(featureName);
+      // Create task without dependsOn (legacy format)
+      setupTask(featureName, "01-test-task", {
+        status: "pending",
+        planTitle: "Test Task",
+        // No dependsOn field
+      });
+
+      const result = service.getRawStatus(featureName, "01-test-task");
+
+      expect(result).not.toBeNull();
+      expect(result?.status).toBe("pending");
+      expect(result?.planTitle).toBe("Test Task");
+      // dependsOn should be undefined for legacy tasks
+      expect(result?.dependsOn).toBeUndefined();
+    });
+
+    it("tasks with dependsOn array load correctly", () => {
+      const featureName = "test-feature";
+      setupFeature(featureName);
+      setupTask(featureName, "02-dependent-task", {
+        status: "pending",
+        planTitle: "Dependent Task",
+        dependsOn: ["01-setup", "01-core-api"],
+      });
+
+      const result = service.getRawStatus(featureName, "02-dependent-task");
+
+      expect(result).not.toBeNull();
+      expect(result?.dependsOn).toEqual(["01-setup", "01-core-api"]);
+    });
+
+    it("preserves dependsOn field on update", () => {
+      const featureName = "test-feature";
+      setupFeature(featureName);
+      setupTask(featureName, "02-dependent-task", {
+        status: "pending",
+        dependsOn: ["01-setup"],
+      });
+
+      const result = service.update(featureName, "02-dependent-task", {
+        status: "in_progress",
+      });
+
+      expect(result.status).toBe("in_progress");
+      expect(result.dependsOn).toEqual(["01-setup"]);
+    });
+
+    it("handles empty dependsOn array", () => {
+      const featureName = "test-feature";
+      setupFeature(featureName);
+      setupTask(featureName, "01-independent-task", {
+        status: "pending",
+        dependsOn: [],
+      });
+
+      const result = service.getRawStatus(featureName, "01-independent-task");
+
+      expect(result).not.toBeNull();
+      expect(result?.dependsOn).toEqual([]);
+    });
+  });
+
   describe("concurrent access safety", () => {
     it("handles rapid sequential updates without corruption", () => {
       const featureName = "test-feature";
