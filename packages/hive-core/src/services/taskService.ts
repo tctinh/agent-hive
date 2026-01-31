@@ -61,6 +61,10 @@ export class TaskService {
     }
 
     const planTasks = this.parseTasksFromPlan(planContent);
+    
+    // Validate dependency graph before proceeding
+    this.validateDependencyGraph(planTasks, featureName);
+    
     const existingTasks = this.list(featureName);
     
     const result: TasksSyncResult = {
@@ -230,6 +234,118 @@ export class TaskService {
 
     const previousTask = allTasks.find(t => t.order === task.order - 1);
     return previousTask ? [previousTask.folder] : [];
+  }
+
+  /**
+   * Validate the dependency graph for errors before creating tasks.
+   * Throws descriptive errors pointing the operator to fix plan.md.
+   * 
+   * Checks for:
+   * - Unknown task numbers in dependencies
+   * - Self-dependencies
+   * - Cycles (using DFS topological sort)
+   */
+  private validateDependencyGraph(tasks: ParsedTask[], featureName: string): void {
+    const taskNumbers = new Set(tasks.map(t => t.order));
+    
+    // Validate each task's dependencies
+    for (const task of tasks) {
+      if (task.dependsOnNumbers === null) {
+        // Implicit dependencies - no validation needed
+        continue;
+      }
+      
+      for (const depNum of task.dependsOnNumbers) {
+        // Check for self-dependency
+        if (depNum === task.order) {
+          throw new Error(
+            `Invalid dependency graph in plan.md: Self-dependency detected for task ${task.order} ("${task.name}"). ` +
+            `A task cannot depend on itself. Please fix the "Depends on:" line in plan.md.`
+          );
+        }
+        
+        // Check for unknown task number
+        if (!taskNumbers.has(depNum)) {
+          throw new Error(
+            `Invalid dependency graph in plan.md: Unknown task number ${depNum} referenced in dependencies for task ${task.order} ("${task.name}"). ` +
+            `Available task numbers are: ${Array.from(taskNumbers).sort((a, b) => a - b).join(', ')}. ` +
+            `Please fix the "Depends on:" line in plan.md.`
+          );
+        }
+      }
+    }
+    
+    // Check for cycles using DFS
+    this.detectCycles(tasks);
+  }
+
+  /**
+   * Detect cycles in the dependency graph using DFS.
+   * Throws a descriptive error if a cycle is found.
+   */
+  private detectCycles(tasks: ParsedTask[]): void {
+    // Build adjacency list: task order -> [dependency orders]
+    const taskByOrder = new Map(tasks.map(t => [t.order, t]));
+    
+    // Build dependency graph with resolved implicit dependencies
+    const getDependencies = (task: ParsedTask): number[] => {
+      if (task.dependsOnNumbers !== null) {
+        return task.dependsOnNumbers;
+      }
+      // Implicit sequential dependency
+      if (task.order === 1) {
+        return [];
+      }
+      return [task.order - 1];
+    };
+    
+    // Track visited state: 0 = unvisited, 1 = in current path, 2 = fully processed
+    const visited = new Map<number, number>();
+    const path: number[] = [];
+    
+    const dfs = (taskOrder: number): void => {
+      const state = visited.get(taskOrder);
+      
+      if (state === 2) {
+        // Already fully processed, no cycle through here
+        return;
+      }
+      
+      if (state === 1) {
+        // Found a cycle! Build the cycle path for the error message
+        const cycleStart = path.indexOf(taskOrder);
+        const cyclePath = [...path.slice(cycleStart), taskOrder];
+        const cycleDesc = cyclePath.join(' -> ');
+        
+        throw new Error(
+          `Invalid dependency graph in plan.md: Cycle detected in task dependencies: ${cycleDesc}. ` +
+          `Tasks cannot have circular dependencies. Please fix the "Depends on:" lines in plan.md.`
+        );
+      }
+      
+      // Mark as in current path
+      visited.set(taskOrder, 1);
+      path.push(taskOrder);
+      
+      const task = taskByOrder.get(taskOrder);
+      if (task) {
+        const deps = getDependencies(task);
+        for (const depOrder of deps) {
+          dfs(depOrder);
+        }
+      }
+      
+      // Mark as fully processed
+      path.pop();
+      visited.set(taskOrder, 2);
+    };
+    
+    // Run DFS from each node
+    for (const task of tasks) {
+      if (!visited.has(task.order)) {
+        dfs(task.order);
+      }
+    }
   }
 
   writeSpec(featureName: string, taskFolder: string, content: string): string {

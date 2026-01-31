@@ -1368,6 +1368,7 @@ var TaskService = class {
       throw new Error(`No plan.md found for feature '${featureName}'`);
     }
     const planTasks = this.parseTasksFromPlan(planContent);
+    this.validateDependencyGraph(planTasks, featureName);
     const existingTasks = this.list(featureName);
     const result = {
       created: [],
@@ -1489,6 +1490,65 @@ var TaskService = class {
     }
     const previousTask = allTasks.find((t) => t.order === task.order - 1);
     return previousTask ? [previousTask.folder] : [];
+  }
+  validateDependencyGraph(tasks, featureName) {
+    const taskNumbers = new Set(tasks.map((t) => t.order));
+    for (const task of tasks) {
+      if (task.dependsOnNumbers === null) {
+        continue;
+      }
+      for (const depNum of task.dependsOnNumbers) {
+        if (depNum === task.order) {
+          throw new Error(`Invalid dependency graph in plan.md: Self-dependency detected for task ${task.order} ("${task.name}"). A task cannot depend on itself. Please fix the "Depends on:" line in plan.md.`);
+        }
+        if (!taskNumbers.has(depNum)) {
+          throw new Error(`Invalid dependency graph in plan.md: Unknown task number ${depNum} referenced in dependencies for task ${task.order} ("${task.name}"). Available task numbers are: ${Array.from(taskNumbers).sort((a, b) => a - b).join(", ")}. Please fix the "Depends on:" line in plan.md.`);
+        }
+      }
+    }
+    this.detectCycles(tasks);
+  }
+  detectCycles(tasks) {
+    const taskByOrder = new Map(tasks.map((t) => [t.order, t]));
+    const getDependencies = (task) => {
+      if (task.dependsOnNumbers !== null) {
+        return task.dependsOnNumbers;
+      }
+      if (task.order === 1) {
+        return [];
+      }
+      return [task.order - 1];
+    };
+    const visited = /* @__PURE__ */ new Map();
+    const path32 = [];
+    const dfs = (taskOrder) => {
+      const state = visited.get(taskOrder);
+      if (state === 2) {
+        return;
+      }
+      if (state === 1) {
+        const cycleStart = path32.indexOf(taskOrder);
+        const cyclePath = [...path32.slice(cycleStart), taskOrder];
+        const cycleDesc = cyclePath.join(" -> ");
+        throw new Error(`Invalid dependency graph in plan.md: Cycle detected in task dependencies: ${cycleDesc}. Tasks cannot have circular dependencies. Please fix the "Depends on:" lines in plan.md.`);
+      }
+      visited.set(taskOrder, 1);
+      path32.push(taskOrder);
+      const task = taskByOrder.get(taskOrder);
+      if (task) {
+        const deps = getDependencies(task);
+        for (const depOrder of deps) {
+          dfs(depOrder);
+        }
+      }
+      path32.pop();
+      visited.set(taskOrder, 2);
+    };
+    for (const task of tasks) {
+      if (!visited.has(task.order)) {
+        dfs(task.order);
+      }
+    }
   }
   writeSpec(featureName, taskFolder, content) {
     const specPath = getTaskSpecPath(this.projectRoot, featureName, taskFolder);

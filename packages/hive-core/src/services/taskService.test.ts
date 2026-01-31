@@ -552,6 +552,229 @@ Explicitly depends only on 1, not 2.
     });
   });
 
+  describe("sync() - dependency validation", () => {
+    it("throws error for unknown task numbers in dependencies", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Task 2 depends on non-existent task 99
+      const planContent = `# Plan
+
+### 1. First Task
+
+First task description.
+
+### 2. Second Task
+
+**Depends on**: 1, 99
+
+Second task depends on unknown task 99.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      expect(() => service.sync(featureName)).toThrow(/unknown task number.*99/i);
+    });
+
+    it("throws error for self-dependency", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Task 2 depends on itself
+      const planContent = `# Plan
+
+### 1. First Task
+
+First task description.
+
+### 2. Self Referential Task
+
+**Depends on**: 2
+
+This task depends on itself.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      expect(() => service.sync(featureName)).toThrow(/self-dependency.*task 2/i);
+    });
+
+    it("throws error for cyclic dependencies (simple A->B->A)", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Task 1 depends on task 2, task 2 depends on task 1
+      const planContent = `# Plan
+
+### 1. Task A
+
+**Depends on**: 2
+
+Task A depends on B.
+
+### 2. Task B
+
+**Depends on**: 1
+
+Task B depends on A.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      expect(() => service.sync(featureName)).toThrow(/cycle.*1.*2/i);
+    });
+
+    it("throws error for cyclic dependencies (longer chain A->B->C->A)", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Cycle: 1->2->3->1
+      const planContent = `# Plan
+
+### 1. Task A
+
+**Depends on**: 3
+
+Task A depends on C.
+
+### 2. Task B
+
+**Depends on**: 1
+
+Task B depends on A.
+
+### 3. Task C
+
+**Depends on**: 2
+
+Task C depends on B.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      expect(() => service.sync(featureName)).toThrow(/cycle/i);
+    });
+
+    it("error message for unknown deps points to plan.md", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      const planContent = `# Plan
+
+### 1. Only Task
+
+**Depends on**: 5
+
+Depends on non-existent task 5.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      expect(() => service.sync(featureName)).toThrow(/plan\.md/i);
+    });
+
+    it("error message for cycle points to plan.md", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      const planContent = `# Plan
+
+### 1. Task A
+
+**Depends on**: 2
+
+Cycle with B.
+
+### 2. Task B
+
+**Depends on**: 1
+
+Cycle with A.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      expect(() => service.sync(featureName)).toThrow(/plan\.md/i);
+    });
+
+    it("accepts valid dependency graphs without cycles", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Valid DAG: 1 <- 2, 1 <- 3, 2 <- 4, 3 <- 4
+      const planContent = `# Plan
+
+### 1. Base
+
+**Depends on**: none
+
+Base task.
+
+### 2. Left Branch
+
+**Depends on**: 1
+
+Left branch.
+
+### 3. Right Branch
+
+**Depends on**: 1
+
+Right branch.
+
+### 4. Merge
+
+**Depends on**: 2, 3
+
+Merge both branches.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      // Should not throw
+      const result = service.sync(featureName);
+      expect(result.created).toContain("01-base");
+      expect(result.created).toContain("02-left-branch");
+      expect(result.created).toContain("03-right-branch");
+      expect(result.created).toContain("04-merge");
+    });
+  });
+
   describe("concurrent access safety", () => {
     it("handles rapid sequential updates without corruption", () => {
       const featureName = "test-feature";
