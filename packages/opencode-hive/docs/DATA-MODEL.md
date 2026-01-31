@@ -42,9 +42,23 @@ Delegated execution passes this file path via `workerPromptPath`/`promptFile` to
   "summary": "Login endpoint implemented with JWT",
   "startedAt": "2025-01-05T09:00:00Z",
   "completedAt": "2025-01-05T10:30:00Z",
-  "baseCommit": "abc123"
+  "baseCommit": "abc123",
+  "dependsOn": ["01-setup", "02-database-schema"]
 }
 ```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Task status (see Status Values below) |
+| `origin` | string | `"plan"` (from plan.md) or `"manual"` (manually created) |
+| `planTitle` | string? | Task title from plan.md |
+| `summary` | string? | Execution summary |
+| `startedAt` | string? | ISO timestamp when task started |
+| `completedAt` | string? | ISO timestamp when task completed |
+| `baseCommit` | string? | Git commit hash at task start |
+| `dependsOn` | string[]? | Task folder names this task depends on (e.g., `["01-setup"]`). A task cannot start until all dependencies have status `done`. Resolved from plan.md `Depends on:` annotations during `hive_tasks_sync`. |
 
 ## Status Values
 
