@@ -808,4 +808,214 @@ Merge both branches.
       expect(() => JSON.parse(fs.readFileSync(statusPath, "utf-8"))).not.toThrow();
     });
   });
+
+  describe("sync() - dependency parsing edge cases", () => {
+    it("handles whitespace variations in Depends on line", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Whitespace variations: extra spaces, tabs, etc.
+      const planContent = `# Plan
+
+### 1. Base Task
+
+Base task.
+
+### 2. Task With Spaces
+
+**Depends on**:   1
+
+Task with extra spaces after colon.
+
+### 3. Task With Comma Spaces
+
+**Depends on**: 1 , 2
+
+Task with spaces around comma.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      const result = service.sync(featureName);
+
+      expect(result.created).toContain("01-base-task");
+      expect(result.created).toContain("02-task-with-spaces");
+      expect(result.created).toContain("03-task-with-comma-spaces");
+
+      const task2Status = service.getRawStatus(featureName, "02-task-with-spaces");
+      const task3Status = service.getRawStatus(featureName, "03-task-with-comma-spaces");
+
+      expect(task2Status?.dependsOn).toEqual(["01-base-task"]);
+      expect(task3Status?.dependsOn).toEqual(["01-base-task", "02-task-with-spaces"]);
+    });
+
+    it("handles non-bold Depends on format", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Non-bold format
+      const planContent = `# Plan
+
+### 1. First
+
+First task.
+
+### 2. Second
+
+Depends on: 1
+
+Second depends on first (non-bold format).
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      const result = service.sync(featureName);
+
+      const task2Status = service.getRawStatus(featureName, "02-second");
+      expect(task2Status?.dependsOn).toEqual(["01-first"]);
+    });
+
+    it("handles case insensitive none keyword", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // "None" with capital N
+      const planContent = `# Plan
+
+### 1. Independent Task
+
+**Depends on**: None
+
+Independent task with capital None.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      const result = service.sync(featureName);
+
+      const task1Status = service.getRawStatus(featureName, "01-independent-task");
+      expect(task1Status?.dependsOn).toEqual([]);
+    });
+  });
+
+  describe("sync() - dependency validation edge cases", () => {
+    it("allows forward dependencies (later task depending on earlier)", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Normal forward dependency
+      const planContent = `# Plan
+
+### 1. Foundation
+
+**Depends on**: none
+
+Foundation task.
+
+### 2. Build
+
+**Depends on**: 1
+
+Build depends on foundation.
+
+### 3. Test
+
+**Depends on**: 2
+
+Test depends on build.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      // Should not throw
+      const result = service.sync(featureName);
+      expect(result.created.length).toBe(3);
+    });
+
+    it("throws error for diamond with cycle", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Diamond with cycle: 1->2, 1->3, 2->4, 3->4, 4->1
+      const planContent = `# Plan
+
+### 1. Start
+
+**Depends on**: 4
+
+Start depends on end (creates cycle).
+
+### 2. Left
+
+**Depends on**: 1
+
+Left branch.
+
+### 3. Right
+
+**Depends on**: 1
+
+Right branch.
+
+### 4. End
+
+**Depends on**: 2, 3
+
+End depends on both branches.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      expect(() => service.sync(featureName)).toThrow(/cycle/i);
+    });
+
+    it("provides clear error for multiple unknown dependencies", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      // Multiple unknown task numbers
+      const planContent = `# Plan
+
+### 1. Only Task
+
+**Depends on**: 5, 10, 99
+
+Depends on multiple non-existent tasks.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      expect(() => service.sync(featureName)).toThrow(/unknown.*task/i);
+    });
+  });
 });

@@ -2789,4 +2789,122 @@ describe('Dependency-Aware Ordering Enforcement', () => {
       expect(result.error).toContain('02-core');
     });
   });
+
+  describe('diamond dependency pattern', () => {
+    it('allows task when multiple deps from different branches are done', async () => {
+      // Diamond pattern: 1 <- 2, 1 <- 3, 2 <- 4, 3 <- 4
+      createTestManager({
+        '01-base': { status: 'done', dependsOn: [] },
+        '02-left': { status: 'done', dependsOn: ['01-base'] },
+        '03-right': { status: 'done', dependsOn: ['01-base'] },
+        '04-merge': { status: 'pending', dependsOn: ['02-left', '03-right'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '04-merge',
+        sync: false,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.task).toBeDefined();
+    });
+
+    it('blocks task when one branch of diamond is incomplete', async () => {
+      // Diamond with one incomplete branch
+      createTestManager({
+        '01-base': { status: 'done', dependsOn: [] },
+        '02-left': { status: 'done', dependsOn: ['01-base'] },
+        '03-right': { status: 'in_progress', dependsOn: ['01-base'] },  // Not done
+        '04-merge': { status: 'pending', dependsOn: ['02-left', '03-right'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '04-merge',
+        sync: false,
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('03-right');
+      expect(result.error).not.toContain('02-left');  // Should not mention completed dep
+    });
+  });
+
+  describe('multiple independent tasks (parallel enablement)', () => {
+    it('allows multiple tasks with dependsOn: [] to start independently', async () => {
+      // Three independent tasks that can all start
+      createTestManager({
+        '01-independent-a': { status: 'pending', dependsOn: [] },
+        '02-independent-b': { status: 'pending', dependsOn: [] },
+        '03-independent-c': { status: 'pending', dependsOn: [] },
+      });
+
+      // Start task A
+      const resultA = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '01-independent-a',
+        sync: false,
+      });
+      expect(resultA.error).toBeUndefined();
+
+      // Start task C (skipping B) - should work because all have empty dependsOn
+      const resultC = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '03-independent-c',
+        sync: false,
+      });
+      expect(resultC.error).toBeUndefined();
+    });
+  });
+
+  describe('first task handling', () => {
+    it('allows first task (task 01) to start without dependencies', async () => {
+      createTestManager({
+        '01-first-task': { status: 'pending', dependsOn: [] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '01-first-task',
+        sync: false,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.task).toBeDefined();
+    });
+
+    it('allows first task with implicit dependencies (undefined dependsOn)', async () => {
+      createTestManager({
+        '01-first-task': { status: 'pending' },  // No dependsOn field
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '01-first-task',
+        sync: false,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.task).toBeDefined();
+    });
+  });
 });
