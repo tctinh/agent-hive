@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { WorktreeService, TaskService } from 'hive-core';
+import { WorktreeService, TaskService, buildEffectiveDependencies } from 'hive-core';
 import type { ToolRegistration } from './base';
 
 /**
@@ -7,8 +7,7 @@ import type { ToolRegistration } from './base';
  * 
  * Hybrid enforcement:
  * 1. If task has explicit dependsOn array, check all deps have status 'done'
- * 2. If task has no dependsOn (legacy/undefined), allow (no sequential check here,
- *    as BackgroundManager handles that for delegated execution)
+ * 2. If task has no dependsOn (legacy/undefined), fall back to numeric sequential ordering
  * 
  * Only 'done' status satisfies a dependency - cancelled/failed/blocked/partial do NOT.
  */
@@ -18,23 +17,32 @@ function checkDependencies(
   taskFolder: string
 ): { allowed: boolean; error?: string } {
   const taskStatus = taskService.getRawStatus(feature, taskFolder);
-  
-  // If task has no dependsOn field, allow (backwards compatibility)
-  if (!taskStatus || taskStatus.dependsOn === undefined) {
+
+  if (!taskStatus) {
     return { allowed: true };
   }
-  
-  // Empty dependsOn means no dependencies - always allowed
-  if (taskStatus.dependsOn.length === 0) {
+
+  const tasks = taskService.list(feature).map(task => {
+    const status = taskService.getRawStatus(feature, task.folder);
+    return {
+      folder: task.folder,
+      status: task.status,
+      dependsOn: status?.dependsOn,
+    };
+  });
+
+  const effectiveDeps = buildEffectiveDependencies(tasks);
+  const deps = effectiveDeps.get(taskFolder) ?? [];
+
+  if (deps.length === 0) {
     return { allowed: true };
   }
-  
+
   const unmetDeps: Array<{ folder: string; status: string }> = [];
-  
-  for (const depFolder of taskStatus.dependsOn) {
+
+  for (const depFolder of deps) {
     const depStatus = taskService.getRawStatus(feature, depFolder);
-    
-    // Only 'done' satisfies the dependency
+
     if (!depStatus || depStatus.status !== 'done') {
       unmetDeps.push({
         folder: depFolder,

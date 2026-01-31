@@ -2906,5 +2906,23 @@ describe('Dependency-Aware Ordering Enforcement', () => {
       expect(result.error).toBeUndefined();
       expect(result.task).toBeDefined();
     });
+
+    it('allows legacy tasks with non-numeric folder names to start', async () => {
+      createTestManager({
+        'setup-task': { status: 'pending' },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: 'setup-task',
+        sync: false,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.task).toBeDefined();
+    });
   });
 });

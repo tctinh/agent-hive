@@ -167,8 +167,8 @@ export class TaskService {
     ];
 
     // Add dependencies section
+    specLines.push('## Dependencies', '');
     if (dependsOn.length > 0) {
-      specLines.push('## Dependencies', '');
       for (const dep of dependsOn) {
         const depTask = allTasks.find(t => t.folder === dep);
         if (depTask) {
@@ -177,8 +177,10 @@ export class TaskService {
           specLines.push(`- ${dep}`);
         }
       }
-      specLines.push('', '---', '');
+    } else {
+      specLines.push('_None_');
     }
+    specLines.push('', '---', '');
 
     specLines.push('## Description', '');
     specLines.push(task.description || '_No description provided in plan_', '');

@@ -106,14 +106,29 @@ describe('computeRunnableAndBlocked', () => {
     });
   });
 
-  it('treats undefined dependsOn as empty array', () => {
+  it('applies implicit sequential fallback when dependsOn is undefined', () => {
     const tasks: TaskWithDeps[] = [
       { folder: '01-task-a', status: 'pending', dependsOn: undefined },
+      { folder: '02-task-b', status: 'pending', dependsOn: undefined },
     ];
 
     const result = computeRunnableAndBlocked(tasks);
 
     expect(result.runnable).toEqual(['01-task-a']);
+    expect(result.blocked).toEqual({
+      '02-task-b': ['01-task-a'],
+    });
+  });
+
+  it('marks implicit sequential tasks runnable once prior task is done', () => {
+    const tasks: TaskWithDeps[] = [
+      { folder: '01-task-a', status: 'done', dependsOn: undefined },
+      { folder: '02-task-b', status: 'pending', dependsOn: undefined },
+    ];
+
+    const result = computeRunnableAndBlocked(tasks);
+
+    expect(result.runnable).toEqual(['02-task-b']);
     expect(result.blocked).toEqual({});
   });
 

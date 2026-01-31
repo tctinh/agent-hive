@@ -37,7 +37,6 @@ export interface RunnableBlockedResult {
  * @returns Object with runnable task folders and blocked tasks with their missing deps
  */
 export function computeRunnableAndBlocked(tasks: TaskWithDeps[]): RunnableBlockedResult {
-  // Build a map of folder -> status for quick lookup
   const statusByFolder = new Map<string, TaskStatusType>();
   for (const task of tasks) {
     statusByFolder.set(task.folder, task.status);
@@ -46,15 +45,15 @@ export function computeRunnableAndBlocked(tasks: TaskWithDeps[]): RunnableBlocke
   const runnable: string[] = [];
   const blocked: Record<string, string[]> = {};
 
+  const effectiveDepsByFolder = buildEffectiveDependencies(tasks);
+
   for (const task of tasks) {
-    // Only consider pending tasks
     if (task.status !== 'pending') {
       continue;
     }
 
-    const deps = task.dependsOn ?? [];
-    
-    // Find unmet dependencies (deps that are not 'done')
+    const deps = effectiveDepsByFolder.get(task.folder) ?? [];
+
     const unmetDeps = deps.filter(dep => {
       const depStatus = statusByFolder.get(dep);
       return depStatus !== 'done';
@@ -68,4 +67,47 @@ export function computeRunnableAndBlocked(tasks: TaskWithDeps[]): RunnableBlocke
   }
 
   return { runnable, blocked };
+}
+
+/**
+ * Compute effective dependencies for each task, applying legacy numeric
+ * sequential fallback when dependsOn is undefined.
+ */
+export function buildEffectiveDependencies(tasks: TaskWithDeps[]): Map<string, string[]> {
+  const orderByFolder = new Map<string, number | null>();
+  const folderByOrder = new Map<number, string>();
+
+  for (const task of tasks) {
+    const match = task.folder.match(/^(\d+)-/);
+    if (!match) {
+      orderByFolder.set(task.folder, null);
+      continue;
+    }
+
+    const order = parseInt(match[1], 10);
+    orderByFolder.set(task.folder, order);
+    if (!folderByOrder.has(order)) {
+      folderByOrder.set(order, task.folder);
+    }
+  }
+
+  const effectiveDeps = new Map<string, string[]>();
+
+  for (const task of tasks) {
+    if (task.dependsOn !== undefined) {
+      effectiveDeps.set(task.folder, task.dependsOn);
+      continue;
+    }
+
+    const order = orderByFolder.get(task.folder);
+    if (!order || order <= 1) {
+      effectiveDeps.set(task.folder, []);
+      continue;
+    }
+
+    const previousFolder = folderByOrder.get(order - 1);
+    effectiveDeps.set(task.folder, previousFolder ? [previousFolder] : []);
+  }
+
+  return effectiveDeps;
 }
