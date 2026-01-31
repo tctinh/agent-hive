@@ -1,4 +1,4 @@
-import { FeatureService, TaskService, PlanService, ContextService, computeRunnableAndBlocked } from 'hive-core';
+import { FeatureService, TaskService, PlanService, ContextService, buildEffectiveDependencies, computeRunnableAndBlocked } from 'hive-core';
 import type { TaskWithDeps } from 'hive-core';
 import type { ToolRegistration } from './base';
 
@@ -44,13 +44,18 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
       };
     });
 
-    // Compute runnable and blocked tasks for orchestrators
+    // Compute runnable and blocked tasks for orchestrators (apply legacy fallback)
     const tasksWithDeps: TaskWithDeps[] = tasksSummary.map(t => ({
       folder: t.folder,
       status: t.status,
       dependsOn: t.dependsOn ?? undefined,
     }));
-    const { runnable, blocked } = computeRunnableAndBlocked(tasksWithDeps);
+    const effectiveDeps = buildEffectiveDependencies(tasksWithDeps);
+    const normalizedTasks: TaskWithDeps[] = tasksWithDeps.map(task => ({
+      ...task,
+      dependsOn: effectiveDeps.get(task.folder),
+    }));
+    const { runnable, blocked } = computeRunnableAndBlocked(normalizedTasks);
 
     const contextSummary = contextFiles.map(c => ({
       name: c.name,

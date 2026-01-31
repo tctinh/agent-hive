@@ -507,6 +507,35 @@ Build task.
       expect(specContent).toContain("01-setup");
     });
 
+    it("generates spec.md with Dependencies: none when explicitly empty", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      const planContent = `# Plan
+
+### 1. Independent Task
+
+**Depends on**: none
+
+Independent task.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      service.sync(featureName);
+
+      const specPath = path.join(featurePath, "tasks", "01-independent-task", "spec.md");
+      const specContent = fs.readFileSync(specPath, "utf-8");
+
+      expect(specContent).toContain("## Dependencies");
+      expect(specContent).toContain("_None_");
+    });
+
     it("handles mixed explicit and implicit dependencies", () => {
       const featureName = "test-feature";
       const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
