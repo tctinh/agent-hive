@@ -7303,6 +7303,33 @@ Reminder: run hive_exec_start to work in its worktree, and ensure any subagents 
 
 // src/tools/exec.ts
 var path7 = __toESM(require("path"));
+function checkDependencies(taskService, feature, taskFolder) {
+  const taskStatus = taskService.getRawStatus(feature, taskFolder);
+  if (!taskStatus || taskStatus.dependsOn === void 0) {
+    return { allowed: true };
+  }
+  if (taskStatus.dependsOn.length === 0) {
+    return { allowed: true };
+  }
+  const unmetDeps = [];
+  for (const depFolder of taskStatus.dependsOn) {
+    const depStatus = taskService.getRawStatus(feature, depFolder);
+    if (!depStatus || depStatus.status !== "done") {
+      unmetDeps.push({
+        folder: depFolder,
+        status: depStatus?.status ?? "unknown"
+      });
+    }
+  }
+  if (unmetDeps.length > 0) {
+    const depList = unmetDeps.map((d) => `"${d.folder}" (${d.status})`).join(", ");
+    return {
+      allowed: false,
+      error: `Dependency constraint: Task "${taskFolder}" cannot start - dependencies not done: ${depList}. Only tasks with status 'done' satisfy dependencies.`
+    };
+  }
+  return { allowed: true };
+}
 function getExecTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
@@ -7324,6 +7351,17 @@ function getExecTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature, task } = input;
+        const depCheck = checkDependencies(taskService, feature, task);
+        if (!depCheck.allowed) {
+          return JSON.stringify({
+            success: false,
+            error: depCheck.error,
+            hints: [
+              "Complete the required dependencies before starting this task.",
+              "Use hive_status to see current task states."
+            ]
+          });
+        }
         const worktree = await worktreeService.create(feature, task);
         return JSON.stringify({
           success: true,

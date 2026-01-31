@@ -2,6 +2,62 @@ import * as path from 'path';
 import { WorktreeService, TaskService } from 'hive-core';
 import type { ToolRegistration } from './base';
 
+/**
+ * Check if a task's dependencies are satisfied.
+ * 
+ * Hybrid enforcement:
+ * 1. If task has explicit dependsOn array, check all deps have status 'done'
+ * 2. If task has no dependsOn (legacy/undefined), allow (no sequential check here,
+ *    as BackgroundManager handles that for delegated execution)
+ * 
+ * Only 'done' status satisfies a dependency - cancelled/failed/blocked/partial do NOT.
+ */
+function checkDependencies(
+  taskService: TaskService,
+  feature: string,
+  taskFolder: string
+): { allowed: boolean; error?: string } {
+  const taskStatus = taskService.getRawStatus(feature, taskFolder);
+  
+  // If task has no dependsOn field, allow (backwards compatibility)
+  if (!taskStatus || taskStatus.dependsOn === undefined) {
+    return { allowed: true };
+  }
+  
+  // Empty dependsOn means no dependencies - always allowed
+  if (taskStatus.dependsOn.length === 0) {
+    return { allowed: true };
+  }
+  
+  const unmetDeps: Array<{ folder: string; status: string }> = [];
+  
+  for (const depFolder of taskStatus.dependsOn) {
+    const depStatus = taskService.getRawStatus(feature, depFolder);
+    
+    // Only 'done' satisfies the dependency
+    if (!depStatus || depStatus.status !== 'done') {
+      unmetDeps.push({
+        folder: depFolder,
+        status: depStatus?.status ?? 'unknown',
+      });
+    }
+  }
+  
+  if (unmetDeps.length > 0) {
+    const depList = unmetDeps
+      .map(d => `"${d.folder}" (${d.status})`)
+      .join(', ');
+    
+    return {
+      allowed: false,
+      error: `Dependency constraint: Task "${taskFolder}" cannot start - dependencies not done: ${depList}. ` +
+        `Only tasks with status 'done' satisfy dependencies.`,
+    };
+  }
+  
+  return { allowed: true };
+}
+
 export function getExecTools(workspaceRoot: string): ToolRegistration[] {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
@@ -24,6 +80,20 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
       },
       invoke: async (input) => {
         const { feature, task } = input as { feature: string; task: string };
+        
+        // Check dependencies before creating worktree
+        const depCheck = checkDependencies(taskService, feature, task);
+        if (!depCheck.allowed) {
+          return JSON.stringify({
+            success: false,
+            error: depCheck.error,
+            hints: [
+              'Complete the required dependencies before starting this task.',
+              'Use hive_status to see current task states.',
+            ]
+          });
+        }
+        
         const worktree = await worktreeService.create(feature, task);
         return JSON.stringify({
           success: true,
