@@ -17,6 +17,8 @@ Before dispatching, use `hive_status()` to get the **runnable** list — tasks w
 
 **Only dispatch tasks that are runnable.** Never start tasks with unmet dependencies.
 
+Only `done` satisfies dependencies (not `blocked`, `failed`, `partial`, `cancelled`).
+
 **Ask the operator first:**
 - Use `question()`: "These tasks are runnable and independent: [list]. Execute in parallel?"
 - Record the decision with `hive_context_write({ name: "execution-decisions", content: "..." })`

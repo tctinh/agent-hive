@@ -60,6 +60,10 @@ Delegated execution passes this file path via `workerPromptPath`/`promptFile` to
 | `baseCommit` | string? | Git commit hash at task start |
 | `dependsOn` | string[]? | Task folder names this task depends on (e.g., `["01-setup"]`). A task cannot start until all dependencies have status `done`. Resolved from plan.md `Depends on:` annotations during `hive_tasks_sync`. |
 
+**Dependency rules**:
+- Only status `done` satisfies a dependency.
+- If `dependsOn` is omitted (legacy/manual tasks), Hive applies implicit sequential ordering based on the numeric task prefix (N depends on N-1).
+
 ## Status Values
 
 Task statuses (TaskStatusType):
@@ -76,6 +80,63 @@ Feature statuses (FeatureStatusType):
 - `approved`: Plan approved, ready for execution
 - `executing`: Tasks being executed
 - `completed`: All tasks done, feature complete
+
+## hive_status Output
+
+`hive_status` returns a JSON summary of feature state and task readiness.
+
+### Task List Fields
+
+Each entry in `tasks.list` includes:
+- `folder` (string)
+- `name` (string)
+- `status` (string)
+- `origin` (string)
+- `summary` (string | null)
+- `dependsOn` (string[] | null)
+
+### Runnable and Blocked
+
+```
+tasks.runnable   # array of task folders ready to start
+tasks.blockedBy  # map: task folder -> array of unmet dependency folders
+```
+
+Rules:
+- Only `done` satisfies dependencies.
+- If `dependsOn` is omitted (legacy/manual tasks), runnable/blocked uses implicit sequential ordering (N depends on N-1).
+
+Example:
+
+```json
+{
+  "tasks": {
+    "list": [
+      {"folder":"01-setup","status":"done","dependsOn":[]},
+      {"folder":"02-core","status":"pending","dependsOn":["01-setup"]},
+      {"folder":"03-ui","status":"pending","dependsOn":[]}
+    ],
+    "runnable": ["02-core","03-ui"],
+    "blockedBy": {}
+  }
+}
+```
+
+## spec.md Structure
+
+`spec.md` is generated for each task. It always includes a **Dependencies** section:
+
+```
+## Dependencies
+- **1. Setup** (01-setup)
+```
+
+If a task has no dependencies (explicit `Depends on: none`), the section is:
+
+```
+## Dependencies
+_None_
+```
 
 ## Session Metadata
 

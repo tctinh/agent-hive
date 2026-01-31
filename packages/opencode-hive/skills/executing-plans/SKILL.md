@@ -25,6 +25,8 @@ Load plan, review critically, execute tasks in batches, report for review betwee
 
 Use `hive_status()` to get the **runnable** list — tasks with all dependencies satisfied.
 
+Only `done` satisfies dependencies (not `blocked`, `failed`, `partial`, `cancelled`).
+
 **When 2+ tasks are runnable:**
 - **Ask the operator** via `question()`: "Multiple tasks are runnable: [list]. Run in parallel, sequential, or a specific subset?"
 - Record the decision with `hive_context_write({ name: "execution-decisions", content: "..." })` for future reference
