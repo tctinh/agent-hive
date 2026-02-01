@@ -104,7 +104,7 @@ export class TaskService {
 
     for (const planTask of planTasks) {
       if (!existingByName.has(planTask.folder)) {
-        this.createFromPlan(featureName, planTask, planTasks);
+        this.createFromPlan(featureName, planTask, planTasks, planContent);
         result.created.push(planTask.folder);
       }
     }
@@ -139,7 +139,7 @@ export class TaskService {
     return folder;
   }
 
-  private createFromPlan(featureName: string, task: ParsedTask, allTasks: ParsedTask[]): void {
+  private createFromPlan(featureName: string, task: ParsedTask, allTasks: ParsedTask[], planContent: string): void {
     const taskPath = getTaskPath(this.projectRoot, featureName, task.folder);
     ensureDir(taskPath);
 
@@ -154,20 +154,37 @@ export class TaskService {
     };
     writeJson(getTaskStatusPath(this.projectRoot, featureName, task.folder), status);
 
-    // Write enhanced spec.md with full context
+    const specContent = this.buildSpecContent({
+      featureName,
+      task,
+      dependsOn,
+      allTasks,
+      planContent,
+    });
+
+    writeText(getTaskSpecPath(this.projectRoot, featureName, task.folder), specContent);
+  }
+
+  buildSpecContent(params: {
+    featureName: string;
+    task: { folder: string; name: string; order: number; description?: string };
+    dependsOn: string[];
+    allTasks: Array<{ folder: string; name: string; order: number }>;
+    planContent?: string | null;
+    contextFiles?: Array<{ name: string; content: string }>;
+    completedTasks?: Array<{ name: string; summary: string }>;
+  }): string {
+    const { featureName, task, dependsOn, allTasks, planContent, contextFiles = [], completedTasks = [] } = params;
+
     const specLines: string[] = [
-      `# Task ${task.order}: ${task.name}`,
+      `# Task: ${task.folder}`,
       '',
-      `**Feature:** ${featureName}`,
-      `**Folder:** ${task.folder}`,
-      `**Status:** pending`,
+      `## Feature: ${featureName}`,
       '',
-      '---',
+      '## Dependencies',
       '',
     ];
 
-    // Add dependencies section
-    specLines.push('## Dependencies', '');
     if (dependsOn.length > 0) {
       for (const dep of dependsOn) {
         const depTask = allTasks.find(t => t.folder === dep);
@@ -180,34 +197,46 @@ export class TaskService {
     } else {
       specLines.push('_None_');
     }
-    specLines.push('', '---', '');
 
-    specLines.push('## Description', '');
-    specLines.push(task.description || '_No description provided in plan_', '');
+    specLines.push('', '## Plan Section', '');
 
-    // Add prior tasks section if not first task
-    if (task.order > 1) {
-      const priorTasks = allTasks.filter(t => t.order < task.order);
-      if (priorTasks.length > 0) {
-        specLines.push('---', '', '## Prior Tasks', '');
-        for (const prior of priorTasks) {
-          specLines.push(`- **${prior.order}. ${prior.name}** (${prior.folder})`);
-        }
-        specLines.push('');
-      }
+    const planSection = this.extractPlanSection(planContent ?? null, task);
+    if (planSection) {
+      specLines.push(planSection.trim());
+    } else {
+      specLines.push('_No plan section available._');
     }
 
-    // Add next tasks section if not last task
-    const nextTasks = allTasks.filter(t => t.order > task.order);
-    if (nextTasks.length > 0) {
-      specLines.push('---', '', '## Upcoming Tasks', '');
-      for (const next of nextTasks) {
-        specLines.push(`- **${next.order}. ${next.name}** (${next.folder})`);
-      }
-      specLines.push('');
+    specLines.push('');
+
+    if (contextFiles.length > 0) {
+      const contextCompiled = contextFiles
+        .map(f => `## ${f.name}\n\n${f.content}`)
+        .join('\n\n---\n\n');
+      specLines.push('## Context', '', contextCompiled, '');
     }
 
-    writeText(getTaskSpecPath(this.projectRoot, featureName, task.folder), specLines.join('\n'));
+    if (completedTasks.length > 0) {
+      const completedLines = completedTasks.map(t => `- ${t.name}: ${t.summary}`);
+      specLines.push('## Completed Tasks', '', ...completedLines, '');
+    }
+
+    return specLines.join('\n');
+  }
+
+  private extractPlanSection(planContent: string | null, task: { name: string; order: number; folder: string }): string | null {
+    if (!planContent) return null;
+
+    const escapedTitle = task.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const titleRegex = new RegExp(`###\\s*\\d+\\.\\s*${escapedTitle}[\\s\\S]*?(?=###|$)`, 'i');
+    let taskMatch = planContent.match(titleRegex);
+
+    if (!taskMatch && task.order > 0) {
+      const orderRegex = new RegExp(`###\\s*${task.order}\\.\\s*[^\\n]+[\\s\\S]*?(?=###|$)`, 'i');
+      taskMatch = planContent.match(orderRegex);
+    }
+
+    return taskMatch ? taskMatch[0].trim() : null;
   }
 
   /**

@@ -504,6 +504,7 @@ Build task.
       const specContent = fs.readFileSync(specPath, "utf-8");
 
       expect(specContent).toContain("## Dependencies");
+      expect(specContent).toContain("## Plan Section");
       expect(specContent).toContain("01-setup");
     });
 
