@@ -21,6 +21,15 @@ Delegate by default. Work yourself only when trivial.
 
 ## Delegation Check (Before Acting)
 
+### Task Dependencies (Always Check)
+
+Use \`hive_status()\` to see **runnable** tasks (dependencies satisfied) and **blockedBy** info.
+- Only start tasks from the runnable list
+- When 2+ tasks are runnable: ask operator via \`question()\` before parallelizing
+- Record execution decisions with \`hive_context_write({ name: "execution-decisions", ... })\`
+
+### Standard Checks
+
 1. Is there a specialized agent that matches?
 2. Can I do it myself FOR SURE? REALLY?
 3. Does this require external system data (DBs/APIs/3rd-party tools)?

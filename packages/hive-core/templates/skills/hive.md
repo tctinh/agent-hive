@@ -173,6 +173,8 @@ hive_plan_write({ content: "..." })
 
 ### 1. {Task Title}
 
+**Depends on**: none
+
 **What to do**:
 - {Implementation step}
 
@@ -202,6 +204,41 @@ hive_plan_write({ content: "..." })
 | **References** | File:line citations with WHY |
 | **Must NOT do** | Task-level guardrails |
 | **Acceptance Criteria** | Verifiable conditions |
+| **Depends on** | Task execution order (optional) |
+
+### Task Dependencies
+
+The `**Depends on**:` annotation declares which tasks must complete before a task can start.
+
+| Syntax | Meaning |
+|--------|---------|
+| `**Depends on**: none` | No dependencies — can run immediately or in parallel |
+| `**Depends on**: 1` | Depends on task 1 |
+| `**Depends on**: 1, 3` | Depends on tasks 1 and 3 |
+| *(omitted)* | Implicit sequential — depends on previous task (N-1) |
+
+**Default behavior**: When no `**Depends on**:` annotation is present, the task implicitly depends on the previous task (task N depends on task N-1). This preserves backwards compatibility with existing plans.
+
+**Example**:
+```markdown
+### 1. Set up database schema
+**Depends on**: none
+...
+
+### 2. Create API endpoints
+**Depends on**: 1
+...
+
+### 3. Add authentication
+**Depends on**: 1
+...
+
+### 4. Build UI components
+**Depends on**: 2, 3
+...
+```
+
+In this example, tasks 2 and 3 can run in parallel (both only depend on 1), while task 4 waits for both.
 
 ---
 
@@ -237,7 +274,21 @@ hive_merge({ task: "01-task-name", strategy: "squash" })
 
 ### Parallel Execution (Swarming)
 
-When tasks are parallelizable:
+When multiple tasks have their dependencies satisfied (runnable), the orchestrator should ask the operator how to proceed:
+
+```json
+{
+  "questions": [{
+    "question": "Multiple tasks are ready. How should we proceed?",
+    "header": "Parallel Execution",
+    "options": [
+      { "label": "Parallel", "description": "Run all ready tasks simultaneously" },
+      { "label": "Sequential", "description": "Run one at a time for easier review" },
+      { "label": "Pick", "description": "Let me choose which to run" }
+    ]
+  }]
+}
+```
 
 If `delegationRequired` is returned for a task, call `task` to spawn that worker.
 

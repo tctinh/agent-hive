@@ -1368,6 +1368,7 @@ var TaskService = class {
       throw new Error(`No plan.md found for feature '${featureName}'`);
     }
     const planTasks = this.parseTasksFromPlan(planContent);
+    this.validateDependencyGraph(planTasks, featureName);
     const existingTasks = this.list(featureName);
     const result = {
       created: [],
@@ -1424,10 +1425,12 @@ var TaskService = class {
   createFromPlan(featureName, task, allTasks) {
     const taskPath = getTaskPath(this.projectRoot, featureName, task.folder);
     ensureDir(taskPath);
+    const dependsOn = this.resolveDependencies(task, allTasks);
     const status = {
       status: "pending",
       origin: "plan",
-      planTitle: task.name
+      planTitle: task.name,
+      dependsOn
     };
     writeJson(getTaskStatusPath(this.projectRoot, featureName, task.folder), status);
     const specLines = [
@@ -1438,12 +1441,22 @@ var TaskService = class {
       `**Status:** pending`,
       "",
       "---",
-      "",
-      "## Description",
-      "",
-      task.description || "_No description provided in plan_",
       ""
     ];
+    if (dependsOn.length > 0) {
+      specLines.push("## Dependencies", "");
+      for (const dep of dependsOn) {
+        const depTask = allTasks.find((t) => t.folder === dep);
+        if (depTask) {
+          specLines.push(`- **${depTask.order}. ${depTask.name}** (${dep})`);
+        } else {
+          specLines.push(`- ${dep}`);
+        }
+      }
+      specLines.push("", "---", "");
+    }
+    specLines.push("## Description", "");
+    specLines.push(task.description || "_No description provided in plan_", "");
     if (task.order > 1) {
       const priorTasks = allTasks.filter((t) => t.order < task.order);
       if (priorTasks.length > 0) {
@@ -1464,6 +1477,78 @@ var TaskService = class {
     }
     writeText(getTaskSpecPath(this.projectRoot, featureName, task.folder), specLines.join(`
 `));
+  }
+  resolveDependencies(task, allTasks) {
+    if (task.dependsOnNumbers !== null && task.dependsOnNumbers.length === 0) {
+      return [];
+    }
+    if (task.dependsOnNumbers !== null) {
+      return task.dependsOnNumbers.map((num) => allTasks.find((t) => t.order === num)?.folder).filter((folder) => folder !== void 0);
+    }
+    if (task.order === 1) {
+      return [];
+    }
+    const previousTask = allTasks.find((t) => t.order === task.order - 1);
+    return previousTask ? [previousTask.folder] : [];
+  }
+  validateDependencyGraph(tasks, featureName) {
+    const taskNumbers = new Set(tasks.map((t) => t.order));
+    for (const task of tasks) {
+      if (task.dependsOnNumbers === null) {
+        continue;
+      }
+      for (const depNum of task.dependsOnNumbers) {
+        if (depNum === task.order) {
+          throw new Error(`Invalid dependency graph in plan.md: Self-dependency detected for task ${task.order} ("${task.name}"). A task cannot depend on itself. Please fix the "Depends on:" line in plan.md.`);
+        }
+        if (!taskNumbers.has(depNum)) {
+          throw new Error(`Invalid dependency graph in plan.md: Unknown task number ${depNum} referenced in dependencies for task ${task.order} ("${task.name}"). Available task numbers are: ${Array.from(taskNumbers).sort((a, b) => a - b).join(", ")}. Please fix the "Depends on:" line in plan.md.`);
+        }
+      }
+    }
+    this.detectCycles(tasks);
+  }
+  detectCycles(tasks) {
+    const taskByOrder = new Map(tasks.map((t) => [t.order, t]));
+    const getDependencies = (task) => {
+      if (task.dependsOnNumbers !== null) {
+        return task.dependsOnNumbers;
+      }
+      if (task.order === 1) {
+        return [];
+      }
+      return [task.order - 1];
+    };
+    const visited = /* @__PURE__ */ new Map();
+    const path32 = [];
+    const dfs = (taskOrder) => {
+      const state = visited.get(taskOrder);
+      if (state === 2) {
+        return;
+      }
+      if (state === 1) {
+        const cycleStart = path32.indexOf(taskOrder);
+        const cyclePath = [...path32.slice(cycleStart), taskOrder];
+        const cycleDesc = cyclePath.join(" -> ");
+        throw new Error(`Invalid dependency graph in plan.md: Cycle detected in task dependencies: ${cycleDesc}. Tasks cannot have circular dependencies. Please fix the "Depends on:" lines in plan.md.`);
+      }
+      visited.set(taskOrder, 1);
+      path32.push(taskOrder);
+      const task = taskByOrder.get(taskOrder);
+      if (task) {
+        const deps = getDependencies(task);
+        for (const depOrder of deps) {
+          dfs(depOrder);
+        }
+      }
+      path32.pop();
+      visited.set(taskOrder, 2);
+    };
+    for (const task of tasks) {
+      if (!visited.has(task.order)) {
+        dfs(task.order);
+      }
+    }
   }
   writeSpec(featureName, taskFolder, content) {
     const specPath = getTaskSpecPath(this.projectRoot, featureName, taskFolder);
@@ -1554,6 +1639,7 @@ var TaskService = class {
 `);
     let currentTask = null;
     let descriptionLines = [];
+    const dependsOnRegex = /^\s*\*{0,2}Depends\s+on\*{0,2}\s*:\s*(.+)$/i;
     for (const line of lines) {
       const taskMatch = line.match(/^###\s+(\d+)\.\s+(.+)$/);
       if (taskMatch) {
@@ -1570,7 +1656,8 @@ var TaskService = class {
           folder,
           order,
           name: rawName,
-          description: ""
+          description: "",
+          dependsOnNumbers: null
         };
         descriptionLines = [];
       } else if (currentTask) {
@@ -1581,6 +1668,16 @@ var TaskService = class {
           currentTask = null;
           descriptionLines = [];
         } else {
+          const dependsMatch = line.match(dependsOnRegex);
+          if (dependsMatch) {
+            const value = dependsMatch[1].trim().toLowerCase();
+            if (value === "none") {
+              currentTask.dependsOnNumbers = [];
+            } else {
+              const numbers = value.split(/[,\s]+/).map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+              currentTask.dependsOnNumbers = numbers;
+            }
+          }
           descriptionLines.push(line);
         }
       }
@@ -6267,6 +6364,30 @@ ${f.content}`);
     return `${normalized}.md`;
   }
 };
+function computeRunnableAndBlocked(tasks) {
+  const statusByFolder = /* @__PURE__ */ new Map();
+  for (const task of tasks) {
+    statusByFolder.set(task.folder, task.status);
+  }
+  const runnable = [];
+  const blocked = {};
+  for (const task of tasks) {
+    if (task.status !== "pending") {
+      continue;
+    }
+    const deps = task.dependsOn ?? [];
+    const unmetDeps = deps.filter((dep) => {
+      const depStatus = statusByFolder.get(dep);
+      return depStatus !== "done";
+    });
+    if (unmetDeps.length === 0) {
+      runnable.push(task.folder);
+    } else {
+      blocked[task.folder] = unmetDeps;
+    }
+  }
+  return { runnable, blocked };
+}
 
 // src/services/watcher.ts
 var vscode = __toESM(require("vscode"));
@@ -7206,6 +7327,33 @@ Reminder: run hive_exec_start to work in its worktree, and ensure any subagents 
 
 // src/tools/exec.ts
 var path7 = __toESM(require("path"));
+function checkDependencies(taskService, feature, taskFolder) {
+  const taskStatus = taskService.getRawStatus(feature, taskFolder);
+  if (!taskStatus || taskStatus.dependsOn === void 0) {
+    return { allowed: true };
+  }
+  if (taskStatus.dependsOn.length === 0) {
+    return { allowed: true };
+  }
+  const unmetDeps = [];
+  for (const depFolder of taskStatus.dependsOn) {
+    const depStatus = taskService.getRawStatus(feature, depFolder);
+    if (!depStatus || depStatus.status !== "done") {
+      unmetDeps.push({
+        folder: depFolder,
+        status: depStatus?.status ?? "unknown"
+      });
+    }
+  }
+  if (unmetDeps.length > 0) {
+    const depList = unmetDeps.map((d) => `"${d.folder}" (${d.status})`).join(", ");
+    return {
+      allowed: false,
+      error: `Dependency constraint: Task "${taskFolder}" cannot start - dependencies not done: ${depList}. Only tasks with status 'done' satisfy dependencies.`
+    };
+  }
+  return { allowed: true };
+}
 function getExecTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
@@ -7227,6 +7375,17 @@ function getExecTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature, task } = input;
+        const depCheck = checkDependencies(taskService, feature, task);
+        if (!depCheck.allowed) {
+          return JSON.stringify({
+            success: false,
+            error: depCheck.error,
+            hints: [
+              "Complete the required dependencies before starting this task.",
+              "Use hive_status to see current task states."
+            ]
+          });
+        }
         const worktree = await worktreeService.create(feature, task);
         return JSON.stringify({
           success: true,
@@ -7415,13 +7574,23 @@ function getStatusTools(workspaceRoot) {
     const plan = planService.read(feature);
     const tasks = taskService.list(feature);
     const contextFiles = contextService.list(feature);
-    const tasksSummary = tasks.map((t) => ({
+    const tasksSummary = tasks.map((t) => {
+      const rawStatus = taskService.getRawStatus(feature, t.folder);
+      return {
+        folder: t.folder,
+        name: t.folder.replace(/^\d+-/, ""),
+        status: t.status,
+        summary: t.summary || null,
+        origin: t.origin,
+        dependsOn: rawStatus?.dependsOn ?? null
+      };
+    });
+    const tasksWithDeps = tasksSummary.map((t) => ({
       folder: t.folder,
-      name: t.folder.replace(/^\d+-/, ""),
       status: t.status,
-      summary: t.summary || null,
-      origin: t.origin
+      dependsOn: t.dependsOn ?? void 0
     }));
+    const { runnable, blocked } = computeRunnableAndBlocked(tasksWithDeps);
     const contextSummary = contextFiles.map((c) => ({
       name: c.name,
       chars: c.content.length,
@@ -7448,13 +7617,15 @@ function getStatusTools(workspaceRoot) {
         pending: pendingTasks.length,
         inProgress: inProgressTasks.length,
         done: doneTasks.length,
-        list: tasksSummary
+        list: tasksSummary,
+        runnable,
+        blockedBy: blocked
       },
       context: {
         fileCount: contextFiles.length,
         files: contextSummary
       },
-      nextAction: getNextAction(planStatus, tasksSummary)
+      nextAction: getNextAction(planStatus, tasksSummary, runnable)
     });
   };
   const baseStatusTool = {
@@ -7483,7 +7654,7 @@ function getStatusTools(workspaceRoot) {
     }
   ];
 }
-function getNextAction(planStatus, tasks) {
+function getNextAction(planStatus, tasks, runnable) {
   if (!planStatus || planStatus === "draft") {
     return "Write or revise plan with hive_plan_write, then get approval";
   }
@@ -7497,9 +7668,15 @@ function getNextAction(planStatus, tasks) {
   if (inProgress) {
     return `Continue work on task: ${inProgress.folder}`;
   }
+  if (runnable.length > 1) {
+    return `${runnable.length} tasks are ready to start in parallel: ${runnable.join(", ")}`;
+  }
+  if (runnable.length === 1) {
+    return `Start next task with hive_exec_start: ${runnable[0]}`;
+  }
   const pending = tasks.find((t) => t.status === "pending");
   if (pending) {
-    return `Start next task with hive_exec_start: ${pending.folder}`;
+    return `Pending tasks exist but are blocked by dependencies. Check blockedBy for details.`;
   }
   return "All tasks complete. Review and merge or complete feature.";
 }

@@ -45,6 +45,8 @@ interface ParsedTask {
   order: number;
   name: string;
   description: string;
+  /** Raw dependency numbers parsed from plan. null = not specified (use implicit), [] = explicit none */
+  dependsOnNumbers: number[] | null;
 }
 
 export class TaskService {
@@ -59,6 +61,10 @@ export class TaskService {
     }
 
     const planTasks = this.parseTasksFromPlan(planContent);
+    
+    // Validate dependency graph before proceeding
+    this.validateDependencyGraph(planTasks, featureName);
+    
     const existingTasks = this.list(featureName);
     
     const result: TasksSyncResult = {
@@ -98,7 +104,7 @@ export class TaskService {
 
     for (const planTask of planTasks) {
       if (!existingByName.has(planTask.folder)) {
-        this.createFromPlan(featureName, planTask, planTasks);
+        this.createFromPlan(featureName, planTask, planTasks, planContent);
         result.created.push(planTask.folder);
       }
     }
@@ -133,56 +139,244 @@ export class TaskService {
     return folder;
   }
 
-  private createFromPlan(featureName: string, task: ParsedTask, allTasks: ParsedTask[]): void {
+  private createFromPlan(featureName: string, task: ParsedTask, allTasks: ParsedTask[], planContent: string): void {
     const taskPath = getTaskPath(this.projectRoot, featureName, task.folder);
     ensureDir(taskPath);
+
+    // Resolve dependencies: numbers -> folder names
+    const dependsOn = this.resolveDependencies(task, allTasks);
 
     const status: TaskStatus = {
       status: 'pending',
       origin: 'plan',
       planTitle: task.name,
+      dependsOn,
     };
     writeJson(getTaskStatusPath(this.projectRoot, featureName, task.folder), status);
 
-    // Write enhanced spec.md with full context
+    const specContent = this.buildSpecContent({
+      featureName,
+      task,
+      dependsOn,
+      allTasks,
+      planContent,
+    });
+
+    writeText(getTaskSpecPath(this.projectRoot, featureName, task.folder), specContent);
+  }
+
+  buildSpecContent(params: {
+    featureName: string;
+    task: { folder: string; name: string; order: number; description?: string };
+    dependsOn: string[];
+    allTasks: Array<{ folder: string; name: string; order: number }>;
+    planContent?: string | null;
+    contextFiles?: Array<{ name: string; content: string }>;
+    completedTasks?: Array<{ name: string; summary: string }>;
+  }): string {
+    const { featureName, task, dependsOn, allTasks, planContent, contextFiles = [], completedTasks = [] } = params;
+
     const specLines: string[] = [
-      `# Task ${task.order}: ${task.name}`,
+      `# Task: ${task.folder}`,
       '',
-      `**Feature:** ${featureName}`,
-      `**Folder:** ${task.folder}`,
-      `**Status:** pending`,
+      `## Feature: ${featureName}`,
       '',
-      '---',
-      '',
-      '## Description',
-      '',
-      task.description || '_No description provided in plan_',
+      '## Dependencies',
       '',
     ];
 
-    // Add prior tasks section if not first task
-    if (task.order > 1) {
-      const priorTasks = allTasks.filter(t => t.order < task.order);
-      if (priorTasks.length > 0) {
-        specLines.push('---', '', '## Prior Tasks', '');
-        for (const prior of priorTasks) {
-          specLines.push(`- **${prior.order}. ${prior.name}** (${prior.folder})`);
+    if (dependsOn.length > 0) {
+      for (const dep of dependsOn) {
+        const depTask = allTasks.find(t => t.folder === dep);
+        if (depTask) {
+          specLines.push(`- **${depTask.order}. ${depTask.name}** (${dep})`);
+        } else {
+          specLines.push(`- ${dep}`);
         }
-        specLines.push('');
       }
+    } else {
+      specLines.push('_None_');
     }
 
-    // Add next tasks section if not last task
-    const nextTasks = allTasks.filter(t => t.order > task.order);
-    if (nextTasks.length > 0) {
-      specLines.push('---', '', '## Upcoming Tasks', '');
-      for (const next of nextTasks) {
-        specLines.push(`- **${next.order}. ${next.name}** (${next.folder})`);
-      }
-      specLines.push('');
+    specLines.push('', '## Plan Section', '');
+
+    const planSection = this.extractPlanSection(planContent ?? null, task);
+    if (planSection) {
+      specLines.push(planSection.trim());
+    } else {
+      specLines.push('_No plan section available._');
     }
 
-    writeText(getTaskSpecPath(this.projectRoot, featureName, task.folder), specLines.join('\n'));
+    specLines.push('');
+
+    if (contextFiles.length > 0) {
+      const contextCompiled = contextFiles
+        .map(f => `## ${f.name}\n\n${f.content}`)
+        .join('\n\n---\n\n');
+      specLines.push('## Context', '', contextCompiled, '');
+    }
+
+    if (completedTasks.length > 0) {
+      const completedLines = completedTasks.map(t => `- ${t.name}: ${t.summary}`);
+      specLines.push('## Completed Tasks', '', ...completedLines, '');
+    }
+
+    return specLines.join('\n');
+  }
+
+  private extractPlanSection(planContent: string | null, task: { name: string; order: number; folder: string }): string | null {
+    if (!planContent) return null;
+
+    const escapedTitle = task.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const titleRegex = new RegExp(`###\\s*\\d+\\.\\s*${escapedTitle}[\\s\\S]*?(?=###|$)`, 'i');
+    let taskMatch = planContent.match(titleRegex);
+
+    if (!taskMatch && task.order > 0) {
+      const orderRegex = new RegExp(`###\\s*${task.order}\\.\\s*[^\\n]+[\\s\\S]*?(?=###|$)`, 'i');
+      taskMatch = planContent.match(orderRegex);
+    }
+
+    return taskMatch ? taskMatch[0].trim() : null;
+  }
+
+  /**
+   * Resolve dependency numbers to folder names.
+   * - If dependsOnNumbers is null (not specified), apply implicit sequential default (N-1 for N > 1).
+   * - If dependsOnNumbers is [] (explicit "none"), return empty array.
+   * - Otherwise, map numbers to corresponding task folders.
+   */
+  private resolveDependencies(task: ParsedTask, allTasks: ParsedTask[]): string[] {
+    // Explicit "none" - no dependencies
+    if (task.dependsOnNumbers !== null && task.dependsOnNumbers.length === 0) {
+      return [];
+    }
+
+    // Explicit dependency numbers provided
+    if (task.dependsOnNumbers !== null) {
+      return task.dependsOnNumbers
+        .map(num => allTasks.find(t => t.order === num)?.folder)
+        .filter((folder): folder is string => folder !== undefined);
+    }
+
+    // Implicit sequential default: depend on previous task (N-1)
+    if (task.order === 1) {
+      return [];
+    }
+
+    const previousTask = allTasks.find(t => t.order === task.order - 1);
+    return previousTask ? [previousTask.folder] : [];
+  }
+
+  /**
+   * Validate the dependency graph for errors before creating tasks.
+   * Throws descriptive errors pointing the operator to fix plan.md.
+   * 
+   * Checks for:
+   * - Unknown task numbers in dependencies
+   * - Self-dependencies
+   * - Cycles (using DFS topological sort)
+   */
+  private validateDependencyGraph(tasks: ParsedTask[], featureName: string): void {
+    const taskNumbers = new Set(tasks.map(t => t.order));
+    
+    // Validate each task's dependencies
+    for (const task of tasks) {
+      if (task.dependsOnNumbers === null) {
+        // Implicit dependencies - no validation needed
+        continue;
+      }
+      
+      for (const depNum of task.dependsOnNumbers) {
+        // Check for self-dependency
+        if (depNum === task.order) {
+          throw new Error(
+            `Invalid dependency graph in plan.md: Self-dependency detected for task ${task.order} ("${task.name}"). ` +
+            `A task cannot depend on itself. Please fix the "Depends on:" line in plan.md.`
+          );
+        }
+        
+        // Check for unknown task number
+        if (!taskNumbers.has(depNum)) {
+          throw new Error(
+            `Invalid dependency graph in plan.md: Unknown task number ${depNum} referenced in dependencies for task ${task.order} ("${task.name}"). ` +
+            `Available task numbers are: ${Array.from(taskNumbers).sort((a, b) => a - b).join(', ')}. ` +
+            `Please fix the "Depends on:" line in plan.md.`
+          );
+        }
+      }
+    }
+    
+    // Check for cycles using DFS
+    this.detectCycles(tasks);
+  }
+
+  /**
+   * Detect cycles in the dependency graph using DFS.
+   * Throws a descriptive error if a cycle is found.
+   */
+  private detectCycles(tasks: ParsedTask[]): void {
+    // Build adjacency list: task order -> [dependency orders]
+    const taskByOrder = new Map(tasks.map(t => [t.order, t]));
+    
+    // Build dependency graph with resolved implicit dependencies
+    const getDependencies = (task: ParsedTask): number[] => {
+      if (task.dependsOnNumbers !== null) {
+        return task.dependsOnNumbers;
+      }
+      // Implicit sequential dependency
+      if (task.order === 1) {
+        return [];
+      }
+      return [task.order - 1];
+    };
+    
+    // Track visited state: 0 = unvisited, 1 = in current path, 2 = fully processed
+    const visited = new Map<number, number>();
+    const path: number[] = [];
+    
+    const dfs = (taskOrder: number): void => {
+      const state = visited.get(taskOrder);
+      
+      if (state === 2) {
+        // Already fully processed, no cycle through here
+        return;
+      }
+      
+      if (state === 1) {
+        // Found a cycle! Build the cycle path for the error message
+        const cycleStart = path.indexOf(taskOrder);
+        const cyclePath = [...path.slice(cycleStart), taskOrder];
+        const cycleDesc = cyclePath.join(' -> ');
+        
+        throw new Error(
+          `Invalid dependency graph in plan.md: Cycle detected in task dependencies: ${cycleDesc}. ` +
+          `Tasks cannot have circular dependencies. Please fix the "Depends on:" lines in plan.md.`
+        );
+      }
+      
+      // Mark as in current path
+      visited.set(taskOrder, 1);
+      path.push(taskOrder);
+      
+      const task = taskByOrder.get(taskOrder);
+      if (task) {
+        const deps = getDependencies(task);
+        for (const depOrder of deps) {
+          dfs(depOrder);
+        }
+      }
+      
+      // Mark as fully processed
+      path.pop();
+      visited.set(taskOrder, 2);
+    };
+    
+    // Run DFS from each node
+    for (const task of tasks) {
+      if (!visited.has(task.order)) {
+        dfs(task.order);
+      }
+    }
   }
 
   writeSpec(featureName: string, taskFolder: string, content: string): string {
@@ -342,6 +536,10 @@ export class TaskService {
     let currentTask: ParsedTask | null = null;
     let descriptionLines: string[] = [];
     
+    // Regex to match "Depends on:" or "**Depends on**:" with optional markdown
+    // Strips markdown formatting (**, *, etc.) and captures the value
+    const dependsOnRegex = /^\s*\*{0,2}Depends\s+on\*{0,2}\s*:\s*(.+)$/i;
+    
     for (const line of lines) {
       // Check for task header: ### N. Task Name
       const taskMatch = line.match(/^###\s+(\d+)\.\s+(.+)$/);
@@ -363,6 +561,7 @@ export class TaskService {
           order,
           name: rawName,
           description: '',
+          dependsOnNumbers: null,  // null = not specified, use implicit
         };
         descriptionLines = [];
       } else if (currentTask) {
@@ -373,6 +572,21 @@ export class TaskService {
           currentTask = null;
           descriptionLines = [];
         } else {
+          // Check for Depends on: annotation within task section
+          const dependsMatch = line.match(dependsOnRegex);
+          if (dependsMatch) {
+            const value = dependsMatch[1].trim().toLowerCase();
+            if (value === 'none') {
+              currentTask.dependsOnNumbers = [];
+            } else {
+              // Parse comma-separated numbers
+              const numbers = value
+                .split(/[,\s]+/)
+                .map(s => parseInt(s.trim(), 10))
+                .filter(n => !isNaN(n));
+              currentTask.dependsOnNumbers = numbers;
+            }
+          }
           descriptionLines.push(line);
         }
       }

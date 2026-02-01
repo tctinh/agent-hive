@@ -95,11 +95,26 @@ What we're building and why.
 ## Tasks
 
 ### 1. First Task Name
+**Depends on**: none
 Description of what to do.
 
 ### 2. Second Task Name
+**Depends on**: 1
+Description of what to do.
+
+### 3. Third Task Name
+**Depends on**: 1
 Description of what to do.
 ```
+
+### Task Dependencies
+
+The `**Depends on**:` annotation declares task execution order:
+- `**Depends on**: none` — Can run immediately or in parallel
+- `**Depends on**: 1, 3` — Depends on tasks 1 and 3
+- *(omitted)* — Implicit sequential, depends on previous task (N-1)
+
+When multiple tasks are runnable, ask the user whether to run them in parallel or sequentially.
 
 ## Example Interaction
 

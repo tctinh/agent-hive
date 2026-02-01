@@ -2497,3 +2497,432 @@ describe('Prompt File Reference - Prevent Tool Output Truncation', () => {
     });
   });
 });
+
+// ============================================================================
+// Dependency-Aware Ordering Enforcement (Task 05)
+// ============================================================================
+
+describe('Dependency-Aware Ordering Enforcement', () => {
+  let store: BackgroundTaskStore;
+  let manager: BackgroundManager;
+  let taskServiceMock: {
+    getRawStatus: ReturnType<typeof vi.fn>;
+    patchBackgroundFields: ReturnType<typeof vi.fn>;
+  };
+
+  beforeEach(() => {
+    resetStore();
+    store = new BackgroundTaskStore();
+    taskServiceMock = {
+      getRawStatus: vi.fn(),
+      patchBackgroundFields: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    if (manager) {
+      manager.shutdown();
+    }
+  });
+
+  /**
+   * Helper to create manager with mocked TaskService.
+   * Uses vi.spyOn to replace TaskService methods for controlled testing.
+   */
+  function createTestManager(statusLookup: Record<string, { status: string; dependsOn?: string[] }>) {
+    const client: OpencodeClient = {
+      session: {
+        create: async () => ({ data: { id: 'test-session-123' } }),
+        prompt: async () => ({ data: {} }),
+        get: async () => ({ data: { id: 'test-session-123', status: 'idle' } }),
+        messages: async () => ({ data: [] }),
+        abort: async () => {},
+        status: async () => ({ data: {} }),
+      },
+      app: {
+        agents: async () => ({ data: [{ name: 'forager', mode: 'subagent' }] }),
+        log: async () => {},
+      },
+      config: {
+        get: async () => ({ data: {} }),
+      },
+    };
+
+    manager = new BackgroundManager({
+      client,
+      projectRoot: '/tmp/test-project',
+      store,
+      concurrency: { defaultLimit: 10, minDelayBetweenStartsMs: 0 },
+    });
+
+    // Mock the TaskService's getRawStatus method
+    const originalGetRawStatus = manager['taskService'].getRawStatus.bind(manager['taskService']);
+    vi.spyOn(manager['taskService'], 'getRawStatus').mockImplementation((feature: string, folder: string) => {
+      if (statusLookup[folder]) {
+        return statusLookup[folder] as any;
+      }
+      return null;
+    });
+
+    vi.spyOn(manager['taskService'], 'patchBackgroundFields').mockImplementation(() => ({} as any));
+
+    return manager;
+  }
+
+  describe('dependsOn-based blocking', () => {
+    it('blocks task when dependsOn dependency is not done', async () => {
+      // Setup: Task 02 depends on Task 01, but Task 01 is still in_progress
+      createTestManager({
+        '01-setup': { status: 'in_progress', dependsOn: [] },
+        '02-implement': { status: 'pending', dependsOn: ['01-setup'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '02-implement',
+        sync: false,
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('01-setup');
+      expect(result.error).toContain('not done');
+    });
+
+    it('blocks task when any dependsOn dependency is pending', async () => {
+      // Setup: Task 03 depends on Tasks 01 and 02, but Task 02 is pending
+      createTestManager({
+        '01-setup': { status: 'done', dependsOn: [] },
+        '02-core': { status: 'pending', dependsOn: ['01-setup'] },
+        '03-final': { status: 'pending', dependsOn: ['01-setup', '02-core'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '03-final',
+        sync: false,
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('02-core');
+    });
+
+    it('allows task when all dependsOn dependencies are done', async () => {
+      // Setup: Task 02 depends on Task 01, and Task 01 is done
+      createTestManager({
+        '01-setup': { status: 'done', dependsOn: [] },
+        '02-implement': { status: 'pending', dependsOn: ['01-setup'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '02-implement',
+        sync: false,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.task).toBeDefined();
+    });
+
+    it('allows task with empty dependsOn even if earlier-numbered tasks are pending', async () => {
+      // This is the key feature: explicit empty deps enables parallelism
+      // Task 03 has dependsOn: [] (explicit none), so it can run even if 01 and 02 are pending
+      createTestManager({
+        '01-setup': { status: 'pending', dependsOn: [] },
+        '02-core': { status: 'pending', dependsOn: ['01-setup'] },
+        '03-independent': { status: 'pending', dependsOn: [] },  // Explicit empty = no deps
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '03-independent',
+        sync: false,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.task).toBeDefined();
+    });
+  });
+
+  describe('backwards compatibility', () => {
+    it('falls back to numeric sequential ordering when dependsOn is undefined', async () => {
+      // Legacy task without dependsOn field should use numeric ordering
+      createTestManager({
+        '01-setup': { status: 'pending' },  // No dependsOn field
+        '02-implement': { status: 'pending' },  // No dependsOn field
+      });
+
+      // Create an active background task for 01
+      store.create({
+        agent: 'forager',
+        description: 'Task 1',
+        sessionId: 'session-1',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '01-setup',
+      });
+      store.updateStatus(store.list()[0].taskId, 'running');
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '02-implement',
+        sync: false,
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('01-setup');
+      expect(result.error).toContain('Sequential ordering');
+    });
+  });
+
+  describe('non-done statuses are not satisfied', () => {
+    it('treats cancelled as not satisfied', async () => {
+      createTestManager({
+        '01-setup': { status: 'cancelled', dependsOn: [] },
+        '02-implement': { status: 'pending', dependsOn: ['01-setup'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '02-implement',
+        sync: false,
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('01-setup');
+    });
+
+    it('treats failed as not satisfied', async () => {
+      createTestManager({
+        '01-setup': { status: 'failed', dependsOn: [] },
+        '02-implement': { status: 'pending', dependsOn: ['01-setup'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '02-implement',
+        sync: false,
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('01-setup');
+    });
+
+    it('treats blocked as not satisfied', async () => {
+      createTestManager({
+        '01-setup': { status: 'blocked', dependsOn: [] },
+        '02-implement': { status: 'pending', dependsOn: ['01-setup'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '02-implement',
+        sync: false,
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('01-setup');
+    });
+
+    it('treats partial as not satisfied', async () => {
+      createTestManager({
+        '01-setup': { status: 'partial', dependsOn: [] },
+        '02-implement': { status: 'pending', dependsOn: ['01-setup'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '02-implement',
+        sync: false,
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('01-setup');
+    });
+  });
+
+  describe('error message clarity', () => {
+    it('lists all missing dependencies in error message', async () => {
+      createTestManager({
+        '01-setup': { status: 'pending', dependsOn: [] },
+        '02-core': { status: 'in_progress', dependsOn: ['01-setup'] },
+        '03-final': { status: 'pending', dependsOn: ['01-setup', '02-core'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '03-final',
+        sync: false,
+      });
+
+      expect(result.error).toBeDefined();
+      // Should list both missing deps
+      expect(result.error).toContain('01-setup');
+      expect(result.error).toContain('02-core');
+    });
+  });
+
+  describe('diamond dependency pattern', () => {
+    it('allows task when multiple deps from different branches are done', async () => {
+      // Diamond pattern: 1 <- 2, 1 <- 3, 2 <- 4, 3 <- 4
+      createTestManager({
+        '01-base': { status: 'done', dependsOn: [] },
+        '02-left': { status: 'done', dependsOn: ['01-base'] },
+        '03-right': { status: 'done', dependsOn: ['01-base'] },
+        '04-merge': { status: 'pending', dependsOn: ['02-left', '03-right'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '04-merge',
+        sync: false,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.task).toBeDefined();
+    });
+
+    it('blocks task when one branch of diamond is incomplete', async () => {
+      // Diamond with one incomplete branch
+      createTestManager({
+        '01-base': { status: 'done', dependsOn: [] },
+        '02-left': { status: 'done', dependsOn: ['01-base'] },
+        '03-right': { status: 'in_progress', dependsOn: ['01-base'] },  // Not done
+        '04-merge': { status: 'pending', dependsOn: ['02-left', '03-right'] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '04-merge',
+        sync: false,
+      });
+
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('03-right');
+      expect(result.error).not.toContain('02-left');  // Should not mention completed dep
+    });
+  });
+
+  describe('multiple independent tasks (parallel enablement)', () => {
+    it('allows multiple tasks with dependsOn: [] to start independently', async () => {
+      // Three independent tasks that can all start
+      createTestManager({
+        '01-independent-a': { status: 'pending', dependsOn: [] },
+        '02-independent-b': { status: 'pending', dependsOn: [] },
+        '03-independent-c': { status: 'pending', dependsOn: [] },
+      });
+
+      // Start task A
+      const resultA = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '01-independent-a',
+        sync: false,
+      });
+      expect(resultA.error).toBeUndefined();
+
+      // Start task C (skipping B) - should work because all have empty dependsOn
+      const resultC = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '03-independent-c',
+        sync: false,
+      });
+      expect(resultC.error).toBeUndefined();
+    });
+  });
+
+  describe('first task handling', () => {
+    it('allows first task (task 01) to start without dependencies', async () => {
+      createTestManager({
+        '01-first-task': { status: 'pending', dependsOn: [] },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '01-first-task',
+        sync: false,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.task).toBeDefined();
+    });
+
+    it('allows first task with implicit dependencies (undefined dependsOn)', async () => {
+      createTestManager({
+        '01-first-task': { status: 'pending' },  // No dependsOn field
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: '01-first-task',
+        sync: false,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.task).toBeDefined();
+    });
+
+    it('allows legacy tasks with non-numeric folder names to start', async () => {
+      createTestManager({
+        'setup-task': { status: 'pending' },
+      });
+
+      const result = await manager.spawn({
+        agent: 'forager',
+        prompt: 'test',
+        description: 'test',
+        hiveFeature: 'test-feature',
+        hiveTaskFolder: 'setup-task',
+        sync: false,
+      });
+
+      expect(result.error).toBeUndefined();
+      expect(result.task).toBeDefined();
+    });
+  });
+});
