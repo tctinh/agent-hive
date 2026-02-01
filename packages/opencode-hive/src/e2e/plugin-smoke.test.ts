@@ -243,6 +243,18 @@ Do it
     expect(execStart.instructions).toContain("sync: true");
     expect(execStart.instructions).not.toContain("sync: false");
 
+    const specPath = path.join(
+      testRoot,
+      ".hive",
+      "features",
+      "smoke-feature",
+      "tasks",
+      "01-first-task",
+      "spec.md"
+    );
+    const specContent = fs.readFileSync(specPath, "utf-8");
+    expect(specContent).toContain("## Dependencies");
+
     const statusOutput = await hooks.tool!.hive_worker_status.execute(
       { feature: "smoke-feature" },
       toolContext
