@@ -135,6 +135,8 @@ import {
   TaskService,
   ContextService,
   ConfigService,
+  buildEffectiveDependencies,
+  computeRunnableAndBlocked,
   detectContext,
   listFeatures,
   normalizePath,
@@ -328,6 +330,56 @@ The human has blocked this feature. Wait for them to unblock it.
 To unblock: Remove .hive/features/${feature}/BLOCKED`;
     }
     return null;
+  };
+
+  const checkDependencies = (feature: string, taskFolder: string): { allowed: boolean; error?: string } => {
+    const taskStatus = taskService.getRawStatus(feature, taskFolder);
+    if (!taskStatus) {
+      return { allowed: true };
+    }
+
+    const tasks = taskService.list(feature).map(task => {
+      const status = taskService.getRawStatus(feature, task.folder);
+      return {
+        folder: task.folder,
+        status: task.status,
+        dependsOn: status?.dependsOn,
+      };
+    });
+
+    const effectiveDeps = buildEffectiveDependencies(tasks);
+    const deps = effectiveDeps.get(taskFolder) ?? [];
+
+    if (deps.length === 0) {
+      return { allowed: true };
+    }
+
+    const unmetDeps: Array<{ folder: string; status: string }> = [];
+
+    for (const depFolder of deps) {
+      const depStatus = taskService.getRawStatus(feature, depFolder);
+
+      if (!depStatus || depStatus.status !== 'done') {
+        unmetDeps.push({
+          folder: depFolder,
+          status: depStatus?.status ?? 'unknown',
+        });
+      }
+    }
+
+    if (unmetDeps.length > 0) {
+      const depList = unmetDeps
+        .map(d => `"${d.folder}" (${d.status})`)
+        .join(', ');
+
+      return {
+        allowed: false,
+        error: `Dependency constraint: Task "${taskFolder}" cannot start - dependencies not done: ${depList}. ` +
+          `Only tasks with status 'done' satisfy dependencies.`,
+      };
+    }
+
+    return { allowed: true };
   };
 
   return {
@@ -638,8 +690,8 @@ Add this section to your plan content and try again.`;
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
-          const blocked = checkBlocked(feature);
-          if (blocked) return blocked;
+          const blockedMessage = checkBlocked(feature);
+          if (blockedMessage) return blockedMessage;
 
           const taskInfo = taskService.get(feature, task);
           if (!taskInfo) return `Error: Task "${task}" not found`;
@@ -648,6 +700,20 @@ Add this section to your plan content and try again.`;
           if (taskInfo.status === 'done') return "Error: Task already completed";
           if (continueFrom === 'blocked' && taskInfo.status !== 'blocked') {
             return "Error: Task is not in blocked state. Use without continueFrom.";
+          }
+
+          if (continueFrom !== 'blocked') {
+            const depCheck = checkDependencies(feature, task);
+            if (!depCheck.allowed) {
+              return JSON.stringify({
+                success: false,
+                error: depCheck.error,
+                hints: [
+                  'Complete the required dependencies before starting this task.',
+                  'Use hive_status to see current task states.',
+                ],
+              });
+            }
           }
 
           // Check if we're continuing from blocked - reuse existing worktree
@@ -1278,12 +1344,16 @@ Re-run with updated summary showing verification results.`;
           const tasks = taskService.list(feature);
           const contextFiles = contextService.list(feature);
 
-          const tasksSummary = tasks.map(t => ({
-            folder: t.folder,
-            name: t.name,
-            status: t.status,
-            origin: t.origin || 'plan',
-          }));
+          const tasksSummary = tasks.map(t => {
+            const rawStatus = taskService.getRawStatus(feature, t.folder);
+            return {
+              folder: t.folder,
+              name: t.name,
+              status: t.status,
+              origin: t.origin || 'plan',
+              dependsOn: rawStatus?.dependsOn ?? null,
+            };
+          });
 
           const contextSummary = contextFiles.map(c => ({
             name: c.name,
@@ -1295,7 +1365,19 @@ Re-run with updated summary showing verification results.`;
           const inProgressTasks = tasksSummary.filter(t => t.status === 'in_progress');
           const doneTasks = tasksSummary.filter(t => t.status === 'done');
 
-          const getNextAction = (planStatus: string | null, tasks: Array<{ status: string; folder: string }>): string => {
+          const tasksWithDeps = tasksSummary.map(t => ({
+            folder: t.folder,
+            status: t.status,
+            dependsOn: t.dependsOn ?? undefined,
+          }));
+          const effectiveDeps = buildEffectiveDependencies(tasksWithDeps);
+          const normalizedTasks = tasksWithDeps.map(task => ({
+            ...task,
+            dependsOn: effectiveDeps.get(task.folder),
+          }));
+          const { runnable, blocked: blockedBy } = computeRunnableAndBlocked(normalizedTasks);
+
+          const getNextAction = (planStatus: string | null, tasks: Array<{ status: string; folder: string }>, runnableTasks: string[]): string => {
             if (!planStatus || planStatus === 'draft') {
               return 'Write or revise plan with hive_plan_write, then get approval';
             }
@@ -1309,9 +1391,15 @@ Re-run with updated summary showing verification results.`;
             if (inProgress) {
               return `Continue work on task: ${inProgress.folder}`;
             }
+            if (runnableTasks.length > 1) {
+              return `${runnableTasks.length} tasks are ready to start in parallel: ${runnableTasks.join(', ')}`;
+            }
+            if (runnableTasks.length === 1) {
+              return `Start next task with hive_exec_start: ${runnableTasks[0]}`;
+            }
             const pending = tasks.find(t => t.status === 'pending');
             if (pending) {
-              return `Start next task with hive_exec_start: ${pending.folder}`;
+              return `Pending tasks exist but are blocked by dependencies. Check blockedBy for details.`;
             }
             return 'All tasks complete. Review and merge or complete feature.';
           };
@@ -1338,12 +1426,14 @@ Re-run with updated summary showing verification results.`;
               inProgress: inProgressTasks.length,
               done: doneTasks.length,
               list: tasksSummary,
+              runnable,
+              blockedBy,
             },
             context: {
               fileCount: contextFiles.length,
               files: contextSummary,
             },
-            nextAction: getNextAction(planStatus, tasksSummary),
+            nextAction: getNextAction(planStatus, tasksSummary, runnable),
           });
         },
       }),

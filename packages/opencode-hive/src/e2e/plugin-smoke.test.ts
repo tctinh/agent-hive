@@ -208,6 +208,23 @@ Do it
 
     expect(featureJson.sessionId).toBe(sessionID);
 
+    const statusRaw = await hooks.tool!.hive_status.execute(
+      { feature: "smoke-feature" },
+      toolContext
+    );
+    const hiveStatus = JSON.parse(statusRaw as string) as {
+      tasks?: {
+        list?: Array<{ folder: string; dependsOn?: string[] | null }>;
+        runnable?: string[];
+        blockedBy?: Record<string, string[]>;
+      };
+    };
+
+    expect(hiveStatus.tasks?.list?.[0]?.folder).toBe("01-first-task");
+    expect(hiveStatus.tasks?.list?.[0]?.dependsOn).toEqual([]);
+    expect(hiveStatus.tasks?.runnable).toContain("01-first-task");
+    expect(hiveStatus.tasks?.blockedBy).toEqual({});
+
     const execStartOutput = await hooks.tool!.hive_exec_start.execute(
       { feature: "smoke-feature", task: "01-first-task" },
       toolContext
@@ -313,6 +330,74 @@ Do it
     
     // Verify status hint is in system.transform (this is still there)
     expect(joined).toContain("### Current Hive Status");
+  });
+
+  it("blocks hive_exec_start when dependencies are not done", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_dependency_block");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "dep-block-feature" },
+      toolContext
+    );
+
+    const plan = `# Dep Block Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes
+
+## Overview
+
+Test
+
+## Tasks
+
+### 1. First Task
+Do it
+
+### 2. Second Task
+
+**Depends on**: 1
+
+Do it later
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "dep-block-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_approve.execute(
+      { feature: "dep-block-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_tasks_sync.execute(
+      { feature: "dep-block-feature" },
+      toolContext
+    );
+
+    const execStartOutput = await hooks.tool!.hive_exec_start.execute(
+      { feature: "dep-block-feature", task: "02-second-task" },
+      toolContext
+    );
+
+    const execStart = JSON.parse(execStartOutput as string) as {
+      success?: boolean;
+      error?: string;
+    };
+
+    expect(execStart.success).toBe(false);
+    expect(execStart.error).toContain("dependencies not done");
   });
 
   it("auto-loads parallel exploration for planner agents by default", async () => {
