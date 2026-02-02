@@ -158,4 +158,42 @@ describe('Agent permissions for background task delegation', () => {
     expect(architectPerm!.edit).toBe('deny');
     expect(architectPerm!.task).toBe('deny');
   });
+
+  it('explicitly denies delegation tools for subagents', async () => {
+    spyOn(ConfigService.prototype, 'get').mockReturnValue({
+      agentMode: 'unified',
+      agents: {
+        'hive-master': {},
+      },
+    } as any);
+
+    const repoRoot = path.resolve(import.meta.dir, '..', '..', '..', '..');
+
+    const ctx: PluginInput = {
+      directory: repoRoot,
+      worktree: repoRoot,
+      serverUrl: new URL('http://localhost:1'),
+      project: { id: 'test', worktree: repoRoot, time: { created: Date.now() } },
+      client: createStubClient(),
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx as any);
+    const opencodeConfig: {
+      agent?: Record<string, { permission?: Record<string, string> }>;
+      default_agent?: string;
+    } = {};
+    await hooks.config?.(opencodeConfig);
+
+    const subagentNames = ['scout-researcher', 'forager-worker', 'hygienic-reviewer'] as const;
+    for (const name of subagentNames) {
+      const perm = opencodeConfig.agent?.[name]?.permission;
+      expect(perm).toBeTruthy();
+      expect(perm!.hive_background_task).toBe('deny');
+      expect(perm!.hive_background_output).toBe('deny');
+      expect(perm!.hive_background_cancel).toBe('deny');
+      expect(perm!.task).toBe('deny');
+      expect(perm!.delegate).toBe('deny');
+    }
+  });
 });

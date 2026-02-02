@@ -1614,6 +1614,11 @@ Make the requested changes, then call hive_request_review again.`;
         prompt: SCOUT_BEE_PROMPT + scoutAutoLoadedSkills,
         permission: {
           edit: "deny",  // Researchers don't edit code
+          hive_background_task: "deny",
+          hive_background_output: "deny",
+          hive_background_cancel: "deny",
+          task: "deny",
+          delegate: "deny",
           skill: "allow",
           webfetch: "allow",
         },
@@ -1628,6 +1633,11 @@ Make the requested changes, then call hive_request_review again.`;
         description: 'Forager (Worker/Coder) - Executes tasks directly in isolated worktrees. Never delegates.',
         prompt: FORAGER_BEE_PROMPT + foragerAutoLoadedSkills,
         permission: {
+          hive_background_task: "deny",
+          hive_background_output: "deny",
+          hive_background_cancel: "deny",
+          task: "deny",
+          delegate: "deny",
           skill: "allow",
         },
       };
@@ -1642,6 +1652,11 @@ Make the requested changes, then call hive_request_review again.`;
         prompt: HYGIENIC_BEE_PROMPT + hygienicAutoLoadedSkills,
         permission: {
           edit: "deny",  // Reviewers don't edit
+          hive_background_task: "deny",
+          hive_background_output: "deny",
+          hive_background_cancel: "deny",
+          task: "deny",
+          delegate: "deny",
           skill: "allow",
         },
       };
