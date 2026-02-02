@@ -444,9 +444,10 @@ Do it later
     );
     expect(agents["hive-master"]?.prompt).not.toContain(onboardingSnippet);
 
-    // scout-researcher should have parallel-exploration in prompt (unified mode)
+    // scout-researcher should NOT have parallel-exploration in prompt (unified mode)
+    // (removed to prevent recursive delegation - scout cannot spawn scouts)
     expect(agents["scout-researcher"]?.prompt).toBeDefined();
-    expect(agents["scout-researcher"]?.prompt).toContain(
+    expect(agents["scout-researcher"]?.prompt).not.toContain(
       parallelExplorationSkill!.template,
     );
     expect(agents["scout-researcher"]?.prompt).not.toContain(onboardingSnippet);

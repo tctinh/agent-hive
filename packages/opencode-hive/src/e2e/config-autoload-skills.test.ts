@@ -87,10 +87,11 @@ describe("config hook autoLoadSkills injection", () => {
     expect(parallelExplorationSkill).toBeDefined();
     expect(hiveMasterPrompt).toContain(parallelExplorationSkill!.template);
 
-    // scout-researcher should HAVE parallel-exploration injected by default (per DEFAULT_HIVE_CONFIG)
+    // scout-researcher should NOT have parallel-exploration injected by default
+    // (removed to prevent recursive delegation - scout cannot spawn scouts)
     const scoutPrompt = opencodeConfig.agent["scout-researcher"]?.prompt as string;
     expect(scoutPrompt).toBeDefined();
-    expect(scoutPrompt).toContain(parallelExplorationSkill!.template);
+    expect(scoutPrompt).not.toContain(parallelExplorationSkill!.template);
 
     // forager-worker should have test-driven-development and verification-before-completion by default
     const foragerPrompt = opencodeConfig.agent["forager-worker"]?.prompt as string;
