@@ -451,7 +451,7 @@ export class BackgroundManager {
 **Description:** ${task.description}
 **Agent:** ${task.agent}${errorLine}
 
-Use \`background_output({ task_id: "${task.taskId}" })\` to retrieve the result.
+ Use \`hive_background_output({ task_id: "${task.taskId}" })\` to retrieve the result.
 </system-reminder>`;
 
     try {

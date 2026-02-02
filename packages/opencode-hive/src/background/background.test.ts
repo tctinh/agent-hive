@@ -1191,7 +1191,8 @@ describe('BackgroundManager completion integration', () => {
     const parentCall = promptCalls.find(c => c.id === 'parent-session-1');
     expect(parentCall?.agent).toBe('hive');
     expect(parentCall?.text).toContain('BACKGROUND TASK');
-    expect(parentCall?.text).toContain('background_output');
+    expect(parentCall?.text).toContain('hive_background_output({ task_id:');
+    expect(parentCall?.text).not.toMatch(/\bbackground_output\(\{ task_id:/);
 
     manager.shutdown();
   });
