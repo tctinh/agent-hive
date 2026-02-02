@@ -238,7 +238,7 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
       model: DEFAULT_AGENT_MODELS['scout-researcher'],
       temperature: 0.5,
       skills: [],
-      autoLoadSkills: ['parallel-exploration'],
+      autoLoadSkills: [],
     },
     'forager-worker': {
       model: DEFAULT_AGENT_MODELS['forager-worker'],

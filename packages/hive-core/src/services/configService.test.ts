@@ -191,6 +191,15 @@ describe("ConfigService defaults", () => {
       expect(agent?.variant).toBeUndefined();
     }
   });
+
+  it("scout-researcher autoLoadSkills does NOT include parallel-exploration", () => {
+    // Scout should not auto-load parallel-exploration to prevent recursive delegation.
+    // Scouts are leaf agents that should not spawn further scouts.
+    const service = new ConfigService();
+    const scoutConfig = service.getAgentConfig("scout-researcher");
+
+    expect(scoutConfig.autoLoadSkills).not.toContain("parallel-exploration");
+  });
 });
 
 describe("ConfigService disabled skills/mcps", () => {

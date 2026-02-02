@@ -247,7 +247,7 @@ Skill IDs must be safe directory names (no `/`, `\`, `..`, or `.`). Missing or i
 |-------|------------------------|
 | `hive-master` | `parallel-exploration` |
 | `forager-worker` | `test-driven-development`, `verification-before-completion` |
-| `scout-researcher` | `parallel-exploration` |
+| `scout-researcher` | (none) |
 | `architect-planner` | `parallel-exploration` |
 | `swarm-orchestrator` | (none) |
 
