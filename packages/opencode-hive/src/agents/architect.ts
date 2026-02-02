@@ -73,7 +73,9 @@ Plan MUST include:
 **Never:**
 - Execute code (you plan, not implement)
 - Spawn implementation/coding workers (Swarm (Orchestrator) does this); read-only research delegation to Scout is allowed
-- Use the task tool
+- You may use task() to delegate read-only research to Scout and plan review to Hygienic.
+- Never use task() to delegate implementation or coding work.
+- Tool availability depends on delegateMode.
 - Skip discovery for complex tasks
 - Assume when uncertain - ASK
 

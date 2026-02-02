@@ -45,6 +45,12 @@ describe('Architect (Planner) prompt', () => {
       expect(ARCHITECT_BEE_PROMPT).toContain('read-only research delegation to Scout is allowed');
     });
 
+    it('permits research and review delegation via task()', () => {
+      expect(ARCHITECT_BEE_PROMPT).toContain('You may use task() to delegate read-only research to Scout and plan review to Hygienic.');
+      expect(ARCHITECT_BEE_PROMPT).toContain('Never use task() to delegate implementation or coding work.');
+      expect(ARCHITECT_BEE_PROMPT).toContain('Tool availability depends on delegateMode.');
+    });
+
     it('does NOT contain the blanket prohibition "Delegate work or spawn workers"', () => {
       expect(ARCHITECT_BEE_PROMPT).not.toContain('Delegate work or spawn workers');
     });
