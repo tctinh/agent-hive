@@ -139,6 +139,26 @@ export function createBackgroundTools(
       ): Promise<string> {
         const ctx = toolContext as ToolContext;
 
+        // Delegation guard: only orchestrator agents can spawn background tasks.
+        // This prevents recursive delegation (e.g., scout spawning scout).
+        const ALLOWED_CALLERS = new Set([
+          'hive-master',
+          'architect-planner',
+          'swarm-orchestrator',
+        ]);
+
+        const callerAgent = ctx?.agent;
+        if (!callerAgent || !ALLOWED_CALLERS.has(callerAgent)) {
+          const output: BackgroundTaskOutput = {
+            provider: 'hive',
+            task_id: '',
+            session_id: '',
+            status: 'error',
+            error: `Agent "${callerAgent ?? 'unknown'}" is not allowed to spawn background tasks. Only orchestrator agents (${[...ALLOWED_CALLERS].join(', ')}) can delegate.`,
+          };
+          return JSON.stringify(output, null, 2);
+        }
+
         // Resolve prompt from file if promptFile is provided
         let resolvedPrompt = prompt;
         if (promptFile) {

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'bun:test';
+import { describe, it, expect, afterEach, vi } from 'bun:test';
 import type { BackgroundManager, OpencodeClient } from '../background/index.js';
 import type { BackgroundTaskRecord } from '../background/types.js';
 import { createBackgroundTools } from './background-tools.js';
@@ -141,5 +141,241 @@ describe('hive_background_output observation metadata', () => {
 
     expect(parsed.observation?.lastActivityAt).toBeNull();
     expect(parsed.observation?.lastActivityAgo).toBe('never');
+  });
+});
+
+describe('hive_background_task delegation guard', () => {
+  /**
+   * Creates a minimal mock manager with a spawn spy.
+   */
+  function createMockManager() {
+    const spawnSpy = vi.fn().mockResolvedValue({
+      task: {
+        provider: 'hive',
+        taskId: 'task-123',
+        sessionId: 'session-123',
+        agent: 'forager-worker',
+        description: 'Test task',
+        status: 'running',
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+    const manager = {
+      spawn: spawnSpy,
+      getTask: () => undefined,
+      getTaskObservation: () => null,
+    } as unknown as BackgroundManager;
+
+    return { manager, spawnSpy };
+  }
+
+  /**
+   * Creates a minimal mock client.
+   */
+  function createMockClient() {
+    return {
+      session: {
+        messages: async () => ({ data: [] }),
+      },
+    } as unknown as OpencodeClient;
+  }
+
+  it('denies scout-researcher from delegating (must not call spawn)', async () => {
+    const { manager, spawnSpy } = createMockManager();
+    const client = createMockClient();
+    const tools = createBackgroundTools(manager, client);
+
+    const result = await tools.hive_background_task.execute(
+      {
+        agent: 'forager-worker',
+        prompt: 'Do something',
+        description: 'Test task',
+      },
+      {
+        sessionID: 'parent-session',
+        messageID: 'msg-1',
+        agent: 'scout-researcher',
+        abort: new AbortController().signal,
+      }
+    );
+
+    const parsed = JSON.parse(result as string);
+    expect(parsed.status).toBe('error');
+    expect(parsed.error).toContain('not allowed to spawn');
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  it('denies undefined agent from delegating (must not call spawn)', async () => {
+    const { manager, spawnSpy } = createMockManager();
+    const client = createMockClient();
+    const tools = createBackgroundTools(manager, client);
+
+    const result = await tools.hive_background_task.execute(
+      {
+        agent: 'forager-worker',
+        prompt: 'Do something',
+        description: 'Test task',
+      },
+      {
+        sessionID: 'parent-session',
+        messageID: 'msg-1',
+        agent: undefined as unknown as string,
+        abort: new AbortController().signal,
+      }
+    );
+
+    const parsed = JSON.parse(result as string);
+    expect(parsed.status).toBe('error');
+    expect(parsed.error).toContain('not allowed to spawn');
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  it('denies unknown agents from delegating (must not call spawn)', async () => {
+    const { manager, spawnSpy } = createMockManager();
+    const client = createMockClient();
+    const tools = createBackgroundTools(manager, client);
+
+    const result = await tools.hive_background_task.execute(
+      {
+        agent: 'forager-worker',
+        prompt: 'Do something',
+        description: 'Test task',
+      },
+      {
+        sessionID: 'parent-session',
+        messageID: 'msg-1',
+        agent: 'some-unknown-agent',
+        abort: new AbortController().signal,
+      }
+    );
+
+    const parsed = JSON.parse(result as string);
+    expect(parsed.status).toBe('error');
+    expect(parsed.error).toContain('not allowed to spawn');
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  it('allows hive-master to delegate (calls spawn)', async () => {
+    const { manager, spawnSpy } = createMockManager();
+    const client = createMockClient();
+    const tools = createBackgroundTools(manager, client);
+
+    const result = await tools.hive_background_task.execute(
+      {
+        agent: 'forager-worker',
+        prompt: 'Do something',
+        description: 'Test task',
+      },
+      {
+        sessionID: 'parent-session',
+        messageID: 'msg-1',
+        agent: 'hive-master',
+        abort: new AbortController().signal,
+      }
+    );
+
+    const parsed = JSON.parse(result as string);
+    expect(parsed.status).toBe('running');
+    expect(parsed.task_id).toBe('task-123');
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows architect-planner to delegate (calls spawn)', async () => {
+    const { manager, spawnSpy } = createMockManager();
+    const client = createMockClient();
+    const tools = createBackgroundTools(manager, client);
+
+    const result = await tools.hive_background_task.execute(
+      {
+        agent: 'forager-worker',
+        prompt: 'Do something',
+        description: 'Test task',
+      },
+      {
+        sessionID: 'parent-session',
+        messageID: 'msg-1',
+        agent: 'architect-planner',
+        abort: new AbortController().signal,
+      }
+    );
+
+    const parsed = JSON.parse(result as string);
+    expect(parsed.status).toBe('running');
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows swarm-orchestrator to delegate (calls spawn)', async () => {
+    const { manager, spawnSpy } = createMockManager();
+    const client = createMockClient();
+    const tools = createBackgroundTools(manager, client);
+
+    const result = await tools.hive_background_task.execute(
+      {
+        agent: 'forager-worker',
+        prompt: 'Do something',
+        description: 'Test task',
+      },
+      {
+        sessionID: 'parent-session',
+        messageID: 'msg-1',
+        agent: 'swarm-orchestrator',
+        abort: new AbortController().signal,
+      }
+    );
+
+    const parsed = JSON.parse(result as string);
+    expect(parsed.status).toBe('running');
+    expect(spawnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('denies forager-worker from delegating (must not call spawn)', async () => {
+    const { manager, spawnSpy } = createMockManager();
+    const client = createMockClient();
+    const tools = createBackgroundTools(manager, client);
+
+    const result = await tools.hive_background_task.execute(
+      {
+        agent: 'scout-researcher',
+        prompt: 'Research something',
+        description: 'Test task',
+      },
+      {
+        sessionID: 'parent-session',
+        messageID: 'msg-1',
+        agent: 'forager-worker',
+        abort: new AbortController().signal,
+      }
+    );
+
+    const parsed = JSON.parse(result as string);
+    expect(parsed.status).toBe('error');
+    expect(parsed.error).toContain('not allowed to spawn');
+    expect(spawnSpy).not.toHaveBeenCalled();
+  });
+
+  it('denies hygienic-reviewer from delegating (must not call spawn)', async () => {
+    const { manager, spawnSpy } = createMockManager();
+    const client = createMockClient();
+    const tools = createBackgroundTools(manager, client);
+
+    const result = await tools.hive_background_task.execute(
+      {
+        agent: 'scout-researcher',
+        prompt: 'Research something',
+        description: 'Test task',
+      },
+      {
+        sessionID: 'parent-session',
+        messageID: 'msg-1',
+        agent: 'hygienic-reviewer',
+        abort: new AbortController().signal,
+      }
+    );
+
+    const parsed = JSON.parse(result as string);
+    expect(parsed.status).toBe('error');
+    expect(parsed.error).toContain('not allowed to spawn');
+    expect(spawnSpy).not.toHaveBeenCalled();
   });
 });
