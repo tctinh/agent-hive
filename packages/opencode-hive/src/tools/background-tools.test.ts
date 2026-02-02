@@ -206,6 +206,43 @@ describe('hive_background_task delegation guard', () => {
     expect(spawnSpy).not.toHaveBeenCalled();
   });
 
+  it('denies scout-researcher without creating a new session', async () => {
+    const spawnSpy = vi.fn();
+    const sessionCreateSpy = vi.fn();
+    const manager = {
+      spawn: spawnSpy,
+      getTask: () => undefined,
+      getTaskObservation: () => null,
+    } as unknown as BackgroundManager;
+    const client = {
+      session: {
+        create: sessionCreateSpy,
+        messages: async () => ({ data: [] }),
+      },
+    } as unknown as OpencodeClient;
+    const tools = createBackgroundTools(manager, client);
+
+    const result = await tools.hive_background_task.execute(
+      {
+        agent: 'forager-worker',
+        prompt: 'Do something',
+        description: 'Test task',
+      },
+      {
+        sessionID: 's',
+        messageID: 'm',
+        agent: 'scout-researcher',
+        abort: new AbortController().signal,
+      }
+    );
+
+    const parsed = JSON.parse(result as string);
+    expect(parsed.status).toBe('error');
+    expect(parsed.error).toContain('not allowed to spawn');
+    expect(spawnSpy).not.toHaveBeenCalled();
+    expect(sessionCreateSpy).not.toHaveBeenCalled();
+  });
+
   it('denies undefined agent from delegating (must not call spawn)', async () => {
     const { manager, spawnSpy } = createMockManager();
     const client = createMockClient();
