@@ -1195,6 +1195,72 @@ describe('BackgroundManager completion integration', () => {
 
     manager.shutdown();
   });
+
+  it('disables all delegation tools in spawned session prompt', async () => {
+    const store = new BackgroundTaskStore();
+
+    const promptCalls: Array<{ id: string; body: Record<string, unknown> }> = [];
+
+    const client: OpencodeClient = {
+      session: {
+        create: async () => ({ data: { id: 'session-delegation-tools' } }),
+        prompt: async ({ path, body }) => {
+          promptCalls.push({ id: path.id, body: body as Record<string, unknown> });
+          return { data: {} };
+        },
+        get: async () => ({ data: { id: 'session-delegation-tools', status: 'idle' } }),
+        messages: async () => ({ data: [] }),
+        abort: async () => {},
+        status: async () => ({ data: { 'session-delegation-tools': { type: 'idle' } } }),
+      },
+      app: {
+        agents: async () => ({ data: [{ name: 'forager-worker', mode: 'subagent' }] }),
+        log: async () => {},
+      },
+      config: {
+        get: async () => ({ data: {} }),
+      },
+    };
+
+    const manager = new BackgroundManager({
+      client,
+      projectRoot: '/tmp',
+      store,
+      concurrency: { defaultLimit: 1, minDelayBetweenStartsMs: 0 },
+    });
+
+    const spawn = await manager.spawn({
+      agent: 'forager-worker',
+      prompt: 'test prompt',
+      description: 'test delegation tools disabled',
+      sync: false,
+    });
+
+    expect(spawn.error).toBeUndefined();
+    
+    // Wait for the async prompt call
+    await new Promise(r => setTimeout(r, 50));
+
+    // Find the prompt call for the worker session
+    const workerPrompt = promptCalls.find(c => c.id === 'session-delegation-tools');
+    expect(workerPrompt).toBeDefined();
+    
+    const tools = workerPrompt?.body.tools as Record<string, boolean> | undefined;
+    expect(tools).toBeDefined();
+    
+    // Verify all delegation tools are disabled
+    // Original tools that were already disabled:
+    expect(tools?.background_task).toBe(false);
+    expect(tools?.delegate).toBe(false);
+    
+    // NEW: Additional hive delegation tools that must be disabled:
+    expect(tools?.hive_background_task).toBe(false);
+    expect(tools?.hive_background_output).toBe(false);
+    expect(tools?.hive_background_cancel).toBe(false);
+    expect(tools?.task).toBe(false);
+
+    manager.shutdown();
+  });
 });
 
 // =========================================================================

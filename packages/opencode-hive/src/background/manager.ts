@@ -231,6 +231,11 @@ export class BackgroundManager {
             // Disable tools that could cause recursion
             background_task: false,
             delegate: false,
+            // Defense-in-depth: disable all Hive delegation tools
+            hive_background_task: false,
+            hive_background_output: false,
+            hive_background_cancel: false,
+            task: false,
           },
           // Pass variant to OpenCode for model options merging
           ...(normalizedVariant !== undefined && { variant: normalizedVariant }),
