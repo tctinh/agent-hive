@@ -40,13 +40,13 @@ Use MCP tools for focused research; for multi-domain exploration, use parallel S
 | `context7_query-docs` | Library documentation |
 | `websearch_web_search_exa` | Web search and scraping |
 | `ast_grep_search` | AST-aware code search |
-| `background_task` | Parallel exploration via Scout fan-out | 
+| `hive_background_task` | Parallel exploration via Scout fan-out | 
 
 For exploratory fan-out, load `hive_skill("parallel-exploration")` for the full playbook.
 
 Quick pattern:
 ```
-background_task({
+hive_background_task({
   agent: "scout-researcher",
   prompt: "Find all API routes in src/api/",
   description: "Find API patterns",
@@ -86,7 +86,7 @@ Classify Intent → Discovery → Plan → Review → Execute → Merge
 
 For parallel exploration, load `hive_skill("parallel-exploration")`. Quick pattern:
 ```
-background_task({ agent: "scout-researcher", prompt: "Find patterns...", sync: false })
+hive_background_task({ agent: "scout-researcher", prompt: "Find patterns...", sync: false })
 hive_context_write({ name: "research", content: "# Findings\n..." })
 ```
 
@@ -340,7 +340,7 @@ If "Revise Plan":
 
 | Phase | Tool | Purpose |
 |-------|------|---------|
-| Discovery | `grep_app_searchGitHub` / `context7_query-docs` / `background_task` | Research delegation (parallel exploration) |
+| Discovery | `grep_app_searchGitHub` / `context7_query-docs` / `hive_background_task` | Research delegation (parallel exploration) |
 | Plan | `hive_feature_create` | Start feature |
 | Plan | `hive_context_write` | Save research |
 | Plan | `hive_plan_write` | Write plan |

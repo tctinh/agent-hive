@@ -140,7 +140,7 @@ Each task executes in an isolated git worktree:
 
 ## Plugin Load Order (Background Tool Boundary)
 
-When using Hive with OMO-Slim for delegated execution, **agent-hive must be loaded LAST** in the OpenCode plugin configuration. This ensures that `background_task` and `background_output` tool calls resolve to Hive's implementations rather than OMO-Slim's.
+When using Hive with OMO-Slim for delegated execution, **agent-hive must be loaded LAST** in the OpenCode plugin configuration. This ensures that `hive_background_task` and `hive_background_output` tool calls resolve to Hive's implementations rather than OMO-Slim's.
 
 ### Configuration
 
@@ -157,7 +157,7 @@ In `opencode.json`:
 ### Misconfiguration Symptoms
 
 If agent-hive is loaded before OMO-Slim:
-- `background_task` calls spawn generic workers instead of Foragers
+- `hive_background_task` calls spawn generic workers instead of Foragers
 - Workers lack Hive context (spec.md, context files, prior task summaries)
 - `hive_exec_complete` never gets called (workers don't know the protocol)
 - Tasks stay stuck in `in_progress` forever

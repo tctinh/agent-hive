@@ -36,7 +36,7 @@
 - `workerPromptPreview`: short preview of the prompt
 - `promptMeta`, `payloadMeta`, `budgetApplied`, `warnings`: size and budget observability
 
-Delegation uses `background_task` with `promptFile` pointing at `workerPromptPath` to avoid inlining large prompts.
+Delegation uses `hive_background_task` with `promptFile` pointing at `workerPromptPath` to avoid inlining large prompts.
 
 ### Merge (2 tools)
 | Tool | Purpose |

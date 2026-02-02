@@ -46,7 +46,7 @@ During planning, "don't execute" means "don't implement" (no code edits, no work
 #### Canonical Delegation Threshold
 
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
-- Prefer `background_task(agent: "scout-researcher", sync: true, ...)` for single investigations; use `sync: false` only for multi-scout fan-out.
+- Prefer `hive_background_task(agent: "scout-researcher", sync: true, ...)` for single investigations; use `sync: false` only for multi-scout fan-out.
 - Local `read`/`grep`/`glob` is acceptable only for a single known file and a bounded question.
 
 ## Tools
@@ -82,13 +82,13 @@ During planning, "don't execute" means "don't implement" (no code edits, no work
 ### Background Tasks
 | Tool | Description |
 |------|-------------|
-| `background_task` | Spawn a background agent task |
-| `background_output` | Get output from a running/completed task |
-| `background_cancel` | Cancel running background task(s) |
+| `hive_background_task` | Spawn a background agent task |
+| `hive_background_output` | Get output from a running/completed task |
+| `hive_background_cancel` | Cancel running background task(s) |
 
-The `background_task` tool supports `promptFile` as an alternative to inline `prompt`:
+The `hive_background_task` tool supports `promptFile` as an alternative to inline `prompt`:
 ```typescript
-background_task({
+hive_background_task({
   agent: "forager-worker",
   promptFile: ".hive/features/my-feature/tasks/01-task/worker-prompt.md",
   description: "Execute task 01",

@@ -1,6 +1,6 @@
 ---
 name: parallel-exploration
-description: Use when you need parallel, read-only exploration via hive_hive_background_task (Scout fan-out)
+description: Use when you need parallel, read-only exploration via hive_background_task (Scout fan-out)
 ---
 
 # Parallel Exploration (Background Scout Fan-Out)
@@ -9,7 +9,7 @@ description: Use when you need parallel, read-only exploration via hive_hive_bac
 
 When you need to answer "where/how does X work?" across multiple domains (codebase, tests, docs, OSS), investigating sequentially wastes time. Each investigation is independent and can happen in parallel.
 
-**Core principle:** Decompose into independent sub-questions, spawn one `hive_hive_background_task` per sub-question, collect results asynchronously.
+**Core principle:** Decompose into independent sub-questions, spawn one `hive_background_task` per sub-question, collect results asynchronously.
 
 **Safe in Planning mode:** This is read-only exploration. It is OK to use during exploratory research even when there is no feature, no plan, and no approved tasks.
 
