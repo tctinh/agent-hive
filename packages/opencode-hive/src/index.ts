@@ -1574,7 +1574,7 @@ Make the requested changes, then call hive_request_review again.`;
         prompt: ARCHITECT_BEE_PROMPT + architectAutoLoadedSkills,
         permission: {
           edit: "deny",  // Planners don't edit code
-          task: "deny",
+          task: "allow",
           question: "allow",
           skill: "allow",
           todowrite: "allow",

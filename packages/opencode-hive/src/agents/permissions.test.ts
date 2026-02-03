@@ -156,7 +156,7 @@ describe('Agent permissions for background task delegation', () => {
     }
 
     expect(architectPerm!.edit).toBe('deny');
-    expect(architectPerm!.task).toBe('deny');
+    expect(architectPerm!.task).toBe('allow');
   });
 
   it('explicitly denies delegation tools for subagents', async () => {

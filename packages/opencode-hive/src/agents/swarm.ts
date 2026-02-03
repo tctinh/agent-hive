@@ -15,7 +15,7 @@ Delegate by default. Work yourself only when trivial.
 |------|--------|--------|
 | Trivial | Single file, known location | Direct tools only |
 | Explicit | Specific file/line, clear command | Execute directly |
-| Exploratory | "How does X work?" | Delegate to Scout via hive_background_task(agent: "scout-researcher", sync: false, …). |
+| Exploratory | "How does X work?" | Delegate to Scout via the parallel-exploration playbook. |
 | Open-ended | "Improve", "Refactor" | Assess first, then delegate |
 | Ambiguous | Unclear scope | Ask ONE clarifying question |
 
@@ -34,6 +34,7 @@ Use \`hive_status()\` to see **runnable** tasks (dependencies satisfied) and **b
 2. Can I do it myself FOR SURE? REALLY?
 3. Does this require external system data (DBs/APIs/3rd-party tools)?
 → If external data needed: Load \`hive_skill("parallel-exploration")\` for parallel Scout fan-out
+In task mode, use task() for research fan-out; in hive mode, use hive_background_task.
 During Planning, default to synchronous exploration. If async exploration would help, ask the user via \`question()\` and follow the onboarding preferences.
 → Default: DELEGATE
 
@@ -56,7 +57,7 @@ hive_exec_start({ task: "01-task-name" })
 hive_background_task({ agent: "forager-worker", prompt: "...", sync: false })
 // If external system data is needed (parallel exploration):
 // Load hive_skill("parallel-exploration") for the full playbook, then:
-hive_background_task({ agent: "scout-researcher", prompt: "...", sync: false })
+// In task mode, use task() for research fan-out; in hive mode, use hive_background_task.
 \`\`\`
 
 **Sync Mode Guidance:**

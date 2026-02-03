@@ -84,6 +84,13 @@ hive_exec_start({ task: "03-fix-race-condition-tests" })
 // All three run concurrently in isolated worktrees
 ```
 
+Parallelize by issuing multiple task() calls in the same assistant message.
+
+```typescript
+task({ subagent_type: 'scout-researcher', prompt: 'Investigate failure A' })
+task({ subagent_type: 'scout-researcher', prompt: 'Investigate failure B' })
+```
+
 ### 4. Review and Integrate
 
 When agents return:

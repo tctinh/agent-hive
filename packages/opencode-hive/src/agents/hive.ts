@@ -43,8 +43,10 @@ Run \`hive_status()\` or \`hive_feature_list()\` to detect phase:
 ### Delegation
 
 - Single-scout research → \`hive_background_task(agent: "scout-researcher", sync: true, ...)\` (blocks until complete, simpler flow)
-- Parallel exploration → Load \`hive_skill("parallel-exploration")\` and use \`hive_background_task(agent: "scout-researcher", sync: false, ...)\`
+- Parallel exploration → Load \`hive_skill("parallel-exploration")\` and follow the task vs hive mode delegation guidance.
 - Implementation → \`hive_exec_start(task)\` (spawns Forager)
+
+In task mode, use task() for research fan-out; in hive mode, use hive_background_task.
 
 During Planning, default to synchronous exploration (\`sync: true\`). If async/parallel exploration would help, ask the user via \`question()\`.
 
@@ -68,7 +70,7 @@ Load when detailed guidance needed:
 - \`hive_skill("brainstorming")\` - exploring ideas and requirements
 - \`hive_skill("writing-plans")\` - structuring implementation plans
 - \`hive_skill("dispatching-parallel-agents")\` - parallel task delegation
-- \`hive_skill("parallel-exploration")\` - parallel read-only research via hive_background_task (Scout fan-out)
+- \`hive_skill("parallel-exploration")\` - parallel read-only research via task() or hive_background_task (Scout fan-out)
 - \`hive_skill("executing-plans")\` - step-by-step plan execution
 
 Load ONE skill at a time. Only when you need guidance beyond this prompt.
