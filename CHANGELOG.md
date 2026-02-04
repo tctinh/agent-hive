@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-02-04
+
+### Added
+- **E2E Smoke Tests**: Comprehensive end-to-end testing suite for the OpenCode plugin
+  - Plugin smoke tests covering core functionality
+  - Better test coverage for task delegation workflows
+- **@path Prompt References**: Use `@path` prompt references for task delegation
+  - More reliable worker prompt referencing for native tasks
+  - Improved path handling in worker prompts
+
+### Fixed
+- **Missing Dependency Skills**: Fixed missing dependency skills in OpenCode agents
+  - Align plan templates with updated dependency guidance
+  - Architect agent: updated to include missing dependency skills
+  - Hive agent: synchronized with new dependency handling
+  - Swarm agent: added missing skill references
+  - Skills registry: regenerated to include all required dependencies
+
+### Changed
+- **Documentation**: Enhanced documentation across all packages
+  - AGENTS.md: Added guidance on worker prompt referencing
+  - OpenCode Hive README: Expanded documentation on task delegation
+  - DATA-MODEL.md: Updated data model documentation
+  - HIVE-TOOLS.md: Clarified tool usage patterns
+- **Writing-Plans Skill**: Major skill documentation update
+  - 95 insertions, 52 deletions for better clarity
+  - Better dependency annotation guidance
+  - Clearer task structure documentation
+
 ## [1.0.6] - 2026-02-03
 
 ### Added
