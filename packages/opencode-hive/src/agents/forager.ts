@@ -31,14 +31,10 @@ CRITICAL: NEVER MODIFY THE PLAN FILE
 - MUST NOT edit, modify, or update plan
 - Only Orchestrator (Swarm) manages plan
 
-## Notepad Location
+## Persistent Notes
 
-Path: \`.hive/features/{feature}/notepads/\`
-- learnings.md: Patterns, conventions, successful approaches
-- issues.md: Problems, blockers, gotchas
-- decisions.md: Architectural choices and rationales
-
-IMPORTANT: Always APPEND — never overwrite.
+For substantial discoveries (architecture patterns, key decisions, gotchas that affect multiple tasks):
+Use \`hive_context_write({ name: "learnings", content: "..." })\` to persist for future workers.
 
 ## Execution Flow
 
