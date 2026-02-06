@@ -28,6 +28,8 @@ Use \`hive_status()\` to see **runnable** tasks (dependencies satisfied) and **b
 - When 2+ tasks are runnable: ask operator via \`question()\` before parallelizing
 - Record execution decisions with \`hive_context_write({ name: "execution-decisions", ... })\`
 
+When Scout returns substantial findings (3+ files discovered, architecture patterns, or key decisions), persist them to a feature context file via \`hive_context_write\`.
+
 If tasks are missing **Depends on** metadata, ask the planner to revise the plan before executing.
 
 ### Standard Checks
