@@ -39,6 +39,7 @@ ANY NO → Ask the unclear thing
 | Premature abstraction | "Extracted to utility" | "Abstract or inline?" |
 | Over-validation | "15 error checks for 3 inputs" | "Minimal or comprehensive error handling?" |
 | Documentation bloat | "Added JSDoc everywhere" | "None, minimal, or full docs?" |
+| Fragile assumption | "Assuming X is always true" | "If X is wrong, what should change?" |
 
 ## Gap Classification (Self-Review)
 
