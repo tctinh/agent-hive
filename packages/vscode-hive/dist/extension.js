@@ -38,7 +38,7 @@ var vscode7 = __toESM(require("vscode"));
 var fs10 = __toESM(require("fs"));
 var path10 = __toESM(require("path"));
 
-// ../../../../../../packages/hive-core/dist/index.js
+// ../hive-core/dist/index.js
 var import_node_module = require("node:module");
 var path = __toESM(require("path"), 1);
 var fs = __toESM(require("fs"), 1);
