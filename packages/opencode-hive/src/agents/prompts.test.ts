@@ -31,10 +31,8 @@ describe('Hive (Hybrid) prompt', () => {
       expect(QUEEN_BEE_PROMPT).toContain('Internal codebase exploration');
     });
 
-    it('includes task vs hive mode research fan-out guidance', () => {
-      expect(QUEEN_BEE_PROMPT).toContain(
-        'In task mode, use task() for research fan-out; in hive mode, use hive_background_task.'
-      );
+    it('includes task() guidance for research fan-out', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('task() for research fan-out');
     });
   });
 });
@@ -48,7 +46,6 @@ describe('Architect (Planner) prompt', () => {
     it('permits research and review delegation via task()', () => {
       expect(ARCHITECT_BEE_PROMPT).toContain('You may use task() to delegate read-only research to Scout and plan review to Hygienic.');
       expect(ARCHITECT_BEE_PROMPT).toContain('Never use task() to delegate implementation or coding work.');
-      expect(ARCHITECT_BEE_PROMPT).toContain('Tool availability depends on delegateMode.');
     });
 
     it('does NOT contain the blanket prohibition "Delegate work or spawn workers"', () => {
@@ -87,10 +84,8 @@ describe('Swarm (Orchestrator) prompt', () => {
       expect(SWARM_BEE_PROMPT).toContain('sync: false');
     });
 
-    it('includes task vs hive mode research fan-out guidance', () => {
-      expect(SWARM_BEE_PROMPT).toContain(
-        'In task mode, use task() for research fan-out; in hive mode, use hive_background_task.'
-      );
+    it('includes task() guidance for research fan-out', () => {
+      expect(SWARM_BEE_PROMPT).toContain('task() for research fan-out');
     });
   });
 });

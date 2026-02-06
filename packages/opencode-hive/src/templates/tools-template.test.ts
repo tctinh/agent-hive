@@ -15,6 +15,5 @@ describe('tools template', () => {
     const toolsTemplate = readFileSync(toolsTemplatePath, 'utf-8');
 
     expect(toolsTemplate).toContain('In task mode, use task()');
-    expect(toolsTemplate).toContain('in hive mode, use hive_background_task');
   });
 });

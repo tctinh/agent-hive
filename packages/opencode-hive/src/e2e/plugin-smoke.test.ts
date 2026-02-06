@@ -7,7 +7,7 @@ import { createOpencodeClient } from "@opencode-ai/sdk";
 import plugin from "../index";
 import { BUILTIN_SKILLS } from "../skills/registry.generated.js";
 
-const OPENCODE_CLIENT = createOpencodeClient({ baseUrl: "http://localhost:1" });
+const OPENCODE_CLIENT = createOpencodeClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
 
 type ToolContext = {
   sessionID: string;
@@ -18,7 +18,6 @@ type ToolContext = {
 
 const EXPECTED_TOOLS = [
   "hive_feature_create",
-  "hive_feature_list",
   "hive_feature_complete",
   "hive_plan_write",
   "hive_plan_read",
@@ -29,15 +28,10 @@ const EXPECTED_TOOLS = [
   "hive_exec_start",
   "hive_exec_complete",
   "hive_exec_abort",
-  "hive_worker_status",
   "hive_merge",
-  "hive_worktree_list",
   "hive_context_write",
   "hive_status",
   "hive_skill",
-  "hive_background_task",
-  "hive_background_output",
-  "hive_background_cancel",
 ] as const;
 
 const TEST_ROOT_BASE = "/tmp/hive-e2e-plugin";
@@ -101,14 +95,6 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
     testRoot = fs.mkdtempSync(path.join(TEST_ROOT_BASE, "project-"));
     process.env.HOME = testRoot;
     
-    // Ensure delegateMode is 'hive' so all tools are registered for testing
-    const configDir = path.join(testRoot, ".config", "opencode");
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(configDir, "agent_hive.json"),
-      JSON.stringify({ delegateMode: "hive" })
-    );
-
     execSync("git init", { cwd: testRoot });
     execSync('git config user.email "test@example.com"', { cwd: testRoot });
     execSync('git config user.name "Test"', { cwd: testRoot });
@@ -238,15 +224,7 @@ Do it
       instructions?: string;
       backgroundTaskCall?: Record<string, unknown>;
     };
-
-    expect(execStart.backgroundTaskCall).toBeTruthy();
-    expect('sync' in (execStart.backgroundTaskCall as Record<string, unknown>)).toBe(false);
-
-    expect(execStart.instructions).toContain(
-      "Wait for the completion notification (no polling required)."
-    );
-    expect(execStart.instructions).toContain("sync: true");
-    expect(execStart.instructions).not.toContain("sync: false");
+    expect(execStart.backgroundTaskCall).toBeUndefined();
 
     const specPath = path.join(
       testRoot,
@@ -260,50 +238,19 @@ Do it
     const specContent = fs.readFileSync(specPath, "utf-8");
     expect(specContent).toContain("## Dependencies");
 
-    const statusOutput = await hooks.tool!.hive_worker_status.execute(
+    const statusOutput = await hooks.tool!.hive_status.execute(
       { feature: "smoke-feature" },
       toolContext
     );
     const status = JSON.parse(statusOutput as string) as {
-      hint?: string;
-      summary?: { stuckWorkers?: number };
-      workers?: Array<{
-        activity?: {
-          elapsedMs: number;
-          elapsedFormatted: string;
-          messageCount: number;
-          lastActivityAgo: string;
-          lastMessagePreview: string | null;
-          maybeStuck: boolean;
-        };
-      }>;
+      tasks?: {
+        list?: Array<{ folder: string }>;
+      };
     };
-
-    expect(status.hint).toContain("Wait for the completion notification");
-    expect(status.hint).toContain("spot checks");
-    expect(status.workers?.length).toBeGreaterThan(0);
-
-    const workerActivity = status.workers?.[0]?.activity;
-    expect(workerActivity).toBeDefined();
-    expect(typeof workerActivity?.elapsedMs).toBe("number");
-    expect(typeof workerActivity?.elapsedFormatted).toBe("string");
-    expect(typeof workerActivity?.messageCount).toBe("number");
-    expect(typeof workerActivity?.lastActivityAgo).toBe("string");
-    expect(typeof workerActivity?.maybeStuck).toBe("boolean");
-    expect(
-      workerActivity?.lastMessagePreview === null ||
-        typeof workerActivity?.lastMessagePreview === "string"
-    ).toBe(true);
-    expect(typeof status.summary?.stuckWorkers).toBe("number");
+    expect(status.tasks?.list?.[0]?.folder).toBe("01-first-task");
   });
 
-  it("returns task tool call using @file prompt when delegateMode=task", async () => {
-    const configPath = path.join(testRoot, ".config", "opencode", "agent_hive.json");
-    fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(
-      configPath,
-      JSON.stringify({ delegateMode: "task" })
-    );
+  it("returns task tool call using @file prompt", async () => {
 
     const ctx: PluginInput = {
       directory: testRoot,
@@ -373,7 +320,6 @@ Do it
       "worker-prompt.md"
     );
 
-    expect(execStart.backgroundTaskCall).toBeUndefined();
     expect(execStart.taskToolCall).toBeDefined();
     expect(execStart.taskToolCall?.subagent_type).toBeDefined();
     expect(execStart.taskToolCall?.description).toBe("Hive: 01-first-task");
@@ -556,13 +502,7 @@ Do it later
     expect(agents["forager-worker"]?.prompt).not.toContain(onboardingSnippet);
   });
 
-  it("includes task prompt mode when delegateMode=task", async () => {
-    const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
-    fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(
-      configPath,
-      JSON.stringify({ delegateMode: "task" })
-    );
+  it("includes task prompt mode", async () => {
 
     const ctx: PluginInput = {
       directory: testRoot,
@@ -613,11 +553,9 @@ Do it
     );
 
     const execStart = JSON.parse(execStartOutput as string) as {
-      delegateMode?: string;
       taskPromptMode?: string;
     };
 
-    expect(execStart.delegateMode).toBe("task");
     expect(execStart.taskPromptMode).toBe("opencode-at-file");
   });
 });
