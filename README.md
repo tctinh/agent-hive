@@ -104,7 +104,6 @@ Run Agent Hive once to auto-generate a default configuration at `~/.config/openc
 {
   "$schema": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
   "agentMode": "unified",
-  "delegateMode": "task",
   "disableSkills": [],
   "disableMcps": [],
   "agents": {
@@ -121,7 +120,6 @@ Run Agent Hive once to auto-generate a default configuration at `~/.config/openc
 | Option | Values | Description |
 |--------|--------|-------------|
 | `agentMode` | `unified` (default), `dedicated` | `unified`: Single `hive-master` agent handles planning + orchestration. `dedicated`: Separate `architect-planner` and `swarm-orchestrator` agents. |
-| `delegateMode` | `task` (default), `hive` | `task`: Use OpenCode's built-in `task()` tool. `hive`: Use Hive's `hive_background_task` tools. |
 | `disableSkills` | `string[]` | Globally disable specific skills (won't appear in `hive_skill` tool). |
 | `disableMcps` | `string[]` | Globally disable MCP servers. Options: `websearch`, `context7`, `grep_app`, `ast_grep`. |
 

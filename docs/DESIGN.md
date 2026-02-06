@@ -41,14 +41,14 @@ packages/
 3. User reviews in VSCode, adds comments
 4. User approves via `hive_plan_approve`
 5. Tasks synced via `hive_tasks_sync` (generates spec.md for each)
-6. Each task executed via `hive_exec_start` -> work -> `hive_exec_complete`
+6. Each task executed via `hive_worktree_create` -> work -> `hive_worktree_commit`
 7. Changes applied from worktree to main repo
 8. Report generated with diff stats and file list
 
 ## Prompt Management
 
 - `spec.md` is the single source for plan/context/prior task summaries in worker prompts to avoid duplication.
-- `hive_exec_start` writes the full prompt to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` and returns `workerPromptPath` plus a short preview.
+- `hive_worktree_create` writes the full prompt to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` and returns `workerPromptPath` plus a short preview.
 - Prompt budgets default to last 10 tasks, 2000 chars per summary, 20KB per context file, 60KB total; `promptMeta`, `payloadMeta`, and `warnings` report sizes.
 
 ## Feature Resolution (v0.5.0)
@@ -127,8 +127,8 @@ Contains execution results:
 Each task executes in an isolated git worktree:
 - Full repo copy at `.hive/.worktrees/{feature}/{task}/`
 - Agent makes changes freely without affecting main repo
-- On `exec_complete`: diff extracted and applied to main repo
-- On `exec_abort`: worktree discarded, no changes applied
+- On `hive_worktree_commit`: diff extracted and applied to main repo
+- On `hive_worktree_discard`: worktree discarded, no changes applied
 
 ## Key Principles
 
@@ -137,34 +137,6 @@ Each task executes in an isolated git worktree:
 - **Isolation** — Each task in own worktree, safe to discard
 - **Audit trail** — Every action logged to `.hive/`
 - **Agent-friendly** — Minimal overhead during execution
-
-## Plugin Load Order (Background Tool Boundary)
-
-When using Hive with OMO-Slim for delegated execution, **agent-hive must be loaded LAST** in the OpenCode plugin configuration. This ensures that `hive_background_task` and `hive_background_output` tool calls resolve to Hive's implementations rather than OMO-Slim's.
-
-### Configuration
-
-In `opencode.json`:
-```json
-{
-  "plugins": [
-    "@anthropic/omos-slim",
-    "@anthropic/agent-hive"  // MUST be last
-  ]
-}
-```
-
-### Misconfiguration Symptoms
-
-If agent-hive is loaded before OMO-Slim:
-- `hive_background_task` calls spawn generic workers instead of Foragers
-- Workers lack Hive context (spec.md, context files, prior task summaries)
-- `hive_exec_complete` never gets called (workers don't know the protocol)
-- Tasks stay stuck in `in_progress` forever
-
-### Fix
-
-Reorder plugins so agent-hive appears last. Restart OpenCode after changing.
 
 ## Source of Truth Rules
 
@@ -177,11 +149,9 @@ Hive uses file-based state with clear ownership boundaries:
 | `status.json` (task) | Worker | Hive Master (read), Poller (read-only) |
 | `plan.md` | Hive Master | VS Code (read + comment) |
 | `comments.json` | VS Code | Hive Master (read-only) |
-| `spec.md` | `hive_exec_start` | Worker (read-only) |
+| `spec.md` | `hive_worktree_create` | Worker (read-only) |
 | `report.md` | Worker | All (read-only) |
 | `BLOCKED` | Beekeeper | All (read-only, blocks operations) |
-| `PENDING_REVIEW` | Worker | VS Code (delete to respond) |
-| `REVIEW_RESULT` | VS Code | Worker (read-only) |
 
 ### Poller Constraints
 
@@ -196,25 +166,22 @@ Task `status.json` fields and who writes them:
 
 | Field | Written By | When |
 |-------|-----------|------|
-| `status` | Worker via `hive_exec_complete` | On completion/block |
+| `status` | Worker via `hive_worktree_commit` | On completion/block |
 | `origin` | `hive_tasks_sync` | On task creation |
 | `planTitle` | `hive_tasks_sync` | On task creation |
-| `summary` | Worker via `hive_exec_complete` | On completion |
-| `startedAt` | `hive_exec_start` | On task start |
-| `completedAt` | `hive_exec_complete` | On completion |
-| `baseCommit` | `hive_exec_start` | On worktree creation |
-| `blocker` | Worker via `hive_exec_complete` | When blocked |
+| `summary` | Worker via `hive_worktree_commit` | On completion |
+| `startedAt` | `hive_worktree_create` | On task start |
+| `completedAt` | `hive_worktree_commit` | On completion |
+| `baseCommit` | `hive_worktree_create` | On worktree creation |
+| `blocker` | Worker via `hive_worktree_commit` | When blocked |
 
 ## Idempotency Expectations
 
 ### Idempotent Operations
 
 These operations are safe to retry:
-- `hive_feature_list` - Pure read
 - `hive_plan_read` - Pure read
 - `hive_status` - Pure read
-- `hive_worker_status` - Pure read
-- `hive_worktree_list` - Pure read
 
 ### Non-Idempotent Operations
 
@@ -222,8 +189,8 @@ These operations have side effects:
 - `hive_feature_create` - Creates feature directory (errors if exists)
 - `hive_plan_write` - Overwrites plan.md, clears comments
 - `hive_tasks_sync` - Reconciles tasks (additive, removes orphans)
-- `hive_exec_start` - Creates worktree (reuses if exists for blocked resume)
-- `hive_exec_complete` - Commits changes, writes report (once per completion)
+- `hive_worktree_create` - Creates worktree (reuses if exists for blocked resume)
+- `hive_worktree_commit` - Commits changes, writes report (once per completion)
 - `hive_merge` - Merges branch (fails if already merged)
 
 ### Recovery Patterns
@@ -231,5 +198,5 @@ These operations have side effects:
 If a tool call fails mid-operation:
 1. Check `hive_status` to see current state
 2. Most operations leave state consistent (atomic file writes)
-3. Worktrees can be cleaned up with `hive_exec_abort`
+3. Worktrees can be cleaned up with `hive_worktree_discard`
 4. Partial merges require manual git intervention
