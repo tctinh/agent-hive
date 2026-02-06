@@ -896,7 +896,6 @@ var DEFAULT_HIVE_CONFIG = {
   disableSkills: [],
   disableMcps: [],
   agentMode: "unified",
-  delegateMode: "task",
   agents: {
     "hive-master": {
       model: DEFAULT_AGENT_MODELS["hive-master"],
@@ -950,12 +949,8 @@ var FEATURE_FILE = "feature.json";
 var STATUS_FILE = "status.json";
 var REPORT_FILE = "report.md";
 var APPROVED_FILE = "APPROVED";
-var JOURNAL_FILE = "journal.md";
 function getHivePath(projectRoot) {
   return path.join(projectRoot, HIVE_DIR);
-}
-function getJournalPath(projectRoot) {
-  return path.join(getHivePath(projectRoot), JOURNAL_FILE);
 }
 function getFeaturesPath(projectRoot) {
   return path.join(getHivePath(projectRoot), FEATURES_DIR);
@@ -1146,21 +1141,6 @@ function writeText(filePath, content) {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, content);
 }
-var JOURNAL_TEMPLATE = `# Hive Journal
-
-Audit trail of project learnings. Updated when trouble is resolved.
-
----
-
-<!-- Entry template:
-### YYYY-MM-DD: feature-name
-
-**Trouble**: What went wrong
-**Resolution**: How it was fixed
-**Constraint**: Never/Always rule derived (add to Iron Laws if recurring)
-**See**: .hive/features/feature-name/plan.md
--->
-`;
 var FeatureService = class {
   projectRoot;
   constructor(projectRoot) {
@@ -1174,10 +1154,6 @@ var FeatureService = class {
     ensureDir(featurePath);
     ensureDir(getContextPath(this.projectRoot, name));
     ensureDir(getTasksPath(this.projectRoot, name));
-    const journalPath = getJournalPath(this.projectRoot);
-    if (!fileExists(journalPath)) {
-      fs3.writeFileSync(journalPath, JOURNAL_TEMPLATE);
-    }
     const feature = {
       name,
       status: "planning",
