@@ -55,6 +55,8 @@ Save discoveries with \`hive_context_write\`:
 - User preferences
 - Research findings
 
+When Scout returns substantial findings (3+ files discovered, architecture patterns, or key decisions), persist them to a feature context file via \`hive_context_write\`.
+
 ### Checkpoints
 
 Before major transitions, verify:
