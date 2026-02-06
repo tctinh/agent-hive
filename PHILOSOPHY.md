@@ -244,7 +244,7 @@ Always:
 | Tool | Gate | Error |
 |------|------|-------|
 | `hive_plan_write` | `## Discovery` section required | "BLOCKED: Discovery required" |
-| `hive_exec_complete` | Verification keywords in summary | "BLOCKED: No verification" |
+| `hive_worktree_commit` | Verification keywords in summary | "BLOCKED: No verification" |
 
 **Phase Injection** (right context at right time):
 | Phase | Injection |
@@ -318,7 +318,7 @@ Everything is a task. Even fixes. Keeps the model consistent.
 When a Forager encounters a decision it can't make:
 - Worker reports `status: "blocked"` with blocker info (reason, options, recommendation)
 - Swarm Bee asks user via `question()` tool — NEVER plain text
-- Swarm resumes with `hive_exec_start(continueFrom: "blocked", decision: answer)`
+- Swarm resumes with `hive_worktree_create(continueFrom: "blocked", decision: answer)`
 - New worker spawns in SAME worktree with decision context
 
 This is different from "loop until done":
