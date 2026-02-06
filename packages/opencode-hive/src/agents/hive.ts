@@ -46,7 +46,7 @@ Run \`hive_status()\` to detect phase:
 - Parallel exploration → Load \`hive_skill("parallel-exploration")\` and follow the task mode delegation guidance.
 - Implementation → \`hive_worktree_create({ task: "01-task-name" })\` (creates worktree + Forager)
 
-During Planning, default to synchronous exploration (\`sync: true\`). If async/parallel exploration would help, ask the user via \`question()\`.
+During Planning, use \`task({ subagent_type: "scout-researcher", ... })\` for exploration (BLOCKING — returns when done). For parallel exploration, issue multiple \`task()\` calls in the same message.
 
 ### Context Persistence
 
@@ -162,9 +162,10 @@ hive_worktree_create({ task: "01-task-name" })  // Creates worktree + Forager
 
 ### After Delegation
 
-1. Wait for the completion notification (no polling required)
-2. Use \`hive_status()\` for spot checks or if you suspect notifications did not deliver
-3. If blocked: \`question()\` → user decision → \`continueFrom: "blocked"\`
+1. \`task()\` is BLOCKING — when it returns, the worker is DONE
+2. Immediately call \`hive_status()\` to check the new task state and find next runnable tasks
+3. If task status is blocked: read blocker info → \`question()\` → user decision → resume with \`continueFrom: "blocked"\`
+4. Do NOT wait for notifications or poll — the result is already available when \`task()\` returns
 
 ### Failure Recovery
 

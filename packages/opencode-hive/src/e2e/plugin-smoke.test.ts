@@ -25,9 +25,9 @@ const EXPECTED_TOOLS = [
   "hive_tasks_sync",
   "hive_task_create",
   "hive_task_update",
-  "hive_exec_start",
-  "hive_exec_complete",
-  "hive_exec_abort",
+  "hive_worktree_create",
+  "hive_worktree_commit",
+  "hive_worktree_discard",
   "hive_merge",
   "hive_context_write",
   "hive_status",
@@ -216,7 +216,7 @@ Do it
     expect(hiveStatus.tasks?.runnable).toContain("01-first-task");
     expect(hiveStatus.tasks?.blockedBy).toEqual({});
 
-    const execStartOutput = await hooks.tool!.hive_exec_start.execute(
+    const execStartOutput = await hooks.tool!.hive_worktree_create.execute(
       { feature: "smoke-feature", task: "01-first-task" },
       toolContext
     );
@@ -298,7 +298,7 @@ Do it
       toolContext
     );
 
-    const execStartOutput = await hooks.tool!.hive_exec_start.execute(
+    const execStartOutput = await hooks.tool!.hive_worktree_create.execute(
       { feature: "task-mode-feature", task: "01-first-task" },
       toolContext
     );
@@ -386,7 +386,7 @@ Do it
     expect(joined).toContain("### Current Hive Status");
   });
 
-  it("blocks hive_exec_start when dependencies are not done", async () => {
+  it("blocks hive_worktree_create when dependencies are not done", async () => {
     const ctx: PluginInput = {
       directory: testRoot,
       worktree: testRoot,
@@ -440,7 +440,7 @@ Do it later
       toolContext
     );
 
-    const execStartOutput = await hooks.tool!.hive_exec_start.execute(
+    const execStartOutput = await hooks.tool!.hive_worktree_create.execute(
       { feature: "dep-block-feature", task: "02-second-task" },
       toolContext
     );
@@ -547,7 +547,7 @@ Do it
       toolContext
     );
 
-    const execStartOutput = await hooks.tool!.hive_exec_start.execute(
+    const execStartOutput = await hooks.tool!.hive_worktree_create.execute(
       { feature: "prompt-mode-feature", task: "01-first-task" },
       toolContext
     );

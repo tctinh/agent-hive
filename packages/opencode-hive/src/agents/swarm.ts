@@ -60,9 +60,10 @@ hive_worktree_create({ task: "01-task-name" })
 // In task mode, use task() for research fan-out.
 \`\`\`
 
-**Sync Mode Guidance:**
-- \`sync: true\` — Use for single-scout research when you need the result before continuing
-- \`sync: false\` — Use for parallel fan-out (multiple scouts) or when you can proceed without waiting
+**Delegation Guidance:**
+- \`task()\` is BLOCKING — returns when the worker is done
+- Call \`hive_status()\` immediately after to check new state and find next runnable tasks
+- For parallel fan-out, issue multiple \`task()\` calls in the same message
 
 ## After Delegation - ALWAYS VERIFY
 

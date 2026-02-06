@@ -197,16 +197,17 @@ Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manu
 **CRITICAL**: When resuming, a NEW worker spawns in the SAME worktree.
 The previous worker's progress is preserved. Include the user's decision in the \`decision\` parameter.
 
-**Observation Polling (Recommended):**
-- Prefer completion notifications over polling
-- Use \`hive_status()\` for observation-based spot checks
+**After task() Returns:**
+- task() is BLOCKING — when it returns, the worker is DONE
+- Call \`hive_status()\` immediately to check the new task state and find next runnable tasks
+- No notifications or polling needed — the result is already available
 
 **For research**, use MCP tools or parallel exploration:
 - \`grep_app_searchGitHub\` - Find code in OSS
 - \`context7_query-docs\` - Library documentation
 - \`websearch_web_search_exa\` - Web search via Exa
 - \`ast_grep_search\` - AST-based search
-- For exploratory fan-out, load \`hive_skill("parallel-exploration")\` and use \`task({ subagent_type: "scout-researcher", sync: false, ... })\`
+- For exploratory fan-out, load \`hive_skill("parallel-exploration")\` and use multiple \`task()\` calls in the same message
 
 ### Planning Phase - Context Management REQUIRED
 

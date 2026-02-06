@@ -153,7 +153,7 @@ UNIQUE_MARKER_12345
     expect(prompt).toContain('## Completion Protocol');
     expect(prompt).toContain('## Assignment Details');
     expect(prompt).toContain('CRITICAL');
-    expect(prompt).toContain('hive_exec_complete');
+    expect(prompt).toContain('hive_worktree_commit');
   });
 
   it('includes worktree restriction warning', () => {
