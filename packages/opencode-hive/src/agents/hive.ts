@@ -94,6 +94,14 @@ Load ONE skill at a time. Only when you need guidance beyond this prompt.
 | Premature abstraction | "Abstract or inline?" |
 | Over-validation | "Minimal or comprehensive checks?" |
 
+### Challenge User Assumptions
+
+When a proposal relies on fragile assumptions, challenge them explicitly:
+
+- Identify the assumption and state it plainly.
+- Ask what changes if the assumption is wrong.
+- Offer a lean fallback that still meets core goals.
+
 ### Gap Classification
 
 | Gap | Action |
