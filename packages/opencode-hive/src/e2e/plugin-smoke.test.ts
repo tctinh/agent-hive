@@ -214,7 +214,11 @@ Do it
     );
     const hiveStatus = JSON.parse(statusRaw as string) as {
       tasks?: {
-        list?: Array<{ folder: string; dependsOn?: string[] | null }>;
+        list?: Array<{
+          folder: string;
+          dependsOn?: string[] | null;
+          worktree?: { branch: string; hasChanges: boolean | null } | null;
+        }>;
         runnable?: string[];
         blockedBy?: Record<string, string[]>;
       };
@@ -222,6 +226,7 @@ Do it
 
     expect(hiveStatus.tasks?.list?.[0]?.folder).toBe("01-first-task");
     expect(hiveStatus.tasks?.list?.[0]?.dependsOn).toEqual([]);
+    expect(hiveStatus.tasks?.list?.[0]?.worktree).toBeNull();
     expect(hiveStatus.tasks?.runnable).toContain("01-first-task");
     expect(hiveStatus.tasks?.blockedBy).toEqual({});
 

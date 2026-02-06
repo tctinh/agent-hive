@@ -1075,16 +1075,25 @@ Re-run with updated summary showing verification results.`;
           const tasks = taskService.list(feature);
           const contextFiles = contextService.list(feature);
 
-          const tasksSummary = tasks.map(t => {
+          const tasksSummary = await Promise.all(tasks.map(async t => {
             const rawStatus = taskService.getRawStatus(feature, t.folder);
+            const worktree = await worktreeService.get(feature, t.folder);
+            const hasChanges = worktree
+              ? await worktreeService.hasUncommittedChanges(worktree.feature, worktree.step)
+              : null;
+
             return {
               folder: t.folder,
               name: t.name,
               status: t.status,
               origin: t.origin || 'plan',
               dependsOn: rawStatus?.dependsOn ?? null,
+              worktree: worktree ? {
+                branch: worktree.branch,
+                hasChanges,
+              } : null,
             };
-          });
+          }));
 
           const contextSummary = contextFiles.map(c => ({
             name: c.name,
