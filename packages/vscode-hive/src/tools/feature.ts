@@ -36,29 +36,6 @@ export function getFeatureTools(workspaceRoot: string): ToolRegistration[] {
       },
     },
     {
-      name: 'hive_feature_list',
-      displayName: 'List Hive Features',
-      modelDescription: 'List all Hive features in the workspace with their status. Use to see available features before switching context or checking progress.',
-      readOnly: true,
-      inputSchema: {
-        type: 'object',
-        properties: {},
-      },
-      invoke: async () => {
-        const names = featureService.list();
-        const features = names.map(name => {
-          const info = featureService.getInfo(name);
-          return {
-            name,
-            status: info?.status || 'unknown',
-            taskCount: info?.tasks.length || 0,
-            hasPlan: info?.hasPlan || false,
-          };
-        });
-        return JSON.stringify({ features });
-      },
-    },
-    {
       name: 'hive_feature_complete',
       displayName: 'Complete Hive Feature',
       modelDescription: 'Mark a feature as completed. Use when all tasks are done and the feature is ready for final integration. This is irreversible.',

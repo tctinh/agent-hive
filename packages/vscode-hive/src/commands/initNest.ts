@@ -110,7 +110,7 @@ For each task in order:
 
 #### 1. Start (creates worktree)
 \`\`\`
-hive_exec_start({ task: "01-task-name" })
+hive_worktree_create({ task: "01-task-name" })
 \`\`\`
 
 #### 2. Implement
@@ -118,7 +118,7 @@ Work in the isolated worktree path. Read \`spec.md\` for context.
 
 #### 3. Complete (commits to branch)
 \`\`\`
-hive_exec_complete({ task: "01-task-name", summary: "What was done" })
+hive_worktree_commit({ task: "01-task-name", summary: "What was done" })
 \`\`\`
 
 #### 4. Merge (integrates to main)
@@ -147,8 +147,8 @@ hive_feature_complete({ name: "feature-name" })
 | Plan | \`hive_plan_read\` | Check for user comments |
 | Plan | \`hive_plan_approve\` | Approve plan |
 | Execute | \`hive_tasks_sync\` | Generate tasks from plan |
-| Execute | \`hive_exec_start\` | Start task (creates worktree) |
-| Execute | \`hive_exec_complete\` | Finish task (commits changes) |
+| Execute | \`hive_worktree_create\` | Start task (creates worktree) |
+| Execute | \`hive_worktree_commit\` | Finish task (commits changes) |
 | Execute | \`hive_merge\` | Integrate task to main |
 | Complete | \`hive_feature_complete\` | Mark feature done |
 
@@ -187,8 +187,8 @@ hive_feature_complete({ name: "feature-name" })
 
 ### Task Failed
 \`\`\`
-hive_exec_abort(task="<task>")  # Discards changes
-hive_exec_start(task="<task>")  # Fresh start
+hive_worktree_discard(task="<task>")  # Discards changes
+hive_worktree_create(task="<task>")  # Fresh start
 \`\`\`
 
 ### Merge Conflicts
@@ -199,7 +199,7 @@ hive_exec_start(task="<task>")  # Fresh start
 
 const COPILOT_AGENT_TEMPLATE = `---
 description: 'Plan-first feature development with isolated worktrees and persistent context.'
-tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureList', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveExecStart', 'tctinh.vscode-hive/hiveExecComplete', 'tctinh.vscode-hive/hiveExecAbort', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveWorktreeList', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveStatus']
+tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveWorktreeCreate', 'tctinh.vscode-hive/hiveWorktreeCommit', 'tctinh.vscode-hive/hiveWorktreeDiscard', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveStatus']
 ---
 
 # Hive Agent
@@ -220,9 +220,9 @@ User reviews in VS Code, adds comments, approves when ready.
 ### Phase 3: Execution
 1. \\\`tasksSync()\\\` - Generate tasks from plan
 2. For each task:
-   - \\\`execStart({ task: "task-name" })\\\`
+   - \\\`worktreeCreate({ task: "task-name" })\\\`
    - Implement
-   - \\\`execComplete({ task: "task-name", summary: "..." })\\\`
+   - \\\`worktreeCommit({ task: "task-name", summary: "..." })\\\`
    - \\\`merge({ task: "task-name", strategy: "squash" })\\\`
 
 ### Phase 4: Completion

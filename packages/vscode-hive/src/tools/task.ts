@@ -30,7 +30,7 @@ export function getTaskTools(workspaceRoot: string): ToolRegistration[] {
           manual: result.manual.length,
           message: `${result.created.length} tasks created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`,
           hints: [
-            'Use hive_exec_start to begin work on a task.',
+            'Use hive_worktree_create to begin work on a task.',
             'Tasks should be executed in order unless explicitly parallelizable.',
             'Read context files before starting implementation.',
             'Update via hive_task_update when work progresses.'
@@ -63,7 +63,7 @@ export function getTaskTools(workspaceRoot: string): ToolRegistration[] {
       invoke: async (input, _token) => {
         const { feature, name, order } = input as { feature: string; name: string; order?: number };
         const folder = taskService.create(feature, name, order);
-        return `Created task "${folder}" with status: pending\nReminder: run hive_exec_start to work in its worktree, and ensure any subagents work in that worktree too.`;
+        return `Created task "${folder}" with status: pending\nReminder: run hive_worktree_create to work in its worktree, and ensure any subagents work in that worktree too.`;
       },
     },
     {
