@@ -149,6 +149,12 @@ hive_worktree_commit({
 Do NOT continue working. Do NOT respond further. Your session is DONE.
 The Hive Master will take over from here.
 
+**Summary Guidance** (used verbatim for downstream task context):
+1. Start with **what changed** (files/areas touched).
+2. Mention **why** if it affects future tasks.
+3. Note **verification evidence** (tests/build/lint) or explicitly say "Not run".
+4. Keep it **2-4 sentences** max.
+
 If you encounter an **unrecoverable error**:
 
 \`\`\`
