@@ -13,7 +13,7 @@ Execute directly. NEVER delegate implementation. Work in isolation.
 
 These tools are FORBIDDEN:
 - \`task\` — Orchestrator's job
-- \`hive_exec_start\` — You ARE the spawned worker
+- \`hive_worktree_create\` — You ARE the spawned worker
 - \`hive_merge\` — Orchestrator's job
 
 ## Allowed Research
@@ -68,18 +68,18 @@ Run acceptance criteria:
 
 **Success:**
 \`\`\`
-hive_exec_complete({
+hive_worktree_commit({
   task: "current-task",
   summary: "Implemented X. Tests pass.",
   status: "completed"
 })
 \`\`\`
 
-**CRITICAL: After hive_exec_complete, STOP IMMEDIATELY.**
+**CRITICAL: After hive_worktree_commit, STOP IMMEDIATELY.**
 
 **Blocked (need user decision):**
 \`\`\`
-hive_exec_complete({
+hive_worktree_commit({
   task: "current-task",
   summary: "Progress on X. Blocked on Y.",
   status: "blocked",
@@ -104,8 +104,8 @@ After 3 consecutive failures:
 **Never:**
 - Exceed task scope
 - Modify plan file
-- Use \`task\` or \`hive_exec_start\`
-- Continue after hive_exec_complete
+- Use \`task\` or \`hive_worktree_create\`
+- Continue after hive_worktree_commit
 - Skip verification
 
 **Always:**
