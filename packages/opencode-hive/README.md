@@ -46,7 +46,6 @@ During planning, "don't execute" means "don't implement" (no code edits, no work
 #### Canonical Delegation Threshold
 
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
-- Prefer `hive_background_task(agent: "scout-researcher", sync: true, ...)` for single investigations; use `sync: false` only for multi-scout fan-out.
 - Local `read`/`grep`/`glob` is acceptable only for a single known file and a bounded question.
 
 ## Tools
@@ -55,7 +54,6 @@ During planning, "don't execute" means "don't implement" (no code edits, no work
 | Tool | Description |
 |------|-------------|
 | `hive_feature_create` | Create a new feature |
-| `hive_feature_list` | List all features |
 | `hive_feature_complete` | Mark feature as complete |
 
 ### Planning
@@ -72,38 +70,12 @@ During planning, "don't execute" means "don't implement" (no code edits, no work
 | `hive_task_create` | Create manual task |
 | `hive_task_update` | Update task status/summary |
 
-### Execution
+### Worktree
 | Tool | Description |
 |------|-------------|
-| `hive_exec_start` | Start work on task (creates worktree) |
-| `hive_exec_complete` | Complete task (applies changes) |
-| `hive_exec_abort` | Abort task (discard changes) |
-
-### Background Tasks
-| Tool | Description |
-|------|-------------|
-| `hive_background_task` | Spawn a background agent task |
-| `hive_background_output` | Get output from a running/completed task |
-| `hive_background_cancel` | Cancel running background task(s) |
-
-The `hive_background_task` tool supports `promptFile` as an alternative to inline `prompt`:
-```typescript
-hive_background_task({
-  agent: "forager-worker",
-  promptFile: ".hive/features/my-feature/tasks/01-task/worker-prompt.md",
-  description: "Execute task 01",
-  workdir: "/path/to/worktree"
-})
-```
-
-When `delegateMode` is set to `task`, Hive uses OpenCode's `task()` and references the prompt by file using `@path` syntax:
-```typescript
-task({
-  subagent_type: "forager-worker",
-  description: "Hive: 01-task",
-  prompt: "Follow instructions in @.hive/features/my-feature/tasks/01-task/worker-prompt.md"
-})
-```
+| `hive_worktree_create` | Start work on task (creates worktree) |
+| `hive_worktree_commit` | Complete task (applies changes) |
+| `hive_worktree_discard` | Abort task (discard changes) |
 
 ## Prompt Budgeting & Observability
 
@@ -122,7 +94,7 @@ When limits are exceeded, content is truncated with `...[truncated]` markers and
 
 ### Observability
 
-`hive_exec_start` output includes metadata fields:
+`hive_worktree_create` output includes metadata fields:
 
 - **`promptMeta`**: Character counts for plan, context, previousTasks, spec, workerPrompt
 - **`payloadMeta`**: JSON payload size, whether prompt is inlined or referenced by file
@@ -132,7 +104,6 @@ When limits are exceeded, content is truncated with `...[truncated]` markers and
 ### Prompt Files
 
 Large prompts are written to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` and passed by file reference (`workerPromptPath`) rather than inlined in tool output. This prevents truncation of large prompts.
-When using `delegateMode: "task"`, the file is referenced via `@<workerPromptPath>` in the `task()` prompt string.
 
 ## Plan Format
 

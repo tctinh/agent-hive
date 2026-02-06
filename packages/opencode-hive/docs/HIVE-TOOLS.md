@@ -1,12 +1,11 @@
 # Hive Tools Inventory
 
-## Tools (18 total)
+## Tools (14 total)
 
-### Feature Management (3 tools)
+### Feature Management (2 tools)
 | Tool | Purpose |
 |------|---------|
 | `hive_feature_create` | Create new feature, set as active |
-| `hive_feature_list` | List all features |
 | `hive_feature_complete` | Mark feature completed (irreversible) |
 
 ### Plan Management (3 tools)
@@ -23,28 +22,23 @@
 | `hive_task_create` | Create manual task (not from plan) |
 | `hive_task_update` | Update task status or summary |
 
-### Execution (3 tools)
+### Worktree (3 tools)
 | Tool | Purpose |
 |------|---------|
-| `hive_exec_start` | Create worktree and begin work |
-| `hive_exec_complete` | Commit changes, write report (does NOT merge) |
-| `hive_exec_abort` | Discard changes, reset status |
+| `hive_worktree_create` | Create worktree and begin work |
+| `hive_worktree_commit` | Commit changes, write report (does NOT merge) |
+| `hive_worktree_discard` | Discard changes, reset status |
 
-#### hive_exec_start output
+#### hive_worktree_create output
 
 - `workerPromptPath`: file path to `.hive/features/<feature>/tasks/<task>/worker-prompt.md`
 - `workerPromptPreview`: short preview of the prompt
 - `promptMeta`, `payloadMeta`, `budgetApplied`, `warnings`: size and budget observability
 
-Delegation uses pass-by-reference to avoid inlining large prompts:
-- `delegateMode: "task"` uses OpenCode's `task()` with `prompt` referencing `@<workerPromptPath>`
-- `delegateMode: "hive"` uses `background_task` with `promptFile: workerPromptPath`
-
-### Merge (2 tools)
+### Merge (1 tool)
 | Tool | Purpose |
 |------|---------|
 | `hive_merge` | Merge task branch (strategies: merge/squash/rebase) |
-| `hive_worktree_list` | List all worktrees for feature |
 
 ### Context (1 tool)
 | Tool | Purpose |
@@ -55,11 +49,6 @@ Delegation uses pass-by-reference to avoid inlining large prompts:
 | Tool | Purpose |
 |------|---------|
 | `hive_status` | Get comprehensive feature status as JSON |
-
-### Review (1 tool)
-| Tool | Purpose |
-|------|---------|
-| `hive_request_review` | Request human review |
 
 ### Steering (1 tool)
 | Tool | Purpose |
@@ -83,13 +72,12 @@ Delegation uses pass-by-reference to avoid inlining large prompts:
 
 | Category | Count | Tools |
 |----------|-------|-------|
-| Feature | 3 | create, list, complete |
+| Feature | 2 | create, complete |
 | Plan | 3 | write, read, approve |
 | Task | 3 | sync, create, update |
-| Exec | 3 | start, complete, abort |
-| Merge | 2 | merge, worktree_list |
+| Worktree | 3 | create, commit, discard |
+| Merge | 1 | merge |
 | Context | 1 | write |
 | Status | 1 | status |
-| Review | 1 | request_review |
 | Steering | 1 | steering |
-| **Total** | **18** | |
+| **Total** | **14** | |
