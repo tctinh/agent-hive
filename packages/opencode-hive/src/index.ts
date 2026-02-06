@@ -717,7 +717,7 @@ Add this section to your plan content and try again.`;
           }
 
           // Check if we're continuing from blocked - reuse existing worktree
-          let worktree;
+          let worktree: Awaited<ReturnType<typeof worktreeService.get>>;
           if (continueFrom === 'blocked') {
             worktree = await worktreeService.get(feature, task);
             if (!worktree) return "Error: No worktree found for blocked task";
@@ -1332,16 +1332,25 @@ Re-run with updated summary showing verification results.`;
           const tasks = taskService.list(feature);
           const contextFiles = contextService.list(feature);
 
-          const tasksSummary = tasks.map(t => {
+          const tasksSummary = await Promise.all(tasks.map(async t => {
             const rawStatus = taskService.getRawStatus(feature, t.folder);
+            const worktree = await worktreeService.get(feature, t.folder);
+            const hasChanges = worktree
+              ? await worktreeService.hasUncommittedChanges(worktree.feature, worktree.step)
+              : null;
+
             return {
               folder: t.folder,
               name: t.name,
               status: t.status,
               origin: t.origin || 'plan',
               dependsOn: rawStatus?.dependsOn ?? null,
+              worktree: worktree ? {
+                branch: worktree.branch,
+                hasChanges,
+              } : null,
             };
-          });
+          }));
 
           const contextSummary = contextFiles.map(c => ({
             name: c.name,
