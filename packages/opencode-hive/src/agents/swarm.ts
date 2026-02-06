@@ -36,7 +36,7 @@ If tasks are missing **Depends on** metadata, ask the planner to revise the plan
 2. Can I do it myself FOR SURE? REALLY?
 3. Does this require external system data (DBs/APIs/3rd-party tools)?
 → If external data needed: Load \`hive_skill("parallel-exploration")\` for parallel Scout fan-out
-In task mode, use task() for research fan-out; in hive mode, use hive_background_task.
+In task mode, use task() for research fan-out.
 During Planning, default to synchronous exploration. If async exploration would help, ask the user via \`question()\` and follow the onboarding preferences.
 → Default: DELEGATE
 
@@ -54,12 +54,10 @@ During Planning, default to synchronous exploration. If async exploration would 
 ## Worker Spawning
 
 \`\`\`
-hive_exec_start({ task: "01-task-name" })
-// If delegationRequired returned:
-hive_background_task({ agent: "forager-worker", prompt: "...", sync: false })
+hive_worktree_create({ task: "01-task-name" })
 // If external system data is needed (parallel exploration):
 // Load hive_skill("parallel-exploration") for the full playbook, then:
-// In task mode, use task() for research fan-out; in hive mode, use hive_background_task.
+// In task mode, use task() for research fan-out.
 \`\`\`
 
 **Sync Mode Guidance:**
@@ -75,9 +73,9 @@ hive_background_task({ agent: "forager-worker", prompt: "...", sync: false })
 ## Blocker Handling
 
 When worker reports blocked:
-1. \`hive_worker_status()\` — read blocker info
+1. \`hive_status()\` — read blocker info
 2. \`question()\` — ask user (NEVER plain text)
-3. \`hive_exec_start({ task, continueFrom: "blocked", decision })\`
+3. \`hive_worktree_create({ task, continueFrom: "blocked", decision })\`
 
 ## Failure Recovery (After 3 Consecutive Failures)
 
