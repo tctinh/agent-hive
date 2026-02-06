@@ -1048,4 +1048,106 @@ Depends on multiple non-existent tasks.
       expect(() => service.sync(featureName)).toThrow(/unknown.*task/i);
     });
   });
+
+  describe("buildSpecContent - task type inference", () => {
+    it("should infer greenfield type when plan section has only Create: files", () => {
+      const featureName = "test-feature";
+      const planContent = `# Plan
+
+### 1. Greenfield Task
+
+**Depends on**: none
+
+**Files:**
+- Create: \`packages/hive-core/src/new-module.ts\`
+
+Create the new module.
+`;
+
+      const specContent = service.buildSpecContent({
+        featureName,
+        task: { folder: "01-greenfield-task", name: "Greenfield Task", order: 1 },
+        dependsOn: [],
+        allTasks: [{ folder: "01-greenfield-task", name: "Greenfield Task", order: 1 }],
+        planContent,
+      });
+
+      expect(specContent).toContain("## Task Type");
+      expect(specContent).toContain("greenfield");
+    });
+
+    it("should infer testing type when plan section has only Test: files", () => {
+      const featureName = "test-feature";
+      const planContent = `# Plan
+
+### 1. Coverage Update
+
+**Depends on**: none
+
+**Files:**
+- Test: \`packages/hive-core/src/services/taskService.test.ts\`
+
+Add coverage for task specs.
+`;
+
+      const specContent = service.buildSpecContent({
+        featureName,
+        task: { folder: "01-coverage-update", name: "Coverage Update", order: 1 },
+        dependsOn: [],
+        allTasks: [{ folder: "01-coverage-update", name: "Coverage Update", order: 1 }],
+        planContent,
+      });
+
+      expect(specContent).toContain("## Task Type");
+      expect(specContent).toContain("testing");
+    });
+
+    it("should infer modification type when plan section has Modify: files", () => {
+      const featureName = "test-feature";
+      const planContent = `# Plan
+
+### 1. Update Worker Prompt
+
+**Depends on**: none
+
+**Files:**
+- Modify: \`packages/opencode-hive/src/agents/forager.ts\`
+
+Update prompt copy.
+`;
+
+      const specContent = service.buildSpecContent({
+        featureName,
+        task: { folder: "01-update-worker-prompt", name: "Update Worker Prompt", order: 1 },
+        dependsOn: [],
+        allTasks: [{ folder: "01-update-worker-prompt", name: "Update Worker Prompt", order: 1 }],
+        planContent,
+      });
+
+      expect(specContent).toContain("## Task Type");
+      expect(specContent).toContain("modification");
+    });
+
+    it("should omit task type when no inference signal is present", () => {
+      const featureName = "test-feature";
+      const planContent = `# Plan
+
+### 1. Align Docs
+
+**Depends on**: none
+
+Align documentation wording.
+`;
+
+      const specContent = service.buildSpecContent({
+        featureName,
+        task: { folder: "01-align-docs", name: "Align Docs", order: 1 },
+        dependsOn: [],
+        allTasks: [{ folder: "01-align-docs", name: "Align Docs", order: 1 }],
+        planContent,
+      });
+
+      expect(specContent).not.toContain("## Task Type");
+    });
+  });
 });
