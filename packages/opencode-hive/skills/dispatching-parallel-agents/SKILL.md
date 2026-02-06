@@ -78,9 +78,9 @@ Each agent gets:
 
 ```typescript
 // Using Hive tools for parallel execution
-hive_exec_start({ task: "01-fix-abort-tests" })
-hive_exec_start({ task: "02-fix-batch-tests" })
-hive_exec_start({ task: "03-fix-race-condition-tests" })
+hive_worktree_create({ task: "01-fix-abort-tests" })
+hive_worktree_create({ task: "02-fix-batch-tests" })
+hive_worktree_create({ task: "03-fix-race-condition-tests" })
 // All three run concurrently in isolated worktrees
 ```
 
