@@ -177,22 +177,4 @@ export class ConfigService {
     return config.disableMcps ?? [];
   }
 
-  /**
-   * Get the delegate mode for background task execution.
-   * - 'hive': Use hive_background_task tools
-   * - 'task': Use OpenCode's built-in task() tool (default)
-   */
-  getDelegateMode(): 'hive' | 'task' {
-    const config = this.get();
-    return config.delegateMode ?? 'task';
-  }
-
-  /**
-   * Check if hive background tasks should be enabled.
-   * Returns true when delegateMode is 'hive'.
-   * Returns false when delegateMode is 'task' (use OpenCode's task tool instead).
-   */
-  isHiveBackgroundEnabled(): boolean {
-    return this.getDelegateMode() === 'hive';
-  }
 }
