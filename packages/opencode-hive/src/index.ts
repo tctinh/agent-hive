@@ -140,6 +140,7 @@ import {
   detectContext,
   listFeatures,
   normalizePath,
+  type WorktreeInfo,
 } from "hive-core";
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
 import { calculatePromptMeta, calculatePayloadMeta, checkWarnings } from "./utils/prompt-observability";
@@ -162,7 +163,7 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Feature | hive_feature_create, hive_feature_list, hive_feature_complete |
 | Plan | hive_plan_write, hive_plan_read, hive_plan_approve |
 | Task | hive_tasks_sync, hive_task_create, hive_task_update |
-| Exec | hive_exec_start, hive_exec_complete, hive_exec_abort |
+| Worktree | hive_worktree_create, hive_worktree_commit, hive_worktree_discard |
 | Worker | hive_worker_status |
 | Merge | hive_merge, hive_worktree_list |
 | Context | hive_context_write |
@@ -176,25 +177,25 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 3. User adds comments in VSCode → \`hive_plan_read\` to see them
 4. Revise plan → User approves
 5. \`hive_tasks_sync()\` - Generate tasks from plan
-6. \`hive_exec_start(task)\` → work in worktree → \`hive_exec_complete(task, summary)\`
+6. \`hive_worktree_create(task)\` → work in worktree → \`hive_worktree_commit(task, summary)\`
 7. \`hive_merge(task)\` - Merge task branch into main (when ready)
 
-**Important:** \`hive_exec_complete\` commits changes to task branch but does NOT merge.
+**Important:** \`hive_worktree_commit\` commits changes to task branch but does NOT merge.
 Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manually removed.
 
 ### Delegated Execution
 
-\`hive_exec_start\` creates worktree and spawns worker automatically:
+\`hive_worktree_create\` creates worktree and spawns worker automatically:
 
-1. \`hive_exec_start(task)\` → Creates worktree + spawns Forager (Worker/Coder) worker
-2. Worker executes → calls \`hive_exec_complete(status: "completed")\`
-3. Worker blocked → calls \`hive_exec_complete(status: "blocked", blocker: {...})\`
+1. \`hive_worktree_create(task)\` → Creates worktree + spawns Forager (Worker/Coder) worker
+2. Worker executes → calls \`hive_worktree_commit(status: "completed")\`
+3. Worker blocked → calls \`hive_worktree_commit(status: "blocked", blocker: {...})\`
 
 **Handling blocked workers:**
 1. Check blockers with \`hive_worker_status()\`
 2. Read the blocker info (reason, options, recommendation, context)
 3. Ask user via \`question()\` tool - NEVER plain text
-4. Resume with \`hive_exec_start(task, continueFrom: "blocked", decision: answer)\`
+4. Resume with \`hive_worktree_create(task, continueFrom: "blocked", decision: answer)\`
 
 **CRITICAL**: When resuming, a NEW worker spawns in the SAME worktree.
 The previous worker's progress is preserved. Include the user's decision in the \`decision\` parameter.
@@ -655,7 +656,7 @@ Add this section to your plan content and try again.`;
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
           const folder = taskService.create(feature, name, order);
-          return `Manual task created: ${folder}\nReminder: start work with hive_exec_start to use its worktree, and ensure any subagents work in that worktree too.`;
+          return `Manual task created: ${folder}\nReminder: start work with hive_worktree_create to use its worktree, and ensure any subagents work in that worktree too.`;
         },
       }),
 
@@ -678,7 +679,7 @@ Add this section to your plan content and try again.`;
         },
       }),
 
-      hive_exec_start: tool({
+      hive_worktree_create: tool({
         description: 'Create worktree and begin work on task. Spawns Forager worker automatically.',
         args: {
           task: tool.schema.string().describe('Task folder name'),
@@ -717,7 +718,7 @@ Add this section to your plan content and try again.`;
           }
 
           // Check if we're continuing from blocked - reuse existing worktree
-          let worktree;
+          let worktree: WorktreeInfo;
           if (continueFrom === 'blocked') {
             worktree = await worktreeService.get(feature, task);
             if (!worktree) return "Error: No worktree found for blocked task";
@@ -820,7 +821,7 @@ Add this section to your plan content and try again.`;
           });
 
           // Always use Forager (forager-worker) for task execution
-          // Forager knows Hive protocols (hive_exec_complete, blocker protocol, Iron Laws)
+          // Forager knows Hive protocols (hive_worktree_commit, blocker protocol, Iron Laws)
           // Forager can research via MCP tools (grep_app, context7, etc.)
           const agent = 'forager-worker';
 
@@ -869,7 +870,7 @@ Call the hive_background_task tool to spawn a Forager (Worker/Coder) worker.
 - Add \`sync: true\` if you need the result in this session.
 - Otherwise omit \`sync\`. Wait for the completion notification (no polling required). After the <system-reminder> arrives, call \`hive_background_output({ task_id: "<id>", block: false })\` once to fetch the final result.
 
-Troubleshooting: if you see "Unknown parameter: workdir", your hive_background_task tool is not Hive's provider. Ensure agent-hive loads after other background_* tool providers, then re-run hive_exec_start.`;
+ Troubleshooting: if you see "Unknown parameter: workdir", your hive_background_task tool is not Hive's provider. Ensure agent-hive loads after other background_* tool providers, then re-run hive_worktree_create.`;
 
           const taskToolPrompt = `Follow instructions in @${relativePromptPath}`;
 
@@ -971,7 +972,7 @@ Note: delegateMode is set to 'task' in agent_hive.json. To use Hive's background
         },
       }),
 
-      hive_exec_complete: tool({
+      hive_worktree_commit: tool({
         description: 'Complete task: commit changes to branch, write report. Supports blocked/failed/partial status for worker communication.',
         args: {
           task: tool.schema.string().describe('Task folder name'),
@@ -1028,7 +1029,7 @@ Re-run with updated summary showing verification results.`;
               summary,
               blocker,
               worktreePath: worktree?.path,
-              message: 'Task blocked. Hive Master will ask user and resume with hive_exec_start(continueFrom: "blocked", decision: answer)',
+              message: 'Task blocked. Hive Master will ask user and resume with hive_worktree_create(continueFrom: "blocked", decision: answer)',
             }, null, 2);
           }
 
@@ -1087,7 +1088,7 @@ Re-run with updated summary showing verification results.`;
         },
       }),
 
-      hive_exec_abort: tool({
+      hive_worktree_discard: tool({
         description: 'Abort task: discard changes, reset status',
         args: {
           task: tool.schema.string().describe('Task folder name'),
@@ -1214,9 +1215,9 @@ Re-run with updated summary showing verification results.`;
 
           const stuckWorkers = workers.filter(worker => worker.activity?.maybeStuck).length;
           const hint = workers.some(w => w.status === 'blocked')
-            ? 'Use hive_exec_start(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
+            ? 'Use hive_worktree_create(task, continueFrom: "blocked", decision: answer) to resume blocked workers'
             : workers.some(w => w.maybeStuck)
-              ? 'Some workers may be stuck. Use hive_background_output({ task_id }) to check output, or abort with hive_exec_abort.'
+              ? 'Some workers may be stuck. Use hive_background_output({ task_id }) to check output, or abort with hive_worktree_discard.'
               : 'Workers in progress. Wait for the completion notification (no polling required). Use hive_worker_status for spot checks; use hive_background_output only if interim output is explicitly needed.';
           const guidance = stuckWorkers > 0
             ? `\n\n⚠️ ${stuckWorkers} worker(s) may be stuck (no activity for 10+ minutes). Consider cancelling or investigating.`
@@ -1249,7 +1250,7 @@ Re-run with updated summary showing verification results.`;
 
           const taskInfo = taskService.get(feature, task);
           if (!taskInfo) return `Error: Task "${task}" not found`;
-          if (taskInfo.status !== 'done') return "Error: Task must be completed before merging. Use hive_exec_complete first.";
+          if (taskInfo.status !== 'done') return "Error: Task must be completed before merging. Use hive_worktree_commit first.";
 
           const result = await worktreeService.merge(feature, task, strategy);
 
@@ -1383,7 +1384,7 @@ Re-run with updated summary showing verification results.`;
               return `${runnableTasks.length} tasks are ready to start in parallel: ${runnableTasks.join(', ')}`;
             }
             if (runnableTasks.length === 1) {
-              return `Start next task with hive_exec_start: ${runnableTasks[0]}`;
+              return `Start next task with hive_worktree_create: ${runnableTasks[0]}`;
             }
             const pending = tasks.find(t => t.status === 'pending');
             if (pending) {
