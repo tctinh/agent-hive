@@ -45,7 +45,14 @@ Read spec for:
 - **Must NOT do** (guardrails)
 - **Acceptance criteria**
 
-### 2. Implement
+### 2. Orient (Pre-flight Before Coding)
+Before writing code:
+- Confirm dependencies are satisfied and required context is present
+- Identify the exact files/sections to touch (from references)
+- Decide the first failing test you will write (TDD)
+- Plan the minimum change to reach green
+
+### 3. Implement
 Follow spec exactly. Use references for patterns.
 
 \`\`\`
@@ -54,13 +61,13 @@ edit(file, { old: "...", new: "..." })   // Implement
 bash("npm test")                          // Verify
 \`\`\`
 
-### 3. Verify
+### 4. Verify
 Run acceptance criteria:
 - Tests pass
 - Build succeeds
 - lsp_diagnostics clean on changed files
 
-### 4. Report
+### 5. Report
 
 **Success:**
 \`\`\`

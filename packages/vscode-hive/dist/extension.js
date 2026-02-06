@@ -38,7 +38,7 @@ var vscode7 = __toESM(require("vscode"));
 var fs10 = __toESM(require("fs"));
 var path10 = __toESM(require("path"));
 
-// ../hive-core/dist/index.js
+// ../../../../../../packages/hive-core/dist/index.js
 var import_node_module = require("node:module");
 var path = __toESM(require("path"), 1);
 var fs = __toESM(require("fs"), 1);
@@ -1420,6 +1420,27 @@ var TaskService = class {
   }
   buildSpecContent(params) {
     const { featureName, task, dependsOn, allTasks, planContent, contextFiles = [], completedTasks = [] } = params;
+    const getTaskType = (planSection2, taskName) => {
+      if (!planSection2) {
+        return null;
+      }
+      const fileTypeMatches = Array.from(planSection2.matchAll(/-\s*(Create|Modify|Test):/gi)).map((match) => match[1].toLowerCase());
+      const fileTypes = new Set(fileTypeMatches);
+      if (fileTypes.size === 0) {
+        return taskName.toLowerCase().includes("test") ? "testing" : null;
+      }
+      if (fileTypes.size === 1) {
+        const onlyType = Array.from(fileTypes)[0];
+        if (onlyType === "create")
+          return "greenfield";
+        if (onlyType === "test")
+          return "testing";
+      }
+      if (fileTypes.has("modify")) {
+        return "modification";
+      }
+      return null;
+    };
     const specLines = [
       `# Task: ${task.folder}`,
       "",
@@ -1448,6 +1469,10 @@ var TaskService = class {
       specLines.push("_No plan section available._");
     }
     specLines.push("");
+    const taskType = getTaskType(planSection, task.name);
+    if (taskType) {
+      specLines.push("## Task Type", "", taskType, "");
+    }
     if (contextFiles.length > 0) {
       const contextCompiled = contextFiles.map((f) => `## ${f.name}
 

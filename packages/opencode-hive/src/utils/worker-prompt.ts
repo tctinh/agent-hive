@@ -98,6 +98,16 @@ ${spec}
 
 ---
 
+## Pre-implementation Checklist
+
+Before writing code, confirm:
+1. Dependencies are satisfied and required context is present.
+2. The exact files/sections to touch (from references) are identified.
+3. The first failing test to write is clear (TDD).
+4. The minimal change needed to reach green is planned.
+
+---
+
 ## Blocker Protocol
 
 If you hit a blocker requiring human decision, **DO NOT** use the question tool directly.
