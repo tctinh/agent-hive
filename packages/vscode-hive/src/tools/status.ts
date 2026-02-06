@@ -147,7 +147,7 @@ function getNextAction(planStatus: string | null, tasks: Array<{ status: string;
     return `${runnable.length} tasks are ready to start in parallel: ${runnable.join(', ')}`;
   }
   if (runnable.length === 1) {
-    return `Start next task with hive_exec_start: ${runnable[0]}`;
+    return `Start next task with hive_worktree_create: ${runnable[0]}`;
   }
   const pending = tasks.find(t => t.status === 'pending');
   if (pending) {

@@ -75,9 +75,9 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
 
   return [
     {
-      name: 'hive_exec_start',
-      displayName: 'Start Task Execution',
-      modelDescription: 'Create a git worktree and begin work on a task. Isolates changes in a separate directory. Use when ready to implement a task.',
+      name: 'hive_worktree_create',
+      displayName: 'Create Task Worktree',
+      modelDescription: 'Create a git worktree for a task. Isolates changes in a separate directory. Use when ready to implement a task.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -107,7 +107,7 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
           success: true,
           worktreePath: worktree.path,
           branch: worktree.branch,
-          message: `Worktree created. Work in ${worktree.path}. When done, use hive_exec_complete.`,
+            message: `Worktree created. Work in ${worktree.path}. When done, use hive_worktree_commit.`,
           hints: [
             'Do all work inside this worktree. Ensure any subagents do the same.',
             'Context files are in .hive/features/<feature>/context/ if you need background.'
@@ -116,8 +116,8 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
       },
     },
     {
-      name: 'hive_exec_complete',
-      displayName: 'Complete Task Execution',
+      name: 'hive_worktree_commit',
+      displayName: 'Commit Task Worktree',
       modelDescription: 'Commit changes in worktree and mark task done. Does NOT merge - use hive_merge for that. Use when task implementation is finished.',
       inputSchema: {
         type: 'object',
@@ -155,8 +155,8 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
       },
     },
     {
-      name: 'hive_exec_abort',
-      displayName: 'Abort Task Execution',
+      name: 'hive_worktree_discard',
+      displayName: 'Discard Task Worktree',
       modelDescription: 'Discard all changes and remove worktree. Use when task approach is wrong and needs restart. This is destructive and irreversible.',
       destructive: true,
       inputSchema: {
@@ -174,7 +174,7 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
         taskService.update(feature, task, { status: 'pending', summary: '' });
         return JSON.stringify({
           success: true,
-          message: `Worktree removed. Task status reset to pending. Can restart with hive_exec_start.`,
+          message: `Worktree removed. Task status reset to pending. Can restart with hive_worktree_create.`,
         });
       },
     },
