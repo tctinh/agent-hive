@@ -8,7 +8,6 @@
   ],
   "tools": [
     "hive_feature_create",
-    "hive_feature_list",
     "hive_feature_complete",
     "hive_plan_write",
     "hive_plan_read",
@@ -20,9 +19,6 @@
     "hive_exec_complete",
     "hive_exec_abort",
     "hive_context_write",
-    "hive_context_read",
-    "hive_context_list",
-    "hive_session_open",
-    "hive_session_list"
+    "hive_status"
   ]
 }
