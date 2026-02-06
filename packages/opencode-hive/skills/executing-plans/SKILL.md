@@ -47,6 +47,11 @@ When batch complete:
 - Show verification output
 - Say: "Ready for feedback."
 
+### Step 4.5: Post-Batch Hygienic Review
+
+After the batch report, ask the operator if they want a Hygienic code review for the batch.
+If yes, run `task({ subagent_type: "hygienic", prompt: "Review implementation changes from the latest batch." })` and apply feedback before starting the next batch.
+
 ### Step 5: Continue
 Based on feedback:
 - Apply changes if needed

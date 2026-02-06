@@ -175,6 +175,13 @@ hive_worktree_create({ task: "01-task-name" })  // Creates worktree + Forager
 
 \`hive_merge({ task: "01-task-name" })\` after verification
 
+### Post-Batch Review (Hygienic)
+
+After completing and merging a batch:
+1. Ask the user via \`question()\` if they want a Hygienic code review for the batch.
+2. If yes, run \`task({ subagent_type: "hygienic", prompt: "Review implementation changes from the latest batch." })\`.
+3. Apply feedback before starting the next batch.
+
 ### Orchestration Iron Laws
 
 - Delegate by default
