@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-08
+
+### Added
+- **Docker Mastery Skill**: On-demand skill teaching agents container thinking — debugging, docker-compose, Dockerfile authoring, image optimization, integration testing. Primary user: Forager. Loaded via `hive_skill("docker-mastery")`
+- **AGENTS.md Mastery Skill**: On-demand skill teaching agents what makes effective pseudo-memory — signal vs noise filtering, section structure, when to prune. Primary users: Hive, Swarm, Architect. Loaded via `hive_skill("agents-md-mastery")`
+- **Atomic AGENTS.md Apply**: New `apply` action on `hive_agents_md` tool — agents propose → user approves → apply writes atomically to eliminate manual edit errors
+- **Persistent Sandbox Containers**: One container per worktree, reused across commands via `docker exec`. 50 test runs = 1 container (not 50). Reduces overhead, speeds up test execution
+- **Context Lifecycle Management**: `archive()` moves stale contexts to timestamped archive/, `stats()` reports context health (count/size/age), size warning at 20K chars
+- **Sandbox Bypass Audit Logging**: All HOST: commands logged with `[hive:sandbox]` prefix for visibility into sandbox escape usage
+
+### Changed
+- **Discovery Gate Tightened**: Replaced substring match with regex + 100 char minimum content length. Empty or comment-hidden Discovery sections now rejected (P7 Hard Gates enforcement)
+- **Forager Prompt**: Removed HOST: escape hatch documentation — agents must report as blocked and ask users when host access needed
+- **Agent Prompts (Hive, Swarm, Forager)**: Added skill references for docker-mastery and agents-md-mastery
+- **Skill Count**: 9 skills → 11 skills (docker-mastery, agents-md-mastery added)
+- **JSON Schema**: Added sandbox, dockerImage, and persistentContainers properties to agent_hive.schema.json
+
+### Fixed
+- **Discovery Gate Bypass**: Empty Discovery sections or hidden Discovery headers (in HTML comments) no longer pass validation
+
 ## [1.1.1] - 2026-02-08
 
 ### Added
