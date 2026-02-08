@@ -1212,12 +1212,13 @@ Re-run with updated summary showing verification results.`;
 
       // AGENTS.md Tool
       hive_agents_md: tool({
-        description: 'Initialize or sync AGENTS.md. init: scan codebase and generate (preview only). sync: propose updates from feature contexts.',
+        description: 'Initialize or sync AGENTS.md. init: scan codebase and generate (preview only). sync: propose updates from feature contexts. apply: write approved content to disk.',
         args: {
-          action: tool.schema.enum(['init', 'sync']).describe('Action to perform'),
+          action: tool.schema.enum(['init', 'sync', 'apply']).describe('Action to perform'),
           feature: tool.schema.string().optional().describe('Feature name for sync action'),
+          content: tool.schema.string().optional().describe('Content to write (required for apply action)'),
         },
-        async execute({ action, feature }) {
+        async execute({ action, feature, content }) {
           if (action === 'init') {
             const result = await agentsMdService.init();
             if (result.existed) {
@@ -1235,6 +1236,12 @@ Re-run with updated summary showing verification results.`;
             }
             // P2 gate: Return diff for review — never auto-apply
             return `Proposed AGENTS.md updates from feature "${feature}":\n\n${result.diff}\n\n⚠️ These changes have NOT been applied. Ask the user via question() whether to apply them.`;
+          }
+
+          if (action === 'apply') {
+            if (!content) return 'Error: content required for apply action. Use init or sync first to get content, then apply with the approved content.';
+            const result = agentsMdService.apply(content);
+            return `AGENTS.md ${result.isNew ? 'created' : 'updated'} (${result.chars} chars) at ${result.path}`;
           }
 
           return 'Error: unknown action';
