@@ -8,5 +8,7 @@ export { ContextService } from './contextService.js';
 export { SessionService } from './sessionService.js';
 export { ConfigService } from './configService.js';
 export { AgentsMdService } from './agentsMdService.js';
+export { DockerSandboxService } from './dockerSandboxService.js';
+export type { SandboxConfig } from './dockerSandboxService.js';
 export { buildEffectiveDependencies, computeRunnableAndBlocked } from './taskDependencyGraph.js';
 export type { TaskWithDeps, RunnableBlockedResult } from './taskDependencyGraph.js';
