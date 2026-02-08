@@ -1,10 +1,11 @@
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, sep } from 'path';
 import { execSync } from 'child_process';
 
 export interface SandboxConfig {
   mode: 'none' | 'docker';
   image?: string;
+  persistent?: boolean;
 }
 
 /**
@@ -66,6 +67,85 @@ export class DockerSandboxService {
   }
 
   /**
+   * Generates a container name from a worktree path.
+   * Extracts feature and task from .hive/.worktrees/<feature>/<task> pattern.
+   * 
+   * @param worktreePath - Path to the worktree directory
+   * @returns Container name (e.g., 'hive-my-feature-my-task')
+   */
+  static containerName(worktreePath: string): string {
+    const parts = worktreePath.split(sep);
+    const worktreeIdx = parts.indexOf('.worktrees');
+    
+    if (worktreeIdx === -1 || worktreeIdx + 2 >= parts.length) {
+      // Not a standard worktree path, use timestamp
+      return `hive-sandbox-${Date.now()}`;
+    }
+    
+    const feature = parts[worktreeIdx + 1];
+    const task = parts[worktreeIdx + 2];
+    
+    // Sanitize for Docker container name (only alphanumeric and hyphens)
+    const name = `hive-${feature}-${task}`.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+    
+    // Docker container names must be <= 63 characters
+    return name.slice(0, 63);
+  }
+
+  /**
+   * Ensures a persistent container exists for the worktree.
+   * If container already running, returns its name.
+   * Otherwise, creates a new detached container.
+   * 
+   * @param worktreePath - Path to the worktree directory
+   * @param image - Docker image to use
+   * @returns Container name
+   */
+  static ensureContainer(worktreePath: string, image: string): string {
+    const name = this.containerName(worktreePath);
+    
+    try {
+      // Check if container exists and is running
+      execSync(`docker inspect --format='{{.State.Running}}' ${name}`, { stdio: 'pipe' });
+      return name; // Already running
+    } catch {
+      // Container doesn't exist, create it
+      execSync(
+        `docker run -d --name ${name} -v ${worktreePath}:/app -w /app ${image} tail -f /dev/null`,
+        { stdio: 'pipe' }
+      );
+      return name;
+    }
+  }
+
+  /**
+   * Builds a docker exec command for persistent containers.
+   * 
+   * @param containerName - Name of the running container
+   * @param command - Command to execute
+   * @returns Complete docker exec command string
+   */
+  static buildExecCommand(containerName: string, command: string): string {
+    // Escape single quotes for shell safety: replace ' with '\''
+    const escapedCommand = command.replace(/'/g, "'\\''");
+    return `docker exec ${containerName} sh -c '${escapedCommand}'`;
+  }
+
+  /**
+   * Stops and removes a persistent container for a worktree.
+   * 
+   * @param worktreePath - Path to the worktree directory
+   */
+  static stopContainer(worktreePath: string): void {
+    const name = this.containerName(worktreePath);
+    try {
+      execSync(`docker rm -f ${name}`, { stdio: 'ignore' });
+    } catch {
+      // Ignore errors (container may not exist)
+    }
+  }
+
+  /**
    * Checks if Docker is available on the system.
    * 
    * @returns true if docker is available, false otherwise
@@ -114,6 +194,12 @@ export class DockerSandboxService {
       }
     }
 
-    return this.buildRunCommand(worktreePath, command, image);
+    // Use persistent container (docker exec) or ephemeral (docker run --rm)
+    if (config.persistent) {
+      const containerName = this.ensureContainer(worktreePath, image);
+      return this.buildExecCommand(containerName, command);
+    } else {
+      return this.buildRunCommand(worktreePath, command, image);
+    }
   }
 }

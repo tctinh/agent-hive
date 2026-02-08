@@ -453,7 +453,7 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       const hiveWorktreeBase = path.join(directory, '.hive', '.worktrees');
       if (!workdir.startsWith(hiveWorktreeBase)) return;
       
-      // Wrap command using static method
+      // Wrap command using static method (with persistent config)
       const wrapped = DockerSandboxService.wrapCommand(workdir, command, sandboxConfig);
       output.args.command = wrapped;
       output.args.workdir = undefined; // docker command runs on host

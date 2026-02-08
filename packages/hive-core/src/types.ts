@@ -189,6 +189,8 @@ export interface HiveConfig {
   sandbox?: 'none' | 'docker';
   /** Docker image to use when sandbox is 'docker' (optional explicit override) */
   dockerImage?: string;
+  /** Reuse Docker containers per worktree (default: true when sandbox is 'docker') */
+  persistentContainers?: boolean;
 }
 
 /** Default models for Hive agents */
