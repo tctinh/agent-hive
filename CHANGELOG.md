@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Architect Prompt Hardened**: Expanded intent classification with Strategy column, 6-item clearance checklist, Test Strategy section, Turn Termination rules
+- **Forager Prompt Hardened**: "Resolve Before Blocking" guidance (try 3+ approaches), expanded Orient pre-flight, 6-item Completion Checklist
+- **Scout Prompt Fixed**: Fixed leaked persistence example (truncated research dump), added year awareness to Iron Laws
+- **Swarm Prompt Hardened**: Removed non-existent "oracle" subagent reference, added "After Delegation — VERIFY" checklist, Turn Termination
+- **Hive Prompt Hardened**: Turn Termination (valid/invalid endings), Hard Blocks table replacing vague Iron Laws prose, AI-Slop Flags
+- **Hygienic Prompt Hardened**: Agent-executable verification emphasis with ✅/❌ examples, expanded Active Implementation Simulation
+- **Writing-Plans Skill**: Added agent-executable acceptance criteria guidance
+- **Hive Skill Loading**: Added `systematic-debugging`, `test-driven-development`, `verification-before-completion` to Hive's skill table
+
+### Removed
+- **Onboarding Skill**: Deleted — unreferenced by any agent (10 skills → 9)
+
+### Fixed
+- **Broken Skill References**: Fixed `executing-plans` referencing deleted `finishing-a-development-branch`, fixed `test-driven-development` referencing non-existent `@testing-anti-patterns.md`
+- **Skill Registry Regenerated**: `registry.generated.ts` updated to reflect 9 skills
+
+### Stats
+- 6 agent prompts updated, 3 skills fixed/removed, 39 prompt tests added/updated
+- Clean build across all 3 packages, 9 skills registered
+
 ## [1.1.0] - 2026-02-06
 
 ### Added
