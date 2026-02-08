@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileExists, readText, writeText } from '../utils/paths.js';
-import type { ContextService, ContextFile } from './contextService.js';
+import type { ContextFile } from '../types.js';
+import type { ContextService } from './contextService.js';
 
 export interface InitResult {
   content: string;

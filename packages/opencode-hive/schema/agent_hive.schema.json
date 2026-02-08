@@ -10,6 +10,21 @@
       "type": "string",
       "description": "Schema reference for this config file"
     },
+    "sandbox": {
+      "type": "string",
+      "enum": ["none", "docker"],
+      "default": "none",
+      "description": "Sandbox isolation mode. 'none' runs commands directly; 'docker' wraps bash commands in Docker containers."
+    },
+    "dockerImage": {
+      "type": "string",
+      "description": "Docker image to use for sandbox. Auto-detected from project files if omitted (e.g., node:22-slim for Node.js projects)."
+    },
+    "persistentContainers": {
+      "type": "boolean",
+      "default": true,
+      "description": "Reuse Docker containers per worktree (docker exec) instead of creating new ones per command (docker run --rm). Default: true when sandbox is 'docker'."
+    },
     "enableToolsFor": {
       "type": "array",
       "items": {

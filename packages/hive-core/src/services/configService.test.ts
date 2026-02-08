@@ -240,7 +240,7 @@ describe("ConfigService sandbox config", () => {
     const service = new ConfigService();
     const sandboxConfig = service.getSandboxConfig();
 
-    expect(sandboxConfig).toEqual({ mode: 'none' });
+    expect(sandboxConfig).toEqual({ mode: 'none', persistent: false });
   });
 
   it("getSandboxConfig() returns { mode: 'docker' } when sandbox is set to docker", () => {
@@ -256,7 +256,7 @@ describe("ConfigService sandbox config", () => {
     );
 
     const sandboxConfig = service.getSandboxConfig();
-    expect(sandboxConfig).toEqual({ mode: 'docker' });
+    expect(sandboxConfig).toEqual({ mode: 'docker', persistent: true });
   });
 
   it("getSandboxConfig() returns { mode: 'docker', image: 'node:22-slim' } when configured with dockerImage", () => {
@@ -273,6 +273,6 @@ describe("ConfigService sandbox config", () => {
     );
 
     const sandboxConfig = service.getSandboxConfig();
-    expect(sandboxConfig).toEqual({ mode: 'docker', image: 'node:22-slim' });
+    expect(sandboxConfig).toEqual({ mode: 'docker', image: 'node:22-slim', persistent: true });
   });
 });
