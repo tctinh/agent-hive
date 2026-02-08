@@ -111,6 +111,12 @@ Always include **Depends on** for each task. Use `none` to enable parallel start
 **Verify**:
 - [ ] Run: `{command}` → {expected}
 - [ ] {Additional acceptance criteria}
+
+All verification MUST be agent-executable (no human intervention):
+✅ `bun test` → all pass
+✅ `curl -X POST /api/x` → 201
+❌ "User manually tests..."
+❌ "Visually confirm..."
 ````
 
 ## Remember
@@ -119,6 +125,7 @@ Always include **Depends on** for each task. Use `none` to enable parallel start
 - Exact commands with expected output
 - Reference relevant skills with @ syntax
 - DRY, YAGNI, TDD, frequent commits
+- All acceptance criteria must be agent-executable (zero human intervention)
 
 ## Execution Handoff
 
