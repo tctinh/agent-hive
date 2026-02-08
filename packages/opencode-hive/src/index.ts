@@ -135,6 +135,7 @@ import {
   TaskService,
   ContextService,
   ConfigService,
+  AgentsMdService,
   buildEffectiveDependencies,
   computeRunnableAndBlocked,
   detectContext,
@@ -243,6 +244,7 @@ const plugin: Plugin = async (ctx) => {
   const planService = new PlanService(directory);
   const taskService = new TaskService(directory);
   const contextService = new ContextService(directory);
+  const agentsMdService = new AgentsMdService(directory);
   const configService = new ConfigService(); // User config at ~/.config/opencode/agent_hive.json
   const disabledMcps = configService.getDisabledMcps();
   const disabledSkills = configService.getDisabledSkills();
@@ -1176,6 +1178,27 @@ Re-run with updated summary showing verification results.`;
             },
             nextAction: getNextAction(planStatus, tasksSummary, runnable),
           });
+        },
+      }),
+
+      // AGENTS.md Tool
+      hive_agents_md: tool({
+        description: 'Initialize or sync AGENTS.md. init: scan codebase and generate (preview only). sync: propose updates from feature contexts.',
+        args: {
+          action: tool.schema.enum(['init', 'sync']).describe('Action to perform'),
+          feature: tool.schema.string().optional().describe('Feature name for sync action'),
+        },
+        async execute({ action, feature }) {
+          if (action === 'init') {
+            const result = await agentsMdService.init();
+            if (result.existed) {
+              return `AGENTS.md already exists (${result.content.length} chars). Use 'sync' to propose updates.`;
+            }
+            // P2 gate: Return content for review — ask user via question() before writing
+            return `Generated AGENTS.md from codebase scan (${result.content.length} chars):\n\n${result.content}\n\n⚠️ This has NOT been written to disk. Ask the user via question() whether to write it to AGENTS.md.`;
+          }
+          // sync handled in task 6
+          return 'Error: sync action not yet implemented';
         },
       }),
 
