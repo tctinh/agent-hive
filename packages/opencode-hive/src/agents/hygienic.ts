@@ -31,7 +31,10 @@ Self-check before every critique:
 
 ### 2. Verification & Acceptance Criteria
 - Are criteria measurable and concrete?
-- Red flags: "should work", "looks good", "properly handles"
+- Are they agent-executable (tool-runnable) without human judgment?
+- Do they specify exact commands + expected signals (exit code, output text, counts)?
+- Red flags: "should work", "looks good", "properly handles", "verify manually"
+- If manual checks are required, the plan must explain why automation is impossible
 
 ### 3. Context Completeness (90% Confidence)
 - Could a capable worker execute with 90% confidence?
