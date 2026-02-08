@@ -145,7 +145,7 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
 ## Discovery
 
 **Q: Is this a test?**
-A: Yes
+A: Yes, this is an integration test to validate the basic workflow of feature creation, plan writing, task sync, and worktree operations work correctly end-to-end in the plugin.
 
 ## Overview
 
@@ -274,7 +274,7 @@ Do it
 ## Discovery
 
 **Q: Is this a test?**
-A: Yes
+A: Yes, this is an integration test to validate task mode with @file prompts. Testing that worker prompt files are correctly generated and used.
 
 ## Overview
 
@@ -409,7 +409,7 @@ Do it
 ## Discovery
 
 **Q: Is this a test?**
-A: Yes
+A: Yes, this integration test validates dependency blocking. Testing that task 2 cannot start until task 1 completes, ensuring proper dependency enforcement.
 
 ## Overview
 
@@ -526,7 +526,7 @@ Do it later
 ## Discovery
 
 **Q: Is this a test?**
-A: Yes
+A: Yes, this integration test validates task prompt mode functionality. Ensures worker-prompt.md files are correctly generated with mission context.
 
 ## Tasks
 

@@ -528,9 +528,9 @@ NEXT: Ask your first clarifying question about this feature.`;
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
-          // GATE: Check for discovery section
-          const hasDiscovery = content.toLowerCase().includes('## discovery');
-          if (!hasDiscovery) {
+          // GATE: Check for discovery section with substantive content
+          const discoveryMatch = content.match(/^##\s+Discovery\s*$/im);
+          if (!discoveryMatch) {
             return `BLOCKED: Discovery section required before planning.
 
 Your plan must include a \`## Discovery\` section documenting:
@@ -539,6 +539,24 @@ Your plan must include a \`## Discovery\` section documenting:
 - Key decisions made
 
 Add this section to your plan content and try again.`;
+          }
+          
+          // Extract content between ## Discovery and next ## heading (or end)
+          const afterDiscovery = content.slice(discoveryMatch.index! + discoveryMatch[0].length);
+          const nextHeading = afterDiscovery.search(/^##\s+/m);
+          const discoveryContent = nextHeading > -1
+            ? afterDiscovery.slice(0, nextHeading).trim()
+            : afterDiscovery.trim();
+          
+          if (discoveryContent.length < 100) {
+            return `BLOCKED: Discovery section is too thin (${discoveryContent.length} chars, minimum 100).
+
+A substantive Discovery section should include:
+- Original request quoted
+- Interview summary (key decisions)
+- Research findings with file:line references
+
+Expand your Discovery section and try again.`;
           }
 
           captureSession(feature, toolContext);
