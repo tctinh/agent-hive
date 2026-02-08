@@ -234,3 +234,45 @@ describe("ConfigService disabled skills/mcps", () => {
     expect(service.getDisabledMcps()).toEqual(["websearch", "ast_grep"]);
   });
 });
+
+describe("ConfigService sandbox config", () => {
+  it("getSandboxConfig() returns { mode: 'none' } when not configured", () => {
+    const service = new ConfigService();
+    const sandboxConfig = service.getSandboxConfig();
+
+    expect(sandboxConfig).toEqual({ mode: 'none' });
+  });
+
+  it("getSandboxConfig() returns { mode: 'docker' } when sandbox is set to docker", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        sandbox: 'docker',
+      }),
+    );
+
+    const sandboxConfig = service.getSandboxConfig();
+    expect(sandboxConfig).toEqual({ mode: 'docker' });
+  });
+
+  it("getSandboxConfig() returns { mode: 'docker', image: 'node:22-slim' } when configured with dockerImage", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        sandbox: 'docker',
+        dockerImage: 'node:22-slim',
+      }),
+    );
+
+    const sandboxConfig = service.getSandboxConfig();
+    expect(sandboxConfig).toEqual({ mode: 'docker', image: 'node:22-slim' });
+  });
+});
