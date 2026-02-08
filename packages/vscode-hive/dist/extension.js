@@ -896,6 +896,7 @@ var DEFAULT_HIVE_CONFIG = {
   disableSkills: [],
   disableMcps: [],
   agentMode: "unified",
+  sandbox: "none",
   agents: {
     "hive-master": {
       model: DEFAULT_AGENT_MODELS["hive-master"],

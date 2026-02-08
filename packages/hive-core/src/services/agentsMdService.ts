@@ -1,14 +1,23 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileExists, readText } from '../utils/paths.js';
+import type { ContextService, ContextFile } from './contextService.js';
 
 export interface InitResult {
   content: string;
   existed: boolean;
 }
 
+export interface SyncResult {
+  proposals: string[];
+  diff: string;
+}
+
 export class AgentsMdService {
-  constructor(private readonly rootDir: string) {}
+  constructor(
+    private readonly rootDir: string,
+    private readonly contextService: ContextService,
+  ) {}
 
   async init(): Promise<InitResult> {
     const agentsMdPath = path.join(this.rootDir, 'AGENTS.md');
@@ -22,6 +31,85 @@ export class AgentsMdService {
     // Scan codebase for bootstrap content — DO NOT write to disk
     const content = await this.scanAndGenerate();
     return { content, existed: false };
+  }
+
+  async sync(featureName: string): Promise<SyncResult> {
+    // 1. Read all context files using ContextService.list()
+    const contexts: ContextFile[] = this.contextService.list(featureName);
+
+    // 2. Read current AGENTS.md
+    const agentsMdPath = path.join(this.rootDir, 'AGENTS.md');
+    const current = await fs.promises.readFile(agentsMdPath, 'utf-8').catch(() => '');
+
+    // 3. Extract actionable findings from context content strings
+    const findings = this.extractFindings(contexts);
+
+    // 4. Generate proposed additions
+    const proposals = this.generateProposals(findings, current);
+
+    // 5. Return proposals for human review (P2 gate — no auto-apply)
+    return { proposals, diff: this.formatDiff(current, proposals) };
+  }
+
+  private extractFindings(contexts: ContextFile[]): string[] {
+    const findings: string[] = [];
+    
+    // Regex patterns for actionable findings
+    const patterns = [
+      // "we use X" / "prefer X over Y" / "don't use X"
+      /we\s+use\s+[^.\n]+/gi,
+      /prefer\s+[^.\n]+\s+over\s+[^.\n]+/gi,
+      /don't\s+use\s+[^.\n]+/gi,
+      /do\s+not\s+use\s+[^.\n]+/gi,
+      // Build/test commands
+      /(?:build|test|dev)\s+command:\s*[^.\n]+/gi,
+      // File path conventions
+      /[a-zA-Z]+\s+lives?\s+in\s+\/[^\s.\n]+/gi,
+    ];
+
+    for (const context of contexts) {
+      const lines = context.content.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+
+        for (const pattern of patterns) {
+          const matches = trimmed.match(pattern);
+          if (matches) {
+            for (const match of matches) {
+              const finding = match.trim();
+              if (finding && !findings.includes(finding)) {
+                findings.push(finding);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return findings;
+  }
+
+  private generateProposals(findings: string[], current: string): string[] {
+    const proposals: string[] = [];
+    const currentLower = current.toLowerCase();
+
+    for (const finding of findings) {
+      // Check if finding already exists in current AGENTS.md
+      const findingLower = finding.toLowerCase();
+      if (!currentLower.includes(findingLower)) {
+        proposals.push(finding);
+      }
+    }
+
+    return proposals;
+  }
+
+  private formatDiff(current: string, proposals: string[]): string {
+    if (proposals.length === 0) return '';
+
+    const lines = proposals.map(p => `+ ${p}`);
+    return lines.join('\n');
   }
 
   private async scanAndGenerate(): Promise<string> {
