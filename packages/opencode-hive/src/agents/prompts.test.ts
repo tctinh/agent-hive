@@ -215,3 +215,32 @@ describe('README.md documentation', () => {
     });
   });
 });
+
+describe('AGENTS.md tool guidance', () => {
+  describe('Hive (Hybrid) prompt', () => {
+    it('contains guidance to use hive_agents_md tool', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('hive_agents_md');
+    });
+
+    it('instructs to sync AGENTS.md after feature completion', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('feature completion');
+      expect(QUEEN_BEE_PROMPT).toContain('sync');
+    });
+
+    it('explains the init action for bootstrapping AGENTS.md', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('init');
+      expect(QUEEN_BEE_PROMPT).toContain('AGENTS.md');
+    });
+  });
+
+  describe('Swarm (Orchestrator) prompt', () => {
+    it('contains guidance to use hive_agents_md tool', () => {
+      expect(SWARM_BEE_PROMPT).toContain('hive_agents_md');
+    });
+
+    it('instructs to sync AGENTS.md after batch completion', () => {
+      expect(SWARM_BEE_PROMPT).toContain('batch');
+      expect(SWARM_BEE_PROMPT).toContain('sync');
+    });
+  });
+});

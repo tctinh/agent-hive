@@ -97,12 +97,23 @@ hive_merge({ task: "01-task-name", strategy: "merge" })
 
 Merge only after verification passes.
 
-## Post-Batch Review (Hygienic)
+### Post-Batch Review (Hygienic)
 
 After completing and merging a batch:
 1. Ask the user via \`question()\` if they want a Hygienic code review for the batch.
 2. If yes, run \`task({ subagent_type: "hygienic", prompt: "Review implementation changes from the latest batch." })\`.
 3. Apply feedback before starting the next batch.
+
+### AGENTS.md Maintenance
+
+After completing and merging a batch:
+1. Sync context findings to AGENTS.md: \`hive_agents_md({ action: "sync", feature: "feature-name" })\`
+2. Review the proposed diff with the user
+3. Apply approved changes to keep AGENTS.md current
+
+For projects without AGENTS.md:
+- Bootstrap with \`hive_agents_md({ action: "init" })\`
+- Generates initial documentation from codebase analysis
 
 ## Turn Termination
 

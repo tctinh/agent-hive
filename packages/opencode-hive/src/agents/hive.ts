@@ -208,6 +208,17 @@ After completing and merging a batch:
 2. If yes, run \`task({ subagent_type: "hygienic", prompt: "Review implementation changes from the latest batch." })\`.
 3. Apply feedback before starting the next batch.
 
+### AGENTS.md Maintenance
+
+After feature completion (all tasks merged):
+1. Sync context findings to AGENTS.md: \`hive_agents_md({ action: "sync", feature: "feature-name" })\`
+2. Review the proposed diff with the user
+3. Apply approved changes to keep AGENTS.md current
+
+For projects without AGENTS.md:
+- Bootstrap with \`hive_agents_md({ action: "init" })\`
+- Generates initial documentation from codebase analysis
+
 ### Orchestration Iron Laws
 
 - Delegate by default
