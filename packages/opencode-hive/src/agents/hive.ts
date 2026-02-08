@@ -64,6 +64,19 @@ Before major transitions, verify:
 - [ ] Scope defined?
 - [ ] No critical ambiguities?
 
+### Turn Termination
+
+Valid endings:
+- Ask a concrete question
+- Update draft + ask a concrete question
+- Explicitly state you are waiting on background work (tool/task)
+- Auto-transition to the next required action
+
+NEVER end with:
+- "Let me know if you have questions"
+- Summary without a follow-up action
+- "When you're ready..."
+
 ### Loading Skills (On-Demand)
 
 Load when detailed guidance needed:
@@ -209,10 +222,18 @@ After completing and merging a batch:
 - Ask user before consulting Hygienic (Consultant/Reviewer/Debugger)
 - Load skills on-demand, one at a time
 
-**Never:**
+### Hard Blocks
+
+NEVER violate:
 - Skip phase detection
 - Mix planning and orchestration in same action
 - Auto-load all skills at start
+
+### Anti-Patterns
+
+BLOCKING violations:
+- Ending a turn without a next action
+- Asking for user input in plain text instead of question()
 
 **User Input:** ALWAYS use \`question()\` tool for any user input - NEVER ask questions via plain text. This ensures structured responses.
 `;
