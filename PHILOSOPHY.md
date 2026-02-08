@@ -201,6 +201,8 @@ Batch 1 (parallel):     Batch 2 (parallel):
 
 This solves multi-agent coordination without complex orchestration. Each task gets a worktree. Glue tasks merge and synthesize.
 
+> **Implementation status**: Task dependencies (`dependsOn` field) enable parallel execution of independent tasks. Orchestrators handle batch synthesis and context flow manually via `hive_context_write`. Formal batch tracking and automated glue tasks are aspirational.
+
 *Inspired by Boris's Tip 8: "Use a few subagents regularly to automate common workflows."*
 
 ### P6: Tests Define Done
@@ -221,6 +223,8 @@ Task: Implement calculator
 ```
 
 Each subtask has its own `spec.md` (what to do) and `report.md` (what was done) — first-class audit trail.
+
+> **Implementation status**: Subtask infrastructure exists in `hive-core` (full CRUD in `subtaskService.ts` and `taskService.ts`), but agent-facing tools (`hive_subtask_*`) are not yet implemented. TDD patterns are currently enforced through prompt guidance and the verification keyword gate (P7).
 
 *Inspired by Boris's Tip 13: "Give Claude a way to verify its work. When Claude has a feedback loop, it will 2-3x the quality of the final result."*
 
@@ -264,6 +268,8 @@ Always:
 ## Subtasks: First-Class TDD Support
 
 Subtasks enable granular tracking within a task, perfect for TDD workflows:
+
+> **Note**: Subtask CRUD operations exist in `hive-core` services. Agent-facing tools are planned but not yet implemented — workers currently follow TDD via prompt guidance.
 
 ```
 .hive/features/user-auth/tasks/01-auth-service/
@@ -571,7 +577,7 @@ Human shapes at the top. Agent builds at the bottom. Gate in the middle. Tests v
 
 **Theme:** Less infrastructure, smarter agents. Trust the model, not the tooling.
 
-- **Tool consolidation (22 → 14 tools)**: Removed the entire background task infrastructure (~5,000 lines). Direct worktree execution proved simpler and more reliable than the async queue-poll-result pattern. Renamed `hive_exec_*` → `hive_worktree_*` to reflect the actual execution model
+- **Tool consolidation (22 → 16 tools)**: Removed the entire background task infrastructure (~5,000 lines). Direct worktree execution proved simpler and more reliable than the async queue-poll-result pattern. Renamed `hive_exec_*` → `hive_worktree_*` to reflect the actual execution model
 - **Journal infrastructure removed**: Journals were write-only artifacts nobody read. Context files (`hive_context_write`) replaced them — persistent, queryable, and actually consumed by downstream workers
 - **Worker Orient Phase**: Workers now run a pre-flight checklist before coding — read references, check existing patterns, verify assumptions. This came from observing workers that jumped straight into implementation and missed critical context. Orient aligns with P1 (Context Persists) and P7 (Iron Laws)
 - **Task-type auto-inference**: `buildSpecContent()` infers whether a task is greenfield, testing, modification, bugfix, or refactoring from the task name and plan section. This is orchestrator-level intelligence — the worker gets better context without the planner having to annotate every task
@@ -599,7 +605,7 @@ We studied [Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode) (omo
 
 **Skill cleanup:**
 
-- Deleted `onboarding` skill (unreferenced by any agent, 10 total → 9)
+- Deleted `onboarding` skill (unreferenced by any agent). Later additions (brainstorming, code-reviewer, parallel-exploration, dispatching-parallel-agents) bring total to 11
 - Fixed `executing-plans` skill: replaced broken `finishing-a-development-branch` reference with `verification-before-completion`
 - Fixed `test-driven-development` skill: removed broken `@testing-anti-patterns.md` reference
 - Updated `writing-plans` skill with agent-executable acceptance criteria guidance
@@ -621,7 +627,7 @@ We studied [Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode) (omo
 - **Tighter Discovery gate**: Replaced substring match with regex + content length check (minimum 100 chars). Empty or hidden Discovery sections now rejected. Aligns with P7 (Hard Gates)
 - **Sandbox bypass audit**: All HOST: commands logged with `[hive:sandbox]` prefix. Escape hatch removed from agent prompts — agents must ask users when host access needed. P7 enforcement without removing the mechanism
 - **Atomic AGENTS.md apply**: New `apply` action on `hive_agents_md` tool. Agents propose → user approves → apply writes atomically. Eliminates manual edit errors during approval flow
-- **Persistent sandbox containers**: One container per worktree, reused across commands. 50 test runs = 1 container, not 50. `docker run -d` + `docker exec` replaces ephemeral `docker run --rm`
+- **Persistent sandbox containers [Planned]**: Designed but not yet implemented. Goal: one container per worktree, reused across commands (`docker run -d` + `docker exec` replacing ephemeral `docker run --rm`)
 - **Context lifecycle management**: Archive method moves stale contexts to timestamped archive/. Stats method reports context health. Size warning at 20K chars. Prevents unbounded context growth
 
 **Design insight:** v1.1.1 asked "how do agents learn from their work?" v1.2.0 asks "how do agents learn to use their tools?" Skills are the answer — on-demand depth without prompt bloat. The Docker skill teaches container thinking. The AGENTS.md skill teaches memory hygiene. Both make agents more capable without adding infrastructure.
