@@ -168,6 +168,14 @@ describe('Forager (Worker/Coder) prompt', () => {
     expect(FORAGER_BEE_PROMPT).toContain('Read the referenced files and surrounding code');
     expect(FORAGER_BEE_PROMPT).toContain('Search for similar patterns in the codebase');
   });
+
+  it('contains Docker Sandbox section in Iron Laws', () => {
+    expect(FORAGER_BEE_PROMPT).toContain('Docker Sandbox');
+  });
+
+  it('explains HOST: escape hatch for bypassing sandbox', () => {
+    expect(FORAGER_BEE_PROMPT).toContain('HOST:');
+  });
 });
 
 describe('Scout (Explorer/Researcher) prompt', () => {

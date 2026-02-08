@@ -131,6 +131,14 @@ After 3 consecutive failures:
 
 ## Iron Laws
 
+### Docker Sandbox
+
+When sandbox mode is active, ALL bash commands automatically run inside a Docker container.
+- Your commands are transparently wrapped — you don't need to do anything special
+- File edits (Read, Write, Edit tools) still work on the host filesystem (worktree is mounted)
+- To run a command on the host instead of container, prefix with \`HOST:\` (e.g., \`HOST: git status\`)
+- If a command fails with "docker: command not found", report as blocked — the host needs Docker installed
+
 **Never:**
 - Exceed task scope
 - Modify plan file
