@@ -244,7 +244,7 @@ const plugin: Plugin = async (ctx) => {
   const planService = new PlanService(directory);
   const taskService = new TaskService(directory);
   const contextService = new ContextService(directory);
-  const agentsMdService = new AgentsMdService(directory);
+  const agentsMdService = new AgentsMdService(directory, contextService);
   const configService = new ConfigService(); // User config at ~/.config/opencode/agent_hive.json
   const disabledMcps = configService.getDisabledMcps();
   const disabledSkills = configService.getDisabledSkills();
@@ -1197,8 +1197,18 @@ Re-run with updated summary showing verification results.`;
             // P2 gate: Return content for review — ask user via question() before writing
             return `Generated AGENTS.md from codebase scan (${result.content.length} chars):\n\n${result.content}\n\n⚠️ This has NOT been written to disk. Ask the user via question() whether to write it to AGENTS.md.`;
           }
-          // sync handled in task 6
-          return 'Error: sync action not yet implemented';
+
+          if (action === 'sync') {
+            if (!feature) return 'Error: feature name required for sync action';
+            const result = await agentsMdService.sync(feature);
+            if (result.proposals.length === 0) {
+              return 'No new findings to sync to AGENTS.md.';
+            }
+            // P2 gate: Return diff for review — never auto-apply
+            return `Proposed AGENTS.md updates from feature "${feature}":\n\n${result.diff}\n\n⚠️ These changes have NOT been applied. Ask the user via question() whether to apply them.`;
+          }
+
+          return 'Error: unknown action';
         },
       }),
 

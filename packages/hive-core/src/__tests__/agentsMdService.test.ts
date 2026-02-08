@@ -2,15 +2,18 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgentsMdService } from '../services/agentsMdService.js';
+import { ContextService } from '../services/contextService.js';
 
 describe('AgentsMdService', () => {
   let testDir: string;
   let service: AgentsMdService;
+  let contextService: ContextService;
 
   beforeEach(() => {
     // Create temp directory for each test
     testDir = fs.mkdtempSync(path.join('/tmp', 'agents-md-test-'));
-    service = new AgentsMdService(testDir);
+    contextService = new ContextService(testDir);
+    service = new AgentsMdService(testDir, contextService);
   });
 
   afterEach(() => {
@@ -87,6 +90,61 @@ describe('AgentsMdService', () => {
       expect(result.content).toContain('bun run build');
       expect(result.content).toContain('bun test');
       expect(result.content).toContain('bun run dev');
+    });
+  });
+
+  describe('sync()', () => {
+    beforeEach(() => {
+      // Create a feature with contexts directory
+      const featurePath = path.join(testDir, '.hive', 'features', 'test-feature');
+      fs.mkdirSync(featurePath, { recursive: true });
+    });
+
+    test('calls contextService.list() with feature name and extracts findings', async () => {
+      // Setup context files with actionable findings
+      contextService.write('test-feature', 'conventions', 
+        'We use Zustand, not Redux\nAuth lives in /lib/auth, not /utils/auth');
+      contextService.write('test-feature', 'decisions',
+        'Build command: bun run build\nPrefer async/await over .then()');
+
+      const result = await service.sync('test-feature');
+
+      expect(result.proposals).toBeDefined();
+      expect(Array.isArray(result.proposals)).toBe(true);
+      expect(result.diff).toBeDefined();
+      expect(typeof result.diff).toBe('string');
+    });
+
+    test('generates proposals only for findings NOT already in AGENTS.md', async () => {
+      // Create AGENTS.md with existing content
+      const existingContent = `# Agent Guidelines\n\n## Code Style\n\nWe use Zustand for state management.\n`;
+      fs.writeFileSync(path.join(testDir, 'AGENTS.md'), existingContent);
+
+      // Add context with duplicate and new findings
+      contextService.write('test-feature', 'conventions',
+        'We use Zustand for state management.\nWe use TypeScript strict mode.');
+
+      const result = await service.sync('test-feature');
+
+      // Should only propose the new finding (TypeScript strict mode)
+      expect(result.proposals.length).toBe(1);
+      expect(result.proposals[0]).toContain('TypeScript strict mode');
+      expect(result.proposals[0]).not.toContain('Zustand');
+    });
+
+    test('returns empty proposals array when all findings already present', async () => {
+      // Create AGENTS.md with existing content
+      const existingContent = `# Agent Guidelines\n\nWe use Zustand for state management.\n`;
+      fs.writeFileSync(path.join(testDir, 'AGENTS.md'), existingContent);
+
+      // Add context with only duplicate finding
+      contextService.write('test-feature', 'conventions',
+        'We use Zustand for state management.');
+
+      const result = await service.sync('test-feature');
+
+      expect(result.proposals.length).toBe(0);
+      expect(result.diff).toBe('');
     });
   });
 });
