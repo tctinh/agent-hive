@@ -147,4 +147,48 @@ describe('AgentsMdService', () => {
       expect(result.diff).toBe('');
     });
   });
+
+  describe('apply()', () => {
+    test('writes content to AGENTS.md and returns path and char count', () => {
+      const content = '# Agent Guidelines\n\nThis is test content.';
+      
+      const result = service.apply(content);
+      
+      expect(result.path).toBe(path.join(testDir, 'AGENTS.md'));
+      expect(result.chars).toBe(content.length);
+      
+      // Verify file was written
+      const agentsMdPath = path.join(testDir, 'AGENTS.md');
+      expect(fs.existsSync(agentsMdPath)).toBe(true);
+      const fileContent = fs.readFileSync(agentsMdPath, 'utf-8');
+      expect(fileContent).toBe(content);
+    });
+
+    test('with existing AGENTS.md returns isNew: false', () => {
+      // Create existing AGENTS.md
+      const agentsMdPath = path.join(testDir, 'AGENTS.md');
+      fs.writeFileSync(agentsMdPath, '# Old content');
+      
+      const content = '# New content';
+      const result = service.apply(content);
+      
+      expect(result.isNew).toBe(false);
+      expect(result.path).toBe(agentsMdPath);
+      expect(result.chars).toBe(content.length);
+      
+      // Verify file was overwritten
+      const fileContent = fs.readFileSync(agentsMdPath, 'utf-8');
+      expect(fileContent).toBe(content);
+    });
+
+    test('with no existing AGENTS.md returns isNew: true', () => {
+      const content = '# Brand new content';
+      
+      const result = service.apply(content);
+      
+      expect(result.isNew).toBe(true);
+      expect(result.path).toBe(path.join(testDir, 'AGENTS.md'));
+      expect(result.chars).toBe(content.length);
+    });
+  });
 });

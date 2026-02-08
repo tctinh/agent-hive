@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileExists, readText } from '../utils/paths.js';
+import { fileExists, readText, writeText } from '../utils/paths.js';
 import type { ContextService, ContextFile } from './contextService.js';
 
 export interface InitResult {
@@ -11,6 +11,12 @@ export interface InitResult {
 export interface SyncResult {
   proposals: string[];
   diff: string;
+}
+
+export interface ApplyResult {
+  path: string;
+  chars: number;
+  isNew: boolean;
 }
 
 export class AgentsMdService {
@@ -49,6 +55,13 @@ export class AgentsMdService {
 
     // 5. Return proposals for human review (P2 gate — no auto-apply)
     return { proposals, diff: this.formatDiff(current, proposals) };
+  }
+
+  apply(content: string): ApplyResult {
+    const agentsMdPath = path.join(this.rootDir, 'AGENTS.md');
+    const isNew = !fileExists(agentsMdPath);
+    writeText(agentsMdPath, content);
+    return { path: agentsMdPath, chars: content.length, isNew };
   }
 
   private extractFindings(contexts: ContextFile[]): string[] {
