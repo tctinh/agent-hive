@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **AGENTS.md Self-Maintenance Tool**: New `hive_agents_md` tool with `init` and `sync` operations — agents can bootstrap AGENTS.md from codebase analysis and propose updates from feature context discoveries (with approval gate per P2)
+- **Docker Sandbox Isolation**: Level 1 Docker sandboxing for worker execution — transparent bash interception wraps test commands in containers, auto-detects project runtime (node/python/go/rust), includes `HOST:` escape hatch for host-level operations
+
+### Changed
+- **PHILOSOPHY.md**: Added "Wax Seal" (sandbox) to Hive Terminology table, added v1.1.1 evolution notes documenting AGENTS.md integration and Docker sandbox design decisions
+- **Agent Prompts (Hive + Swarm)**: Added AGENTS.md maintenance guidance — orchestrators sync context findings after feature completion
+- **Forager Prompt**: Added Docker Sandbox awareness section to Iron Laws — explains transparent container wrapping and HOST: escape hatch
+
 ## [1.1.0] - 2026-02-06
 
 ### Added

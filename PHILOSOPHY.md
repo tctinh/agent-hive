@@ -47,6 +47,7 @@ The answer became this platform.
 | **Royal Jelly** | Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
 | **Honey** | Artifacts | The output — `plan.md`, `spec.md`, `report.md`, code. Persistent documentation that emerges from work. |
 | **Propolis** | Verification | TDD subtasks that seal work as complete. Tests prove the cell is solid. |
+| **Wax Seal** | Sandbox | Docker container that isolates worker execution. Tests run inside, results flow out. |
 | **Waggle Dance** | Planning | The planning phase. Architect communicates, Beekeeper reviews, alignment before action. |
 | **Swarming** | Parallelism | Batched parallel execution. Multiple Foragers dispatched simultaneously to their cells. |
 | **Hiving** | Working | The act of using the Hive platform. *"Stop vibing. Start hiving."* |
@@ -579,6 +580,15 @@ Human shapes at the top. Agent builds at the bottom. Gate in the middle. Tests v
 - **Active Discovery**: Planning agents now challenge user assumptions during the planning phase. This isn't adversarial — it's collaborative pushback that aligns with P3 (Human Shapes, Agent Builds) and P4 (Good Enough Wins). An agent that accepts everything uncritically isn't planning, it's transcribing
 
 **Design insight:** The common thread is knowledge transfer. Orient ensures workers receive context. Richer summaries ensure orchestrators receive results. Scout persistence ensures future sessions receive research. Active Discovery ensures plans receive honest scrutiny. Every change improved how information flows between agents.
+
+### v1.1.1 (Prompt Hardening + Self-Maintenance)
+
+**Theme:** Agents bootstrap and maintain their own operating manual.
+
+- **AGENTS.md integration**: Self-maintaining bootstrap that evolves with the project. New `hive_agents_md` tool with two operations: `init` (codebase scan → AGENTS.md template) and `sync` (context findings → AGENTS.md proposals). Sync respects P2 (Plan → Approve → Execute) — agents propose updates, humans approve. Context files flow into living documentation instead of becoming stale write-only artifacts
+- **Docker sandbox**: Lightweight container isolation for TDD (P6 + P7 alignment). Workers execute tests in sandboxed Docker containers via bash interception hook — transparent to agents, no code changes needed. Escape hatch: `HOST: <command>` prefix bypasses sandbox for host-level operations. Level 1 implementation (docker run) with auto-detection of project runtime (node:22-slim, python:3.12-slim, etc.). Aligns with "Good Enough Wins" (P4) — most projects need clean test environments, not full devcontainer complexity
+
+**Design insight:** Both features address the same meta-problem: *How do agents learn from their own work?* AGENTS.md captures project-level learnings (conventions, patterns, gotchas). Docker sandbox ensures those learnings are tested in isolation. Together they create a self-improving loop: agents document what they learn, test in clean environments, and future agents benefit from both.
 
 ---
 
