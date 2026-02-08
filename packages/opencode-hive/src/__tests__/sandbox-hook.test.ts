@@ -38,7 +38,9 @@ describe('tool.execute.before bash interception hook logic', () => {
     
     // Escape hatch: HOST: prefix (case-insensitive)
     if (/^HOST:\s*/i.test(command)) {
-      output.args.command = command.replace(/^HOST:\s*/i, '');
+      const strippedCommand = command.replace(/^HOST:\s*/i, '');
+      console.warn(`[hive:sandbox] HOST bypass: ${strippedCommand.slice(0, 80)}${strippedCommand.length > 80 ? '...' : ''}`);
+      output.args.command = strippedCommand;
       return;
     }
     
@@ -172,6 +174,72 @@ describe('tool.execute.before bash interception hook logic', () => {
 
       expect(output.args.command).toBe('git log');
       expect(output.args.command).not.toContain('docker run');
+    });
+
+    test('logs console.warn with [hive:sandbox] prefix when HOST: is used', () => {
+      const sandboxConfig = { mode: 'docker' as const, image: 'node:22-slim' };
+      
+      const input = {
+        tool: 'bash',
+        sessionID: 'test-session',
+        callID: 'test-call',
+      };
+      const output = {
+        args: {
+          command: 'HOST: bun test',
+          workdir: worktreePath,
+        },
+      };
+
+      const originalWarn = console.warn;
+      const warnings: string[] = [];
+      console.warn = (...args: any[]) => {
+        warnings.push(args.join(' '));
+      };
+
+      executeHook(input, output, sandboxConfig, mockDirectory);
+
+      console.warn = originalWarn;
+
+      expect(warnings.length).toBe(1);
+      expect(warnings[0]).toContain('[hive:sandbox]');
+      expect(warnings[0]).toContain('HOST bypass:');
+      expect(warnings[0]).toContain('bun test');
+    });
+
+    test('truncates long commands in HOST: audit log', () => {
+      const sandboxConfig = { mode: 'docker' as const, image: 'node:22-slim' };
+      const longCommand = 'HOST: echo ' + 'a'.repeat(100); // 106 chars after "HOST: "
+      
+      const input = {
+        tool: 'bash',
+        sessionID: 'test-session',
+        callID: 'test-call',
+      };
+      const output = {
+        args: {
+          command: longCommand,
+          workdir: worktreePath,
+        },
+      };
+
+      const originalWarn = console.warn;
+      const warnings: string[] = [];
+      console.warn = (...args: any[]) => {
+        warnings.push(args.join(' '));
+      };
+
+      executeHook(input, output, sandboxConfig, mockDirectory);
+
+      console.warn = originalWarn;
+
+      expect(warnings.length).toBe(1);
+      const logMessage = warnings[0];
+      expect(logMessage).toContain('[hive:sandbox]');
+      expect(logMessage).toContain('...');
+      // Verify it's truncated (should be ~80 chars + "..." after the prefix)
+      const commandPart = logMessage.split('HOST bypass: ')[1];
+      expect(commandPart.length).toBeLessThan(90); // 80 + "..." + some margin
     });
   });
 
