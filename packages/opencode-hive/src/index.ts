@@ -440,7 +440,9 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       
       // Escape hatch: HOST: prefix (case-insensitive)
       if (/^HOST:\s*/i.test(command)) {
-        output.args.command = command.replace(/^HOST:\s*/i, '');
+        const strippedCommand = command.replace(/^HOST:\s*/i, '');
+        console.warn(`[hive:sandbox] HOST bypass: ${strippedCommand.slice(0, 80)}${strippedCommand.length > 80 ? '...' : ''}`);
+        output.args.command = strippedCommand;
         return;
       }
       
