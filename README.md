@@ -155,7 +155,8 @@ Skills provide specialized workflows that agents can load on-demand via `hive_sk
 | `verification-before-completion` | Requires running verification commands before claiming success |
 | `parallel-exploration` | Fan-out research across multiple Scout agents |
 | `code-reviewer` | Reviews code changes against plan for quality and alignment |
-| `onboarding` | Asks about workflow preferences and stores them for future sessions |
+| `docker-mastery` | Docker container expertise — debugging, docker-compose, optimization |
+| `agents-md-mastery` | AGENTS.md quality review — signal vs noise, when to prune |
 
 **Per-agent skills:** Restrict which skills appear in `hive_skill()` tool:
 
@@ -448,7 +449,7 @@ The extension watches your `.hive/` directory and displays the current state. Al
 
 | Package | Platform | Description |
 |---------|----------|-------------|
-| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 6 specialized bee agents, 14 tools, 10 skills |
+| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 6 specialized bee agents, 15 tools, 11 skills |
 | **[vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive)** | VS Code | Visual management — review, comment, approve |
 
 **Agent Selection:** Use `hive`, `architect`, or `swarm` as your primary agent. Use `@scout`, `@forager`, or `@hygienic` to mention subagents directly.
