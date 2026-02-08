@@ -612,6 +612,20 @@ We studied [Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode) (omo
 
 **Design insight:** Both features address the same meta-problem: *How do agents learn from their own work?* Prompts are contracts, not suggestions — concrete tables, checklists, and ✅/❌ examples survive model interpretation (P7). AGENTS.md captures project-level learnings (conventions, patterns, gotchas). Docker sandbox ensures those learnings are tested in isolation. Together they create a self-improving loop: agents document what they learn, test in clean environments, and future agents benefit from both.
 
+### v1.2.0 (Tighten the Gates, Deepen the Loop)
+
+**Theme:** Make agents smarter about their infrastructure, tighten enforcement.
+
+- **Docker Mastery Skill**: On-demand skill teaching agents to think in containers — debugging, docker-compose, Dockerfile authoring, image optimization. Docker is a platform for sandboxes (testing, integration, deployment), not just transparent wrapping. Primary user: Forager. Loaded via `hive_skill("docker-mastery")`
+- **AGENTS.md Mastery Skill**: On-demand skill teaching agents what makes effective pseudo-memory. AGENTS.md isn't documentation — it's the first briefing every session. Quality > quantity. Signal entries change agent behavior; noise entries waste context window. Loaded via `hive_skill("agents-md-mastery")`
+- **Tighter Discovery gate**: Replaced substring match with regex + content length check (minimum 100 chars). Empty or hidden Discovery sections now rejected. Aligns with P7 (Hard Gates)
+- **Sandbox bypass audit**: All HOST: commands logged with `[hive:sandbox]` prefix. Escape hatch removed from agent prompts — agents must ask users when host access needed. P7 enforcement without removing the mechanism
+- **Atomic AGENTS.md apply**: New `apply` action on `hive_agents_md` tool. Agents propose → user approves → apply writes atomically. Eliminates manual edit errors during approval flow
+- **Persistent sandbox containers**: One container per worktree, reused across commands. 50 test runs = 1 container, not 50. `docker run -d` + `docker exec` replaces ephemeral `docker run --rm`
+- **Context lifecycle management**: Archive method moves stale contexts to timestamped archive/. Stats method reports context health. Size warning at 20K chars. Prevents unbounded context growth
+
+**Design insight:** v1.1.1 asked "how do agents learn from their work?" v1.2.0 asks "how do agents learn to use their tools?" Skills are the answer — on-demand depth without prompt bloat. The Docker skill teaches container thinking. The AGENTS.md skill teaches memory hygiene. Both make agents more capable without adding infrastructure.
+
 ---
 
 <p align="center">
