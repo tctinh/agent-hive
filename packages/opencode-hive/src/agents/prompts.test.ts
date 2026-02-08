@@ -37,6 +37,19 @@ describe('Hive (Hybrid) prompt', () => {
       expect(QUEEN_BEE_PROMPT).toContain('scout-researcher');
     });
   });
+
+  describe('turn termination and hard blocks', () => {
+    it('defines turn termination rules', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('### Turn Termination');
+      expect(QUEEN_BEE_PROMPT).toContain('Valid endings');
+      expect(QUEEN_BEE_PROMPT).toContain('NEVER end with');
+    });
+
+    it('separates hard blocks from anti-patterns', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('### Hard Blocks');
+      expect(QUEEN_BEE_PROMPT).toContain('### Anti-Patterns');
+    });
+  });
 });
 
 describe('Architect (Planner) prompt', () => {
