@@ -98,16 +98,26 @@ ${spec}
 
 ---
 
+## Pre-implementation Checklist
+
+Before writing code, confirm:
+1. Dependencies are satisfied and required context is present.
+2. The exact files/sections to touch (from references) are identified.
+3. The first failing test to write is clear (TDD).
+4. The minimal change needed to reach green is planned.
+
+---
+
 ## Blocker Protocol
 
 If you hit a blocker requiring human decision, **DO NOT** use the question tool directly.
 Instead, escalate via the blocker protocol:
 
 1. **Save your progress** to the worktree (commit if appropriate)
-2. **Call hive_exec_complete** with blocker info:
+2. **Call hive_worktree_commit** with blocker info:
 
 \`\`\`
-hive_exec_complete({
+hive_worktree_commit({
   task: "${task}",
   feature: "${feature}",
   status: "blocked",
@@ -121,7 +131,7 @@ hive_exec_complete({
 })
 \`\`\`
 
-**After calling hive_exec_complete with blocked status, STOP IMMEDIATELY.**
+**After calling hive_worktree_commit with blocked status, STOP IMMEDIATELY.**
 
 The Hive Master will:
 1. Receive your blocker info
@@ -137,7 +147,7 @@ This keeps the user focused on ONE conversation (Hive Master) instead of multipl
 When your task is **fully complete**:
 
 \`\`\`
-hive_exec_complete({
+hive_worktree_commit({
   task: "${task}",
   feature: "${feature}",
   status: "completed",
@@ -145,14 +155,20 @@ hive_exec_complete({
 })
 \`\`\`
 
-**CRITICAL: After calling hive_exec_complete, you MUST STOP IMMEDIATELY.**
+**CRITICAL: After calling hive_worktree_commit, you MUST STOP IMMEDIATELY.**
 Do NOT continue working. Do NOT respond further. Your session is DONE.
 The Hive Master will take over from here.
+
+**Summary Guidance** (used verbatim for downstream task context):
+1. Start with **what changed** (files/areas touched).
+2. Mention **why** if it affects future tasks.
+3. Note **verification evidence** (tests/build/lint) or explicitly say "Not run".
+4. Keep it **2-4 sentences** max.
 
 If you encounter an **unrecoverable error**:
 
 \`\`\`
-hive_exec_complete({
+hive_worktree_commit({
   task: "${task}",
   feature: "${feature}",
   status: "failed",
@@ -163,7 +179,7 @@ hive_exec_complete({
 If you made **partial progress** but can't continue:
 
 \`\`\`
-hive_exec_complete({
+hive_worktree_commit({
   task: "${task}",
   feature: "${feature}",
   status: "partial",
@@ -197,16 +213,16 @@ After 3 failed attempts at same fix: STOP and report blocker.
 
 **You have access to:**
 - All standard tools (read, write, edit, bash, glob, grep)
-- \`hive_exec_complete\` - Signal task done/blocked/failed
-- \`hive_exec_abort\` - Abort and discard changes
+- \`hive_worktree_commit\` - Signal task done/blocked/failed
+- \`hive_worktree_discard\` - Abort and discard changes
 - \`hive_plan_read\` - Re-read plan if needed
 - \`hive_context_write\` - Save learnings for future tasks
 
 **You do NOT have access to (or should not use):**
 - \`question\` - Escalate via blocker protocol instead
-- \`hive_exec_start\` - No spawning sub-workers
+- \`hive_worktree_create\` - No spawning sub-workers
 - \`hive_merge\` - Only Hive Master merges
-- \`hive_background_task\` / \`task\` - No recursive delegation
+- \`task\` - No recursive delegation
 
 ---
 
@@ -216,7 +232,7 @@ After 3 failed attempts at same fix: STOP and report blocker.
 2. **Stay in scope** - Only do what the spec asks
 3. **Escalate blockers** - Don't guess on important decisions
 4. **Save context** - Use hive_context_write for discoveries
-5. **Complete cleanly** - Always call hive_exec_complete when done
+5. **Complete cleanly** - Always call hive_worktree_commit when done
 
 ---
 

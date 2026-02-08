@@ -896,7 +896,6 @@ var DEFAULT_HIVE_CONFIG = {
   disableSkills: [],
   disableMcps: [],
   agentMode: "unified",
-  delegateMode: "task",
   agents: {
     "hive-master": {
       model: DEFAULT_AGENT_MODELS["hive-master"],
@@ -950,12 +949,8 @@ var FEATURE_FILE = "feature.json";
 var STATUS_FILE = "status.json";
 var REPORT_FILE = "report.md";
 var APPROVED_FILE = "APPROVED";
-var JOURNAL_FILE = "journal.md";
 function getHivePath(projectRoot) {
   return path.join(projectRoot, HIVE_DIR);
-}
-function getJournalPath(projectRoot) {
-  return path.join(getHivePath(projectRoot), JOURNAL_FILE);
 }
 function getFeaturesPath(projectRoot) {
   return path.join(getHivePath(projectRoot), FEATURES_DIR);
@@ -1146,21 +1141,6 @@ function writeText(filePath, content) {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, content);
 }
-var JOURNAL_TEMPLATE = `# Hive Journal
-
-Audit trail of project learnings. Updated when trouble is resolved.
-
----
-
-<!-- Entry template:
-### YYYY-MM-DD: feature-name
-
-**Trouble**: What went wrong
-**Resolution**: How it was fixed
-**Constraint**: Never/Always rule derived (add to Iron Laws if recurring)
-**See**: .hive/features/feature-name/plan.md
--->
-`;
 var FeatureService = class {
   projectRoot;
   constructor(projectRoot) {
@@ -1174,10 +1154,6 @@ var FeatureService = class {
     ensureDir(featurePath);
     ensureDir(getContextPath(this.projectRoot, name));
     ensureDir(getTasksPath(this.projectRoot, name));
-    const journalPath = getJournalPath(this.projectRoot);
-    if (!fileExists(journalPath)) {
-      fs3.writeFileSync(journalPath, JOURNAL_TEMPLATE);
-    }
     const feature = {
       name,
       status: "planning",
@@ -1444,6 +1420,27 @@ var TaskService = class {
   }
   buildSpecContent(params) {
     const { featureName, task, dependsOn, allTasks, planContent, contextFiles = [], completedTasks = [] } = params;
+    const getTaskType = (planSection2, taskName) => {
+      if (!planSection2) {
+        return null;
+      }
+      const fileTypeMatches = Array.from(planSection2.matchAll(/-\s*(Create|Modify|Test):/gi)).map((match) => match[1].toLowerCase());
+      const fileTypes = new Set(fileTypeMatches);
+      if (fileTypes.size === 0) {
+        return taskName.toLowerCase().includes("test") ? "testing" : null;
+      }
+      if (fileTypes.size === 1) {
+        const onlyType = Array.from(fileTypes)[0];
+        if (onlyType === "create")
+          return "greenfield";
+        if (onlyType === "test")
+          return "testing";
+      }
+      if (fileTypes.has("modify")) {
+        return "modification";
+      }
+      return null;
+    };
     const specLines = [
       `# Task: ${task.folder}`,
       "",
@@ -1472,6 +1469,10 @@ var TaskService = class {
       specLines.push("_No plan section available._");
     }
     specLines.push("");
+    const taskType = getTaskType(planSection, task.name);
+    if (taskType) {
+      specLines.push("## Task Type", "", taskType, "");
+    }
     if (contextFiles.length > 0) {
       const contextCompiled = contextFiles.map((f) => `## ${f.name}
 
@@ -7119,29 +7120,6 @@ function getFeatureTools(workspaceRoot) {
       }
     },
     {
-      name: "hive_feature_list",
-      displayName: "List Hive Features",
-      modelDescription: "List all Hive features in the workspace with their status. Use to see available features before switching context or checking progress.",
-      readOnly: true,
-      inputSchema: {
-        type: "object",
-        properties: {}
-      },
-      invoke: async () => {
-        const names = featureService.list();
-        const features = names.map((name) => {
-          const info = featureService.getInfo(name);
-          return {
-            name,
-            status: info?.status || "unknown",
-            taskCount: info?.tasks.length || 0,
-            hasPlan: info?.hasPlan || false
-          };
-        });
-        return JSON.stringify({ features });
-      }
-    },
-    {
       name: "hive_feature_complete",
       displayName: "Complete Hive Feature",
       modelDescription: "Mark a feature as completed. Use when all tasks are done and the feature is ready for final integration. This is irreversible.",
@@ -7303,7 +7281,7 @@ function getTaskTools(workspaceRoot) {
           manual: result.manual.length,
           message: `${result.created.length} tasks created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`,
           hints: [
-            "Use hive_exec_start to begin work on a task.",
+            "Use hive_worktree_create to begin work on a task.",
             "Tasks should be executed in order unless explicitly parallelizable.",
             "Read context files before starting implementation.",
             "Update via hive_task_update when work progresses."
@@ -7337,7 +7315,7 @@ function getTaskTools(workspaceRoot) {
         const { feature, name, order } = input;
         const folder = taskService.create(feature, name, order);
         return `Created task "${folder}" with status: pending
-Reminder: run hive_exec_start to work in its worktree, and ensure any subagents work in that worktree too.`;
+Reminder: run hive_worktree_create to work in its worktree, and ensure any subagents work in that worktree too.`;
       }
     },
     {
@@ -7427,9 +7405,9 @@ function getExecTools(workspaceRoot) {
   const taskService = new TaskService(workspaceRoot);
   return [
     {
-      name: "hive_exec_start",
-      displayName: "Start Task Execution",
-      modelDescription: "Create a git worktree and begin work on a task. Isolates changes in a separate directory. Use when ready to implement a task.",
+      name: "hive_worktree_create",
+      displayName: "Create Task Worktree",
+      modelDescription: "Create a git worktree for a task. Isolates changes in a separate directory. Use when ready to implement a task.",
       inputSchema: {
         type: "object",
         properties: {
@@ -7456,7 +7434,7 @@ function getExecTools(workspaceRoot) {
           success: true,
           worktreePath: worktree.path,
           branch: worktree.branch,
-          message: `Worktree created. Work in ${worktree.path}. When done, use hive_exec_complete.`,
+          message: `Worktree created. Work in ${worktree.path}. When done, use hive_worktree_commit.`,
           hints: [
             "Do all work inside this worktree. Ensure any subagents do the same.",
             "Context files are in .hive/features/<feature>/context/ if you need background."
@@ -7465,8 +7443,8 @@ function getExecTools(workspaceRoot) {
       }
     },
     {
-      name: "hive_exec_complete",
-      displayName: "Complete Task Execution",
+      name: "hive_worktree_commit",
+      displayName: "Commit Task Worktree",
       modelDescription: "Commit changes in worktree and mark task done. Does NOT merge - use hive_merge for that. Use when task implementation is finished.",
       inputSchema: {
         type: "object",
@@ -7507,8 +7485,8 @@ ${summary}
       }
     },
     {
-      name: "hive_exec_abort",
-      displayName: "Abort Task Execution",
+      name: "hive_worktree_discard",
+      displayName: "Discard Task Worktree",
       modelDescription: "Discard all changes and remove worktree. Use when task approach is wrong and needs restart. This is destructive and irreversible.",
       destructive: true,
       inputSchema: {
@@ -7525,7 +7503,7 @@ ${summary}
         taskService.update(feature, task, { status: "pending", summary: "" });
         return JSON.stringify({
           success: true,
-          message: `Worktree removed. Task status reset to pending. Can restart with hive_exec_start.`
+          message: `Worktree removed. Task status reset to pending. Can restart with hive_worktree_create.`
         });
       }
     }
@@ -7543,7 +7521,7 @@ function getMergeTools(workspaceRoot) {
     {
       name: "hive_merge",
       displayName: "Merge Task Branch",
-      modelDescription: "Merge a completed task branch into current branch. Supports merge, squash, or rebase strategies. Use after hive_exec_complete to integrate changes.",
+      modelDescription: "Merge a completed task branch into current branch. Supports merge, squash, or rebase strategies. Use after hive_worktree_commit to integrate changes.",
       inputSchema: {
         type: "object",
         properties: {
@@ -7561,28 +7539,10 @@ function getMergeTools(workspaceRoot) {
         const { feature, task, strategy = "merge" } = input;
         const result = await worktreeService.merge(feature, task, strategy);
         return JSON.stringify({
-          success: true,
+          success: result.success,
           strategy,
-          message: result.message
+          message: result.success ? "Merge completed." : result.error || "Merge failed."
         });
-      }
-    },
-    {
-      name: "hive_worktree_list",
-      displayName: "List Worktrees",
-      modelDescription: "List all worktrees for a feature. Shows which tasks have active worktrees for concurrent work.",
-      readOnly: true,
-      inputSchema: {
-        type: "object",
-        properties: {
-          feature: { type: "string", description: "Feature name" }
-        },
-        required: ["feature"]
-      },
-      invoke: async (input) => {
-        const { feature } = input;
-        const worktrees = await worktreeService.list(feature);
-        return JSON.stringify({ worktrees });
       }
     }
   ];
@@ -7742,7 +7702,7 @@ function getNextAction(planStatus, tasks, runnable) {
     return `${runnable.length} tasks are ready to start in parallel: ${runnable.join(", ")}`;
   }
   if (runnable.length === 1) {
-    return `Start next task with hive_exec_start: ${runnable[0]}`;
+    return `Start next task with hive_worktree_create: ${runnable[0]}`;
   }
   const pending = tasks.find((t) => t.status === "pending");
   if (pending) {
@@ -7863,7 +7823,7 @@ For each task in order:
 
 #### 1. Start (creates worktree)
 \`\`\`
-hive_exec_start({ task: "01-task-name" })
+hive_worktree_create({ task: "01-task-name" })
 \`\`\`
 
 #### 2. Implement
@@ -7871,7 +7831,7 @@ Work in the isolated worktree path. Read \`spec.md\` for context.
 
 #### 3. Complete (commits to branch)
 \`\`\`
-hive_exec_complete({ task: "01-task-name", summary: "What was done" })
+hive_worktree_commit({ task: "01-task-name", summary: "What was done" })
 \`\`\`
 
 #### 4. Merge (integrates to main)
@@ -7900,8 +7860,8 @@ hive_feature_complete({ name: "feature-name" })
 | Plan | \`hive_plan_read\` | Check for user comments |
 | Plan | \`hive_plan_approve\` | Approve plan |
 | Execute | \`hive_tasks_sync\` | Generate tasks from plan |
-| Execute | \`hive_exec_start\` | Start task (creates worktree) |
-| Execute | \`hive_exec_complete\` | Finish task (commits changes) |
+| Execute | \`hive_worktree_create\` | Start task (creates worktree) |
+| Execute | \`hive_worktree_commit\` | Finish task (commits changes) |
 | Execute | \`hive_merge\` | Integrate task to main |
 | Complete | \`hive_feature_complete\` | Mark feature done |
 
@@ -7940,8 +7900,8 @@ hive_feature_complete({ name: "feature-name" })
 
 ### Task Failed
 \`\`\`
-hive_exec_abort(task="<task>")  # Discards changes
-hive_exec_start(task="<task>")  # Fresh start
+hive_worktree_discard(task="<task>")  # Discards changes
+hive_worktree_create(task="<task>")  # Fresh start
 \`\`\`
 
 ### Merge Conflicts
@@ -7951,7 +7911,7 @@ hive_exec_start(task="<task>")  # Fresh start
 `;
 var COPILOT_AGENT_TEMPLATE = `---
 description: 'Plan-first feature development with isolated worktrees and persistent context.'
-tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureList', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveExecStart', 'tctinh.vscode-hive/hiveExecComplete', 'tctinh.vscode-hive/hiveExecAbort', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveWorktreeList', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveStatus']
+tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveWorktreeCreate', 'tctinh.vscode-hive/hiveWorktreeCommit', 'tctinh.vscode-hive/hiveWorktreeDiscard', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveStatus']
 ---
 
 # Hive Agent
@@ -7972,9 +7932,9 @@ User reviews in VS Code, adds comments, approves when ready.
 ### Phase 3: Execution
 1. \\\`tasksSync()\\\` - Generate tasks from plan
 2. For each task:
-   - \\\`execStart({ task: "task-name" })\\\`
+   - \\\`worktreeCreate({ task: "task-name" })\\\`
    - Implement
-   - \\\`execComplete({ task: "task-name", summary: "..." })\\\`
+   - \\\`worktreeCommit({ task: "task-name", summary: "..." })\\\`
    - \\\`merge({ task: "task-name", strategy: "squash" })\\\`
 
 ### Phase 4: Completion

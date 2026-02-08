@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-02-06
+
+### Added
+- **Worker Orient Phase**: Forager agents now run a pre-flight checklist before coding — read references, check patterns, verify assumptions. Prevents "code first, ask questions later" failures
+- **Task-Type Auto-Inference**: `buildSpecContent()` automatically infers task type (greenfield/testing/modification/bugfix/refactoring) from task name and plan section, giving workers better context without manual annotation
+- **Post-Batch Code Review Checkpoints**: After each batch merge, orchestrators (Hive + Swarm) prompt for optional Hygienic reviewer consultation to catch drift early
+- **Scout Research Persistence**: Scout agents now persist research findings to context files via `hive_context_write`, so discoveries survive for future workers instead of dying with the session
+- **Active Discovery**: Planning agents (Hive + Architect) challenge user assumptions during planning — collaborative pushback on proposals that may not survive "Good Enough Wins" (P4)
+- **Worktree Info in `hive_status`**: Task status output now includes worktree path and branch info per task for better visibility
+
+### Changed
+- **Tool Consolidation**: Simplified from 22 tools → 14 tools by removing redundant background task and journal infrastructure
+- **Tool Rename**: `hive_exec_start` → `hive_worktree_create`, `hive_exec_complete` → `hive_worktree_commit` — names now reflect the worktree-based execution model
+- **Worker Summary Guidance**: Forager prompts now guide richer summaries (files changed, key decisions, gotchas, what's left) instead of the old notepad-based approach
+- **All Agent Prompts Updated**: Hive, Swarm, Architect, Scout, Forager, Hygienic — all reflect the consolidated tool set and new capabilities
+- **All Skills Updated**: Removed background task references, renamed exec→worktree throughout
+- **VS Code Extension Updated**: Tool registrations reflect the 14-tool set
+
+### Removed
+- **Background Task Infrastructure**: ~5,000 lines deleted — `agent-gate.ts`, `concurrency.ts`, `manager.ts`, `poller.ts`, `store.ts`, `types.ts`, `background-tools.ts` and tests. The complexity wasn't justified; direct worktree execution is simpler and more reliable
+- **`delegateMode` Config**: Removed from types and configuration — no longer needed without background tasks
+- **Journal Infrastructure**: Removed journal paths, templates, and references from hive-core — journals were write-only artifacts nobody read
+- **8 Redundant Tools**: `hive_background_start`, `hive_background_status`, `hive_background_cancel`, `hive_background_result`, `hive_exec_start`, `hive_exec_complete`, `hive_journal_read`, `hive_feature_status`
+- **Dead Notepad References**: Cleaned up stale notepad guidance from forager prompt
+
+### Fixed
+- **Stale Tool References**: `hive_exec_start`/`hive_exec_complete` → `hive_worktree_create`/`hive_worktree_commit` in PHILOSOPHY.md and all documentation
+
+### Stats
+- 54 files changed, 512 insertions, 7,328 deletions (net ~6,800 lines removed)
+- Test suite: 88 tests across 5 files (4 new tests for task-type inference)
+- Clean build across all 3 packages (hive-core, opencode-hive, vscode-hive)
+
 ## [1.0.7] - 2026-02-04
 
 ### Added

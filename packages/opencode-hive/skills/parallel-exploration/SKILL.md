@@ -1,6 +1,6 @@
 ---
 name: parallel-exploration
-description: Use when you need parallel, read-only exploration with hive_background_* or task() (Scout fan-out)
+description: Use when you need parallel, read-only exploration with task() (Scout fan-out)
 ---
 
 # Parallel Exploration (Scout Fan-Out)
@@ -13,11 +13,7 @@ When you need to answer "where/how does X work?" across multiple domains (codeba
 
 **Safe in Planning mode:** This is read-only exploration. It is OK to use during exploratory research even when there is no feature, no plan, and no approved tasks.
 
-**This skill is for read-only research.** For parallel implementation work, use `hive_skill("dispatching-parallel-agents")` with `hive_exec_start`.
-
-**Two valid execution paths:**
-- **Path A (Hive background tools):** Use `hive_background_task`, `hive_background_output`, `hive_background_cancel` when available.
-- **Path B (Task mode):** Use native `task()` for delegation when background tools are not registered.
+**This skill is for read-only research.** For parallel implementation work, use `hive_skill("dispatching-parallel-agents")` with `hive_worktree_create`.
 
 ## When to Use
 
@@ -56,51 +52,16 @@ Split your investigation into 2-4 independent sub-questions. Good decomposition:
 - "What is X?" then "How is X used?" (second depends on first)
 - "Find the bug" then "Fix the bug" (not read-only)
 
-### 2. Spawn Background Tasks (Fan-Out)
+### 2. Spawn Tasks (Fan-Out)
 
 Launch all tasks before waiting for any results:
 
 ```typescript
-// Path A: Hive background tools (when available)
-// Fan-out: spawn all tasks first
-hive_background_task({
-  agent: "scout-researcher",
-  description: "Find hive_background_task implementation",
-  prompt: `Where is hive_background_task implemented and registered?
-    - Find the tool definition
-    - Find the plugin registration
-    - Return file paths with line numbers`,
-  sync: false
-})
-
-hive_background_task({
-  agent: "scout-researcher",
-  description: "Analyze background task concurrency",
-  prompt: `How does background task concurrency/queueing work?
-    - Find the manager/scheduler code
-    - Document the concurrency model
-    - Return file paths with evidence`,
-  sync: false
-})
-
-hive_background_task({
-  agent: "scout-researcher",
-  description: "Find parent notification mechanism",
-  prompt: `How does parent notification work for background tasks?
-    - Where is the notification built?
-    - How is it sent to the parent session?
-    - Return file paths with evidence`,
-  sync: false
-})
-```
-
-```typescript
-// Path B: Task mode (native task tool)
 // Parallelize by issuing multiple task() calls in the same assistant message.
 task({
   subagent_type: 'scout-researcher',
-  description: 'Find hive_background_task implementation',
-  prompt: `Where is hive_background_task implemented and registered?
+  description: 'Find API route implementation',
+  prompt: `Where are API routes implemented and registered?
     - Find the tool definition
     - Find the plugin registration
     - Return file paths with line numbers`,
@@ -126,8 +87,7 @@ task({
 ```
 
 **Key points:**
-- Use `agent: "scout-researcher"` for read-only exploration
-- Use `sync: false` to return immediately (non-blocking)
+- Use `subagent_type: 'scout-researcher'` for read-only exploration
 - Give each task a clear, focused `description`
 - Make prompts specific about what evidence to return
 
@@ -142,35 +102,7 @@ You'll receive a `<system-reminder>` notification when each task completes.
 
 ### 4. Collect Results
 
-When notified of completion, retrieve results:
-
-```typescript
-// Path A: Hive background tools
-// Get output from completed task
-hive_background_output({
-  task_id: "task-abc123",
-  block: false  // Don't wait, task already done
-})
-```
-
-**For incremental output (long-running tasks):**
-
-```typescript
-// First call - get initial output
-hive_background_output({
-  task_id: "task-abc123",
-  block: true,      // Wait for output
-  timeout: 30000    // 30 second timeout
-})
-// Returns: { output: "...", cursor: "5" }
-
-// Later call - get new output since cursor
-hive_background_output({
-  task_id: "task-abc123",
-  cursor: "5",      // Resume from message 5
-  block: true
-})
-```
+When each task completes, its result is returned directly. Collect the outputs from each task and proceed to synthesis.
 
 ### 5. Synthesize Findings
 
@@ -181,16 +113,7 @@ Combine results from all tasks:
 
 ### 6. Cleanup (If Needed)
 
-Cancel tasks that are no longer needed:
-
-```typescript
-// Path A: Hive background tools
-// Cancel specific task
-hive_background_cancel({ task_id: "task-abc123" })
-
-// Cancel all your background tasks
-hive_background_cancel({ all: true })
-```
+No manual cancellation is required in task mode.
 
 ## Prompt Templates
 
@@ -238,48 +161,20 @@ Return:
 
 ## Real Example
 
-**Investigation:** "How does the background task system work?"
+**Investigation:** "How does the API routing system work?"
 
 **Decomposition:**
-1. Implementation: Where is `hive_background_task` tool defined?
-2. Concurrency: How does task scheduling/queueing work?
-3. Notifications: How does parent session get notified?
+1. Implementation: Where are API routes defined?
+2. Routing: How does route registration work?
+3. Notifications: How are errors surfaced to the caller?
 
 **Fan-out:**
 ```typescript
-// Path A: Hive background tools
-// Task 1: Implementation
-hive_background_task({
-  agent: "scout-researcher",
-  description: "Find hive_background_task implementation",
-  prompt: "Where is hive_background_task implemented? Find tool definition and registration.",
-  sync: false
-})
-
-// Task 2: Concurrency
-hive_background_task({
-  agent: "scout-researcher",
-  description: "Analyze concurrency model",
-  prompt: "How does background task concurrency work? Find the manager/scheduler.",
-  sync: false
-})
-
-// Task 3: Notifications
-hive_background_task({
-  agent: "scout-researcher",
-  description: "Find notification mechanism",
-  prompt: "How are parent sessions notified of task completion?",
-  sync: false
-})
-```
-
-```typescript
-// Path B: Task mode (native task tool)
 // Parallelize by issuing multiple task() calls in the same assistant message.
 task({
   subagent_type: 'scout-researcher',
-  description: 'Find hive_background_task implementation',
-  prompt: 'Where is hive_background_task implemented? Find tool definition and registration.',
+  description: 'Find API route implementation',
+  prompt: 'Where are API routes implemented? Find tool definition and registration.',
 });
 
 task({
@@ -307,20 +202,12 @@ task({
 **Spawning sequentially (defeats the purpose):**
 ```typescript
 // BAD: Wait for each before spawning next
-const result1 = await hive_background_task({ ..., sync: true })
-const result2 = await hive_background_task({ ..., sync: true })
+await task({ ... });
+await task({ ... });
 ```
 
 ```typescript
-// GOOD: Spawn all, then collect
-hive_background_task({ ..., sync: false })  // Returns immediately
-hive_background_task({ ..., sync: false })  // Returns immediately
-hive_background_task({ ..., sync: false })  // Returns immediately
-// ... later, collect results with hive_background_output
-```
-
-```typescript
-// GOOD (task mode): Spawn all in the same assistant message
+// GOOD: Spawn all in the same assistant message
 task({ ... });
 task({ ... });
 task({ ... });
@@ -349,7 +236,5 @@ task({ ... });
 
 After using this pattern, verify:
 - [ ] All tasks spawned before collecting any results (true fan-out)
-- [ ] Received notifications for completed tasks (Path A)
-- [ ] Successfully retrieved output with `hive_background_output` (Path A)
-- [ ] Verified `task()` fan-out pattern used when in task mode (Path B)
+- [ ] Verified `task()` fan-out pattern used for parallel exploration
 - [ ] Synthesized findings into coherent answer

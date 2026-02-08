@@ -12,7 +12,7 @@ export function getMergeTools(workspaceRoot: string): ToolRegistration[] {
     {
       name: 'hive_merge',
       displayName: 'Merge Task Branch',
-      modelDescription: 'Merge a completed task branch into current branch. Supports merge, squash, or rebase strategies. Use after hive_exec_complete to integrate changes.',
+      modelDescription: 'Merge a completed task branch into current branch. Supports merge, squash, or rebase strategies. Use after hive_worktree_commit to integrate changes.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -30,28 +30,12 @@ export function getMergeTools(workspaceRoot: string): ToolRegistration[] {
         const { feature, task, strategy = 'merge' } = input as { feature: string; task: string; strategy?: string };
         const result = await worktreeService.merge(feature, task, strategy as any);
         return JSON.stringify({
-          success: true,
+          success: result.success,
           strategy,
-          message: result.message,
+          message: result.success
+            ? 'Merge completed.'
+            : result.error || 'Merge failed.',
         });
-      },
-    },
-    {
-      name: 'hive_worktree_list',
-      displayName: 'List Worktrees',
-      modelDescription: 'List all worktrees for a feature. Shows which tasks have active worktrees for concurrent work.',
-      readOnly: true,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          feature: { type: 'string', description: 'Feature name' },
-        },
-        required: ['feature'],
-      },
-      invoke: async (input) => {
-        const { feature } = input as { feature: string };
-        const worktrees = await worktreeService.list(feature);
-        return JSON.stringify({ worktrees });
       },
     },
   ];

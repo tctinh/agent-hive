@@ -40,19 +40,9 @@ Use MCP tools for focused research; for multi-domain exploration, use parallel S
 | `context7_query-docs` | Library documentation |
 | `websearch_web_search_exa` | Web search and scraping |
 | `ast_grep_search` | AST-aware code search |
-| `hive_background_task` | Parallel exploration via Scout fan-out | 
+| `task()` | Parallel exploration via Scout fan-out | 
 
 For exploratory fan-out, load `hive_skill("parallel-exploration")` for the full playbook.
-
-Quick pattern:
-```
-hive_background_task({
-  agent: "scout-researcher",
-  prompt: "Find all API routes in src/api/",
-  description: "Find API patterns",
-  sync: false
-})
-```
 
 ---
 
@@ -84,11 +74,7 @@ Classify Intent → Discovery → Plan → Review → Execute → Merge
 
 ### Research First (Greenfield/Complex)
 
-For parallel exploration, load `hive_skill("parallel-exploration")`. Quick pattern:
-```
-hive_background_task({ agent: "scout-researcher", prompt: "Find patterns...", sync: false })
-hive_context_write({ name: "research", content: "# Findings\n..." })
-```
+For parallel exploration, load `hive_skill("parallel-exploration")`.
 
 ### Question Tool
 
@@ -262,12 +248,12 @@ hive_tasks_sync()
 ### Execute Each Task
 
 ```
-hive_exec_start({ task: "01-task-name" })  // Creates worktree; returns delegation instructions
+hive_worktree_create({ task: "01-task-name" })  // Creates worktree; returns delegation instructions
 task({ ...taskCall })  // Only when delegationRequired is true
   ↓
 [Forager Bee implements in worktree]
   ↓
-hive_exec_complete({ task, summary, status: "completed" })
+hive_worktree_commit({ task, summary, status: "completed" })
   ↓
 hive_merge({ task: "01-task-name", strategy: "squash" })
 ```
@@ -293,9 +279,9 @@ When multiple tasks have their dependencies satisfied (runnable), the orchestrat
 If `delegationRequired` is returned for a task, call `task` to spawn that worker.
 
 ```
-hive_exec_start({ task: "02-task-a" })
-hive_exec_start({ task: "03-task-b" })
-hive_worker_status()  // Monitor all
+hive_worktree_create({ task: "02-task-a" })
+hive_worktree_create({ task: "03-task-b" })
+hive_status()  // Monitor all
 ```
 
 ---
@@ -306,9 +292,9 @@ When worker returns `status: 'blocked'`:
 
 ### Quick Decision (No Plan Change)
 
-1. `hive_worker_status()` - get details
+1. `hive_status()` - get details
 2. Ask user via question tool
-3. Resume: `hive_exec_start({ task, continueFrom: "blocked", decision: "..." })`
+3. Resume: `hive_worktree_create({ task, continueFrom: "blocked", decision: "..." })`
 
 ### Plan Gap Detected
 
@@ -329,7 +315,7 @@ If blocker suggests plan is incomplete:
 ```
 
 If "Revise Plan":
-1. `hive_exec_abort({ task })`
+1. `hive_worktree_discard({ task })`
 2. `hive_context_write({ name: "learnings", content: "..." })`
 3. `hive_plan_write({ content: "..." })` (updated plan)
 4. Wait for re-approval
@@ -340,18 +326,18 @@ If "Revise Plan":
 
 | Phase | Tool | Purpose |
 |-------|------|---------|
-| Discovery | `grep_app_searchGitHub` / `context7_query-docs` / `hive_background_task` | Research delegation (parallel exploration) |
+| Discovery | `grep_app_searchGitHub` / `context7_query-docs` / `task()` | Research delegation (parallel exploration) |
 | Plan | `hive_feature_create` | Start feature |
 | Plan | `hive_context_write` | Save research |
 | Plan | `hive_plan_write` | Write plan |
 | Plan | `hive_plan_read` | Check comments |
 | Plan | `hive_plan_approve` | Approve plan |
 | Execute | `hive_tasks_sync` | Generate tasks |
-| Execute | `hive_exec_start` | Spawn Forager Bee worker |
-| Execute | `hive_exec_complete` | Finish task |
-| Execute | `hive_exec_abort` | Discard task |
+| Execute | `hive_worktree_create` | Spawn Forager Bee worker |
+| Execute | `hive_worktree_commit` | Finish task |
+| Execute | `hive_worktree_discard` | Discard task |
 | Execute | `hive_merge` | Integrate task |
-| Execute | `hive_worker_status` | Check workers/blockers |
+| Execute | `hive_status` | Check workers/blockers |
 | Complete | `hive_feature_complete` | Mark done |
 | Status | `hive_status` | Overall progress |
 
@@ -379,8 +365,8 @@ If "Revise Plan":
 
 ### Task Failed
 ```
-hive_exec_abort({ task })  # Discard
-hive_exec_start({ task })  # Fresh start
+hive_worktree_discard({ task })  # Discard
+hive_worktree_create({ task })  # Fresh start
 ```
 
 ### After 3 Failures

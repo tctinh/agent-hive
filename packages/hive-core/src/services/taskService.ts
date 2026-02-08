@@ -176,6 +176,33 @@ export class TaskService {
   }): string {
     const { featureName, task, dependsOn, allTasks, planContent, contextFiles = [], completedTasks = [] } = params;
 
+    const getTaskType = (planSection: string | null, taskName: string): string | null => {
+      if (!planSection) {
+        return null;
+      }
+
+      const fileTypeMatches = Array.from(planSection.matchAll(/-\s*(Create|Modify|Test):/gi)).map(
+        match => match[1].toLowerCase()
+      );
+      const fileTypes = new Set(fileTypeMatches);
+
+      if (fileTypes.size === 0) {
+        return taskName.toLowerCase().includes('test') ? 'testing' : null;
+      }
+
+      if (fileTypes.size === 1) {
+        const onlyType = Array.from(fileTypes)[0];
+        if (onlyType === 'create') return 'greenfield';
+        if (onlyType === 'test') return 'testing';
+      }
+
+      if (fileTypes.has('modify')) {
+        return 'modification';
+      }
+
+      return null;
+    };
+
     const specLines: string[] = [
       `# Task: ${task.folder}`,
       '',
@@ -208,6 +235,11 @@ export class TaskService {
     }
 
     specLines.push('');
+
+    const taskType = getTaskType(planSection, task.name);
+    if (taskType) {
+      specLines.push('## Task Type', '', taskType, '');
+    }
 
     if (contextFiles.length > 0) {
       const contextCompiled = contextFiles

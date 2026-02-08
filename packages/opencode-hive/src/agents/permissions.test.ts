@@ -58,7 +58,7 @@ function createStubClient(): unknown {
   };
 }
 
-describe('Agent permissions for background task delegation', () => {
+describe('Agent permissions', () => {
   afterEach(() => {
     mock.restore();
   });
@@ -101,9 +101,6 @@ describe('Agent permissions for background task delegation', () => {
 
     const hivePerm = opencodeConfig.agent?.['hive-master']?.permission;
     expect(hivePerm).toBeTruthy();
-    expect(hivePerm!.hive_background_task).toBe('allow');
-    expect(hivePerm!.hive_background_output).toBe('allow');
-    expect(hivePerm!.hive_background_cancel).toBe('allow');
   });
 
   it('registers dedicated agents in dedicated mode', async () => {
@@ -149,12 +146,6 @@ describe('Agent permissions for background task delegation', () => {
     expect(swarmPerm).toBeTruthy();
     expect(architectPerm).toBeTruthy();
 
-    for (const perm of [swarmPerm!, architectPerm!]) {
-      expect(perm.hive_background_task).toBe('allow');
-      expect(perm.hive_background_output).toBe('allow');
-      expect(perm.hive_background_cancel).toBe('allow');
-    }
-
     expect(architectPerm!.edit).toBe('deny');
     expect(architectPerm!.task).toBe('allow');
   });
@@ -189,9 +180,6 @@ describe('Agent permissions for background task delegation', () => {
     for (const name of subagentNames) {
       const perm = opencodeConfig.agent?.[name]?.permission;
       expect(perm).toBeTruthy();
-      expect(perm!.hive_background_task).toBe('deny');
-      expect(perm!.hive_background_output).toBe('deny');
-      expect(perm!.hive_background_cancel).toBe('deny');
       expect(perm!.task).toBe('deny');
       expect(perm!.delegate).toBe('deny');
     }

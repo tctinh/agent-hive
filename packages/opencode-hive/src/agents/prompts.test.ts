@@ -23,18 +23,18 @@ describe('Hive (Hybrid) prompt', () => {
       expect(QUEEN_BEE_PROMPT).not.toContain("- Don't execute - plan only");
     });
 
-    it('recommends sync: true for single-scout research', () => {
-      expect(QUEEN_BEE_PROMPT).toContain('sync: true');
+    it('explains task() is BLOCKING', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('BLOCKING');
+      expect(QUEEN_BEE_PROMPT).toContain('returns when done');
     });
 
     it('includes internal codebase exploration in Research intent', () => {
       expect(QUEEN_BEE_PROMPT).toContain('Internal codebase exploration');
     });
 
-    it('includes task vs hive mode research fan-out guidance', () => {
-      expect(QUEEN_BEE_PROMPT).toContain(
-        'In task mode, use task() for research fan-out; in hive mode, use hive_background_task.'
-      );
+    it('includes task() guidance for research', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('task(');
+      expect(QUEEN_BEE_PROMPT).toContain('scout-researcher');
     });
   });
 });
@@ -48,7 +48,6 @@ describe('Architect (Planner) prompt', () => {
     it('permits research and review delegation via task()', () => {
       expect(ARCHITECT_BEE_PROMPT).toContain('You may use task() to delegate read-only research to Scout and plan review to Hygienic.');
       expect(ARCHITECT_BEE_PROMPT).toContain('Never use task() to delegate implementation or coding work.');
-      expect(ARCHITECT_BEE_PROMPT).toContain('Tool availability depends on delegateMode.');
     });
 
     it('does NOT contain the blanket prohibition "Delegate work or spawn workers"', () => {
@@ -79,18 +78,17 @@ describe('Swarm (Orchestrator) prompt', () => {
       expect(SWARM_BEE_PROMPT).toContain('Cancel background tasks only when stale or no longer needed');
     });
 
-    it('contains sync: true guidance for single-scout research', () => {
-      expect(SWARM_BEE_PROMPT).toContain('sync: true');
+    it('explains task() is BLOCKING for delegation', () => {
+      expect(SWARM_BEE_PROMPT).toContain('BLOCKING');
+      expect(SWARM_BEE_PROMPT).toContain('returns when');
     });
 
-    it('contains sync: false guidance for fan-out', () => {
-      expect(SWARM_BEE_PROMPT).toContain('sync: false');
+    it('tells to check hive_status() after task() returns', () => {
+      expect(SWARM_BEE_PROMPT).toContain('hive_status()');
     });
 
-    it('includes task vs hive mode research fan-out guidance', () => {
-      expect(SWARM_BEE_PROMPT).toContain(
-        'In task mode, use task() for research fan-out; in hive mode, use hive_background_task.'
-      );
+    it('includes task() guidance for research fan-out', () => {
+      expect(SWARM_BEE_PROMPT).toContain('task() for research fan-out');
     });
   });
 });
@@ -104,12 +102,9 @@ describe('README.md documentation', () => {
       expect(readmeContent).toContain('### Planning-mode delegation');
     });
 
-    it('contains sync: true string', () => {
-      expect(readmeContent).toContain('sync: true');
-    });
-
-    it('contains sync: false string', () => {
-      expect(readmeContent).toContain('sync: false');
+    it('explains task() delegation model', () => {
+      expect(readmeContent).toContain('Delegate to Scout');
+      expect(readmeContent).toContain('Read-only exploration');
     });
 
     it('clarifies that "don\'t execute" means "don\'t implement"', () => {

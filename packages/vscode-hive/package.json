@@ -2,7 +2,7 @@
   "name": "vscode-hive",
   "displayName": "Agent Hive",
   "description": "From Vibe Coding to Hive Coding - Review and approve AI-generated plans",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "publisher": "tctinh",
   "license": "MIT WITH Commons-Clause",
   "icon": "icon.png",
@@ -56,17 +56,6 @@
           "required": [
             "name"
           ]
-        }
-      },
-      {
-        "name": "hive_feature_list",
-        "displayName": "List Hive Features",
-        "modelDescription": "List all Hive features in the workspace with their status. Use to see available features before switching context or checking progress.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveFeatureList",
-        "inputSchema": {
-          "type": "object",
-          "properties": {}
         }
       },
       {
@@ -410,11 +399,11 @@
         }
       },
       {
-        "name": "hive_exec_start",
-        "displayName": "Start Task Execution",
-        "modelDescription": "Create a git worktree and begin work on a task. Isolates changes in a separate directory. Use when ready to implement a task.",
+        "name": "hive_worktree_create",
+        "displayName": "Create Task Worktree",
+        "modelDescription": "Create a git worktree for a task. Isolates changes in a separate directory. Use when ready to implement a task.",
         "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveExecStart",
+        "toolReferenceName": "hiveWorktreeCreate",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -434,11 +423,11 @@
         }
       },
       {
-        "name": "hive_exec_complete",
-        "displayName": "Complete Task Execution",
+        "name": "hive_worktree_commit",
+        "displayName": "Commit Task Worktree",
         "modelDescription": "Commit changes in worktree and mark task done. Does NOT merge - use hive_merge for that. Use when task implementation is finished.",
         "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveExecComplete",
+        "toolReferenceName": "hiveWorktreeCommit",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -463,11 +452,11 @@
         }
       },
       {
-        "name": "hive_exec_abort",
-        "displayName": "Abort Task Execution",
+        "name": "hive_worktree_discard",
+        "displayName": "Discard Task Worktree",
         "modelDescription": "Discard all changes and remove worktree. Use when task approach is wrong and needs restart. This is destructive and irreversible.",
         "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveExecAbort",
+        "toolReferenceName": "hiveWorktreeDiscard",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -516,25 +505,6 @@
           "required": [
             "feature",
             "task"
-          ]
-        }
-      },
-      {
-        "name": "hive_worktree_list",
-        "displayName": "List Worktrees",
-        "modelDescription": "List all worktrees for a feature. Shows which tasks have active worktrees for concurrent work.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveWorktreeList",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": {
-              "type": "string",
-              "description": "Feature name"
-            }
-          },
-          "required": [
-            "feature"
           ]
         }
       },

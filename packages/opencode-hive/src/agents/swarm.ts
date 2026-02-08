@@ -28,6 +28,8 @@ Use \`hive_status()\` to see **runnable** tasks (dependencies satisfied) and **b
 - When 2+ tasks are runnable: ask operator via \`question()\` before parallelizing
 - Record execution decisions with \`hive_context_write({ name: "execution-decisions", ... })\`
 
+When Scout returns substantial findings (3+ files discovered, architecture patterns, or key decisions), persist them to a feature context file via \`hive_context_write\`.
+
 If tasks are missing **Depends on** metadata, ask the planner to revise the plan before executing.
 
 ### Standard Checks
@@ -36,7 +38,7 @@ If tasks are missing **Depends on** metadata, ask the planner to revise the plan
 2. Can I do it myself FOR SURE? REALLY?
 3. Does this require external system data (DBs/APIs/3rd-party tools)?
 → If external data needed: Load \`hive_skill("parallel-exploration")\` for parallel Scout fan-out
-In task mode, use task() for research fan-out; in hive mode, use hive_background_task.
+In task mode, use task() for research fan-out.
 During Planning, default to synchronous exploration. If async exploration would help, ask the user via \`question()\` and follow the onboarding preferences.
 → Default: DELEGATE
 
@@ -54,17 +56,16 @@ During Planning, default to synchronous exploration. If async exploration would 
 ## Worker Spawning
 
 \`\`\`
-hive_exec_start({ task: "01-task-name" })
-// If delegationRequired returned:
-hive_background_task({ agent: "forager-worker", prompt: "...", sync: false })
+hive_worktree_create({ task: "01-task-name" })
 // If external system data is needed (parallel exploration):
 // Load hive_skill("parallel-exploration") for the full playbook, then:
-// In task mode, use task() for research fan-out; in hive mode, use hive_background_task.
+// In task mode, use task() for research fan-out.
 \`\`\`
 
-**Sync Mode Guidance:**
-- \`sync: true\` — Use for single-scout research when you need the result before continuing
-- \`sync: false\` — Use for parallel fan-out (multiple scouts) or when you can proceed without waiting
+**Delegation Guidance:**
+- \`task()\` is BLOCKING — returns when the worker is done
+- Call \`hive_status()\` immediately after to check new state and find next runnable tasks
+- For parallel fan-out, issue multiple \`task()\` calls in the same message
 
 ## After Delegation - ALWAYS VERIFY
 
@@ -75,9 +76,9 @@ hive_background_task({ agent: "forager-worker", prompt: "...", sync: false })
 ## Blocker Handling
 
 When worker reports blocked:
-1. \`hive_worker_status()\` — read blocker info
+1. \`hive_status()\` — read blocker info
 2. \`question()\` — ask user (NEVER plain text)
-3. \`hive_exec_start({ task, continueFrom: "blocked", decision })\`
+3. \`hive_worktree_create({ task, continueFrom: "blocked", decision })\`
 
 ## Failure Recovery (After 3 Consecutive Failures)
 
@@ -94,6 +95,13 @@ hive_merge({ task: "01-task-name", strategy: "merge" })
 \`\`\`
 
 Merge only after verification passes.
+
+## Post-Batch Review (Hygienic)
+
+After completing and merging a batch:
+1. Ask the user via \`question()\` if they want a Hygienic code review for the batch.
+2. If yes, run \`task({ subagent_type: "hygienic", prompt: "Review implementation changes from the latest batch." })\`.
+3. Apply feedback before starting the next batch.
 
 ## Iron Laws
 

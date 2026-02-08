@@ -104,7 +104,6 @@ Run Agent Hive once to auto-generate a default configuration at `~/.config/openc
 {
   "$schema": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
   "agentMode": "unified",
-  "delegateMode": "task",
   "disableSkills": [],
   "disableMcps": [],
   "agents": {
@@ -121,7 +120,6 @@ Run Agent Hive once to auto-generate a default configuration at `~/.config/openc
 | Option | Values | Description |
 |--------|--------|-------------|
 | `agentMode` | `unified` (default), `dedicated` | `unified`: Single `hive-master` agent handles planning + orchestration. `dedicated`: Separate `architect-planner` and `swarm-orchestrator` agents. |
-| `delegateMode` | `task` (default), `hive` | `task`: Use OpenCode's built-in `task()` tool. `hive`: Use Hive's `hive_background_task` tools. |
 | `disableSkills` | `string[]` | Globally disable specific skills (won't appear in `hive_skill` tool). |
 | `disableMcps` | `string[]` | Globally disable MCP servers. Options: `websearch`, `context7`, `grep_app`, `ast_grep`. |
 
@@ -156,6 +154,8 @@ Skills provide specialized workflows that agents can load on-demand via `hive_sk
 | `systematic-debugging` | Requires root cause investigation before proposing fixes |
 | `verification-before-completion` | Requires running verification commands before claiming success |
 | `parallel-exploration` | Fan-out research across multiple Scout agents |
+| `code-reviewer` | Reviews code changes against plan for quality and alignment |
+| `onboarding` | Asks about workflow preferences and stores them for future sessions |
 
 **Per-agent skills:** Restrict which skills appear in `hive_skill()` tool:
 
@@ -448,7 +448,7 @@ The extension watches your `.hive/` directory and displays the current state. Al
 
 | Package | Platform | Description |
 |---------|----------|-------------|
-| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 5 specialized bee agents, planning, execution, tracking |
+| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 6 specialized bee agents, 14 tools, 10 skills |
 | **[vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive)** | VS Code | Visual management — review, comment, approve |
 
 **Agent Selection:** Use `hive`, `architect`, or `swarm` as your primary agent. Use `@scout`, `@forager`, or `@hygienic` to mention subagents directly.
@@ -492,7 +492,7 @@ Clean git history (worktree merges), full documentation (generated as you work),
 
 ## Philosophy
 
-Hive is built on 6 core principles:
+Hive is built on 7 core principles:
 
 1. **Context Persists** — Calibration survives sessions. The "3 months later" problem solved.
 2. **Plan → Approve → Execute** — Dialogue until approved, then trust. Two phases with a clear gate.
@@ -500,6 +500,7 @@ Hive is built on 6 core principles:
 4. **Good Enough Wins** — Capture what works for this context. Reject over-engineering.
 5. **Batched Parallelism** — Parallel tasks in batches. Sequential batches share context.
 6. **Tests Define Done** — For implementation tasks, tests provide the feedback loop.
+7. **Iron Laws + Hard Gates** — Non-negotiable constraints enforced by tools, not guidelines.
 
 See [PHILOSOPHY.md](PHILOSOPHY.md) for the full framework.
 
