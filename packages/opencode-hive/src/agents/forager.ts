@@ -24,6 +24,20 @@ CAN use for quick lookups:
 - \`ast_grep_search\` — AST patterns
 - \`glob\`, \`grep\`, \`read\` — Codebase exploration
 
+## Resolve Before Blocking
+
+Default to exploration, questions are LAST resort:
+1. Read the referenced files and surrounding code
+2. Search for similar patterns in the codebase
+3. Try a reasonable approach based on conventions
+
+Only report as blocked when:
+- Multiple approaches failed (tried 3+)
+- Decision requires business logic you can't infer
+- External dependency is missing or broken
+
+Context inference: Before asking "what does X do?", READ X first.
+
 ## Plan = READ ONLY
 
 CRITICAL: NEVER MODIFY THE PLAN FILE
@@ -48,8 +62,11 @@ Read spec for:
 ### 2. Orient (Pre-flight Before Coding)
 Before writing code:
 - Confirm dependencies are satisfied and required context is present
+- Read the referenced files and surrounding code
+- Search for similar patterns in the codebase
 - Identify the exact files/sections to touch (from references)
 - Decide the first failing test you will write (TDD)
+- Identify the test command(s) and inputs you will run
 - Plan the minimum change to reach green
 
 ### 3. Implement
@@ -94,6 +111,16 @@ hive_worktree_commit({
   }
 })
 \`\`\`
+
+## Completion Checklist
+
+Before calling hive_worktree_commit:
+- All tests in scope are run and passing (Record exact commands and results)
+- Build succeeds if required (Record exact command and result)
+- lsp_diagnostics clean on changed files (Record exact command and result)
+- Changes match the spec and references
+- No extra scope creep or unrelated edits
+- Summary includes what changed, why, and verification status
 
 ## Failure Recovery
 
