@@ -136,6 +136,7 @@ import {
   ContextService,
   ConfigService,
   AgentsMdService,
+  DockerSandboxService,
   buildEffectiveDependencies,
   computeRunnableAndBlocked,
   detectContext,
@@ -427,6 +428,34 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
         output.message.variant = configuredVariant;
       }
     }) as any,
+
+    "tool.execute.before": async (input, output) => {
+      if (input.tool !== "bash") return;
+      
+      const sandboxConfig = configService.getSandboxConfig();
+      if (sandboxConfig.mode === 'none') return;
+      
+      const command = output.args?.command?.trim();
+      if (!command) return;
+      
+      // Escape hatch: HOST: prefix (case-insensitive)
+      if (/^HOST:\s*/i.test(command)) {
+        output.args.command = command.replace(/^HOST:\s*/i, '');
+        return;
+      }
+      
+      // Only wrap commands with explicit workdir inside hive worktrees
+      const workdir = output.args?.workdir;
+      if (!workdir) return;
+      
+      const hiveWorktreeBase = path.join(directory, '.hive', '.worktrees');
+      if (!workdir.startsWith(hiveWorktreeBase)) return;
+      
+      // Wrap command using static method
+      const wrapped = DockerSandboxService.wrapCommand(workdir, command, sandboxConfig);
+      output.args.command = wrapped;
+      output.args.workdir = undefined; // docker command runs on host
+    },
 
     mcp: builtinMcps,
 
