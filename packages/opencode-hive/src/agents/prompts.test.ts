@@ -4,6 +4,7 @@ import * as path from 'path';
 import { QUEEN_BEE_PROMPT } from './hive';
 import { ARCHITECT_BEE_PROMPT } from './architect';
 import { SWARM_BEE_PROMPT } from './swarm';
+import { FORAGER_BEE_PROMPT } from './forager';
 
 describe('Hive (Hybrid) prompt', () => {
   describe('delegation planning alignment', () => {
@@ -90,6 +91,24 @@ describe('Swarm (Orchestrator) prompt', () => {
     it('includes task() guidance for research fan-out', () => {
       expect(SWARM_BEE_PROMPT).toContain('task() for research fan-out');
     });
+  });
+});
+
+describe('Forager (Worker/Coder) prompt', () => {
+  it('adds resolve-before-blocking guidance', () => {
+    expect(FORAGER_BEE_PROMPT).toContain('## Resolve Before Blocking');
+    expect(FORAGER_BEE_PROMPT).toContain('Default to exploration, questions are LAST resort');
+    expect(FORAGER_BEE_PROMPT).toContain('Context inference: Before asking "what does X do?", READ X first.');
+  });
+
+  it('adds a completion checklist before reporting done', () => {
+    expect(FORAGER_BEE_PROMPT).toContain('## Completion Checklist');
+    expect(FORAGER_BEE_PROMPT).toContain('Record exact commands and results');
+  });
+
+  it('expands the orient step with explicit pre-flight actions', () => {
+    expect(FORAGER_BEE_PROMPT).toContain('Read the referenced files and surrounding code');
+    expect(FORAGER_BEE_PROMPT).toContain('Search for similar patterns in the codebase');
   });
 });
 
