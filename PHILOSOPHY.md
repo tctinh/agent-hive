@@ -565,6 +565,21 @@ Human shapes at the top. Agent builds at the bottom. Gate in the middle. Tests v
 - Agent registration for @mention support in OpenCode
 - Blocked worker protocol: workers pause for decisions, resume with clarity
 
+### v1.1 (Consolidation + Knowledge Transfer)
+
+**Theme:** Less infrastructure, smarter agents. Trust the model, not the tooling.
+
+- **Tool consolidation (22 → 14 tools)**: Removed the entire background task infrastructure (~5,000 lines). Direct worktree execution proved simpler and more reliable than the async queue-poll-result pattern. Renamed `hive_exec_*` → `hive_worktree_*` to reflect the actual execution model
+- **Journal infrastructure removed**: Journals were write-only artifacts nobody read. Context files (`hive_context_write`) replaced them — persistent, queryable, and actually consumed by downstream workers
+- **Worker Orient Phase**: Workers now run a pre-flight checklist before coding — read references, check existing patterns, verify assumptions. This came from observing workers that jumped straight into implementation and missed critical context. Orient aligns with P1 (Context Persists) and P7 (Iron Laws)
+- **Task-type auto-inference**: `buildSpecContent()` infers whether a task is greenfield, testing, modification, bugfix, or refactoring from the task name and plan section. This is orchestrator-level intelligence — the worker gets better context without the planner having to annotate every task
+- **Richer worker summaries**: Instead of parsing structured notepad entries, we trust the model to write useful summaries. Guidance now asks for files changed, key decisions, gotchas, and what's left. "Models are smart" — structure the ask, not the answer
+- **Scout research persistence**: Scout findings now persist to context files, so research survives the session. Before this, a Scout could discover critical patterns and that knowledge died when the session ended
+- **Post-batch review checkpoints**: After merging each batch, orchestrators can consult the Hygienic reviewer to catch drift before it compounds. Review is collaborative, not mandatory — the beekeeper decides
+- **Active Discovery**: Planning agents now challenge user assumptions during the planning phase. This isn't adversarial — it's collaborative pushback that aligns with P3 (Human Shapes, Agent Builds) and P4 (Good Enough Wins). An agent that accepts everything uncritically isn't planning, it's transcribing
+
+**Design insight:** The common thread is knowledge transfer. Orient ensures workers receive context. Richer summaries ensure orchestrators receive results. Scout persistence ensures future sessions receive research. Active Discovery ensures plans receive honest scrutiny. Every change improved how information flows between agents.
+
 ---
 
 <p align="center">
