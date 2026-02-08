@@ -1,12 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getContextPath, ensureDir, fileExists, readText, writeText } from '../utils/paths.js';
-
-export interface ContextFile {
-  name: string;
-  content: string;
-  updatedAt: string;
-}
+import type { ContextFile } from '../types.js';
 
 export class ContextService {
   constructor(private projectRoot: string) {}
@@ -17,6 +12,13 @@ export class ContextService {
 
     const filePath = path.join(contextPath, this.normalizeFileName(fileName));
     writeText(filePath, content);
+    
+    // Check total size and warn if exceeding 20,000 chars
+    const totalChars = this.list(featureName).reduce((sum, c) => sum + c.content.length, 0);
+    if (totalChars > 20000) {
+      return `${filePath}\n\n⚠️ Context total: ${totalChars} chars (exceeds 20,000). Consider archiving older contexts with contextService.archive().`;
+    }
+    
     return filePath;
   }
 
@@ -63,6 +65,45 @@ export class ContextService {
 
     const sections = files.map(f => `## ${f.name}\n\n${f.content}`);
     return sections.join('\n\n---\n\n');
+  }
+
+  archive(featureName: string): { archived: string[]; archivePath: string } {
+    const contexts = this.list(featureName);
+    if (contexts.length === 0) return { archived: [], archivePath: '' };
+    
+    const contextPath = getContextPath(this.projectRoot, featureName);
+    const archiveDir = path.join(contextPath, '..', 'archive');
+    ensureDir(archiveDir);
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const archived: string[] = [];
+    
+    for (const ctx of contexts) {
+      const archiveName = `${timestamp}_${ctx.name}.md`;
+      const src = path.join(contextPath, `${ctx.name}.md`);
+      const dest = path.join(archiveDir, archiveName);
+      fs.copyFileSync(src, dest);
+      fs.unlinkSync(src);
+      archived.push(ctx.name);
+    }
+    
+    return { archived, archivePath: archiveDir };
+  }
+
+  stats(featureName: string): { count: number; totalChars: number; oldest?: string; newest?: string } {
+    const contexts = this.list(featureName);
+    if (contexts.length === 0) return { count: 0, totalChars: 0 };
+    
+    const sorted = [...contexts].sort((a, b) => 
+      new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+    );
+    
+    return {
+      count: contexts.length,
+      totalChars: contexts.reduce((sum, c) => sum + c.content.length, 0),
+      oldest: sorted[0].name,
+      newest: sorted[sorted.length - 1].name,
+    };
   }
 
   private normalizeFileName(name: string): string {
