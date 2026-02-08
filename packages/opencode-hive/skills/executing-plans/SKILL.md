@@ -61,8 +61,8 @@ Based on feedback:
 ### Step 6: Complete Development
 
 After all tasks complete and verified:
-- Announce: "I'm using the finishing-a-development-branch skill to complete this work."
-- **REQUIRED SUB-SKILL:** Use hive_skill:finishing-a-development-branch
+- Announce: "I'm using the verification-before-completion skill to complete this work."
+- **REQUIRED SUB-SKILL:** Use hive_skill:verification-before-completion
 - Follow that skill to verify tests, present options, execute choice
 
 ## When to Stop and Ask for Help
