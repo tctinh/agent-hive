@@ -48,6 +48,7 @@ The answer became this platform.
 | **Royal Jelly** | Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
 | **Honey** | Artifacts | The output — `plan.md`, `spec.md`, `report.md`, code. Persistent documentation that emerges from work. |
 | **Propolis** | Verification | TDD subtasks that seal work as complete. Tests prove the cell is solid. |
+| **Wax Seal** | Sandbox | Docker container that isolates worker execution. Tests run inside, results flow out. |
 | **Waggle Dance** | Planning | The planning phase. Architect communicates, Beekeeper reviews, alignment before action. |
 | **Swarming** | Parallelism | Batched parallel execution. Multiple Foragers dispatched simultaneously to their cells. |
 | **Hiving** | Working | The act of using the Hive platform. *"Stop vibing. Start hiving."* |
@@ -581,9 +582,9 @@ Human shapes at the top. Agent builds at the bottom. Gate in the middle. Tests v
 
 **Design insight:** The common thread is knowledge transfer. Orient ensures workers receive context. Richer summaries ensure orchestrators receive results. Scout persistence ensures future sessions receive research. Active Discovery ensures plans receive honest scrutiny. Every change improved how information flows between agents.
 
-### v1.1.1 (Prompt Hardening)
+### v1.1.1 (Prompt Hardening + Self-Maintenance)
 
-**Theme:** Behavioral enforcement through prompt engineering. Learning from Oh My OpenCode.
+**Theme:** Behavioral enforcement through prompt engineering, plus agents that bootstrap and maintain their own operating manual.
 
 We studied [Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode) (omo) to learn prompt engineering patterns. Key insight: omo is prompt-composition-based (dynamic assembly), Hive is tool-based (`hive_status`, `hive_plan_write`, etc.). We borrowed selectively, not wholesale.
 
@@ -604,7 +605,12 @@ We studied [Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode) (omo
 - Updated `writing-plans` skill with agent-executable acceptance criteria guidance
 - Added 3 unreferenced-but-kept skills to Hive's loading table: `systematic-debugging`, `test-driven-development`, `verification-before-completion`
 
-**Design insight:** Prompts are contracts, not suggestions. When an agent's prompt says "NEVER end a turn without an action," it needs a concrete list of valid endings and invalid endings. Vague guidance ("be thorough") gets rationalized away. Concrete tables, checklists, and ✅/❌ examples survive model interpretation. This aligns with P7 (Iron Laws + Hard Gates) — enforce with structure, not prose.
+**New capabilities:**
+
+- **AGENTS.md integration**: Self-maintaining bootstrap that evolves with the project. New `hive_agents_md` tool with two operations: `init` (codebase scan → AGENTS.md template) and `sync` (context findings → AGENTS.md proposals). Sync respects P2 (Plan → Approve → Execute) — agents propose updates, humans approve. Context files flow into living documentation instead of becoming stale write-only artifacts
+- **Docker sandbox**: Lightweight container isolation for TDD (P6 + P7 alignment). Workers execute tests in sandboxed Docker containers via bash interception hook — transparent to agents, no code changes needed. Escape hatch: `HOST: <command>` prefix bypasses sandbox for host-level operations. Level 1 implementation (docker run) with auto-detection of project runtime (node:22-slim, python:3.12-slim, etc.). Aligns with "Good Enough Wins" (P4) — most projects need clean test environments, not full devcontainer complexity
+
+**Design insight:** Both features address the same meta-problem: *How do agents learn from their own work?* Prompts are contracts, not suggestions — concrete tables, checklists, and ✅/❌ examples survive model interpretation (P7). AGENTS.md captures project-level learnings (conventions, patterns, gotchas). Docker sandbox ensures those learnings are tested in isolation. Together they create a self-improving loop: agents document what they learn, test in clean environments, and future agents benefit from both.
 
 ---
 

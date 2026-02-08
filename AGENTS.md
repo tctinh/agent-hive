@@ -236,3 +236,60 @@ This is a **bun workspaces** monorepo:
 - Dependencies are hoisted to root `node_modules/`
 - Each package has its own `package.json`
 - Run package scripts from the package directory (for example, `packages/vscode-hive/` → `bun run build`)
+
+## Hive - Feature Development System
+
+Plan-first development: Write plan → User reviews → Approve → Execute tasks
+
+### Tools (15 total)
+
+| Domain | Tools |
+|--------|-------|
+| Feature | hive_feature_create, hive_feature_complete |
+| Plan | hive_plan_write, hive_plan_read, hive_plan_approve |
+| Task | hive_tasks_sync, hive_task_create, hive_task_update |
+| Worktree | hive_worktree_create, hive_worktree_commit, hive_worktree_discard |
+| Merge | hive_merge |
+| Context | hive_context_write |
+| AGENTS.md | hive_agents_md |
+| Status | hive_status |
+
+### Workflow
+
+1. `hive_feature_create(name)` - Create feature
+2. `hive_plan_write(content)` - Write plan.md
+3. User adds comments in VSCode → `hive_plan_read` to see them
+4. Revise plan → User approves
+5. `hive_tasks_sync()` - Generate tasks from plan
+6. `hive_worktree_create(task)` → work in worktree → `hive_worktree_commit(task, summary)`
+7. `hive_merge(task)` - Merge task branch into main (when ready)
+
+**Important:** `hive_worktree_commit` commits changes to task branch but does NOT merge.
+Use `hive_merge` to explicitly integrate changes. Worktrees persist until manually removed.
+
+### Sandbox Configuration
+
+**Docker sandbox** provides isolated test environments for workers:
+
+- **Config location**: `~/.config/opencode/agent_hive.json`
+- **Fields**:
+  - `sandbox: 'none' | 'docker'` — Isolation mode (default: 'none')
+  - `dockerImage?: string` — Custom Docker image (optional, auto-detects if omitted)
+- **Auto-detection**: Detects runtime from project files:
+  - `package.json` → `node:22-slim`
+  - `requirements.txt` / `pyproject.toml` → `python:3.12-slim`
+  - `go.mod` → `golang:1.22-slim`
+  - `Cargo.toml` → `rust:1.77-slim`
+  - `Dockerfile` → builds from project Dockerfile
+  - Fallback → `ubuntu:24.04`
+- **Escape hatch**: Prefix commands with `HOST:` to bypass sandbox and run directly on host
+
+**Example config**:
+```json
+{
+  "sandbox": "docker",
+  "dockerImage": "node:22-slim"
+}
+```
+
+Workers are unaware of sandboxing — bash commands are transparently intercepted and wrapped with `docker run`.

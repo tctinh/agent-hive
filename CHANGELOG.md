@@ -7,15 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **AGENTS.md Self-Maintenance Tool**: New `hive_agents_md` tool with `init` and `sync` operations — agents can bootstrap AGENTS.md from codebase analysis and propose updates from feature context discoveries (with approval gate per P2)
+- **Docker Sandbox Isolation**: Level 1 Docker sandboxing for worker execution — transparent bash interception wraps test commands in containers, auto-detects project runtime (node/python/go/rust), includes `HOST:` escape hatch for host-level operations
+
 ### Changed
 - **Architect Prompt Hardened**: Expanded intent classification with Strategy column, 6-item clearance checklist, Test Strategy section, Turn Termination rules
 - **Forager Prompt Hardened**: "Resolve Before Blocking" guidance (try 3+ approaches), expanded Orient pre-flight, 6-item Completion Checklist
+- **Forager Prompt**: Added Docker Sandbox awareness section to Iron Laws — explains transparent container wrapping and HOST: escape hatch
 - **Scout Prompt Fixed**: Fixed leaked persistence example (truncated research dump), added year awareness to Iron Laws
 - **Swarm Prompt Hardened**: Removed non-existent "oracle" subagent reference, added "After Delegation — VERIFY" checklist, Turn Termination
 - **Hive Prompt Hardened**: Turn Termination (valid/invalid endings), Hard Blocks table replacing vague Iron Laws prose, AI-Slop Flags
 - **Hygienic Prompt Hardened**: Agent-executable verification emphasis with ✅/❌ examples, expanded Active Implementation Simulation
 - **Writing-Plans Skill**: Added agent-executable acceptance criteria guidance
 - **Hive Skill Loading**: Added `systematic-debugging`, `test-driven-development`, `verification-before-completion` to Hive's skill table
+- **PHILOSOPHY.md**: Added "Wax Seal" (sandbox) to Hive Terminology table, added v1.1.1 evolution notes documenting AGENTS.md integration and Docker sandbox design decisions
+- **Agent Prompts (Hive + Swarm)**: Added AGENTS.md maintenance guidance — orchestrators sync context findings after feature completion
 
 ### Removed
 - **Onboarding Skill**: Deleted — unreferenced by any agent (10 skills → 9)
