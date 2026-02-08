@@ -38,7 +38,7 @@ var vscode7 = __toESM(require("vscode"));
 var fs10 = __toESM(require("fs"));
 var path10 = __toESM(require("path"));
 
-// ../hive-core/dist/index.js
+// ../../../../../../packages/hive-core/dist/index.js
 var import_node_module = require("node:module");
 var path = __toESM(require("path"), 1);
 var fs = __toESM(require("fs"), 1);
@@ -6339,6 +6339,12 @@ var ContextService = class {
     ensureDir(contextPath);
     const filePath = path4.join(contextPath, this.normalizeFileName(fileName));
     writeText(filePath, content);
+    const totalChars = this.list(featureName).reduce((sum, c) => sum + c.content.length, 0);
+    if (totalChars > 2e4) {
+      return `${filePath}
+
+\u26A0\uFE0F Context total: ${totalChars} chars (exceeds 20,000). Consider archiving older contexts with contextService.archive().`;
+    }
     return filePath;
   }
   read(featureName, fileName) {
@@ -6383,6 +6389,37 @@ ${f.content}`);
 ---
 
 `);
+  }
+  archive(featureName) {
+    const contexts = this.list(featureName);
+    if (contexts.length === 0)
+      return { archived: [], archivePath: "" };
+    const contextPath = getContextPath(this.projectRoot, featureName);
+    const archiveDir = path4.join(contextPath, "..", "archive");
+    ensureDir(archiveDir);
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+    const archived = [];
+    for (const ctx of contexts) {
+      const archiveName = `${timestamp}_${ctx.name}.md`;
+      const src = path4.join(contextPath, `${ctx.name}.md`);
+      const dest = path4.join(archiveDir, archiveName);
+      fs8.copyFileSync(src, dest);
+      fs8.unlinkSync(src);
+      archived.push(ctx.name);
+    }
+    return { archived, archivePath: archiveDir };
+  }
+  stats(featureName) {
+    const contexts = this.list(featureName);
+    if (contexts.length === 0)
+      return { count: 0, totalChars: 0 };
+    const sorted2 = [...contexts].sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+    return {
+      count: contexts.length,
+      totalChars: contexts.reduce((sum, c) => sum + c.content.length, 0),
+      oldest: sorted2[0].name,
+      newest: sorted2[sorted2.length - 1].name
+    };
   }
   normalizeFileName(name) {
     const normalized = name.replace(/\.md$/, "");
