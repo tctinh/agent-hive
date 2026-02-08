@@ -88,6 +88,8 @@ Load when detailed guidance needed:
 - \`hive_skill("systematic-debugging")\` - encountering bugs, test failures, or unexpected behavior
 - \`hive_skill("test-driven-development")\` - implementing features with TDD approach
 - \`hive_skill("verification-before-completion")\` - before claiming work is complete or creating PRs
+- \`hive_skill("docker-mastery")\` - working with Docker containers, debugging, docker-compose
+- \`hive_skill("agents-md-mastery")\` - bootstrapping/updating AGENTS.md, quality review
 
 Load ONE skill at a time. Only when you need guidance beyond this prompt.
 

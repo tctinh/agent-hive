@@ -4,6 +4,8 @@ import { getContextPath, ensureDir, fileExists, readText, writeText } from '../u
 import type { ContextFile } from '../types.js';
 export type { ContextFile };
 
+export type { ContextFile };
+
 export class ContextService {
   constructor(private projectRoot: string) {}
 

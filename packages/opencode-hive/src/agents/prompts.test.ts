@@ -61,6 +61,14 @@ describe('Hive (Hybrid) prompt', () => {
   it('contains turn termination', () => {
     expect(QUEEN_BEE_PROMPT).toContain('Turn Termination');
   });
+
+  it('contains docker-mastery skill reference', () => {
+    expect(QUEEN_BEE_PROMPT).toContain('docker-mastery');
+  });
+
+  it('contains agents-md-mastery skill reference', () => {
+    expect(QUEEN_BEE_PROMPT).toContain('agents-md-mastery');
+  });
 });
 
 describe('Architect (Planner) prompt', () => {
@@ -173,8 +181,13 @@ describe('Forager (Worker/Coder) prompt', () => {
     expect(FORAGER_BEE_PROMPT).toContain('Docker Sandbox');
   });
 
-  it('explains HOST: escape hatch for bypassing sandbox', () => {
-    expect(FORAGER_BEE_PROMPT).toContain('HOST:');
+  it('instructs to report as blocked instead of HOST: escape', () => {
+    expect(FORAGER_BEE_PROMPT).toContain('report as blocked');
+    expect(FORAGER_BEE_PROMPT).not.toContain('HOST:');
+  });
+
+  it('contains docker-mastery skill reference', () => {
+    expect(FORAGER_BEE_PROMPT).toContain('docker-mastery');
   });
 });
 
@@ -249,6 +262,10 @@ describe('AGENTS.md tool guidance', () => {
     it('instructs to sync AGENTS.md after batch completion', () => {
       expect(SWARM_BEE_PROMPT).toContain('batch');
       expect(SWARM_BEE_PROMPT).toContain('sync');
+    });
+
+    it('contains agents-md-mastery skill reference', () => {
+      expect(SWARM_BEE_PROMPT).toContain('agents-md-mastery');
     });
   });
 });
