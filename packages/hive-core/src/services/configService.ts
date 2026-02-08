@@ -177,4 +177,20 @@ export class ConfigService {
     return config.disableMcps ?? [];
   }
 
+  /**
+   * Get sandbox configuration for worker isolation.
+   * Returns { mode: 'none' | 'docker', image?: string }
+   */
+  getSandboxConfig(): { mode: 'none' | 'docker'; image?: string } {
+    const config = this.get();
+    const mode = config.sandbox ?? 'none';
+    const image = config.dockerImage;
+
+    if (mode === 'docker' && image) {
+      return { mode, image };
+    }
+
+    return { mode };
+  }
+
 }
