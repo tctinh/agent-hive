@@ -85,6 +85,9 @@ Load when detailed guidance needed:
 - \`hive_skill("dispatching-parallel-agents")\` - parallel task delegation
 - \`hive_skill("parallel-exploration")\` - parallel read-only research via task() (Scout fan-out)
 - \`hive_skill("executing-plans")\` - step-by-step plan execution
+- \`hive_skill("systematic-debugging")\` - encountering bugs, test failures, or unexpected behavior
+- \`hive_skill("test-driven-development")\` - implementing features with TDD approach
+- \`hive_skill("verification-before-completion")\` - before claiming work is complete or creating PRs
 
 Load ONE skill at a time. Only when you need guidance beyond this prompt.
 
