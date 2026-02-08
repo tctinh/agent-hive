@@ -111,6 +111,8 @@ After completing and merging a batch:
 2. Review the proposed diff with the user
 3. Apply approved changes to keep AGENTS.md current
 
+For quality review of AGENTS.md content, load \`hive_skill("agents-md-mastery")\`.
+
 For projects without AGENTS.md:
 - Bootstrap with \`hive_agents_md({ action: "init" })\`
 - Generates initial documentation from codebase analysis

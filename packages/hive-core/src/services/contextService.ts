@@ -3,6 +3,8 @@ import * as path from 'path';
 import { getContextPath, ensureDir, fileExists, readText, writeText } from '../utils/paths.js';
 import type { ContextFile } from '../types.js';
 
+export type { ContextFile };
+
 export class ContextService {
   constructor(private projectRoot: string) {}
 
