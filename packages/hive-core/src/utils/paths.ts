@@ -168,12 +168,16 @@ export async function acquireLock(
 ): Promise<() => void> {
   const opts = { ...DEFAULT_LOCK_OPTIONS, ...options };
   const lockPath = getLockPath(filePath);
+  const lockDir = path.dirname(lockPath);
   const startTime = Date.now();
   const lockContent = JSON.stringify({
     pid: process.pid,
     timestamp: new Date().toISOString(),
     filePath,
   });
+
+  // Ensure lock directory exists before first acquisition attempt.
+  ensureDir(lockDir);
 
   while (true) {
     try {
@@ -192,18 +196,22 @@ export async function acquireLock(
       };
     } catch (err: unknown) {
       const error = err as NodeJS.ErrnoException;
-      if (error.code !== 'EEXIST') {
-        throw error; // Unexpected error
-      }
-
-      // Lock exists - check if stale
-      if (isLockStale(lockPath, opts.staleLockTTL)) {
-        try {
-          fs.unlinkSync(lockPath);
-          continue; // Retry immediately after breaking stale lock
-        } catch {
-          // Another process might have removed it, continue
+      if (error.code === 'ENOENT') {
+        // Parent directory can be transiently unavailable on some filesystems.
+        // Recreate and retry until timeout.
+        ensureDir(lockDir);
+      } else if (error.code === 'EEXIST') {
+        // Lock exists - check if stale
+        if (isLockStale(lockPath, opts.staleLockTTL)) {
+          try {
+            fs.unlinkSync(lockPath);
+            continue; // Retry immediately after breaking stale lock
+          } catch {
+            // Another process might have removed it, continue
+          }
         }
+      } else {
+        throw error; // Unexpected error
       }
 
       // Check timeout
@@ -229,12 +237,16 @@ export function acquireLockSync(
 ): () => void {
   const opts = { ...DEFAULT_LOCK_OPTIONS, ...options };
   const lockPath = getLockPath(filePath);
+  const lockDir = path.dirname(lockPath);
   const startTime = Date.now();
   const lockContent = JSON.stringify({
     pid: process.pid,
     timestamp: new Date().toISOString(),
     filePath,
   });
+
+  // Ensure lock directory exists before first acquisition attempt.
+  ensureDir(lockDir);
 
   while (true) {
     try {
@@ -251,17 +263,21 @@ export function acquireLockSync(
       };
     } catch (err: unknown) {
       const error = err as NodeJS.ErrnoException;
-      if (error.code !== 'EEXIST') {
-        throw error;
-      }
-
-      if (isLockStale(lockPath, opts.staleLockTTL)) {
-        try {
-          fs.unlinkSync(lockPath);
-          continue;
-        } catch {
-          // Continue
+      if (error.code === 'ENOENT') {
+        // Parent directory can be transiently unavailable on some filesystems.
+        // Recreate and retry until timeout.
+        ensureDir(lockDir);
+      } else if (error.code === 'EEXIST') {
+        if (isLockStale(lockPath, opts.staleLockTTL)) {
+          try {
+            fs.unlinkSync(lockPath);
+            continue;
+          } catch {
+            // Continue
+          }
         }
+      } else {
+        throw error;
       }
 
       if (Date.now() - startTime >= opts.timeout) {

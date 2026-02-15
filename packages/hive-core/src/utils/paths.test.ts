@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
+import { describe, expect, it, beforeEach, afterEach, spyOn } from "bun:test";
 import * as fs from "fs";
 import * as path from "path";
 import {
@@ -237,6 +237,41 @@ describe("Atomic + Locked JSON Utilities", () => {
 
       expect(readJson<typeof data>(filePath)).toEqual(data);
       expect(fs.existsSync(getLockPath(filePath))).toBe(false);
+    });
+
+    it("creates parent directories before lock acquisition", () => {
+      const filePath = path.join(TEST_DIR, "nested", "deep", "locked-sync.json");
+      const data = { nested: true };
+
+      writeJsonLockedSync(filePath, data);
+
+      expect(readJson<typeof data>(filePath)).toEqual(data);
+      expect(fs.existsSync(getLockPath(filePath))).toBe(false);
+    });
+  });
+
+  describe("ENOENT lock retries", () => {
+    it("retries acquireLockSync when lock create gets transient ENOENT", () => {
+      const filePath = path.join(TEST_DIR, "retry-lock.json");
+      const lockPath = getLockPath(filePath);
+      const originalOpenSync = fs.openSync.bind(fs);
+      let firstAttempt = true;
+      const openSpy = spyOn(fs, "openSync").mockImplementation(((targetPath: fs.PathLike, flags: number, mode?: fs.Mode) => {
+        if (String(targetPath) === lockPath && firstAttempt) {
+          firstAttempt = false;
+          const err = new Error("Transient ENOENT") as NodeJS.ErrnoException;
+          err.code = "ENOENT";
+          throw err;
+        }
+        return originalOpenSync(targetPath, flags, mode);
+      }) as typeof fs.openSync);
+
+      try {
+        const release = acquireLockSync(filePath, { timeout: 200, retryInterval: 1 });
+        release();
+      } finally {
+        openSpy.mockRestore();
+      }
     });
   });
 

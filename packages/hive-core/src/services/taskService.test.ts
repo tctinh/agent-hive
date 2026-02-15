@@ -100,13 +100,26 @@ describe("TaskService", () => {
       expect(result.summary).toBe("Task completed successfully");
     });
 
-    it("throws error for non-existent task", () => {
+    it("throws error for non-existent task without creating task folder", () => {
       const featureName = "test-feature";
+      const missingTask = "nonexistent-task";
       setupFeature(featureName);
+      const missingTaskPath = path.join(
+        TEST_DIR,
+        ".hive",
+        "features",
+        featureName,
+        "tasks",
+        missingTask
+      );
+
+      expect(fs.existsSync(missingTaskPath)).toBe(false);
 
       expect(() =>
-        service.update(featureName, "nonexistent-task", { status: "in_progress" })
+        service.update(featureName, missingTask, { status: "in_progress" })
       ).toThrow(/not found/);
+
+      expect(fs.existsSync(missingTaskPath)).toBe(false);
     });
 
     it("preserves existing fields on update", () => {

@@ -14,7 +14,8 @@ import {
   ensureDir,
   readJson,
   writeJson,
-  writeJsonLockedSync,
+  writeJsonAtomic,
+  acquireLockSync,
   patchJsonLockedSync,
   deepMerge,
   readText,
@@ -434,28 +435,40 @@ export class TaskService {
     lockOptions?: LockOptions
   ): TaskStatus {
     const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);
-    const current = readJson<TaskStatus>(statusPath);
-    
-    if (!current) {
+
+    // Guard before lock acquisition to avoid creating missing task folders
+    // via lock-file parent directory creation on error paths.
+    if (!fileExists(statusPath)) {
       throw new Error(`Task '${taskFolder}' not found`);
     }
 
-    const updated: TaskStatus = {
-      ...current,
-      ...updates,
-      schemaVersion: TASK_STATUS_SCHEMA_VERSION,
-    };
+    const release = acquireLockSync(statusPath, lockOptions);
 
-    if (updates.status === 'in_progress' && !current.startedAt) {
-      updated.startedAt = new Date().toISOString();
-    }
-    if (updates.status === 'done' && !current.completedAt) {
-      updated.completedAt = new Date().toISOString();
-    }
+    try {
+      const current = readJson<TaskStatus>(statusPath);
+      if (!current) {
+        throw new Error(`Task '${taskFolder}' not found`);
+      }
 
-    // Use locked atomic write to prevent race conditions
-    writeJsonLockedSync(statusPath, updated, lockOptions);
-    return updated;
+      const updated: TaskStatus = {
+        ...current,
+        ...updates,
+        schemaVersion: TASK_STATUS_SCHEMA_VERSION,
+      };
+
+      if (updates.status === 'in_progress' && !current.startedAt) {
+        updated.startedAt = new Date().toISOString();
+      }
+      if (updates.status === 'done' && !current.completedAt) {
+        updated.completedAt = new Date().toISOString();
+      }
+
+      // Lock-first read-modify-write to avoid TOCTOU races.
+      writeJsonAtomic(statusPath, updated);
+      return updated;
+    } finally {
+      release();
+    }
   }
 
   /**
