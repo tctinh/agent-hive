@@ -13,7 +13,7 @@ const EXPECTED_TOOLS = [
   "hive_plan_write",
   "hive_plan_read",
   "hive_tasks_sync",
-  "hive_exec_start",
+  "hive_worktree_create",
 ] as const;
 
 type DefaultModel = { providerID: string; modelID: string };
