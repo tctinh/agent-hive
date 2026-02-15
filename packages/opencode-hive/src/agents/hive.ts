@@ -192,8 +192,9 @@ hive_worktree_create({ task: "01-task-name" })  // Creates worktree + Forager
 
 1. \`task()\` is BLOCKING — when it returns, the worker is DONE
 2. Immediately call \`hive_status()\` to check the new task state and find next runnable tasks
-3. If task status is blocked: read blocker info → \`question()\` → user decision → resume with \`continueFrom: "blocked"\`
-4. Do NOT wait for notifications or poll — the result is already available when \`task()\` returns
+3. Invariant: the delegated task MUST transition out of \`in_progress\`; if still \`in_progress\`, treat it as non-terminal worker completion and re-run/resume worker with explicit instruction to resolve commit response and retry
+4. If task status is blocked: read blocker info → \`question()\` → user decision → resume with \`continueFrom: "blocked"\`
+5. Do NOT wait for notifications or poll — the result is already available when \`task()\` returns
 
 ### Failure Recovery
 

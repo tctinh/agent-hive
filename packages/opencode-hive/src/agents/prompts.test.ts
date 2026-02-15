@@ -39,6 +39,10 @@ describe('Hive (Hybrid) prompt', () => {
       expect(QUEEN_BEE_PROMPT).toContain('task(');
       expect(QUEEN_BEE_PROMPT).toContain('scout-researcher');
     });
+
+    it('enforces post-delegation task state invariant', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('MUST transition out of `in_progress`');
+    });
   });
 
   describe('turn termination and hard blocks', () => {
@@ -133,6 +137,10 @@ describe('Swarm (Orchestrator) prompt', () => {
       expect(SWARM_BEE_PROMPT).toContain('hive_status()');
     });
 
+    it('enforces delegated task state invariant', () => {
+      expect(SWARM_BEE_PROMPT).toContain('must not remain `in_progress`');
+    });
+
     it('includes task() guidance for research fan-out', () => {
       expect(SWARM_BEE_PROMPT).toContain('task() for research fan-out');
     });
@@ -159,6 +167,12 @@ describe('Forager (Worker/Coder) prompt', () => {
 
   it('contains completion checklist', () => {
     expect(FORAGER_BEE_PROMPT).toContain('Completion Checklist');
+  });
+
+  it('requires terminal commit result before stopping', () => {
+    expect(FORAGER_BEE_PROMPT).toContain('ok');
+    expect(FORAGER_BEE_PROMPT).toContain('terminal');
+    expect(FORAGER_BEE_PROMPT).toContain('DO NOT STOP');
   });
 
   it('adds resolve-before-blocking guidance', () => {

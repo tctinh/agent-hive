@@ -65,6 +65,7 @@ hive_worktree_create({ task: "01-task-name" })
 **Delegation Guidance:**
 - \`task()\` is BLOCKING — returns when the worker is done
 - Call \`hive_status()\` immediately after to check new state and find next runnable tasks
+- Invariant: delegated task must not remain \`in_progress\`; if it does, treat as non-terminal completion and resume/retry worker with explicit commit-result handling
 - For parallel fan-out, issue multiple \`task()\` calls in the same message
 
 ## After Delegation - VERIFY

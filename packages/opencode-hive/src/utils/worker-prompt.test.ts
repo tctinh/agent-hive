@@ -156,6 +156,15 @@ UNIQUE_MARKER_12345
     expect(prompt).toContain('hive_worktree_commit');
   });
 
+  it('requires terminal commit result before stopping', () => {
+    const params = createTestParams();
+    const prompt = buildWorkerPrompt(params);
+
+    expect(prompt).toContain('ok=true and terminal=true');
+    expect(prompt).toContain('DO NOT STOP');
+    expect(prompt).toContain('result.nextAction');
+  });
+
   it('includes worktree restriction warning', () => {
     const params = createTestParams();
     const prompt = buildWorkerPrompt(params);

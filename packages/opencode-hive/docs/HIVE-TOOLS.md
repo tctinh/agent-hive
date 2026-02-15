@@ -26,8 +26,18 @@
 | Tool | Purpose |
 |------|---------|
 | `hive_worktree_create` | Create worktree and begin work |
-| `hive_worktree_commit` | Commit changes, write report (does NOT merge) |
+| `hive_worktree_commit` | Commit changes, write report (does NOT merge), return JSON completion contract |
 | `hive_worktree_discard` | Discard changes, reset status |
+
+#### hive_worktree_commit output
+
+- Always returns JSON with control-flow fields:
+  - `ok`: whether the operation succeeded
+  - `terminal`: whether worker should stop (`true`) or continue (`false`)
+  - `status`: completion status (`completed`, `blocked`, `failed`, `partial`) or error/rejected state
+  - `taskState`: resulting persisted task state
+  - `nextAction`: explicit next step for worker/orchestrator
+- Non-terminal responses (for example `reason: "verification_required"`) require worker remediation and retry.
 
 #### hive_worktree_create output
 

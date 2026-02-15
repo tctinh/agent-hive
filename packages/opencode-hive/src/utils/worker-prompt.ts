@@ -155,8 +155,16 @@ hive_worktree_commit({
 })
 \`\`\`
 
-**CRITICAL: After calling hive_worktree_commit, you MUST STOP IMMEDIATELY.**
-Do NOT continue working. Do NOT respond further. Your session is DONE.
+Then inspect the tool response fields:
+- If \`ok=true\` and \`terminal=true\`: stop the session
+- Otherwise: **DO NOT STOP**. Follow \`nextAction\`, remediate, and retry \`hive_worktree_commit\`
+
+**CRITICAL: Stop only on terminal commit result (ok=true and terminal=true).**
+If commit returns non-terminal (for example verification_required), DO NOT STOP.
+Follow result.nextAction, fix the issue, and call hive_worktree_commit again.
+
+Only when commit result is terminal should you stop.
+Do NOT continue working after a terminal result. Do NOT respond further. Your session is DONE.
 The Hive Master will take over from here.
 
 **Summary Guidance** (used verbatim for downstream task context):

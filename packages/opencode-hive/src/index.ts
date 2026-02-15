@@ -919,7 +919,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       }),
 
       hive_worktree_commit: tool({
-        description: 'Complete task: commit changes to branch, write report. Supports blocked/failed/partial status for worker communication.',
+        description: 'Complete task: commit changes to branch, write report. Supports blocked/failed/partial status for worker communication. Returns JSON with ok/terminal semantics for worker control flow.',
         args: {
           task: tool.schema.string().describe('Task folder name'),
           summary: tool.schema.string().describe('Summary of what was done'),
@@ -933,12 +933,48 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
         async execute({ task, summary, status = 'completed', blocker, feature: explicitFeature }) {
+          const respond = (payload: Record<string, unknown>) => JSON.stringify(payload, null, 2);
           const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+          if (!feature) {
+            return respond({
+              ok: false,
+              terminal: false,
+              status: 'error',
+              reason: 'feature_required',
+              task,
+              taskState: 'unknown',
+              message: 'No feature specified. Create a feature or provide feature param.',
+              nextAction: 'Provide feature explicitly or create/select an active feature, then retry hive_worktree_commit.',
+            });
+          }
 
           const taskInfo = taskService.get(feature, task);
-          if (!taskInfo) return `Error: Task "${task}" not found`;
-          if (taskInfo.status !== 'in_progress' && taskInfo.status !== 'blocked') return "Error: Task not in progress";
+          if (!taskInfo) {
+            return respond({
+              ok: false,
+              terminal: false,
+              status: 'error',
+              reason: 'task_not_found',
+              feature,
+              task,
+              taskState: 'unknown',
+              message: `Task "${task}" not found`,
+              nextAction: 'Verify task folder via hive_status and retry with the correct task id.',
+            });
+          }
+          if (taskInfo.status !== 'in_progress' && taskInfo.status !== 'blocked') {
+            return respond({
+              ok: false,
+              terminal: false,
+              status: 'error',
+              reason: 'invalid_task_state',
+              feature,
+              task,
+              taskState: taskInfo.status,
+              message: 'Task not in progress',
+              nextAction: 'Only in_progress or blocked tasks can be committed. Start/resume the task first.',
+            });
+          }
 
           // GATE: Check for verification mention when completing
           if (status === 'completed') {
@@ -947,16 +983,23 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
             const hasVerificationMention = verificationKeywords.some(kw => summaryLower.includes(kw));
 
             if (!hasVerificationMention) {
-              return `BLOCKED: No verification detected in summary.
-
-Before claiming completion, you must:
-1. Run tests (vitest, jest, pytest, etc.)
-2. Run build (npm run build, cargo build, etc.)
-3. Include verification results in summary
-
-Example summary: "Implemented auth flow. Tests pass (vitest). Build succeeds."
-
-Re-run with updated summary showing verification results.`;
+              return respond({
+                ok: false,
+                terminal: false,
+                status: 'rejected',
+                reason: 'verification_required',
+                feature,
+                task,
+                taskState: taskInfo.status,
+                summary,
+                message: 'No verification detected in summary.',
+                requirements: [
+                  'Run tests (vitest, jest, pytest, etc.)',
+                  'Run build (npm run build, cargo build, etc.)',
+                  'Include verification results in summary',
+                ],
+                nextAction: 'Run verification commands and call hive_worktree_commit again with verification evidence in summary.',
+              });
             }
           }
 
@@ -969,18 +1012,45 @@ Re-run with updated summary showing verification results.`;
             } as any);
 
             const worktree = await worktreeService.get(feature, task);
-            return JSON.stringify({
+            return respond({
+              ok: true,
+              terminal: true,
               status: 'blocked',
+              reason: 'user_decision_required',
+              feature,
               task,
+              taskState: 'blocked',
               summary,
               blocker,
               worktreePath: worktree?.path,
+              branch: worktree?.branch,
               message: 'Task blocked. Hive Master will ask user and resume with hive_worktree_create(continueFrom: "blocked", decision: answer)',
-            }, null, 2);
+              nextAction: 'Wait for orchestrator to collect user decision and resume with continueFrom: "blocked".',
+            });
           }
 
           // For failed/partial, still commit what we have
           const commitResult = await worktreeService.commitChanges(feature, task, `hive(${task}): ${summary.slice(0, 50)}`);
+
+          if (status === 'completed' && !commitResult.committed && commitResult.message !== 'No changes to commit') {
+            return respond({
+              ok: false,
+              terminal: false,
+              status: 'rejected',
+              reason: 'commit_failed',
+              feature,
+              task,
+              taskState: taskInfo.status,
+              summary,
+              commit: {
+                committed: commitResult.committed,
+                sha: commitResult.sha,
+                message: commitResult.message,
+              },
+              message: `Commit failed: ${commitResult.message || 'unknown error'}`,
+              nextAction: 'Resolve git/worktree issue, then call hive_worktree_commit again.',
+            });
+          }
 
           const diff = await worktreeService.getDiff(feature, task);
 
@@ -1024,13 +1094,31 @@ Re-run with updated summary showing verification results.`;
             reportLines.push('---', '', '## Changes', '', '_No file changes detected_', '');
           }
 
-          taskService.writeReport(feature, task, reportLines.join('\n'));
+          const reportPath = taskService.writeReport(feature, task, reportLines.join('\n'));
 
           const finalStatus = status === 'completed' ? 'done' : status;
           taskService.update(feature, task, { status: finalStatus as any, summary });
 
           const worktree = await worktreeService.get(feature, task);
-          return `Task "${task}" ${status}. Changes committed to branch ${worktree?.branch || 'unknown'}.\nUse hive_merge to integrate changes. Worktree preserved at ${worktree?.path || 'unknown'}.`;
+          return respond({
+            ok: true,
+            terminal: true,
+            status,
+            feature,
+            task,
+            taskState: finalStatus,
+            summary,
+            commit: {
+              committed: commitResult.committed,
+              sha: commitResult.sha,
+              message: commitResult.message,
+            },
+            worktreePath: worktree?.path,
+            branch: worktree?.branch,
+            reportPath,
+            message: `Task "${task}" ${status}.`,
+            nextAction: 'Use hive_merge to integrate changes. Worktree is preserved for review.',
+          });
         },
       }),
 

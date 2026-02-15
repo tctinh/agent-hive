@@ -95,7 +95,13 @@ hive_worktree_commit({
 })
 \`\`\`
 
-**CRITICAL: After hive_worktree_commit, STOP IMMEDIATELY.**
+Then inspect the tool response fields:
+- If \`ok=true\` and \`terminal=true\`: stop and hand off to orchestrator
+- Otherwise: **DO NOT STOP**. Follow \`nextAction\`, remediate, and retry \`hive_worktree_commit\`
+
+**CRITICAL: Stop only on terminal commit result (ok=true and terminal=true).**
+If commit returns non-terminal (for example verification_required), DO NOT STOP.
+Follow nextAction, fix the issue, and call hive_worktree_commit again.
 
 **Blocked (need user decision):**
 \`\`\`
@@ -144,7 +150,8 @@ When sandbox mode is active, ALL bash commands automatically run inside a Docker
 - Exceed task scope
 - Modify plan file
 - Use \`task\` or \`hive_worktree_create\`
-- Continue after hive_worktree_commit
+- Continue after terminal hive_worktree_commit result
+- Stop after non-terminal commit result
 - Skip verification
 
 **Always:**
