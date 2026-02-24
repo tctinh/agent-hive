@@ -1025,30 +1025,15 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
             });
           }
 
-          // GATE: Check for verification mention when completing
+          // ADVISORY: Track verification status (workers do best-effort)
+          let verificationNote: string | undefined;
           if (status === 'completed') {
-            const verificationKeywords = ['test', 'build', 'lint', 'vitest', 'jest', 'npm run', 'pnpm', 'cargo', 'pytest', 'verified', 'passes', 'succeeds'];
+            const verificationKeywords = ['test', 'build', 'lint', 'vitest', 'jest', 'npm run', 'pnpm', 'cargo', 'pytest', 'verified', 'passes', 'succeeds', 'ast-grep', 'scan'];
             const summaryLower = summary.toLowerCase();
             const hasVerificationMention = verificationKeywords.some(kw => summaryLower.includes(kw));
 
             if (!hasVerificationMention) {
-              return respond({
-                ok: false,
-                terminal: false,
-                status: 'rejected',
-                reason: 'verification_required',
-                feature,
-                task,
-                taskState: taskInfo.status,
-                summary,
-                message: 'No verification detected in summary.',
-                requirements: [
-                  'Run tests (vitest, jest, pytest, etc.)',
-                  'Run build (npm run build, cargo build, etc.)',
-                  'Include verification results in summary',
-                ],
-                nextAction: 'Run verification commands and call hive_worktree_commit again with verification evidence in summary.',
-              });
+              verificationNote = 'No verification evidence in summary. Orchestrator should run build+test after merge.';
             }
           }
 
@@ -1157,6 +1142,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
             task,
             taskState: finalStatus,
             summary,
+            ...(verificationNote && { verificationNote }),
             commit: {
               committed: commitResult.committed,
               sha: commitResult.sha,
