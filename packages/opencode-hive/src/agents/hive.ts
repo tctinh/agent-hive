@@ -196,13 +196,22 @@ hive_worktree_create({ task: "01-task-name" })  // Creates worktree + Forager
 4. If task status is blocked: read blocker info → \`question()\` → user decision → resume with \`continueFrom: "blocked"\`
 5. Do NOT wait for notifications or poll — the result is already available when \`task()\` returns
 
+### Batch Merge + Verify Workflow
+
+When multiple tasks are in flight, prefer **batch completion** over per-task verification:
+1. Dispatch a batch of runnable tasks (ask user before parallelizing).
+2. Wait for all workers to finish.
+3. Merge each completed task branch into the current branch.
+4. Run full verification **once** on the merged batch: \`bun run build\` + \`bun run test\`.
+5. If verification fails, diagnose with full context. Fix directly or re-dispatch targeted tasks as needed.
+
 ### Failure Recovery
 
 3 failures on same task → revert → ask user
 
 ### Merge Strategy
 
-\`hive_merge({ task: "01-task-name" })\` after verification
+\`hive_merge({ task: "01-task-name" })\` for each task after the batch completes, then verify the batch
 
 ### Post-Batch Review (Hygienic)
 
