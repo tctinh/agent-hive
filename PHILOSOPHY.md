@@ -544,6 +544,271 @@ Human shapes at the top. Agent builds at the bottom. Gate in the middle. Orchest
 
 *This section tracks how our thinking evolved.*
 
+## Task Type
+
+modification
+
+## Context
+## official-prompting-guides
+
+# Official Prompting Guides — Key Findings for Hive
+
+## Sources
+- `best practice prompt claude.md` — Anthropic's Claude 4.6 prompting best practices
+- `best practice prompt codex.md` — OpenAI's Codex (GPT-5.2) prompting guide
+
+## Patterns to Adopt (Both Guides)
+
+### 1. De-escalate Tone (Claude guide — HIGH IMPACT)
+Claude 4.6 overtriggers on aggressive language. Replace "CRITICAL/MUST/NEVER" with normal phrasing.
+- Before: "You MUST ALWAYS verify before committing"
+- After: "Verify before committing"
+- Source: Claude guide §Overthinking — "Remove over-prompting. Tools that undertriggered in previous models likely trigger appropriately now."
+
+### 2. Autonomous Senior Engineer Persona (Codex guide)
+"You are autonomous senior engineer: once given direction, proactively gather context, plan, implement, test, and refine without waiting for additional prompts."
+- Already partially in our Action Bias. Make it the Forager's identity.
+
+### 3. Promise Discipline (Codex guide — NEW)
+"Avoid committing to tests/broad refactors unless you will do them now. Otherwise, label them explicitly as optional 'Next steps'."
+- Workers shouldn't promise future work they won't do this turn.
+
+### 4. DRY/Search First (Codex guide — NEW)
+"Before adding new helpers or logic, search for prior art and reuse or extract a shared helper instead of duplicating."
+- Concrete rule for convention following.
+
+### 5. Efficient Edits (Codex guide — NEW)
+"Read enough context before changing a file and batch logical edits together instead of thrashing with many tiny patches."
+- Prevents the "micro-edit" anti-pattern.
+
+### 6. Plan Closure (Codex guide — NEW)
+"Before finishing, reconcile every previously stated intention/TODO/plan. Mark each as Done, Blocked, or Cancelled. Do not end with in_progress/pending items."
+- Strengthens Turn-End Self-Check.
+
+### 7. Avoid Over-engineering (Claude guide — NEW)
+"Only make changes directly requested or clearly necessary. Don't add features, refactor code, or make improvements beyond what was asked."
+- Key anti-slop pattern.
+
+### 8. Investigate Before Answering (Claude guide)
+"Never speculate about code you have not opened. Read the file before answering."
+- Already partially in Exploration Hierarchy. Make explicit.
+
+### 9. Reversibility Preference (Claude guide — NEW)
+"Prefer local, reversible actions. For actions hard to reverse, confirm first."
+- Workers should prefer reversible actions in worktrees.
+
+### 10. Batch Parallel Tool Calls (Both guides)
+"Think first → decide ALL files needed → batch reads → analyze → repeat"
+- Codex: explicit workflow pattern
+- Claude: "boost parallel calling to ~100%"
+
+### 11. Tight Error Handling (Codex guide)
+"No broad catches or silent defaults. Propagate or surface errors explicitly."
+- Good coding practice to include in Forager.
+
+### 12. Tell What TO DO, Not What NOT To Do (Claude guide)
+"Instead of 'Do not use markdown' → 'Use smoothly flowing prose paragraphs'"
+- Reframe negative rules as positive instructions where possible.
+
+## Patterns NOT to Adopt
+
+| Pattern | Why Skip |
+|---------|----------|
+| Codex apply_patch tool format | Hive uses different edit tools |
+| Claude prefill migration | Not applicable to agent prompts |
+| Codex shell_command tool format | Hive has its own bash tool |
+| Claude frontend design skills | Not relevant to agent prompts |
+| Codex compaction API | Infrastructure, not prompt |
+| Codex update_plan tool | Hive has its own task tools |
+| Claude LaTeX guidance | Not relevant |
+
+## Meta-Insights
+
+1. **Both guides converge on: action bias + completeness + convention following** — these are universal best practices
+2. **Claude 4.6 specifically: tone de-escalation** — stop shouting in prompts
+3. **Codex specifically: promise discipline + plan closure** — don't leave orphaned TODOs
+4. **Combined effect**: prompts should be shorter (de-escalated tone = fewer ALL-CAPS words), more positive (tell what to do), and more operational (concrete workflows over abstract principles)
+
+
+---
+
+## claude-code-prompt-patterns
+
+# Claude Code System Prompt — Patterns to Adopt
+
+## Source
+Claude Code's official system prompt (Sonnet 4, 2025-08-19 version)
+
+## Key Patterns Worth Adopting
+
+### 1. Tone & Brevity (HIGH VALUE)
+- "concise, direct, to the point"
+- "minimize output tokens while maintaining helpfulness, quality, accuracy"
+- "fewer than 4 lines unless asked for detail"
+- "NO unnecessary preamble or postamble"
+- "Do not add additional code explanation summary unless requested"
+- One-word answers when possible
+
+**Hive application**: Our agent prompts are verbose. Forager is 172 lines. Could be tighter. The PROMPT TEXT ITSELF should model the conciseness we want agents to exhibit.
+
+### 2. Follow Conventions (HIGH VALUE)
+- "NEVER assume a library is available, even if well-known"
+- "look at neighboring files", "check package.json"
+- "When you create a new component, first look at existing components"
+- "When you edit code, first look at surrounding context"
+- "follow security best practices"
+- "DO NOT ADD ANY COMMENTS unless asked"
+
+**Hive application**: Already partially in Forager's Orient phase. But the "no comments unless asked" and "never assume library" rules are concrete and useful.
+
+### 3. Proactiveness Balance
+- "allowed to be proactive, but only when user asks"
+- "balance between doing the right thing and not surprising the user"
+- "if asked how to approach something, answer first, don't jump into actions"
+
+**Hive application**: Relevant for Hive/Swarm (orchestrators). Workers (Forager) should be MORE proactive (action bias). Different rules for different roles.
+
+### 4. Task Doing Pattern
+- Search tools extensively (parallel AND sequential)
+- Implement solution
+- Verify with tests (don't assume test framework)
+- Run lint/typecheck after completion
+- NEVER commit unless explicitly asked
+
+**Hive application**: The "run lint/typecheck" post-work check is good. The "never commit unless asked" is already handled by our worktree model.
+
+### 5. Code References Format
+- `file_path:line_number` for referencing code
+- "allow user to easily navigate to source code location"
+
+**Hive application**: Already in our plan format. Good to reinforce in agent prompts.
+
+## What NOT to Adopt
+- Security restrictions (defensive only) — Hive is general-purpose
+- WebFetch redirect handling — infrastructure-specific
+- Claude Code help/feedback URLs — product-specific
+- "GitHub-flavored markdown for CLI display" — we're in VSCode/terminal, different context
+
+## Prompt Efficiency Insights
+The Claude Code prompt is ~2500 words for a FULL general-purpose coding agent. Our individual agent prompts should aim to be equally efficient or tighter since each has a narrower scope.
+
+Key technique: Use examples instead of verbose explanation. Claude Code uses <example> blocks extensively — short, concrete, unambiguous.
+
+
+---
+
+## execution-decisions
+
+# Execution Decisions (2026-02-24)
+
+- Runnable tasks at execution start: 01, 02, 03, 04.
+- Operator decision: run all four runnable tasks in parallel.
+- Rationale: independent prompt files, no dependency edges between 01-04, fastest path to unlock Task 05.
+
+---
+
+## plan-review-notes
+
+# Plan Review Refresh (2026-02-24)
+
+## Snapshot
+- Feature: `omo-pattern-alignment`
+- Plan status: draft (revised)
+- Comments: none in `.hive/features/omo-pattern-alignment/comments.json`
+
+## Knowledge Refresh
+- Goal: align Forager/Hive/Swarm/Scout prompts to adopt high-value OMO + Claude Code + Anthropic 4.6 + OpenAI Codex patterns while reducing prompt verbosity.
+- Scope: prompt-only updates + PHILOSOPHY.md evolution notes.
+- Non-goals: runtime infrastructure changes, dynamic composition, tool changes.
+
+## Review Findings Applied
+1. Updated baseline references to current agent sizes:
+   - Forager 171, Hive 271, Swarm 161, Scout 129.
+2. Calibrated line-count targets:
+   - Hive <=270, Swarm <=160 (Forager <=180 and Scout <=120 unchanged).
+3. Calibrated aggressive-language verification targets:
+   - Forager <=5, Hive <=6, Swarm <=4, Scout <=2.
+4. Removed external OMO dependency from task references:
+   - Replaced `oh-my-opencode/...` task references with local context references in `.hive/features/omo-pattern-alignment/context/omo-research-findings.md`.
+5. Clarified exploration and wording:
+   - Added explicit instruction to apply all 5 exploration steps in order before blocking.
+   - Added de-escalation examples.
+   - Reworded Docker tightening instruction to explicit 2-3 line reduction.
+6. Added Scout read-only preservation verification check.
+7. Clarified Task 5 dependency as post-batch-merge sequencing.
+8. Made verification deterministic:
+   - Replaced non-portable regex word-boundary checks with `grep -Eci` + `test -le N`.
+   - Replaced non-executable line-order note with executable `test` command.
+   - Removed repo-wide non-deterministic ast-grep gate from task verify blocks.
+
+## Hygienic Reviewer Status
+- First pass: REJECT (determinism + contradiction gaps)
+- Final pass: OKAY
+- Non-blocking polish left:
+  - Normalize all reference entries to `file:line`
+  - Optionally annotate Task 5 final verify command with expected `exit 0`
+
+## Recommendation
+- Plan is execution-ready after user approval.
+
+---
+
+## omo-research-findings
+
+# OMO v3.8+ Research Findings
+
+## Date: 2026-02-24
+
+## Key New Patterns in OMO
+
+### 1. Hephaestus — Autonomous Deep Worker (GPT 5.3 Codex)
+- **File**: `oh-my-opencode/src/agents/hephaestus.ts` (539 LOC)
+- **Model**: `gpt-5.3-codex` with `reasoningEffort: "medium"`
+- **Key Innovation**: Intent extraction → verbalization → commitment loop
+- **"Do NOT Ask — Just Do"** pattern: Workers bias to action, questions are LAST resort
+- **Completion Guarantee**: "100% OR NOTHING" with turn-end self-check
+- **Exploration Hierarchy**: 5-step mandatory exploration before asking questions
+- **Execution Loop**: EXPLORE → PLAN → DECIDE → EXECUTE → VERIFY
+- **Progress Updates**: Proactive reporting at meaningful milestones
+
+### 2. Model-Specific Overlays (Gemini)
+- **File**: `oh-my-opencode/src/agents/sisyphus-gemini-overlays.ts` (118 LOC)
+- Counter model-specific biases with corrective prompt sections
+- Gemini: aggressive optimism → force tool calls, delegation, verification
+- GPT: conservative grounding → force intent extraction, action bias
+
+### 3. Dynamic Prompt Composition
+- **File**: `oh-my-opencode/src/agents/dynamic-agent-prompt-builder.ts` (396 LOC)
+- Prompt sections built from available agents/tools/skills metadata
+
+### 4. Intent Gate Patterns
+- **Sisyphus (Orchestrator)**: Verbalize intent → routing decision → anchor
+- **Hephaestus (Worker)**: Extract true intent → action commitment → turn-end self-check
+- Both include intent mapping tables (surface form → true intent → response)
+
+## Hive Alignment Analysis
+
+### Patterns that STRENGTHEN Hive Philosophy
+
+| OMO Pattern | Hive Principle | Impact |
+|-------------|----------------|--------|
+| Intent Verbalization | P7 (Iron Laws) | Makes routing transparent, prevents silent misclassification |
+| Completion Guarantee + Self-Check | P6 (Tests Define Done) + P7 | Stronger "done means verified" enforcement |
+| Exploration Hierarchy (5-step) | P3 (Human Shapes, Agent Builds) | Workers explore before asking — human shapes, agent explores |
+| "Do NOT Ask — Just Do" (workers) | P3 + P4 (Good Enough Wins) | Workers are autonomous builders, not question machines |
+| Progress Updates | P5 (Batched Parallelism) | Better visibility during parallel execution |
+| Search Stop Conditions | P4 (Good Enough Wins) | Prevents over-exploration |
+| Execution Loop | P2 + P6 | Explicit loop aligns with plan-first + TDD |
+
+### Patterns that CONFLICT — Do NOT adopt
+
+| OMO Pattern | Conflict | Resolution |
+|-------------|----------|------------|
+| "Do NOT Ask — Just Do" (orchestrator-level) | P2 (Plan → Approve) | Apply ONLY to Forager, not Hive/Swarm |
+| Dynamic prompt composition (code-level) | Hive is prompt-based | Adopt patterns in prompts, not infrastructure |
+| Category + Skills delegation | Hive uses worktree isolation | Different execution model — skip |
+| Model-specific overlays (code infrastructure) | No model detection in Hive | Future work |
+
 ### v0.1 (Initial)
 - Started with 8 principles
 - Consolidated to 5 (nothing lost, just cleaner)
