@@ -191,6 +191,8 @@ export interface HiveConfig {
   dockerImage?: string;
   /** Reuse Docker containers per worktree (default: true when sandbox is 'docker') */
   persistentContainers?: boolean;
+  /** Hook execution cadence (number of turns between hook invocations). Key = hook name, Value = cadence (1 = every turn, 3 = every 3rd turn) */
+  hook_cadence?: Record<string, number>;
 }
 
 /** Default models for Hive agents */

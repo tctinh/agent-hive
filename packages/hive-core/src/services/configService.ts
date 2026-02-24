@@ -13,6 +13,7 @@ import type { SandboxConfig } from './dockerSandboxService.js';
  */
 export class ConfigService {
   private configPath: string;
+  private cachedConfig: HiveConfig | null = null;
 
   constructor() {
     const homeDir = process.env.HOME || process.env.USERPROFILE || '';
@@ -31,15 +32,19 @@ export class ConfigService {
    * Get the full config, merged with defaults.
    */
   get(): HiveConfig {
+    if (this.cachedConfig !== null) {
+      return this.cachedConfig;
+    }
     try {
       if (!fs.existsSync(this.configPath)) {
-        return { ...DEFAULT_HIVE_CONFIG };
+        this.cachedConfig = { ...DEFAULT_HIVE_CONFIG };
+        return this.cachedConfig;
       }
       const raw = fs.readFileSync(this.configPath, 'utf-8');
       const stored = JSON.parse(raw) as Partial<HiveConfig>;
 
       // Deep merge with defaults
-      return {
+      const merged: HiveConfig = {
         ...DEFAULT_HIVE_CONFIG,
         ...stored,
         agents: {
@@ -77,8 +82,11 @@ export class ConfigService {
           },
         },
       };
+      this.cachedConfig = merged;
+      return this.cachedConfig;
     } catch {
-      return { ...DEFAULT_HIVE_CONFIG };
+      this.cachedConfig = { ...DEFAULT_HIVE_CONFIG };
+      return this.cachedConfig;
     }
   }
 
@@ -86,6 +94,7 @@ export class ConfigService {
    * Update config (partial merge).
    */
   set(updates: Partial<HiveConfig>): HiveConfig {
+    this.cachedConfig = null; // invalidate cache on write
     const current = this.get();
     
     const merged: HiveConfig = {
@@ -104,6 +113,7 @@ export class ConfigService {
     }
     
     fs.writeFileSync(this.configPath, JSON.stringify(merged, null, 2));
+    this.cachedConfig = merged;
     return merged;
   }
 
@@ -189,6 +199,42 @@ export class ConfigService {
     const persistent = config.persistentContainers ?? (mode === 'docker');
 
     return { mode, ...(image && { image }), persistent };
+  }
+
+  /**
+   * Get hook execution cadence for a specific hook.
+   * Returns the configured cadence or 1 (every turn) if not set.
+   * Validates cadence values and defaults to 1 for invalid values.
+   * 
+   * @param hookName - The OpenCode hook name (e.g., 'experimental.chat.system.transform')
+   * @param options - Optional configuration
+   * @param options.safetyCritical - If true, enforces cadence=1 regardless of config
+   * @returns Validated cadence value (always >= 1)
+   */
+  getHookCadence(hookName: string, options?: { safetyCritical?: boolean }): number {
+    const config = this.get();
+    const configuredCadence = config.hook_cadence?.[hookName];
+
+    // Safety-critical hooks must always fire (cadence=1)
+    if (options?.safetyCritical && configuredCadence && configuredCadence > 1) {
+      console.warn(
+        `[hive:cadence] Ignoring cadence > 1 for safety-critical hook: ${hookName}`
+      );
+      return 1;
+    }
+
+    // Validate and clamp cadence
+    if (configuredCadence === undefined || configuredCadence === null) {
+      return 1;
+    }
+    if (configuredCadence <= 0 || !Number.isInteger(configuredCadence)) {
+      console.warn(
+        `[hive:cadence] Invalid cadence ${configuredCadence} for ${hookName}, using 1`
+      );
+      return 1;
+    }
+
+    return configuredCadence;
   }
 
 }

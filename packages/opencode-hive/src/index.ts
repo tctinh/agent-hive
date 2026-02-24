@@ -151,6 +151,32 @@ import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { formatRelativeTime } from "./utils/format";
 import { HIVE_AGENT_NAMES, isHiveAgent, normalizeVariant } from "./hooks/variant-hook.js";
 
+/**
+ * Core hook cadence logic, extracted for testability.
+ * Determines whether a hook should execute based on its configured cadence.
+ */
+export function shouldExecuteHook(
+  hookName: string,
+  configService: { getHookCadence(name: string, opts?: { safetyCritical?: boolean }): number },
+  turnCounters: Record<string, number>,
+  options?: { safetyCritical?: boolean },
+): boolean {
+  const cadence = configService.getHookCadence(hookName, options);
+
+  // Increment turn counter
+  turnCounters[hookName] = (turnCounters[hookName] || 0) + 1;
+  const currentTurn = turnCounters[hookName];
+
+  // Cadence of 1 means fire every turn (no gating needed)
+  if (cadence === 1) {
+    return true;
+  }
+
+  // Fire on turns 1, (1+cadence), (1+2*cadence), ...
+  // Using (currentTurn - 1) % cadence === 0 ensures turn 1 always fires
+  return (currentTurn - 1) % cadence === 0;
+}
+
 const HIVE_SYSTEM_PROMPT = `
 ## Hive - Feature Development System
 
@@ -313,6 +339,16 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
     return null;
   };
 
+  // ============================================================================
+  // Hook Cadence Management
+  // ============================================================================
+  
+  /**
+   * Turn counters for hook cadence management.
+   * Each hook tracks its own invocation count to determine when to fire.
+   */
+  const turnCounters: Record<string, number> = {};
+
   const checkDependencies = (feature: string, taskFolder: string): { allowed: boolean; error?: string } => {
     const taskStatus = taskService.getRawStatus(feature, taskFolder);
     if (!taskStatus) {
@@ -368,6 +404,11 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       input: { agent?: string } | unknown,
       output: { system: string[] },
     ) => {
+      // Cadence gate: check if this hook should execute this turn
+      if (!shouldExecuteHook("experimental.chat.system.transform", configService, turnCounters)) {
+        return;
+      }
+
       output.system.push(HIVE_SYSTEM_PROMPT);
 
       // NOTE: autoLoadSkills injection is now done in the config hook (prompt field)
@@ -430,6 +471,14 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
     }) as any,
 
     "tool.execute.before": async (input, output) => {
+      // Cadence gate: check if this hook should execute this turn
+      // SAFETY-CRITICAL: This hook wraps commands for Docker sandbox isolation.
+      // Setting cadence > 1 could allow unsafe commands through.
+      // The safetyCritical flag enforces cadence=1 regardless of config.
+      if (!shouldExecuteHook("tool.execute.before", configService, turnCounters, { safetyCritical: true })) {
+        return;
+      }
+
       if (input.tool !== "bash") return;
       
       const sandboxConfig = configService.getSandboxConfig();

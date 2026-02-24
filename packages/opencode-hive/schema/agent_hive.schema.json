@@ -55,6 +55,22 @@
       "default": "unified",
       "description": "Agent specialization mode. 'unified' (default) uses a single hybrid agent for all roles; 'dedicated' uses specialized agents for each role."
     },
+    "hook_cadence": {
+      "type": "object",
+      "description": "Hook execution cadence configuration. Key = hook name, Value = number of turns between invocations (1 = every turn, 3 = every 3rd turn). All hooks default to 1.",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Number of turns between hook invocations"
+      },
+      "examples": [
+        {
+          "experimental.chat.system.transform": 3,
+          "chat.message": 1,
+          "tool.execute.before": 1
+        }
+      ]
+    },
     "agents": {
       "type": "object",
       "description": "Agent model configuration overrides",
