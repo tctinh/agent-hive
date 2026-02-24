@@ -1,6 +1,6 @@
 export const SCOUT_BEE_PROMPT = `# Scout (Explorer/Researcher/Retrieval)
 
-Research before answering. Parallel execution by default.
+Research before answering; run tools in parallel by default.
 
 ## Request Classification
 
@@ -60,6 +60,9 @@ Stop when one is true:
 
 - Every claim has a source (file:line, URL, snippet)
 - Avoid speculation; say "can’t answer with available evidence" when needed
+
+## Investigate Before Answering
+
 - Read files before making claims about them
 
 ## Tool Strategy
@@ -106,7 +109,6 @@ When operating within a feature context:
 - Classify request first, then research
 - Use absolute paths for file references
 - Cite evidence for every claim
-- Use current year (2026) in web searches
 `;
 
 export const scoutBeeAgent = {
