@@ -349,18 +349,6 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
    */
   const turnCounters: Record<string, number> = {};
 
-  /**
-   * Check if a hook should execute based on its configured cadence.
-   * 
-   * @param hookName - The OpenCode hook name
-   * @param options - Optional configuration
-   * @param options.safetyCritical - If true, enforces cadence=1 regardless of config
-   * @returns true if the hook should execute this turn, false otherwise
-   */
-  const shouldExecuteHook = (hookName: string, options?: { safetyCritical?: boolean }): boolean => {
-    return _shouldExecuteHook(hookName, configService, turnCounters, options);
-  };
-
   const checkDependencies = (feature: string, taskFolder: string): { allowed: boolean; error?: string } => {
     const taskStatus = taskService.getRawStatus(feature, taskFolder);
     if (!taskStatus) {
@@ -417,7 +405,7 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       output: { system: string[] },
     ) => {
       // Cadence gate: check if this hook should execute this turn
-      if (!shouldExecuteHook("experimental.chat.system.transform")) {
+      if (!shouldExecuteHook("experimental.chat.system.transform", configService, turnCounters)) {
         return;
       }
 
@@ -487,7 +475,7 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       // SAFETY-CRITICAL: This hook wraps commands for Docker sandbox isolation.
       // Setting cadence > 1 could allow unsafe commands through.
       // The safetyCritical flag enforces cadence=1 regardless of config.
-      if (!shouldExecuteHook("tool.execute.before", { safetyCritical: true })) {
+      if (!shouldExecuteHook("tool.execute.before", configService, turnCounters, { safetyCritical: true })) {
         return;
       }
 
