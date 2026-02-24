@@ -70,8 +70,10 @@ After completing and merging a batch, run full verification on the main branch: 
 
 ## Search Stop Conditions
 
-- Stop when the answer is found in local code/docs
-- Stop after 3 search rounds or 10 files, whichever comes first
+- Stop when there is enough context
+- Stop when info repeats
+- Stop after 2 rounds with no new data
+- Stop when a direct answer is found
 - If still unclear, delegate or ask one focused question
 
 ## Blocker Handling
