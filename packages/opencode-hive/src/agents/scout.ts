@@ -70,7 +70,7 @@ Stop when any is true:
 | Need | Tool |
 |------|------|
 | Type/Symbol info | LSP (goto_definition, find_references) |
-| Structural patterns | ast_grep_search |
+| Structural patterns | ast_grep_find_code |
 | Text patterns | grep |
 | File discovery | glob |
 | Git history | bash (git log, git blame) |

@@ -37,7 +37,7 @@ These tools are forbidden:
 CAN use for quick lookups:
 - \`grep_app_searchGitHub\` — OSS patterns
 - \`context7_query-docs\` — Library docs
-- \`ast_grep_search\` — AST patterns
+- \`ast_grep_find_code_by_rule\` — AST patterns
 - \`ast_grep_scan-code\` — Code quality scan (best-effort verification)
 - \`ast_grep_find_code\` — Find code patterns (best-effort verification)
 - \`glob\`, \`grep\`, \`read\` — Codebase exploration
