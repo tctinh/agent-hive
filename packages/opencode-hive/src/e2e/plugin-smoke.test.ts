@@ -366,8 +366,8 @@ Do it
     output.system.push("## Base Agent Prompt");
 
     const joined = output.system.join("\n");
-    expect(joined).toContain("## Hive - Feature Development System");
-    expect(joined).toContain("hive_feature_create");
+    expect(joined).toContain("## Hive — Active Session");
+    expect(joined).toContain("hive_status");
     
     // Auto-loaded skills are now injected via config hook (prompt field), NOT system.transform
     // Verify by checking the agent's prompt field in config

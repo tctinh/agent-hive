@@ -337,7 +337,7 @@ describe("config hook autoLoadSkills injection", () => {
     expect(joinedWithAgent).not.toContain(parallelExplorationSkill!.template);
 
     // HIVE_SYSTEM_PROMPT should still be there
-    expect(joinedWithAgent).toContain("## Hive - Feature Development System");
+    expect(joinedWithAgent).toContain("## Hive — Active Session");
 
     // Call system.transform WITHOUT agent (simulates runtime scenario)
     const outputWithoutAgent = { system: [] as string[] };
@@ -349,7 +349,7 @@ describe("config hook autoLoadSkills injection", () => {
     expect(joinedWithoutAgent).not.toContain(parallelExplorationSkill!.template);
 
     // HIVE_SYSTEM_PROMPT should still be there
-    expect(joinedWithoutAgent).toContain("## Hive - Feature Development System");
+    expect(joinedWithoutAgent).toContain("## Hive — Active Session");
 
     // Verify skills ARE in the config hook prompt (the correct path)
     const opencodeConfig: any = { agent: {} };

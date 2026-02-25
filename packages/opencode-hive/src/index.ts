@@ -182,83 +182,13 @@ export function shouldExecuteHook(
 }
 
 const HIVE_SYSTEM_PROMPT = `
-## Hive - Feature Development System
+## Hive — Active Session
 
-Plan-first development: Write plan → User reviews → Approve → Execute tasks
+Use hive_status to check feature state before starting work.
+Use hive_plan_read to see plan comments.
 
-### Tools (14 total)
-
-| Domain | Tools |
-|--------|-------|
-| Feature | hive_feature_create, hive_feature_complete |
-| Plan | hive_plan_write, hive_plan_read, hive_plan_approve |
-| Task | hive_tasks_sync, hive_task_create, hive_task_update |
-| Worktree | hive_worktree_create, hive_worktree_commit, hive_worktree_discard |
-| Merge | hive_merge |
-| Context | hive_context_write |
-| Status | hive_status |
-| Skill | hive_skill |
-
-### Workflow
-
-1. \`hive_feature_create(name)\` - Create feature
-2. \`hive_plan_write(content)\` - Write plan.md
-3. User adds comments in VSCode → \`hive_plan_read\` to see them
-4. Revise plan → User approves
-5. \`hive_tasks_sync()\` - Generate tasks from plan
-6. \`hive_worktree_create(task)\` → work in worktree → \`hive_worktree_commit(task, summary)\`
-7. \`hive_merge(task)\` - Merge task branch into main (when ready)
-
-**Important:** \`hive_worktree_commit\` commits changes to task branch but does NOT merge.
-Use \`hive_merge\` to explicitly integrate changes. Worktrees persist until manually removed.
-
-### Delegated Execution
-
-\`hive_worktree_create\` creates worktree and spawns worker automatically:
-
-1. \`hive_worktree_create(task)\` → Creates worktree + spawns Forager (Worker/Coder) worker
-2. Worker executes → calls \`hive_worktree_commit(status: "completed")\`
-3. Worker blocked → calls \`hive_worktree_commit(status: "blocked", blocker: {...})\`
-
-**Handling blocked workers:**
-1. Check blockers with \`hive_status()\`
-2. Read the blocker info (reason, options, recommendation, context)
-3. Ask user via \`question()\` tool - NEVER plain text
-4. Resume with \`hive_worktree_create(task, continueFrom: "blocked", decision: answer)\`
-
-**CRITICAL**: When resuming, a NEW worker spawns in the SAME worktree.
-The previous worker's progress is preserved. Include the user's decision in the \`decision\` parameter.
-
-**After task() Returns:**
-- task() is BLOCKING — when it returns, the worker is DONE
-- Call \`hive_status()\` immediately to check the new task state and find next runnable tasks
-- No notifications or polling needed — the result is already available
-
-**For research**, use MCP tools or parallel exploration:
-- \`grep_app_searchGitHub\` - Find code in OSS
-- \`context7_query-docs\` - Library documentation
-- \`websearch_web_search_exa\` - Web search via Exa
-- \`ast_grep_search\` - AST-based search
-- For exploratory fan-out, load \`hive_skill("parallel-exploration")\` and use multiple \`task()\` calls in the same message
-
-### Planning Phase - Context Management REQUIRED
-
-As you research and plan, CONTINUOUSLY save findings using \`hive_context_write\`:
-- Research findings (API patterns, library docs, codebase structure)
-- User preferences ("we use Zustand, not Redux")
-- Rejected alternatives ("tried X, too complex")
-- Architecture decisions ("auth lives in /lib/auth")
-
-**Update existing context files** when new info emerges - dont create duplicates.
-
-\`hive_tasks_sync\` parses \`### N. Task Name\` headers.
-
-### Execution Phase - Stay Aligned
-
-During execution, call \`hive_status\` periodically to:
-- Check current progress and pending work
-- See context files to read
-- Get reminded of next actions
+**Important:** hive_worktree_commit commits to the task branch but does NOT merge.
+Use hive_merge to integrate changes into the current branch.
 `;
 
 type ToolContext = {
@@ -1410,6 +1340,22 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
 
     // Config hook - merge agents into opencodeConfig.agent
     config: async (opencodeConfig: Record<string, unknown>) => {
+      function agentTools(allowed: string[]): Record<string, boolean> {
+        const allHiveTools = [
+          'hive_feature_create', 'hive_feature_complete',
+          'hive_plan_write', 'hive_plan_read', 'hive_plan_approve',
+          'hive_tasks_sync', 'hive_task_create', 'hive_task_update',
+          'hive_worktree_create', 'hive_worktree_commit', 'hive_worktree_discard',
+          'hive_merge', 'hive_context_write', 'hive_status', 'hive_skill', 'hive_agents_md',
+        ];
+        const result: Record<string, boolean> = {};
+        for (const tool of allHiveTools) {
+          if (!allowed.includes(tool)) {
+            result[tool] = false;
+          }
+        }
+        return result;
+      }
       // Auto-generate config file with defaults if it doesn't exist
       configService.init();
 
@@ -1438,6 +1384,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         temperature: architectUserConfig.temperature ?? 0.7,
         description: 'Architect (Planner) - Plans features, interviews, writes plans. NEVER executes.',
         prompt: ARCHITECT_BEE_PROMPT + architectAutoLoadedSkills,
+        tools: agentTools(['hive_feature_create', 'hive_plan_write', 'hive_plan_read', 'hive_context_write', 'hive_status', 'hive_skill']),
         permission: {
           edit: "deny",  // Planners don't edit code
           task: "allow",
@@ -1457,6 +1404,12 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         temperature: swarmUserConfig.temperature ?? 0.5,
         description: 'Swarm (Orchestrator) - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
         prompt: SWARM_BEE_PROMPT + swarmAutoLoadedSkills,
+        tools: agentTools([
+          'hive_feature_create', 'hive_feature_complete', 'hive_plan_read', 'hive_plan_approve',
+          'hive_tasks_sync', 'hive_task_create', 'hive_task_update',
+          'hive_worktree_create', 'hive_worktree_discard', 'hive_merge',
+          'hive_context_write', 'hive_status', 'hive_skill', 'hive_agents_md',
+        ]),
         permission: {
           question: "allow",
           skill: "allow",
@@ -1474,6 +1427,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         mode: 'subagent' as const,
         description: 'Scout (Explorer/Researcher/Retrieval) - Researches codebase + external docs/data.',
         prompt: SCOUT_BEE_PROMPT + scoutAutoLoadedSkills,
+        tools: agentTools(['hive_plan_read', 'hive_context_write', 'hive_status', 'hive_skill']),
         permission: {
           edit: "deny",  // Researchers don't edit code
           task: "deny",
@@ -1492,6 +1446,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         mode: 'subagent' as const,
         description: 'Forager (Worker/Coder) - Executes tasks directly in isolated worktrees. Never delegates.',
         prompt: FORAGER_BEE_PROMPT + foragerAutoLoadedSkills,
+        tools: agentTools(['hive_plan_read', 'hive_worktree_commit', 'hive_context_write', 'hive_status', 'hive_skill']),
         permission: {
           task: "deny",
           delegate: "deny",
@@ -1508,6 +1463,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         mode: 'subagent' as const,
         description: 'Hygienic (Consultant/Reviewer/Debugger) - Reviews plan documentation quality. OKAY/REJECT verdict.',
         prompt: HYGIENIC_BEE_PROMPT + hygienicAutoLoadedSkills,
+        tools: agentTools(['hive_plan_read', 'hive_context_write', 'hive_status', 'hive_skill']),
         permission: {
           edit: "deny",  // Reviewers don't edit
           task: "deny",
