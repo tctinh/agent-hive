@@ -155,17 +155,21 @@ import { HIVE_AGENT_NAMES, isHiveAgent, normalizeVariant } from "./hooks/variant
  * Core hook cadence logic, extracted for testability.
  * Determines whether a hook should execute based on its configured cadence.
  */
+const fallbackTurnCounters: Record<string, number> = {};
+
 export function shouldExecuteHook(
   hookName: string,
-  configService: { getHookCadence(name: string, opts?: { safetyCritical?: boolean }): number },
-  turnCounters: Record<string, number>,
+  configService: { getHookCadence(name: string, opts?: { safetyCritical?: boolean }): number } | undefined,
+  turnCounters: Record<string, number> | undefined,
   options?: { safetyCritical?: boolean },
 ): boolean {
-  const cadence = configService.getHookCadence(hookName, options);
+  // Fall back to cadence=1 if config service is unavailable during early hook execution.
+  const cadence = configService?.getHookCadence(hookName, options) ?? 1;
+  const counters = turnCounters ?? fallbackTurnCounters;
 
   // Increment turn counter
-  turnCounters[hookName] = (turnCounters[hookName] || 0) + 1;
-  const currentTurn = turnCounters[hookName];
+  counters[hookName] = (counters[hookName] || 0) + 1;
+  const currentTurn = counters[hookName];
 
   // Cadence of 1 means fire every turn (no gating needed)
   if (cadence === 1) {

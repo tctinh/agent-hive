@@ -313,6 +313,22 @@ describe('Hook Cadence Logic', () => {
       configService = new ConfigService();
       expect(configService.getHookCadence('experimental.chat.system.transform')).toBe(1);
     });
+
+    it('defaults to cadence=1 when config service is unavailable', () => {
+      const results = [];
+      for (let i = 0; i < 5; i++) {
+        results.push(shouldExecuteHook('experimental.chat.system.transform', undefined, turnCounters));
+      }
+      expect(results).toEqual([true, true, true, true, true]);
+    });
+
+    it('uses fallback counters when turn counters are unavailable', () => {
+      const results = [];
+      for (let i = 0; i < 5; i++) {
+        results.push(shouldExecuteHook('experimental.chat.system.transform', configService, undefined));
+      }
+      expect(results).toEqual([true, true, true, true, true]);
+    });
   });
 
   describe('Concurrent hook execution', () => {
