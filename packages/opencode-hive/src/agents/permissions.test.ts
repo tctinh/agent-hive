@@ -228,6 +228,17 @@ describe('Per-agent tool filtering', () => {
     expect(foragerTools!['hive_worktree_create']).toBe(false);
   });
 
+  it('forager tool list is exactly [hive_plan_read, hive_worktree_commit, hive_context_write, hive_skill] and excludes hive_status', async () => {
+    const agents = await buildConfig('unified');
+    const foragerTools = agents['forager-worker']?.tools;
+    expect(foragerTools).toBeTruthy();
+    expect(foragerTools!['hive_status']).toBe(false);
+    expect(foragerTools!['hive_plan_read']).toBeUndefined();
+    expect(foragerTools!['hive_worktree_commit']).toBeUndefined();
+    expect(foragerTools!['hive_context_write']).toBeUndefined();
+    expect(foragerTools!['hive_skill']).toBeUndefined();
+  });
+
   it('scout has only read-only hive tools (no worktree_commit, no merge)', async () => {
     const agents = await buildConfig('unified');
     const scoutTools = agents['scout-researcher']?.tools;

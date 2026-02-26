@@ -260,7 +260,7 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 - **Hive** — all 16 tools (hybrid agent)
 - **Swarm** — hive_feature_create, hive_feature_complete, hive_plan_read, hive_plan_approve, hive_tasks_sync, hive_task_create, hive_task_update, hive_worktree_create, hive_worktree_discard, hive_merge, hive_context_write, hive_status, hive_skill, hive_agents_md (14 tools — excludes hive_worktree_commit, hive_plan_write)
 - **Architect** — hive_feature_create, hive_plan_write, hive_plan_read, hive_context_write, hive_status, hive_skill (6 tools)
-- **Forager** — hive_plan_read, hive_worktree_commit, hive_context_write, hive_status, hive_skill (5 tools)
+- **Forager** — hive_plan_read, hive_worktree_commit, hive_context_write, hive_skill (4 tools)
 - **Scout** — hive_plan_read, hive_context_write, hive_status, hive_skill (4 tools)
 - **Hygienic** — hive_plan_read, hive_context_write, hive_status, hive_skill (4 tools)
 

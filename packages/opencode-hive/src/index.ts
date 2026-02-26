@@ -1451,7 +1451,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         mode: 'subagent' as const,
         description: 'Forager (Worker/Coder) - Executes tasks directly in isolated worktrees. Never delegates.',
         prompt: FORAGER_BEE_PROMPT + foragerAutoLoadedSkills,
-        tools: agentTools(['hive_plan_read', 'hive_worktree_commit', 'hive_context_write', 'hive_status', 'hive_skill']),
+        tools: agentTools(['hive_plan_read', 'hive_worktree_commit', 'hive_context_write', 'hive_skill']),
         permission: {
           task: "deny",
           delegate: "deny",
