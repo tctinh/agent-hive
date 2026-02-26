@@ -947,7 +947,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
               task,
               taskState: 'unknown',
               message: `Task "${task}" not found`,
-              nextAction: 'Verify task folder via hive_status and retry with the correct task id.',
+              nextAction: 'Check the task folder name in your worker-prompt.md and retry hive_worktree_commit with the correct task id.',
             });
           }
           if (taskInfo.status !== 'in_progress' && taskInfo.status !== 'blocked') {

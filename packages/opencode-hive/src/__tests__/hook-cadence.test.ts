@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { ConfigService } from 'hive-core';
 import { shouldExecuteHook, HIVE_SYSTEM_PROMPT } from '../index.js';
+import { buildCompactionPrompt } from '../utils/compaction-prompt.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -380,5 +381,50 @@ describe('HIVE_SYSTEM_PROMPT — no broad worker-startup reinjection', () => {
   it('retains the hive_worktree_commit vs hive_merge distinction note', () => {
     expect(HIVE_SYSTEM_PROMPT).toMatch(/hive_worktree_commit/);
     expect(HIVE_SYSTEM_PROMPT).toMatch(/hive_merge/);
+  });
+});
+
+describe('Compaction hook — no hive_status reinjection after compaction', () => {
+  it('compaction prompt does not reference hive_status', () => {
+    const prompt = buildCompactionPrompt();
+    expect(prompt).not.toMatch(/hive_status/);
+  });
+
+  it('system transform does not reintroduce broad startup instruction after compaction', () => {
+    const compactionOutput = buildCompactionPrompt();
+    expect(compactionOutput).not.toMatch(/use hive_status to check feature state before starting work/i);
+    expect(compactionOutput).not.toMatch(/use hive_plan_read to see plan comments/i);
+    expect(HIVE_SYSTEM_PROMPT).not.toMatch(/use hive_status to check feature state before starting work/i);
+  });
+
+  it('compaction prompt instructs worker to resume without status-tool calls', () => {
+    const prompt = buildCompactionPrompt();
+    expect(prompt).toMatch(/do not|avoid|skip/i);
+    expect(prompt).not.toMatch(/hive_status/);
+    expect(prompt).toMatch(/worker-prompt\.md|task spec|spec file/i);
+  });
+});
+
+describe('hive_worktree_commit error guidance — no out-of-surface tool references for Forager', () => {
+  it('task_not_found nextAction does not reference hive_status', async () => {
+    const { default: plugin } = await import('../index.js');
+    const repoRoot = path.resolve(import.meta.dir, '..', '..', '..', '..');
+    const ctx = {
+      directory: repoRoot,
+      worktree: repoRoot,
+      serverUrl: new URL('http://localhost:1'),
+      project: { id: 'test', worktree: repoRoot, time: { created: Date.now() } },
+      client: {} as any,
+      $: {} as any,
+    };
+    const hooks = await plugin(ctx as any);
+    const toolContext = { sessionID: 'sess_test', messageID: 'msg_test', agent: 'forager-worker', abort: new AbortController().signal };
+    const raw = await hooks.tool!.hive_worktree_commit.execute(
+      { task: 'nonexistent-task', summary: 'test', status: 'completed', feature: 'nonexistent-feature' },
+      toolContext,
+    );
+    const result = JSON.parse(raw as string) as { reason?: string; nextAction?: string };
+    expect(result.reason).toBe('task_not_found');
+    expect(result.nextAction).not.toMatch(/hive_status/);
   });
 });
