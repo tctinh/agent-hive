@@ -50,10 +50,10 @@ We studied what actually works in the AI coding community and built upon it:
 
 | Source | What We Learned | Hive Implementation |
 |--------|-----------------|---------------------|
-| **[Boris Cherny's 13 Tips](https://www.anthropic.com/research/claude-code-best-practices)** | Feedback loops = 2-3x quality | Task-level verification with tests |
+| **[Boris Cherny's 13 Tips](https://www.anthropic.com/research/claude-code-best-practices)** | Feedback loops = 2-3x quality | Best-effort worker verification + batch testing |
 | **[Spec Kit](https://github.com/github/spec-kit)** | Specs are valuable | Specs emerge from dialogue, not upfront |
 | **[Conductor](https://github.com/gemini-cli-extensions/conductor)** | Context persistence matters | Feature-scoped `.hive/context/` |
-| **[Ralph Wiggum](https://awesomeclaude.ai/ralph-wiggum)** | Retry loops work for verification | TDD loops, not infinite retries |
+| **[Ralph Wiggum](https://awesomeclaude.ai/ralph-wiggum)** | Retry loops work for verification | Best-effort verification, not infinite retries |
 | **[Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode)** | Agent delegation scales | OMO as Hive Queen, Hive as workflow |
 | **Antigravity** | Plan gates build trust | Plan → Approve → Execute workflow |
 
@@ -500,7 +500,7 @@ Hive is built on 7 core principles:
 3. **Human Shapes, Agent Builds** — Human owns the why. Agent owns the how.
 4. **Good Enough Wins** — Capture what works for this context. Reject over-engineering.
 5. **Batched Parallelism** — Parallel tasks in batches. Sequential batches share context.
-6. **Tests Define Done** — For implementation tasks, tests provide the feedback loop.
+6. **Tests Define Done** — Workers do best-effort checks; orchestrator runs full suite after batch merge.
 7. **Iron Laws + Hard Gates** — Non-negotiable constraints enforced by tools, not guidelines.
 
 See [PHILOSOPHY.md](PHILOSOPHY.md) for the full framework.

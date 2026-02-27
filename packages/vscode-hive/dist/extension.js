@@ -38,7 +38,7 @@ var vscode7 = __toESM(require("vscode"));
 var fs10 = __toESM(require("fs"));
 var path10 = __toESM(require("path"));
 
-// ../../../../../../packages/hive-core/dist/index.js
+// ../hive-core/dist/index.js
 var import_node_module = require("node:module");
 var path = __toESM(require("path"), 1);
 var fs = __toESM(require("fs"), 1);
@@ -1044,12 +1044,14 @@ function isLockStale(lockPath, staleTTL) {
 function acquireLockSync(filePath, options = {}) {
   const opts = { ...DEFAULT_LOCK_OPTIONS, ...options };
   const lockPath = getLockPath(filePath);
+  const lockDir = path.dirname(lockPath);
   const startTime = Date.now();
   const lockContent = JSON.stringify({
     pid: process.pid,
     timestamp: (/* @__PURE__ */ new Date()).toISOString(),
     filePath
   });
+  ensureDir(lockDir);
   while (true) {
     try {
       const fd = fs.openSync(lockPath, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY);
@@ -1063,15 +1065,18 @@ function acquireLockSync(filePath, options = {}) {
       };
     } catch (err) {
       const error = err;
-      if (error.code !== "EEXIST") {
-        throw error;
-      }
-      if (isLockStale(lockPath, opts.staleLockTTL)) {
-        try {
-          fs.unlinkSync(lockPath);
-          continue;
-        } catch {
+      if (error.code === "ENOENT") {
+        ensureDir(lockDir);
+      } else if (error.code === "EEXIST") {
+        if (isLockStale(lockPath, opts.staleLockTTL)) {
+          try {
+            fs.unlinkSync(lockPath);
+            continue;
+          } catch {
+          }
         }
+      } else {
+        throw error;
       }
       if (Date.now() - startTime >= opts.timeout) {
         throw new Error(`Failed to acquire lock on ${filePath} after ${opts.timeout}ms. Lock file: ${lockPath}`);
@@ -1098,14 +1103,6 @@ function writeAtomic(filePath, content) {
 }
 function writeJsonAtomic(filePath, data) {
   writeAtomic(filePath, JSON.stringify(data, null, 2));
-}
-function writeJsonLockedSync(filePath, data, options = {}) {
-  const release = acquireLockSync(filePath, options);
-  try {
-    writeJsonAtomic(filePath, data);
-  } finally {
-    release();
-  }
 }
 function deepMerge(target, patch) {
   const result = { ...target };
@@ -1582,23 +1579,31 @@ ${f.content}`).join(`
   }
   update(featureName, taskFolder, updates, lockOptions) {
     const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);
-    const current = readJson(statusPath);
-    if (!current) {
+    if (!fileExists(statusPath)) {
       throw new Error(`Task '${taskFolder}' not found`);
     }
-    const updated = {
-      ...current,
-      ...updates,
-      schemaVersion: TASK_STATUS_SCHEMA_VERSION
-    };
-    if (updates.status === "in_progress" && !current.startedAt) {
-      updated.startedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const release = acquireLockSync(statusPath, lockOptions);
+    try {
+      const current = readJson(statusPath);
+      if (!current) {
+        throw new Error(`Task '${taskFolder}' not found`);
+      }
+      const updated = {
+        ...current,
+        ...updates,
+        schemaVersion: TASK_STATUS_SCHEMA_VERSION
+      };
+      if (updates.status === "in_progress" && !current.startedAt) {
+        updated.startedAt = (/* @__PURE__ */ new Date()).toISOString();
+      }
+      if (updates.status === "done" && !current.completedAt) {
+        updated.completedAt = (/* @__PURE__ */ new Date()).toISOString();
+      }
+      writeJsonAtomic(statusPath, updated);
+      return updated;
+    } finally {
+      release();
     }
-    if (updates.status === "done" && !current.completedAt) {
-      updated.completedAt = (/* @__PURE__ */ new Date()).toISOString();
-    }
-    writeJsonLockedSync(statusPath, updated, lockOptions);
-    return updated;
   }
   patchBackgroundFields(featureName, taskFolder, patch, lockOptions) {
     const statusPath = getTaskStatusPath(this.projectRoot, featureName, taskFolder);

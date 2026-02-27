@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-02-25
+
+### Added
+- **Multi-Source Prompt Alignment (OMO + Claude + Anthropic + Codex)**: Updated Forager, Hive, Swarm, and Scout prompts with stronger intent extraction/verbalization, exploration hierarchy, verification discipline, and concise instruction patterns
+- **PHILOSOPHY.md v1.3.0 Evolution Notes**: Added a dedicated evolution section documenting adopted patterns, rejected patterns, and rationale across all four source guides
+
+### Changed
+- **Verification Model**: Shifted from mandatory TDD verification to best-effort worker verification + orchestrator batch testing. Workers use ast-grep for lightweight code checks in worktrees (no project dependencies needed). Orchestrators run full build + test suite after merging each batch on the main branch
+- **Forager Prompt**: Removed TDD flow, added best-effort ast-grep verification model. Workers focus on writing quality code with ~80% confidence, not overthinking verification. Added `ast_grep_scan-code` and `ast_grep_find_code` to Allowed Research tools
+- **Hive Prompt**: Added Batch-Merge-Verify Workflow section — orchestrator merges batch, runs `build` + `test`, diagnoses failures with full context
+- **Swarm Prompt**: Same batch-merge-verify workflow as Hive. Replaced "Merge only after verification passes" with batch workflow reference
+- **AGENTS.md**: Updated worktree dependency note and P6 description to reflect best-effort + batch verification model
+- **Verification Gate Softened**: `hive_worktree_commit` no longer hard-rejects commits without test/build keywords. Returns advisory `verificationNote` field instead, keeping keyword tracking for observability
+- **Prompt Contract Cleanup**: Restored compatibility phrases required by prompt regression tests while keeping aligned behavior updates (turn termination wording, completion/blocked guidance, verification section headings)
+- **Branch Hygiene for Hive Artifacts**: Removed `.hive/features/omo-pattern-alignment` files from git tracking on this branch while preserving local copies for operator continuity
+- **Version Bump**: Bumped root and package versions to `1.3.0` (`agent-hive`, `hive-core`, `opencode-hive`, `vscode-hive`)
+
+### Fixed
+- **AST Tool Name Mismatch**: Replaced non-existent `ast_grep_search` prompt references with available AST tools
+- **Plugin E2E Contract**: Updated plugin smoke test expectation to match advisory `verificationNote` behavior for `hive_worktree_commit` when verification evidence is missing
+
+### Design Notes
+- Symlinks for shared node_modules rejected: cross-platform risk (Windows), potential dependency conflicts
+- Pure batch testing (zero worker verification) rejected: too many back-and-forth cycles
+- ast-grep chosen over LLM self-review: already integrated via MCP, no new dependencies, ~80% accuracy vs ~50% for LLM review
+- Agent prompts kept language-agnostic (not bun/node specific) since Hive supports Python, Go, Rust, etc.
+
 ## [1.2.0] - 2026-02-08
 
 ### Added

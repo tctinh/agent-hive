@@ -22,7 +22,7 @@ bun run release:check     # Install, build, and test all packages
 bun run release:prepare   # Prepare release
 ```
 
-Worktree dependency note: worktrees are isolated checkouts and do not share the root `node_modules`. If you run tests or builds inside a worktree, run `bun install` there first (or run tests from the repo root that already has dependencies installed).
+Worktree dependency note: worktrees are lightweight checkouts without project dependencies. Workers do best-effort verification using ast-grep (no dependencies needed). Full build and test verification (`bun run build` + `bun run test`) runs on the main branch after the orchestrator merges a batch of task branches.
 
 ### Package-Specific Commands
 
@@ -132,8 +132,9 @@ feat!: change plan format to support subtasks
 3. **Human Shapes, Agent Builds** - Humans decide direction, agents implement
 4. **Good Enough Wins** - Ship working code, iterate later
 5. **Batched Parallelism** - Delegate independent tasks to workers
-6. **Tests Define Done** - TDD subtasks: test → implement → verify
+6. **Tests Define Done** - Workers do best-effort checks; orchestrator runs full test suite after batch merge
 7. **Iron Laws + Hard Gates** - Non-negotiable constraints per agent
+8. **Cross-Model Prompts** — Agent prompts must work across all supported LLM providers. Use conditional triggers ("when X, do Y") instead of absolute mandates ("always do Y") or blanket defaults ("by default, do Y").
 
 ### Agent Roles
 
@@ -241,7 +242,7 @@ This is a **bun workspaces** monorepo:
 
 Plan-first development: Write plan → User reviews → Approve → Execute tasks
 
-### Tools (15 total)
+### Tools (16 total)
 
 | Domain | Tools |
 |--------|-------|
@@ -253,6 +254,15 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Context | hive_context_write |
 | AGENTS.md | hive_agents_md |
 | Status | hive_status |
+| Skill | hive_skill |
+
+**Tool access is filtered per agent role:**
+- **Hive** — all 16 tools (hybrid agent)
+- **Swarm** — hive_feature_create, hive_feature_complete, hive_plan_read, hive_plan_approve, hive_tasks_sync, hive_task_create, hive_task_update, hive_worktree_create, hive_worktree_discard, hive_merge, hive_context_write, hive_status, hive_skill, hive_agents_md (14 tools — excludes hive_worktree_commit, hive_plan_write)
+- **Architect** — hive_feature_create, hive_plan_write, hive_plan_read, hive_context_write, hive_status, hive_skill (6 tools)
+- **Forager** — hive_plan_read, hive_worktree_commit, hive_context_write, hive_skill (4 tools)
+- **Scout** — hive_plan_read, hive_context_write, hive_status, hive_skill (4 tools)
+- **Hygienic** — hive_plan_read, hive_context_write, hive_status, hive_skill (4 tools)
 
 ### Workflow
 
@@ -266,6 +276,28 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 
 **Important:** `hive_worktree_commit` commits changes to task branch but does NOT merge.
 Use `hive_merge` to explicitly integrate changes. Worktrees persist until manually removed.
+
+### Delegated Execution
+
+`hive_worktree_create` creates worktree and spawns worker automatically:
+
+1. `hive_worktree_create(task)` → Creates worktree + spawns Forager (Worker/Coder) worker
+2. Worker executes → calls `hive_worktree_commit(status: "completed")`
+3. Worker blocked → calls `hive_worktree_commit(status: "blocked", blocker: {...})`
+
+**Handling blocked workers:**
+1. Check blockers with `hive_status()`
+2. Read the blocker info (reason, options, recommendation, context)
+3. Ask user via `question()` tool - NEVER plain text
+4. Resume with `hive_worktree_create(task, continueFrom: "blocked", decision: answer)`
+
+**CRITICAL**: When resuming, a NEW worker spawns in the SAME worktree.
+The previous worker's progress is preserved. Include the user's decision in the `decision` parameter.
+
+**After task() Returns:**
+- task() is BLOCKING — when it returns, the worker is DONE
+- Call `hive_status()` immediately to check the new task state and find next runnable tasks
+- No notifications or polling needed — the result is already available
 
 ### Sandbox Configuration
 

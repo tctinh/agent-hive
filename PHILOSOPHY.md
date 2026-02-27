@@ -19,7 +19,7 @@ This is exactly what we want from AI agents:
 | Waggle dance communicates plans | Plan → Review → Approve workflow |
 | Royal jelly nourishes development | Context files ground agents in reality |
 | Honey is the valuable output | Documentation emerges naturally from work |
-| Propolis seals and protects | TDD verification ensures quality |
+| Propolis seals and protects | Best-effort + batch verification ensures quality |
 ### The Parallel is Intentional
 A beehive solves the exact problems we face with AI agents:
 - **Coordination without chaos** — Thousands of bees, zero conflicts
@@ -47,7 +47,7 @@ The answer became this platform.
 | **Cells** | Tasks | Individual tasks within a comb. Each cell is isolated (worktree) and produces one unit of work. |
 | **Royal Jelly** | Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
 | **Honey** | Artifacts | The output — `plan.md`, `spec.md`, `report.md`, code. Persistent documentation that emerges from work. |
-| **Propolis** | Verification | TDD subtasks that seal work as complete. Tests prove the cell is solid. |
+| **Propolis** | Verification | Best-effort worker checks + orchestrator batch testing that seal work as complete. |
 | **Wax Seal** | Sandbox | Docker container that isolates worker execution. Tests run inside, results flow out. |
 | **Waggle Dance** | Planning | The planning phase. Architect communicates, Beekeeper reviews, alignment before action. |
 | **Swarming** | Parallelism | Batched parallel execution. Multiple Foragers dispatched simultaneously to their cells. |
@@ -86,11 +86,11 @@ The answer became this platform.
          │                 │                 │
     ⬡ Cell (worktree)  ⬡ Cell (worktree) ⬡ Cell (worktree)
          │                 │                 │
-    Honey             Honey              Honey
-    (spec + report)    (spec + report)   (spec + report)
-         │                 │                 │
-    Propolis          Propolis           Propolis
-    (TDD verified)     (TDD verified)    (TDD verified)
+     Honey             Honey              Honey
+     (spec + report)    (spec + report)   (spec + report)
+          │                 │                 │
+     Propolis          Propolis           Propolis
+     (best-effort)     (best-effort)     (best-effort)
 ```
 ### The Efficiency Promise
 Just as a beehive achieves remarkable output through structure, not chaos:
@@ -108,7 +108,7 @@ Hive's design is grounded in proven practices from the AI coding community, part
 | **Tip 4: Team CLAUDE.md** | Context persists per-feature in `.hive/context/` |
 | **Tip 6: Start in Plan mode** | Plan → Approve → Execute workflow |
 | **Tip 8: Leverage subagents** | Batched parallelism with worktree isolation |
-| **Tip 13: Give feedback loops** | TDD subtasks — tests define done |
+| **Tip 13: Give feedback loops** | Best-effort worker verification + orchestrator batch testing |
 
 > *"Give Claude a way to verify its work. When Claude has a feedback loop, it will 2-3x the quality of the final result."* — Boris Cherny
 
@@ -207,24 +207,29 @@ This solves multi-agent coordination without complex orchestration. Each task ge
 
 ### P6: Tests Define Done
 
-For implementation tasks, tests provide the feedback loop that dramatically improves quality.
+For implementation tasks, verification provides the feedback loop that dramatically improves quality.
 
-**TDD Subtask Pattern:**
+**Best-Effort Worker Verification + Orchestrator Batch Testing:**
+
+Workers operate in lightweight worktrees without project dependencies installed. They focus on writing quality code and do best-effort verification using ast-grep (AST-aware code analysis — already integrated, no dependencies needed). Workers aim for ~80% confidence, not perfection. If verification tools are unavailable, they fall back to visual review and note it in their summary.
+
+After a batch of tasks completes, the orchestrator (Hive/Swarm) merges all task branches and runs the full build + test suite on the main branch. Failures are diagnosed with full context and either fixed or re-dispatched.
+
 ```
-Task: Implement calculator
-├── Subtask 1.1 [test]: Write failing tests
-│   └── spec.md: Test requirements
-│   └── report.md: Tests written, all failing ✓
-├── Subtask 1.2 [implement]: Make tests pass
-│   └── spec.md: Implementation approach
-│   └── report.md: All tests passing ✓
-└── Subtask 1.3 [verify]: Final verification
-    └── report.md: 100% coverage, shipped ✓
+Worker (Forager):
+├── Write code in isolated worktree
+├── Best-effort ast-grep verification
+├── Commit with honest summary
+└── ~80% confidence is enough
+
+Orchestrator (Hive/Swarm):
+├── Merge batch of completed tasks
+├── Run full build + test suite
+├── Diagnose any failures
+└── Fix or re-dispatch broken tasks
 ```
 
-Each subtask has its own `spec.md` (what to do) and `report.md` (what was done) — first-class audit trail.
-
-> **Implementation status**: Subtask infrastructure exists in `hive-core` (full CRUD in `subtaskService.ts` and `taskService.ts`), but agent-facing tools (`hive_subtask_*`) are not yet implemented. TDD patterns are currently enforced through prompt guidance and the verification keyword gate (P7).
+> **Implementation status**: Workers use ast-grep MCP tools for verification. Orchestrators run project-specific build/test commands after batch merge. Subtask infrastructure exists in `hive-core` but agent-facing subtask tools are not yet implemented.
 
 *Inspired by Boris's Tip 13: "Give Claude a way to verify its work. When Claude has a feedback loop, it will 2-3x the quality of the final result."*
 
@@ -236,13 +241,12 @@ Soft guidance fails. Agents rationalize around it. Enforce with tools, not promp
 ```
 Never:
 - Plan without asking questions first
-- Code without failing test first
-- Complete without running verification
+- Complete without attempting verification
 - Assume when uncertain - ASK
 
 Always:
 - One question at a time (discovery)
-- Test → Code → Verify (TDD)
+- Best-effort verification before commit
 - Stop and ask when blocked
 ```
 
@@ -250,14 +254,14 @@ Always:
 | Tool | Gate | Error |
 |------|------|-------|
 | `hive_plan_write` | `## Discovery` section required | "BLOCKED: Discovery required" |
-| `hive_worktree_commit` | Verification keywords in summary | "BLOCKED: No verification" |
+| `hive_worktree_commit` | Advisory verification note | Returns `verificationNote` (soft guidance, not hard rejection) |
 
 **Phase Injection** (right context at right time):
 | Phase | Injection |
 |-------|-----------|
 | Feature create | Discovery prompt with example Q&A |
 | Exec start (delegated) | Delegation protocol for Master |
-| Worker spawn | TDD + Debugging protocols |
+| Worker spawn | Best-effort verification + ast-grep guidance |
 
 *Why this works*: Agent must consciously write `## Discovery` section. Agent must mention verification in summary. No silent bypassing.
 
@@ -365,7 +369,7 @@ Hive works WITH existing tools, not instead of them.
 - A structure for multi-agent coordination
 - A context persistence layer
 - A platform that enhances existing tools
-- A TDD-friendly workflow with subtask tracking
+- A TDD-friendly workflow with subtask tracking and best-effort verification
 
 ### Hive IS NOT:
 - A visual dashboard (Vibe Kanban does this better)
@@ -390,7 +394,7 @@ Hive works WITH existing tools, not instead of them.
 2. Worktree isolation per task (clean discard)
 3. Two-phase autonomy with approval gate
 4. Task-based everything (even fixes are tasks)
-5. TDD subtasks with spec.md/report.md audit trail
+5. Best-effort worker verification + orchestrator batch testing
 
 ---
 
@@ -445,7 +449,7 @@ Hive didn't emerge in a vacuum. We studied existing tools, took what worked, and
 - Sometimes you need to stop and re-plan, not retry
 
 **What we built:**
-- TDD subtasks give feedback loops WHERE IT MATTERS (verification)
+- Best-effort verification gives feedback loops WHERE IT MATTERS (worker checks + orchestrator batch testing)
 - Plan approval gate prevents wasted retries on bad plans
 - Fix tasks instead of infinite loops — know when to pivot
 
@@ -478,7 +482,7 @@ Hive didn't emerge in a vacuum. We studied existing tools, took what worked, and
 - `.hive/context/` for feature-scoped CLAUDE.md equivalent
 - Plan approval gate enforces "plan mode first"
 - Batched parallelism with worktree isolation
-- TDD subtasks with spec.md/report.md for feedback loops
+- Best-effort worker verification + orchestrator batch testing for feedback loops
 
 ### From Oh My OpenCode
 
@@ -510,13 +514,13 @@ What makes Hive unique is the COMBINATION:
 |---------|---------------|-----------------|
 | Specs | Spec Kit | Emerge from dialogue, not upfront |
 | Context persistence | Conductor | Feature-scoped, not global |
-| Retry loops | Ralph Wiggum | Only for verification (TDD), not planning |
+| Retry loops | Ralph Wiggum | Only for verification, not planning |
 | Plan gates | Antigravity | Approval before execution |
-| Feedback loops | Boris Cherny | TDD subtasks with audit trail |
+| Feedback loops | Boris Cherny | Best-effort worker + orchestrator batch verification |
 | Parallelism | All of them | Batched with context flow + worktree isolation |
 | Agent delegation | Oh My OpenCode | Hive as workflow layer, OMO as agent layer |
 
-**The result:** A system where humans shape direction, agents execute in isolation, context persists, and tests verify — all with full audit trail.
+**The result:** A system where humans shape direction, agents execute in isolation, context persists, and verification happens at the right level — all with full audit trail.
 
 ---
 
@@ -526,13 +530,13 @@ What makes Hive unique is the COMBINATION:
 Feature
 └── Plan (dialogue until approved)
     └── Tasks (parallel in batches)
-        └── Subtasks (TDD: test → implement → verify)
+        └── Best-effort verification (ast-grep)
             └── Worktrees (isolated execution)
                 └── Reports (what was done)
                     └── Context (persists for next time)
 ```
 
-Human shapes at the top. Agent builds at the bottom. Gate in the middle. Tests verify the work.
+Human shapes at the top. Agent builds at the bottom. Gate in the middle. Orchestrator verifies the batch.
 
 ---
 
@@ -632,8 +636,43 @@ We studied [Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode) (omo
 
 **Design insight:** v1.1.1 asked "how do agents learn from their work?" v1.2.0 asks "how do agents learn to use their tools?" Skills are the answer — on-demand depth without prompt bloat. The Docker skill teaches container thinking. The AGENTS.md skill teaches memory hygiene. Both make agents more capable without adding infrastructure.
 
+### v1.2.1 (Worktree Optimization — Trust the Worker)
+
+**Theme:** Stop overthinking verification. Workers do best-effort, orchestrators run the real checks.
+
+**The problem:** Each task gets a git worktree. The old model expected workers to install project dependencies (`bun install`) and run full TDD in each worktree. With 4 parallel tasks, that's 4× node_modules — heavy, slow, wasteful.
+
+**The solution:** Split verification into two tiers:
+
+- **Workers (Forager)**: Worktrees stay lightweight (no project dependencies). Workers write code and do best-effort verification using ast-grep (already integrated via MCP, no deps needed). ~80% confidence is enough to ship. If tools are unavailable, fall back to visual review and note it in the summary
+- **Orchestrators (Hive/Swarm)**: After merging a batch of tasks, run full build + test on the main branch. Diagnose failures with full context. Fix or re-dispatch broken tasks
+
+**What changed:**
+- `hive_worktree_commit` verification gate softened: advisory `verificationNote` instead of hard rejection
+- Forager prompt: removed TDD flow, added ast-grep best-effort verification, language-agnostic
+- Hive + Swarm prompts: added Batch-Merge-Verify Workflow section
+- AGENTS.md: updated worktree note and P6 description
+
+**Rejected alternatives:**
+- Symlinks for shared node_modules: cross-platform risk (Windows), dependency conflicts
+- Pure batch testing (zero worker verification): too many back-and-forth cycles
+- LLM self-review: ~50% accuracy, not reliable enough
+
+**Design insight:** The old model tried to make every worktree a miniature CI environment. The new model recognizes that workers and orchestrators have different strengths. Workers are good at writing code and spotting obvious issues. Orchestrators are good at running integration checks. Let each do what they're good at. This aligns with P4 (Good Enough Wins) — workers don't overthink verification, they ship honest work.
+
+### v1.3.0 (Multi-Source Pattern Alignment)
+
+**Theme:** Align prompt guidance using multiple authoritative sources while removing internal execution artifacts.
+
+- **Official prompting guides**: consolidated shared patterns (tone de-escalation, promise discipline, DRY/search-first, plan closure, tight error handling) and skipped infrastructure-only advice
+- **Claude Code prompt patterns**: adopted brevity, convention-following, and practical workflow cues without pulling in product-specific details
+- **OMO research synthesis**: mapped worker/orchestrator intent and verification patterns to Hive principles; avoided conflicts like orchestrator-level “do not ask”
+- **Documentation cleanup**: removed leaked task metadata/context dumps from Evolution Notes to keep philosophy focused on public design history
+
+**Design insight:** Cross-referencing multiple sources keeps Hive’s principles grounded and current while preserving scope — we adopt behaviors, not external infrastructure, and we keep the philosophy narrative clean of internal execution scaffolding.
+
 ---
 
 <p align="center">
-  <em>Plan first. Execute with trust. Context persists. Tests verify. Gates enforce.</em>
+  <em>Plan first. Execute with trust. Context persists. Workers verify. Orchestrators enforce.</em>
 </p>
