@@ -576,6 +576,10 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
     if (!depCheck.allowed) {
       return respond({
         success: false,
+        terminal: true,
+        reason: 'dependencies_not_done',
+        feature,
+        task,
         error: depCheck.error,
         hints: [
           'Complete the required dependencies before starting this task.',
@@ -1311,6 +1315,9 @@ Expand your Discovery section and try again.`;
           const feature = resolveFeature(explicitFeature);
           if (!feature) {
             return respond({
+              success: false,
+              terminal: true,
+              reason: 'feature_required',
               error: 'No feature specified and no active feature found',
               hint: 'Use hive_feature_create to create a new feature',
             });
@@ -1319,6 +1326,9 @@ Expand your Discovery section and try again.`;
           const featureData = featureService.get(feature);
           if (!featureData) {
             return respond({
+              success: false,
+              terminal: true,
+              reason: 'feature_not_found',
               error: `Feature '${feature}' not found`,
               availableFeatures: featureService.list(),
             });

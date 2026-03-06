@@ -399,9 +399,33 @@
         }
       },
       {
+        "name": "hive_worktree_start",
+        "displayName": "Start Task Worktree",
+        "modelDescription": "Create a git worktree for a pending/in-progress task. Use for normal task starts.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveWorktreeStart",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": {
+              "type": "string",
+              "description": "Feature name"
+            },
+            "task": {
+              "type": "string",
+              "description": "Task folder name"
+            }
+          },
+          "required": [
+            "feature",
+            "task"
+          ]
+        }
+      },
+      {
         "name": "hive_worktree_create",
         "displayName": "Create Task Worktree",
-        "modelDescription": "Create a git worktree for a task. Isolates changes in a separate directory. Use when ready to implement a task.",
+        "modelDescription": "Legacy alias for starting a task worktree. Prefer hive_worktree_start for normal starts.",
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "hiveWorktreeCreate",
         "inputSchema": {

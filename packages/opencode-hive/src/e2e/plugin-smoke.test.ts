@@ -530,6 +530,67 @@ Do it
     expect(result.hints?.length).toBeGreaterThan(0);
   });
 
+  it("returns structured terminal JSON when hive_status has no active feature", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_status_no_feature");
+
+    const raw = await hooks.tool!.hive_status.execute({}, toolContext);
+
+    const result = JSON.parse(raw as string) as {
+      success?: boolean;
+      terminal?: boolean;
+      reason?: string;
+      error?: string;
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.terminal).toBe(true);
+    expect(result.reason).toBe("feature_required");
+    expect(result.error).toContain("No feature specified");
+  });
+
+  it("returns structured terminal JSON when hive_status feature is missing", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_status_missing_feature");
+
+    const raw = await hooks.tool!.hive_status.execute(
+      { feature: "does-not-exist" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      success?: boolean;
+      terminal?: boolean;
+      reason?: string;
+      error?: string;
+      availableFeatures?: unknown[];
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.terminal).toBe(true);
+    expect(result.reason).toBe("feature_not_found");
+    expect(result.error).toContain("Feature 'does-not-exist' not found");
+    expect(Array.isArray(result.availableFeatures)).toBe(true);
+  });
+
   it("returns explicit success and non-terminal contract fields on worktree start", async () => {
     const ctx: PluginInput = {
       directory: testRoot,
@@ -706,10 +767,14 @@ Do it later
 
     const execStart = JSON.parse(execStartOutput as string) as {
       success?: boolean;
+      terminal?: boolean;
+      reason?: string;
       error?: string;
     };
 
     expect(execStart.success).toBe(false);
+    expect(execStart.terminal).toBe(true);
+    expect(execStart.reason).toBe("dependencies_not_done");
     expect(execStart.error).toContain("dependencies not done");
   });
 

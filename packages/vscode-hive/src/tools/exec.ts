@@ -73,11 +73,43 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
   });
   const taskService = new TaskService(workspaceRoot);
 
+  const startWorktree = async ({ feature, task }: { feature: string; task: string }) => {
+    // Check dependencies before creating worktree
+    const depCheck = checkDependencies(taskService, feature, task);
+    if (!depCheck.allowed) {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: 'dependencies_not_done',
+        feature,
+        task,
+        error: depCheck.error,
+        hints: [
+          'Complete the required dependencies before starting this task.',
+          'Use hive_status to see current task states.',
+        ]
+      });
+    }
+
+    const worktree = await worktreeService.create(feature, task);
+    return JSON.stringify({
+      success: true,
+      terminal: false,
+      worktreePath: worktree.path,
+      branch: worktree.branch,
+      message: `Worktree created. Work in ${worktree.path}. When done, use hive_worktree_commit.`,
+      hints: [
+        'Do all work inside this worktree. Ensure any subagents do the same.',
+        'Context files are in .hive/features/<feature>/context/ if you need background.'
+      ]
+    });
+  };
+
   return [
     {
-      name: 'hive_worktree_create',
-      displayName: 'Create Task Worktree',
-      modelDescription: 'Create a git worktree for a task. Isolates changes in a separate directory. Use when ready to implement a task.',
+      name: 'hive_worktree_start',
+      displayName: 'Start Task Worktree',
+      modelDescription: 'Create a git worktree for a pending/in-progress task. Use for normal task starts.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -88,31 +120,24 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
       },
       invoke: async (input) => {
         const { feature, task } = input as { feature: string; task: string };
-        
-        // Check dependencies before creating worktree
-        const depCheck = checkDependencies(taskService, feature, task);
-        if (!depCheck.allowed) {
-          return JSON.stringify({
-            success: false,
-            error: depCheck.error,
-            hints: [
-              'Complete the required dependencies before starting this task.',
-              'Use hive_status to see current task states.',
-            ]
-          });
-        }
-        
-        const worktree = await worktreeService.create(feature, task);
-        return JSON.stringify({
-          success: true,
-          worktreePath: worktree.path,
-          branch: worktree.branch,
-            message: `Worktree created. Work in ${worktree.path}. When done, use hive_worktree_commit.`,
-          hints: [
-            'Do all work inside this worktree. Ensure any subagents do the same.',
-            'Context files are in .hive/features/<feature>/context/ if you need background.'
-          ]
-        });
+        return startWorktree({ feature, task });
+      },
+    },
+    {
+      name: 'hive_worktree_create',
+      displayName: 'Create Task Worktree',
+      modelDescription: 'Legacy alias for starting a task worktree. Prefer hive_worktree_start for normal starts.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          feature: { type: 'string', description: 'Feature name' },
+          task: { type: 'string', description: 'Task folder name' },
+        },
+        required: ['feature', 'task'],
+      },
+      invoke: async (input) => {
+        const { feature, task } = input as { feature: string; task: string };
+        return startWorktree({ feature, task });
       },
     },
     {
