@@ -46,7 +46,7 @@ Standard checks: specialized agent? can I do it myself for sure? external system
 ## Worker Spawning
 
 \`\`\`
-hive_worktree_create({ task: "01-task-name" })
+hive_worktree_start({ task: "01-task-name" })
 // If external system data is needed (parallel exploration):
 // Load hive_skill("parallel-exploration") for the full playbook, then:
 // In task mode, use task() for research fan-out.
@@ -54,8 +54,10 @@ hive_worktree_create({ task: "01-task-name" })
 
 Delegation guidance:
 - \`task()\` is BLOCKING — returns when the worker is done
-- Call \`hive_status()\` immediately after to check new state and find next runnable tasks
-- Invariant: delegated task must not remain \`in_progress\`; if it does, treat as non-terminal completion and resume/retry worker with explicit commit-result handling
+- After \`task()\` returns, call \`hive_status()\` immediately to check new state and find next runnable tasks before any resume attempt
+- Use \`continueFrom: "blocked"\` only when status is exactly \`blocked\`
+- If status is \`in_progress\` or any other non-blocked state, do not use \`continueFrom: "blocked"\`; re-dispatch the normal \`hive_worktree_start({ feature, task })\` path instead
+- Never loop \`continueFrom: "blocked"\` on non-blocked statuses
 - For parallel fan-out, issue multiple \`task()\` calls in the same message
 
 ## After Delegation - VERIFY
@@ -83,7 +85,7 @@ After completing and merging a batch, run full verification on the main branch: 
 
 ## Blocker Handling
 
-When worker reports blocked: \`hive_status()\` → read blocker info; \`question()\` → ask user (no plain text); \`hive_worktree_create({ task, continueFrom: "blocked", decision })\`.
+When worker reports blocked: \`hive_status()\` → confirm status is exactly \`blocked\` → read blocker info; \`question()\` → ask user (no plain text); \`hive_worktree_create({ task, continueFrom: "blocked", decision })\`. If status is \`in_progress\` or any other non-blocked state, do not use blocked resume; re-dispatch the normal \`hive_worktree_start({ feature, task })\` path.
 
 ## Failure Recovery (After 3 Consecutive Failures)
 
@@ -116,7 +118,7 @@ For projects without AGENTS.md:
 
 ## Turn Termination
 
-Valid endings: worker delegation (hive_worktree_create), status check (hive_status), user question (question()), merge (hive_merge).
+Valid endings: worker delegation (hive_worktree_start/hive_worktree_create), status check (hive_status), user question (question()), merge (hive_merge).
 Avoid ending with: "Let me know when you're ready", "When you're ready...", summary without next action, or waiting for something unspecified.
 
 ## Guardrails

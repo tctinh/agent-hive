@@ -25,6 +25,7 @@ const EXPECTED_TOOLS = [
   "hive_tasks_sync",
   "hive_task_create",
   "hive_task_update",
+  "hive_worktree_start",
   "hive_worktree_create",
   "hive_worktree_commit",
   "hive_worktree_discard",
@@ -216,7 +217,7 @@ Do it
     expect(hiveStatus.tasks?.runnable).toContain("01-first-task");
     expect(hiveStatus.tasks?.blockedBy).toEqual({});
 
-    const execStartOutput = await hooks.tool!.hive_worktree_create.execute(
+    const execStartOutput = await hooks.tool!.hive_worktree_start.execute(
       { feature: "smoke-feature", task: "01-first-task" },
       toolContext
     );
@@ -298,7 +299,7 @@ Do it
       toolContext
     );
 
-    const execStartOutput = await hooks.tool!.hive_worktree_create.execute(
+    const execStartOutput = await hooks.tool!.hive_worktree_start.execute(
       { feature: "task-mode-feature", task: "01-first-task" },
       toolContext
     );
@@ -332,6 +333,263 @@ Do it
       "Use the `@path` attachment syntax in the prompt to reference the file. Do not inline the file contents."
     );
     expect(execStart.instructions).not.toContain("Read the prompt file");
+  });
+
+  it("returns structured JSON when hive_worktree_create is called without a feature", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_missing_feature");
+
+    const raw = await hooks.tool!.hive_worktree_create.execute(
+      { task: "01-missing-task" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      success?: boolean;
+      terminal?: boolean;
+      error?: string;
+      hints?: string[];
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.terminal).toBe(true);
+    expect(result.error).toContain("No feature specified");
+    expect(Array.isArray(result.hints)).toBe(true);
+  });
+
+  it("returns structured JSON when hive_worktree_create task is missing", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_missing_task");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "missing-task-feature" },
+      toolContext
+    );
+
+    const raw = await hooks.tool!.hive_worktree_create.execute(
+      { feature: "missing-task-feature", task: "99-nope" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      success?: boolean;
+      terminal?: boolean;
+      error?: string;
+      hints?: string[];
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.terminal).toBe(true);
+    expect(result.error).toContain('Task "99-nope" not found');
+    expect(Array.isArray(result.hints)).toBe(true);
+  });
+
+  it("returns structured JSON when hive_worktree_create feature is blocked", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_blocked_feature");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "blocked-feature" },
+      toolContext
+    );
+
+    const blockedPath = path.join(
+      testRoot,
+      ".hive",
+      "features",
+      "blocked-feature",
+      "BLOCKED"
+    );
+    fs.writeFileSync(blockedPath, "Need approval from Beekeeper.");
+
+    const raw = await hooks.tool!.hive_worktree_create.execute(
+      { feature: "blocked-feature", task: "01-first-task" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      success?: boolean;
+      terminal?: boolean;
+      error?: string;
+      hints?: string[];
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.terminal).toBe(true);
+    expect(result.error).toContain("BLOCKED by Beekeeper");
+    expect(Array.isArray(result.hints)).toBe(true);
+  });
+
+  it("returns structured JSON when hive_status feature is blocked", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_blocked_status");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "blocked-status-feature" },
+      toolContext
+    );
+
+    const plan = `# Blocked Status Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test validates that hive_status returns terminal JSON instead of plain text when a feature is blocked.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "blocked-status-feature" },
+      toolContext
+    );
+
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "blocked-status-feature",
+        name: "BLOCKED",
+        content: "Need approval from Beekeeper.",
+      },
+      toolContext
+    );
+
+    const blockedPath = path.join(
+      testRoot,
+      ".hive",
+      "features",
+      "blocked-status-feature",
+      "BLOCKED"
+    );
+    const blockedContextPath = path.join(
+      testRoot,
+      ".hive",
+      "features",
+      "blocked-status-feature",
+      "context",
+      "BLOCKED.md"
+    );
+    fs.copyFileSync(blockedContextPath, blockedPath);
+
+    const raw = await hooks.tool!.hive_status.execute(
+      { feature: "blocked-status-feature" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      success?: boolean;
+      terminal?: boolean;
+      blocked?: boolean;
+      error?: string;
+      hints?: string[];
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.terminal).toBe(true);
+    expect(result.blocked).toBe(true);
+    expect(result.error).toContain("BLOCKED by Beekeeper");
+    expect(Array.isArray(result.hints)).toBe(true);
+    expect(result.hints?.length).toBeGreaterThan(0);
+  });
+
+  it("returns explicit success and non-terminal contract fields on worktree start", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_success_contract");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "success-contract-feature" },
+      toolContext
+    );
+
+    const plan = `# Success Contract Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this test validates that successful hive_worktree_start responses include explicit success and terminal contract fields for machine-readable orchestration.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "success-contract-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_approve.execute(
+      { feature: "success-contract-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_tasks_sync.execute(
+      { feature: "success-contract-feature" },
+      toolContext
+    );
+
+    const raw = await hooks.tool!.hive_worktree_start.execute(
+      { feature: "success-contract-feature", task: "01-first-task" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      success?: boolean;
+      terminal?: boolean;
+      worktreePath?: string;
+      taskToolCall?: { prompt?: string };
+    };
+
+    expect(result.success).toBe(true);
+    expect(result.terminal).toBe(false);
+    expect(result.worktreePath).toBeDefined();
+    expect(result.taskToolCall?.prompt).toContain("worker-prompt.md");
   });
 
   it("system prompt hook injects Hive instructions", async () => {
@@ -441,7 +699,7 @@ Do it later
       toolContext
     );
 
-    const execStartOutput = await hooks.tool!.hive_worktree_create.execute(
+    const execStartOutput = await hooks.tool!.hive_worktree_start.execute(
       { feature: "dep-block-feature", task: "02-second-task" },
       toolContext
     );
@@ -453,6 +711,156 @@ Do it later
 
     expect(execStart.success).toBe(false);
     expect(execStart.error).toContain("dependencies not done");
+  });
+
+  it("returns terminal JSON when blocked resume is retried from in_progress", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_invalid_blocked_retry");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "invalid-blocked-retry-feature" },
+      toolContext
+    );
+
+    const plan = `# Invalid Blocked Retry Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test validates that retrying continueFrom:'blocked' while a task is still in_progress returns terminal guidance instead of re-entering the blocked resume flow.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "invalid-blocked-retry-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_approve.execute(
+      { feature: "invalid-blocked-retry-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_tasks_sync.execute(
+      { feature: "invalid-blocked-retry-feature" },
+      toolContext
+    );
+
+    await hooks.tool!.hive_worktree_start.execute(
+      { feature: "invalid-blocked-retry-feature", task: "01-first-task" },
+      toolContext
+    );
+
+    const statusRaw = await hooks.tool!.hive_status.execute(
+      { feature: "invalid-blocked-retry-feature" },
+      toolContext
+    );
+    const status = JSON.parse(statusRaw as string) as {
+      tasks?: {
+        list?: Array<{ folder: string; status: string }>;
+      };
+    };
+
+    const taskStatus = status.tasks?.list?.find(
+      (task) => task.folder === "01-first-task"
+    );
+    expect(taskStatus?.status).toBe("in_progress");
+
+    const invalidRetryRaw = await hooks.tool!.hive_worktree_create.execute(
+      {
+        feature: "invalid-blocked-retry-feature",
+        task: "01-first-task",
+        continueFrom: "blocked",
+        decision: "Retry with the same approach.",
+      },
+      toolContext
+    );
+
+    const invalidRetry = JSON.parse(invalidRetryRaw as string) as {
+      success?: boolean;
+      terminal?: boolean;
+      currentStatus?: string;
+      hints?: string[];
+    };
+
+    expect(invalidRetry.success).toBe(false);
+    expect(invalidRetry.terminal).toBe(true);
+    expect(invalidRetry.currentStatus).toBe("in_progress");
+    expect(Array.isArray(invalidRetry.hints)).toBe(true);
+    expect(invalidRetry.hints?.length).toBeGreaterThan(0);
+    expect(invalidRetry.hints?.some((hint) => /start|resume/i.test(hint))).toBe(true);
+    expect(invalidRetry.hints?.some((hint) => /hive_status|status/i.test(hint))).toBe(true);
+  });
+
+  it("starts a pending task with hive_worktree_start without continueFrom", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_pending_start");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "pending-start-feature" },
+      toolContext
+    );
+
+    const plan = `# Pending Start Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test validates that pending tasks can start via hive_worktree_start without a continueFrom flag.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "pending-start-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_approve.execute(
+      { feature: "pending-start-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_tasks_sync.execute(
+      { feature: "pending-start-feature" },
+      toolContext
+    );
+
+    const raw = await hooks.tool!.hive_worktree_start.execute(
+      { feature: "pending-start-feature", task: "01-first-task" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      success?: boolean;
+      terminal?: boolean;
+      worktreePath?: string;
+    };
+
+    expect(result.success).toBe(true);
+    expect(result.terminal).toBe(false);
+    expect(result.worktreePath).toBeDefined();
   });
 
   it("returns terminal JSON with advisory note when verification evidence is missing", async () => {
@@ -499,7 +907,7 @@ Do it
       toolContext
     );
 
-    await hooks.tool!.hive_worktree_create.execute(
+    await hooks.tool!.hive_worktree_start.execute(
       { feature: "commit-gate-feature", task: "01-first-task" },
       toolContext
     );
@@ -575,7 +983,7 @@ Do it
       toolContext
     );
 
-    const worktreeRaw = await hooks.tool!.hive_worktree_create.execute(
+    const worktreeRaw = await hooks.tool!.hive_worktree_start.execute(
       { feature: "commit-success-feature", task: "01-first-task" },
       toolContext
     );
@@ -707,7 +1115,7 @@ Do it
       toolContext
     );
 
-    const execStartOutput = await hooks.tool!.hive_worktree_create.execute(
+    const execStartOutput = await hooks.tool!.hive_worktree_start.execute(
       { feature: "prompt-mode-feature", task: "01-first-task" },
       toolContext
     );

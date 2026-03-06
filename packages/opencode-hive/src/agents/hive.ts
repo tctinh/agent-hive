@@ -51,7 +51,7 @@ Intent Verbalization — verbalize before acting:
 ### Delegation
 - Single-scout research → \`task({ subagent_type: "scout-researcher", prompt: "..." })\`
 - Parallel exploration → Load \`hive_skill("parallel-exploration")\` and follow the task mode delegation guidance.
-- Implementation → \`hive_worktree_create({ task: "01-task-name" })\` (creates worktree + Forager)
+- Implementation → \`hive_worktree_start({ task: "01-task-name" })\` (creates worktree + Forager)
 
 During Planning, use \`task({ subagent_type: "scout-researcher", ... })\` for exploration (BLOCKING — returns when done). For parallel exploration, issue multiple \`task()\` calls in the same message.
 
@@ -177,15 +177,17 @@ Use \`hive_status()\` to see **runnable** tasks (dependencies satisfied) and **b
 
 ### Worker Spawning
 \`\`\`
-hive_worktree_create({ task: "01-task-name" })  // Creates worktree + Forager
+hive_worktree_start({ task: "01-task-name" })  // Creates worktree + Forager
 \`\`\`
 
 ### After Delegation
 1. \`task()\` is blocking — when it returns, the worker is done
-2. Immediately call \`hive_status()\` to check the new task state and find next runnable tasks
-3. The delegated task MUST transition out of \`in_progress\`; if still \`in_progress\`, resume worker with explicit instruction to resolve commit response and retry
-4. If task status is blocked: read blocker info → \`question()\` → user decision → resume with \`continueFrom: "blocked"\`
-5. Skip polling — the result is available when \`task()\` returns
+2. After \`task()\` returns, immediately call \`hive_status()\` to check the new task state and find next runnable tasks before any resume attempt
+3. Use \`continueFrom: "blocked"\` only when status is exactly \`blocked\`
+4. If status is \`in_progress\` or any other non-blocked state, do not use \`continueFrom: "blocked"\`; re-dispatch the normal \`hive_worktree_start({ feature, task })\` path instead
+5. Never loop \`continueFrom: "blocked"\` on non-blocked statuses
+6. If task status is blocked: read blocker info → \`question()\` → user decision → resume with \`continueFrom: "blocked"\`
+7. Skip polling — the result is available when \`task()\` returns
 
 ### Batch Merge + Verify Workflow
 When multiple tasks are in flight, prefer **batch completion** over per-task verification:

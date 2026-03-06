@@ -1,6 +1,6 @@
 # Hive Tools Inventory
 
-## Tools (14 total)
+## Tools (15 total)
 
 ### Feature Management (2 tools)
 | Tool | Purpose |
@@ -22,10 +22,11 @@
 | `hive_task_create` | Create manual task (not from plan) |
 | `hive_task_update` | Update task status or summary |
 
-### Worktree (3 tools)
+### Worktree (4 tools)
 | Tool | Purpose |
 |------|---------|
-| `hive_worktree_create` | Create worktree and begin work |
+| `hive_worktree_start` | Create worktree and begin normal work |
+| `hive_worktree_create` | Resume blocked task in existing worktree |
 | `hive_worktree_commit` | Commit changes, write report (does NOT merge), return JSON completion contract |
 | `hive_worktree_discard` | Discard changes, reset status |
 
@@ -39,7 +40,7 @@
   - `nextAction`: explicit next step for worker/orchestrator
 - Non-terminal responses (for example `reason: "verification_required"`) require worker remediation and retry.
 
-#### hive_worktree_create output
+#### hive_worktree_start / hive_worktree_create output
 
 - `workerPromptPath`: file path to `.hive/features/<feature>/tasks/<task>/worker-prompt.md`
 - `workerPromptPreview`: short preview of the prompt
@@ -85,9 +86,9 @@
 | Feature | 2 | create, complete |
 | Plan | 3 | write, read, approve |
 | Task | 3 | sync, create, update |
-| Worktree | 3 | create, commit, discard |
+| Worktree | 4 | start, create, commit, discard |
 | Merge | 1 | merge |
 | Context | 1 | write |
 | Status | 1 | status |
 | Steering | 1 | steering |
-| **Total** | **14** | |
+| **Total** | **15** | |

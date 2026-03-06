@@ -16,6 +16,7 @@ const EXPECTED_TOOLS = [
   "hive_plan_write",
   "hive_plan_read",
   "hive_tasks_sync",
+  "hive_worktree_start",
   "hive_worktree_create",
 ] as const;
 
@@ -458,7 +459,7 @@ Test compaction resume flow.
     await hooks.tool!.hive_plan_approve.execute({ feature: "compaction-test-feature" }, toolContext);
     await hooks.tool!.hive_tasks_sync.execute({ feature: "compaction-test-feature" }, toolContext);
 
-    const worktreeRaw = await hooks.tool!.hive_worktree_create.execute(
+    const worktreeRaw = await hooks.tool!.hive_worktree_start.execute(
       { feature: "compaction-test-feature", task: "01-compaction-task" },
       toolContext,
     );

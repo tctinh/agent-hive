@@ -40,8 +40,23 @@ describe('Hive (Hybrid) prompt', () => {
       expect(QUEEN_BEE_PROMPT).toContain('scout-researcher');
     });
 
-    it('enforces post-delegation task state invariant', () => {
-      expect(QUEEN_BEE_PROMPT).toContain('MUST transition out of `in_progress`');
+    it('requires hive_status() before any resume attempt', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('After `task()` returns, immediately call `hive_status()`');
+      expect(QUEEN_BEE_PROMPT).toContain('before any resume attempt');
+    });
+
+    it('allows blocked resume only for exactly blocked tasks', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('Use `continueFrom: "blocked"` only when status is exactly `blocked`');
+    });
+
+    it('forbids blocked resume loops on non-blocked statuses', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('Never loop `continueFrom: "blocked"` on non-blocked statuses');
+    });
+
+    it('redirects non-blocked unresolved tasks to normal dispatch', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('If status is `in_progress` or any other non-blocked state');
+      expect(QUEEN_BEE_PROMPT).toContain('do not use `continueFrom: "blocked"`');
+      expect(QUEEN_BEE_PROMPT).toContain('hive_worktree_start({ feature, task })');
     });
   });
 
@@ -137,8 +152,23 @@ describe('Swarm (Orchestrator) prompt', () => {
       expect(SWARM_BEE_PROMPT).toContain('hive_status()');
     });
 
-    it('enforces delegated task state invariant', () => {
-      expect(SWARM_BEE_PROMPT).toContain('must not remain `in_progress`');
+    it('requires hive_status() before any resume attempt', () => {
+      expect(SWARM_BEE_PROMPT).toContain('After `task()` returns, call `hive_status()` immediately');
+      expect(SWARM_BEE_PROMPT).toContain('before any resume attempt');
+    });
+
+    it('allows blocked resume only for exactly blocked tasks', () => {
+      expect(SWARM_BEE_PROMPT).toContain('Use `continueFrom: "blocked"` only when status is exactly `blocked`');
+    });
+
+    it('forbids blocked resume loops on non-blocked statuses', () => {
+      expect(SWARM_BEE_PROMPT).toContain('Never loop `continueFrom: "blocked"` on non-blocked statuses');
+    });
+
+    it('redirects non-blocked unresolved tasks to normal dispatch', () => {
+      expect(SWARM_BEE_PROMPT).toContain('If status is `in_progress` or any other non-blocked state');
+      expect(SWARM_BEE_PROMPT).toContain('do not use `continueFrom: "blocked"`');
+      expect(SWARM_BEE_PROMPT).toContain('hive_worktree_start({ feature, task })');
     });
 
     it('includes task() guidance for research fan-out', () => {

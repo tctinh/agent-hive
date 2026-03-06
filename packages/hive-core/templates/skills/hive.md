@@ -248,7 +248,7 @@ hive_tasks_sync()
 ### Execute Each Task
 
 ```
-hive_worktree_create({ task: "01-task-name" })  // Creates worktree; returns delegation instructions
+hive_worktree_start({ task: "01-task-name" })  // Creates worktree; returns delegation instructions
 task({ ...taskCall })  // Only when delegationRequired is true
   ↓
 [Forager Bee implements in worktree]
@@ -279,8 +279,8 @@ When multiple tasks have their dependencies satisfied (runnable), the orchestrat
 If `delegationRequired` is returned for a task, call `task` to spawn that worker.
 
 ```
-hive_worktree_create({ task: "02-task-a" })
-hive_worktree_create({ task: "03-task-b" })
+hive_worktree_start({ task: "02-task-a" })
+hive_worktree_start({ task: "03-task-b" })
 hive_status()  // Monitor all
 ```
 
@@ -333,7 +333,8 @@ If "Revise Plan":
 | Plan | `hive_plan_read` | Check comments |
 | Plan | `hive_plan_approve` | Approve plan |
 | Execute | `hive_tasks_sync` | Generate tasks |
-| Execute | `hive_worktree_create` | Spawn Forager Bee worker |
+| Execute | `hive_worktree_start` | Spawn Forager Bee worker for normal starts |
+| Execute | `hive_worktree_create` | Resume blocked Forager Bee worker |
 | Execute | `hive_worktree_commit` | Finish task |
 | Execute | `hive_worktree_discard` | Discard task |
 | Execute | `hive_merge` | Integrate task |
@@ -366,7 +367,7 @@ If "Revise Plan":
 ### Task Failed
 ```
 hive_worktree_discard({ task })  # Discard
-hive_worktree_create({ task })  # Fresh start
+hive_worktree_start({ task })  # Fresh start
 ```
 
 ### After 3 Failures

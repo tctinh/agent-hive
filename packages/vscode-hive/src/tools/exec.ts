@@ -174,7 +174,7 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
         taskService.update(feature, task, { status: 'pending', summary: '' });
         return JSON.stringify({
           success: true,
-          message: `Worktree removed. Task status reset to pending. Can restart with hive_worktree_create.`,
+          message: `Worktree removed. Task status reset to pending. Can restart with hive_worktree_start.`,
         });
       },
     },

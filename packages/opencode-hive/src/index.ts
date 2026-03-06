@@ -298,6 +298,420 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
     return { allowed: true };
   };
 
+  const respond = (payload: Record<string, unknown>) => JSON.stringify(payload, null, 2);
+
+  const buildWorktreeLaunchResponse = async ({
+    feature,
+    task,
+    taskInfo,
+    worktree,
+    continueFrom,
+    decision,
+  }: {
+    feature: string;
+    task: string;
+    taskInfo: NonNullable<ReturnType<typeof taskService.get>>;
+    worktree: WorktreeInfo;
+    continueFrom?: 'blocked';
+    decision?: string;
+  }) => {
+    taskService.update(feature, task, {
+      status: 'in_progress',
+      baseCommit: worktree.commit,
+    });
+
+    const planResult = planService.read(feature);
+    const allTasks = taskService.list(feature);
+
+    const rawContextFiles = contextService.list(feature).map(f => ({
+      name: f.name,
+      content: f.content,
+    }));
+
+    const rawPreviousTasks = allTasks
+      .filter(t => t.status === 'done' && t.summary)
+      .map(t => ({ name: t.folder, summary: t.summary! }));
+
+    const taskBudgetResult = applyTaskBudget(rawPreviousTasks, { ...DEFAULT_BUDGET, feature });
+    const contextBudgetResult = applyContextBudget(rawContextFiles, { ...DEFAULT_BUDGET, feature });
+
+    const contextFiles: ContextFile[] = contextBudgetResult.files.map(f => ({
+      name: f.name,
+      content: f.content,
+    }));
+    const previousTasks: CompletedTask[] = taskBudgetResult.tasks.map(t => ({
+      name: t.name,
+      summary: t.summary,
+    }));
+
+    const truncationEvents: TruncationEvent[] = [
+      ...taskBudgetResult.truncationEvents,
+      ...contextBudgetResult.truncationEvents,
+    ];
+
+    const droppedTasksHint = taskBudgetResult.droppedTasksHint;
+
+    const taskOrder = parseInt(taskInfo.folder.match(/^(\d+)/)?.[1] || '0', 10);
+    const status = taskService.getRawStatus(feature, task);
+    const dependsOn = status?.dependsOn ?? [];
+    const specContent = taskService.buildSpecContent({
+      featureName: feature,
+      task: {
+        folder: task,
+        name: taskInfo.planTitle ?? taskInfo.name,
+        order: taskOrder,
+        description: undefined,
+      },
+      dependsOn,
+      allTasks: allTasks.map(t => ({
+        folder: t.folder,
+        name: t.name,
+        order: parseInt(t.folder.match(/^(\d+)/)?.[1] || '0', 10),
+      })),
+      planContent: planResult?.content ?? null,
+      contextFiles,
+      completedTasks: previousTasks,
+    });
+
+    taskService.writeSpec(feature, task, specContent);
+
+    const workerPrompt = buildWorkerPrompt({
+      feature,
+      task,
+      taskOrder,
+      worktreePath: worktree.path,
+      branch: worktree.branch,
+      plan: planResult?.content || 'No plan available',
+      contextFiles,
+      spec: specContent,
+      previousTasks,
+      continueFrom: continueFrom === 'blocked' ? {
+        status: 'blocked',
+        previousSummary: (taskInfo as any).summary || 'No previous summary',
+        decision: decision || 'No decision provided',
+      } : undefined,
+    });
+
+    const agent = 'forager-worker';
+
+    const rawStatus = taskService.getRawStatus(feature, task);
+    const attempt = (rawStatus?.workerSession?.attempt || 0) + 1;
+    const idempotencyKey = `hive-${feature}-${task}-${attempt}`;
+
+    taskService.patchBackgroundFields(feature, task, { idempotencyKey });
+
+    const contextContent = contextFiles.map(f => f.content).join('\n\n');
+    const previousTasksContent = previousTasks.map(t => `- **${t.name}**: ${t.summary}`).join('\n');
+    const promptMeta = calculatePromptMeta({
+      plan: planResult?.content || '',
+      context: contextContent,
+      previousTasks: previousTasksContent,
+      spec: specContent,
+      workerPrompt,
+    });
+
+    const hiveDir = path.join(directory, '.hive');
+    const workerPromptPath = writeWorkerPromptFile(feature, task, workerPrompt, hiveDir);
+    const relativePromptPath = normalizePath(path.relative(directory, workerPromptPath));
+
+    const PREVIEW_MAX_LENGTH = 200;
+    const workerPromptPreview = workerPrompt.length > PREVIEW_MAX_LENGTH
+      ? workerPrompt.slice(0, PREVIEW_MAX_LENGTH) + '...'
+      : workerPrompt;
+
+    const taskToolPrompt = `Follow instructions in @${relativePromptPath}`;
+
+    const taskToolInstructions = `## Delegation Required
+
+Use OpenCode's built-in \`task\` tool to spawn a Forager (Worker/Coder) worker.
+
+\`\`\`
+task({
+  subagent_type: "${agent}",
+  description: "Hive: ${task}",
+  prompt: "${taskToolPrompt}"
+})
+\`\`\`
+
+Use the \`@path\` attachment syntax in the prompt to reference the file. Do not inline the file contents.
+
+`;
+
+    const responseBase = {
+      success: true,
+      terminal: false,
+      worktreePath: worktree.path,
+      branch: worktree.branch,
+      mode: 'delegate',
+      agent,
+      delegationRequired: true,
+      workerPromptPath: relativePromptPath,
+      workerPromptPreview,
+      taskPromptMode: 'opencode-at-file',
+      taskToolCall: {
+        subagent_type: agent,
+        description: `Hive: ${task}`,
+        prompt: taskToolPrompt,
+      },
+      instructions: taskToolInstructions,
+    };
+
+    const jsonPayload = JSON.stringify(responseBase, null, 2);
+    const payloadMeta = calculatePayloadMeta({
+      jsonPayload,
+      promptInlined: false,
+      promptReferencedByFile: true,
+    });
+
+    const sizeWarnings = checkWarnings(promptMeta, payloadMeta);
+    const budgetWarnings = truncationEvents.map(event => ({
+      type: event.type as string,
+      severity: 'info' as const,
+      message: event.message,
+      affected: event.affected,
+      count: event.count,
+    }));
+    const allWarnings = [...sizeWarnings, ...budgetWarnings];
+
+    return respond({
+      ...responseBase,
+      promptMeta,
+      payloadMeta,
+      budgetApplied: {
+        maxTasks: DEFAULT_BUDGET.maxTasks,
+        maxSummaryChars: DEFAULT_BUDGET.maxSummaryChars,
+        maxContextChars: DEFAULT_BUDGET.maxContextChars,
+        maxTotalContextChars: DEFAULT_BUDGET.maxTotalContextChars,
+        tasksIncluded: previousTasks.length,
+        tasksDropped: rawPreviousTasks.length - previousTasks.length,
+        droppedTasksHint,
+      },
+      warnings: allWarnings.length > 0 ? allWarnings : undefined,
+    });
+  };
+
+  const executeWorktreeStart = async ({
+    task,
+    feature: explicitFeature,
+  }: {
+    task: string;
+    feature?: string;
+  }) => {
+    const feature = resolveFeature(explicitFeature);
+    if (!feature) {
+      return respond({
+        success: false,
+        terminal: true,
+        error: 'No feature specified. Create a feature or provide feature param.',
+        reason: 'feature_required',
+        task,
+        hints: [
+          'Create/select a feature first or pass the feature parameter explicitly.',
+          'Use hive_status to inspect the active feature state before retrying.',
+        ],
+      });
+    }
+
+    const blockedMessage = checkBlocked(feature);
+    if (blockedMessage) {
+      return respond({
+        success: false,
+        terminal: true,
+        error: blockedMessage,
+        reason: 'feature_blocked',
+        feature,
+        task,
+        hints: [
+          'Wait for the human to unblock the feature before retrying.',
+          `If approved, remove .hive/features/${feature}/BLOCKED and retry hive_worktree_start.`,
+        ],
+      });
+    }
+
+    const taskInfo = taskService.get(feature, task);
+    if (!taskInfo) {
+      return respond({
+        success: false,
+        terminal: true,
+        error: `Task "${task}" not found`,
+        reason: 'task_not_found',
+        feature,
+        task,
+        hints: [
+          'Check the task folder name in tasks.json or hive_status output.',
+          'Run hive_tasks_sync if the approved plan has changed and tasks need regeneration.',
+        ],
+      });
+    }
+
+    if (taskInfo.status === 'done') {
+      return respond({
+        success: false,
+        terminal: true,
+        error: `Task "${task}" is already completed (status: done). It cannot be restarted.`,
+        currentStatus: 'done',
+        hints: [
+          'Use hive_merge to integrate the completed task branch if not already merged.',
+          'Use hive_status to see all task states and find the next runnable task.',
+        ],
+      });
+    }
+
+    if (taskInfo.status === 'blocked') {
+      return respond({
+        success: false,
+        terminal: true,
+        error: `Task "${task}" is blocked and must be resumed with hive_worktree_create using continueFrom: 'blocked'.`,
+        currentStatus: 'blocked',
+        feature,
+        task,
+        hints: [
+          'Ask the user the blocker question, then call hive_worktree_create({ task, continueFrom: "blocked", decision }).',
+          'Use hive_status to inspect blocker details before retrying.',
+        ],
+      });
+    }
+
+    const depCheck = checkDependencies(feature, task);
+    if (!depCheck.allowed) {
+      return respond({
+        success: false,
+        error: depCheck.error,
+        hints: [
+          'Complete the required dependencies before starting this task.',
+          'Use hive_status to see current task states.',
+        ],
+      });
+    }
+
+    const worktree = await worktreeService.create(feature, task);
+    return buildWorktreeLaunchResponse({ feature, task, taskInfo, worktree });
+  };
+
+  const executeBlockedResume = async ({
+    task,
+    feature: explicitFeature,
+    continueFrom,
+    decision,
+  }: {
+    task: string;
+    feature?: string;
+    continueFrom?: 'blocked';
+    decision?: string;
+  }) => {
+    const feature = resolveFeature(explicitFeature);
+    if (!feature) {
+      return respond({
+        success: false,
+        terminal: true,
+        error: 'No feature specified. Create a feature or provide feature param.',
+        reason: 'feature_required',
+        task,
+        hints: [
+          'Create/select a feature first or pass the feature parameter explicitly.',
+          'Use hive_status to inspect the active feature state before retrying.',
+        ],
+      });
+    }
+
+    const blockedMessage = checkBlocked(feature);
+    if (blockedMessage) {
+      return respond({
+        success: false,
+        terminal: true,
+        error: blockedMessage,
+        reason: 'feature_blocked',
+        feature,
+        task,
+        hints: [
+          'Wait for the human to unblock the feature before retrying.',
+          `If approved, remove .hive/features/${feature}/BLOCKED and retry hive_worktree_create.`,
+        ],
+      });
+    }
+
+    const taskInfo = taskService.get(feature, task);
+    if (!taskInfo) {
+      return respond({
+        success: false,
+        terminal: true,
+        error: `Task "${task}" not found`,
+        reason: 'task_not_found',
+        feature,
+        task,
+        hints: [
+          'Check the task folder name in tasks.json or hive_status output.',
+          'Run hive_tasks_sync if the approved plan has changed and tasks need regeneration.',
+        ],
+      });
+    }
+
+    if (taskInfo.status === 'done') {
+      return respond({
+        success: false,
+        terminal: true,
+        error: `Task "${task}" is already completed (status: done). It cannot be restarted.`,
+        currentStatus: 'done',
+        hints: [
+          'Use hive_merge to integrate the completed task branch if not already merged.',
+          'Use hive_status to see all task states and find the next runnable task.',
+        ],
+      });
+    }
+
+    if (continueFrom !== 'blocked') {
+      return respond({
+        success: false,
+        terminal: true,
+        error: 'hive_worktree_create is only for resuming blocked tasks.',
+        reason: 'blocked_resume_required',
+        currentStatus: taskInfo.status,
+        feature,
+        task,
+        hints: [
+          'Use hive_worktree_start({ feature, task }) to start a pending or in-progress task normally.',
+          'Use hive_worktree_create({ task, continueFrom: "blocked", decision }) only after hive_status confirms the task is blocked.',
+        ],
+      });
+    }
+
+    if (taskInfo.status !== 'blocked') {
+      return respond({
+        success: false,
+        terminal: true,
+        error: `continueFrom: 'blocked' was specified but task "${task}" is not in blocked state (current status: ${taskInfo.status}).`,
+        currentStatus: taskInfo.status,
+        hints: [
+          'Use hive_worktree_start({ feature, task }) for normal starts or re-dispatch.',
+          'Use hive_status to verify the current task status before retrying.',
+        ],
+      });
+    }
+
+    const worktree = await worktreeService.get(feature, task);
+    if (!worktree) {
+      return respond({
+        success: false,
+        terminal: true,
+        error: `Cannot resume blocked task "${task}": no existing worktree record found.`,
+        currentStatus: taskInfo.status,
+        hints: [
+          'The worktree may have been removed manually. Use hive_worktree_discard to reset the task to pending, then restart it with hive_worktree_start.',
+          'Use hive_status to inspect the current state of the task and its worktree.',
+        ],
+      });
+    }
+
+    return buildWorktreeLaunchResponse({
+      feature,
+      task,
+      taskInfo,
+      worktree,
+      continueFrom,
+      decision,
+    });
+  };
+
   return {
     "experimental.chat.system.transform": async (
       input: { agent?: string } | unknown,
@@ -586,7 +1000,7 @@ Expand your Discovery section and try again.`;
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
           const folder = taskService.create(feature, name, order);
-          return `Manual task created: ${folder}\nReminder: start work with hive_worktree_create to use its worktree, and ensure any subagents work in that worktree too.`;
+          return `Manual task created: ${folder}\nReminder: start work with hive_worktree_start to use its worktree, and ensure any subagents work in that worktree too.`;
         },
       }),
 
@@ -609,298 +1023,27 @@ Expand your Discovery section and try again.`;
         },
       }),
 
+      hive_worktree_start: tool({
+        description: 'Create worktree and begin work on pending/in-progress task. Spawns Forager worker automatically.',
+        args: {
+          task: tool.schema.string().describe('Task folder name'),
+          feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
+        },
+        async execute({ task, feature: explicitFeature }) {
+          return executeWorktreeStart({ task, feature: explicitFeature });
+        },
+      }),
+
       hive_worktree_create: tool({
-        description: 'Create worktree and begin work on task. Spawns Forager worker automatically.',
+        description: 'Resume a blocked task in its existing worktree. Spawns Forager worker automatically.',
         args: {
           task: tool.schema.string().describe('Task folder name'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
           continueFrom: tool.schema.enum(['blocked']).optional().describe('Resume a blocked task'),
           decision: tool.schema.string().optional().describe('Answer to blocker question when continuing'),
         },
-        async execute({ task, feature: explicitFeature, continueFrom, decision }, toolContext) {
-          const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
-
-          const blockedMessage = checkBlocked(feature);
-          if (blockedMessage) return blockedMessage;
-
-          const taskInfo = taskService.get(feature, task);
-          if (!taskInfo) return `Error: Task "${task}" not found`;
-
-          // Allow continuing blocked tasks, but not completed ones
-          if (taskInfo.status === 'done') {
-            return JSON.stringify({
-              success: false,
-              terminal: true,
-              error: `Task "${task}" is already completed (status: done). It cannot be restarted.`,
-              currentStatus: 'done',
-              hints: [
-                'Use hive_merge to integrate the completed task branch if not already merged.',
-                'Use hive_status to see all task states and find the next runnable task.',
-              ],
-            });
-          }
-          if (continueFrom === 'blocked' && taskInfo.status !== 'blocked') {
-            return JSON.stringify({
-              success: false,
-              terminal: true,
-              error: `continueFrom: 'blocked' was specified but task "${task}" is not in blocked state (current status: ${taskInfo.status}).`,
-              currentStatus: taskInfo.status,
-              hints: [
-                'Remove continueFrom to start or resume the task normally.',
-                'Use hive_status to verify the current task status before retrying.',
-              ],
-            });
-          }
-
-          if (continueFrom !== 'blocked') {
-            const depCheck = checkDependencies(feature, task);
-            if (!depCheck.allowed) {
-              return JSON.stringify({
-                success: false,
-                error: depCheck.error,
-                hints: [
-                  'Complete the required dependencies before starting this task.',
-                  'Use hive_status to see current task states.',
-                ],
-              });
-            }
-          }
-
-          // Check if we're continuing from blocked - reuse existing worktree
-          let worktree: Awaited<ReturnType<typeof worktreeService.create>>;
-          if (continueFrom === 'blocked') {
-            worktree = await worktreeService.get(feature, task);
-            if (!worktree) {
-              return JSON.stringify({
-                success: false,
-                terminal: true,
-                error: `Cannot resume blocked task "${task}": no existing worktree record found.`,
-                currentStatus: taskInfo.status,
-                hints: [
-                  'The worktree may have been removed manually. Use hive_worktree_discard to reset the task to pending, then restart it without continueFrom.',
-                  'Use hive_status to inspect the current state of the task and its worktree.',
-                ],
-              });
-            }
-          } else {
-            worktree = await worktreeService.create(feature, task);
-          }
-
-          taskService.update(feature, task, {
-            status: 'in_progress',
-            baseCommit: worktree.commit,
-          });
-
-          // Generate spec.md with context for task
-          // NOTE: Use services once and derive all needed formats from the result (no duplicate reads)
-          const planResult = planService.read(feature);
-          const allTasks = taskService.list(feature);
-          
-          // Use contextService.list() instead of manual fs reads (Task 03 deduplication)
-          // This replaces: fs.existsSync/readdirSync/readFileSync pattern
-          const rawContextFiles = contextService.list(feature).map(f => ({
-            name: f.name,
-            content: f.content,
-          }));
-          
-          // Collect previous tasks ONCE and derive both formats from it
-          const rawPreviousTasks = allTasks
-            .filter(t => t.status === 'done' && t.summary)
-            .map(t => ({ name: t.folder, summary: t.summary! }));
-          
-          // Apply deterministic budgeting to bound prompt growth (Task 04)
-          // - Limits to last N tasks with truncated summaries
-          // - Truncates context files exceeding budget
-          // - Emits truncation events for warnings
-          const taskBudgetResult = applyTaskBudget(rawPreviousTasks, { ...DEFAULT_BUDGET, feature });
-          const contextBudgetResult = applyContextBudget(rawContextFiles, { ...DEFAULT_BUDGET, feature });
-          
-          // Use budgeted versions for prompt construction
-          const contextFiles: ContextFile[] = contextBudgetResult.files.map(f => ({
-            name: f.name,
-            content: f.content,
-          }));
-          const previousTasks: CompletedTask[] = taskBudgetResult.tasks.map(t => ({
-            name: t.name,
-            summary: t.summary,
-          }));
-          
-          // Collect all truncation events for warnings
-          const truncationEvents: TruncationEvent[] = [
-            ...taskBudgetResult.truncationEvents,
-            ...contextBudgetResult.truncationEvents,
-          ];
-          
-          // Add hint about dropped tasks if any were omitted
-          const droppedTasksHint = taskBudgetResult.droppedTasksHint;
-
-          const taskOrder = parseInt(taskInfo.folder.match(/^(\d+)/)?.[1] || '0', 10);
-          const status = taskService.getRawStatus(feature, task);
-          const dependsOn = status?.dependsOn ?? [];
-          const specContent = taskService.buildSpecContent({
-            featureName: feature,
-            task: {
-              folder: task,
-              name: taskInfo.planTitle ?? taskInfo.name,
-              order: taskOrder,
-              description: undefined,
-            },
-            dependsOn,
-            allTasks: allTasks.map(t => ({
-              folder: t.folder,
-              name: t.name,
-              order: parseInt(t.folder.match(/^(\d+)/)?.[1] || '0', 10),
-            })),
-            planContent: planResult?.content ?? null,
-            contextFiles,
-            completedTasks: previousTasks,
-          });
-
-          taskService.writeSpec(feature, task, specContent);
-
-          // Delegated execution is always available via OpenCode's task tool.
-          // OMO-Slim is optional and should not gate delegation.
-          // NOTE: contextFiles and previousTasks are already collected above (no duplicate reads)
-
-          // Build worker prompt
-          const workerPrompt = buildWorkerPrompt({
-            feature,
-            task,
-            taskOrder: parseInt(taskInfo.folder.match(/^(\d+)/)?.[1] || '0', 10),
-            worktreePath: worktree.path,
-            branch: worktree.branch,
-            plan: planResult?.content || 'No plan available',
-            contextFiles,
-            spec: specContent,
-            previousTasks,
-            continueFrom: continueFrom === 'blocked' ? {
-              status: 'blocked',
-              previousSummary: (taskInfo as any).summary || 'No previous summary',
-              decision: decision || 'No decision provided',
-            } : undefined,
-          });
-
-          // Always use Forager (forager-worker) for task execution
-          // Forager knows Hive protocols (hive_worktree_commit, blocker protocol, Iron Laws)
-          // Forager can research via MCP tools (grep_app, context7, etc.)
-          const agent = 'forager-worker';
-
-          // Generate stable idempotency key for safe retries
-          // Format: hive-<feature>-<task>-<attempt>
-          const rawStatus = taskService.getRawStatus(feature, task);
-          const attempt = (rawStatus?.workerSession?.attempt || 0) + 1;
-          const idempotencyKey = `hive-${feature}-${task}-${attempt}`;
-
-          // Persist idempotencyKey early for debugging. The workerSession will be
-          // populated by task tool with the REAL OpenCode session_id/task_id.
-          taskService.patchBackgroundFields(feature, task, { idempotencyKey });
-
-          // Calculate observability metadata for prompt/payload sizes
-          const contextContent = contextFiles.map(f => f.content).join('\n\n');
-          const previousTasksContent = previousTasks.map(t => `- **${t.name}**: ${t.summary}`).join('\n');
-          const promptMeta = calculatePromptMeta({
-            plan: planResult?.content || '',
-            context: contextContent,
-            previousTasks: previousTasksContent,
-            spec: specContent,
-            workerPrompt,
-          });
-
-          // Write worker prompt to file to prevent tool output truncation (Task 05)
-          // This keeps the tool output small while preserving full prompt content
-          const hiveDir = path.join(directory, '.hive');
-          const workerPromptPath = writeWorkerPromptFile(feature, task, workerPrompt, hiveDir);
-          
-          // Convert to relative path for portability in output
-          const relativePromptPath = normalizePath(path.relative(directory, workerPromptPath));
-
-          // Build workerPromptPreview (truncated for display, max 200 chars)
-          const PREVIEW_MAX_LENGTH = 200;
-          const workerPromptPreview = workerPrompt.length > PREVIEW_MAX_LENGTH
-            ? workerPrompt.slice(0, PREVIEW_MAX_LENGTH) + '...'
-            : workerPrompt;
-
-
-
-          const taskToolPrompt = `Follow instructions in @${relativePromptPath}`;
-
-          const taskToolInstructions = `## Delegation Required
-
-Use OpenCode's built-in \`task\` tool to spawn a Forager (Worker/Coder) worker.
-
-\`\`\`
-task({
-  subagent_type: "${agent}",
-  description: "Hive: ${task}",
-  prompt: "${taskToolPrompt}"
-})
-\`\`\`
-
-Use the \`@path\` attachment syntax in the prompt to reference the file. Do not inline the file contents.
-
-`;
-
-          // Build the response object with canonical outermost fields
-          // - agent: top-level only (NOT duplicated in backgroundTaskCall)
-          // - workerPromptPath: file reference (NOT inlined prompt to prevent truncation)
-          // - taskToolCall: contains prompt reference, NOT inline prompt
-          const responseBase = {
-            worktreePath: worktree.path,
-            branch: worktree.branch,
-            mode: 'delegate',
-            agent, // Canonical: top-level only
-            delegationRequired: true,
-            workerPromptPath: relativePromptPath, // File reference (canonical)
-            workerPromptPreview, // Truncated preview for display
-            taskPromptMode: 'opencode-at-file',
-            taskToolCall: {
-              subagent_type: agent,
-              description: `Hive: ${task}`,
-              prompt: taskToolPrompt,
-            },
-            instructions: taskToolInstructions,
-          };
-
-          // Calculate payload meta (JSON size WITHOUT inlined prompt - file reference only)
-          const jsonPayload = JSON.stringify(responseBase, null, 2);
-          const payloadMeta = calculatePayloadMeta({
-            jsonPayload,
-            promptInlined: false, // Prompt is in file, not inlined
-            promptReferencedByFile: true,
-          });
-
-          // Check for warnings about threshold exceedance
-          const sizeWarnings = checkWarnings(promptMeta, payloadMeta);
-          
-          // Convert truncation events to warnings format for unified output
-          const budgetWarnings = truncationEvents.map(event => ({
-            type: event.type as string,
-            severity: 'info' as const,
-            message: event.message,
-            affected: event.affected,
-            count: event.count,
-          }));
-          
-          // Combine all warnings
-          const allWarnings = [...sizeWarnings, ...budgetWarnings];
-
-          // Return delegation instructions with observability data
-          return JSON.stringify({
-            ...responseBase,
-            promptMeta,
-            payloadMeta,
-            budgetApplied: {
-              maxTasks: DEFAULT_BUDGET.maxTasks,
-              maxSummaryChars: DEFAULT_BUDGET.maxSummaryChars,
-              maxContextChars: DEFAULT_BUDGET.maxContextChars,
-              maxTotalContextChars: DEFAULT_BUDGET.maxTotalContextChars,
-              tasksIncluded: previousTasks.length,
-              tasksDropped: rawPreviousTasks.length - previousTasks.length,
-              droppedTasksHint,
-            },
-            warnings: allWarnings.length > 0 ? allWarnings : undefined,
-          }, null, 2);
+        async execute({ task, feature: explicitFeature, continueFrom, decision }) {
+          return executeBlockedResume({ task, feature: explicitFeature, continueFrom, decision });
         },
       }),
 
@@ -1164,9 +1307,10 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
           feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
         },
         async execute({ feature: explicitFeature }) {
+          const respond = (payload: Record<string, unknown>) => JSON.stringify(payload, null, 2);
           const feature = resolveFeature(explicitFeature);
           if (!feature) {
-            return JSON.stringify({
+            return respond({
               error: 'No feature specified and no active feature found',
               hint: 'Use hive_feature_create to create a new feature',
             });
@@ -1174,14 +1318,25 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
 
           const featureData = featureService.get(feature);
           if (!featureData) {
-            return JSON.stringify({
+            return respond({
               error: `Feature '${feature}' not found`,
               availableFeatures: featureService.list(),
             });
           }
 
           const blocked = checkBlocked(feature);
-          if (blocked) return blocked;
+          if (blocked) {
+            return respond({
+              success: false,
+              terminal: true,
+              blocked: true,
+              error: blocked,
+              hints: [
+                'Read the blocker details and resolve them before retrying hive_status.',
+                `Remove .hive/features/${feature}/BLOCKED once the blocker is resolved.`,
+              ],
+            });
+          }
 
           const plan = planService.read(feature);
           const tasks = taskService.list(feature);
@@ -1247,7 +1402,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
               return `${runnableTasks.length} tasks are ready to start in parallel: ${runnableTasks.join(', ')}`;
             }
             if (runnableTasks.length === 1) {
-              return `Start next task with hive_worktree_create: ${runnableTasks[0]}`;
+              return `Start next task with hive_worktree_start: ${runnableTasks[0]}`;
             }
             const pending = tasks.find(t => t.status === 'pending');
             if (pending) {
@@ -1260,7 +1415,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
             featureData.status === 'approved' ? 'approved' :
               featureData.status === 'executing' ? 'locked' : 'none';
 
-          return JSON.stringify({
+          return respond({
             feature: {
               name: feature,
               status: featureData.status,
@@ -1348,7 +1503,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
           'hive_feature_create', 'hive_feature_complete',
           'hive_plan_write', 'hive_plan_read', 'hive_plan_approve',
           'hive_tasks_sync', 'hive_task_create', 'hive_task_update',
-          'hive_worktree_create', 'hive_worktree_commit', 'hive_worktree_discard',
+          'hive_worktree_start', 'hive_worktree_create', 'hive_worktree_commit', 'hive_worktree_discard',
           'hive_merge', 'hive_context_write', 'hive_status', 'hive_skill', 'hive_agents_md',
         ];
         const result: Record<string, boolean> = {};
@@ -1410,7 +1565,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         tools: agentTools([
           'hive_feature_create', 'hive_feature_complete', 'hive_plan_read', 'hive_plan_approve',
           'hive_tasks_sync', 'hive_task_create', 'hive_task_update',
-          'hive_worktree_create', 'hive_worktree_discard', 'hive_merge',
+          'hive_worktree_start', 'hive_worktree_create', 'hive_worktree_discard', 'hive_merge',
           'hive_context_write', 'hive_status', 'hive_skill', 'hive_agents_md',
         ]),
         permission: {

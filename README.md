@@ -96,6 +96,12 @@ Add `opencode-hive` to your `opencode.json`:
 
 OpenCode handles the rest — no manual npm install needed.
 
+For local plugin testing:
+
+1. Keep `plugin: ["opencode-hive"]` in `opencode.json` (not `opencode-hive@latest`).
+2. Build `packages/hive-core` first, then `packages/opencode-hive`.
+3. Symlink `~/.cache/opencode/node_modules/opencode-hive` to your local `packages/opencode-hive` checkout.
+
 ### Configuration
 
 Run Agent Hive once to auto-generate a default configuration at `~/.config/opencode/agent_hive.json`. Review it to ensure it matches your local setup.
@@ -232,6 +238,54 @@ You: "Create a feature for user dashboard"
 ```
 
 That's it. You're hiving.
+
+### Troubleshooting
+
+#### Blocked-resume loop recovery
+
+1. Run `hive_status({ feature })` before any resume attempt and read the current task status.
+2. Use `continueFrom: 'blocked'` only when the task is in the exact `blocked` state.
+3. For `pending`, `in_progress`, `done`, `failed`, or any non-blocked status, call normal `hive_worktree_start({ feature, task })`.
+4. If a resume attempt is rejected, re-run `hive_status` and recover from the reported status instead of retrying the same blocked resume.
+
+#### Using with DCP plugin (recommended safety config)
+
+If you use Dynamic Context Pruning (DCP), use a Hive-safe profile in `~/.config/opencode/dcp.jsonc` so orchestration state is not aggressively pruned.
+
+Recommended baseline:
+
+```jsonc
+{
+  "manualMode": {
+    "enabled": true,
+    "automaticStrategies": false
+  },
+  "turnProtection": {
+    "enabled": true,
+    "turns": 12
+  },
+  "tools": {
+    "settings": {
+      "nudgeEnabled": false,
+      "protectedTools": [
+        "hive_status",
+        "hive_worktree_start",
+        "hive_worktree_create",
+        "hive_worktree_commit",
+        "hive_worktree_discard",
+        "question"
+      ]
+    }
+  },
+  "strategies": {
+    "deduplication": { "enabled": false },
+    "supersedeWrites": { "enabled": false },
+    "purgeErrors": { "enabled": false }
+  }
+}
+```
+
+Also keep OpenCode plugin config as `"opencode-hive"` (not `"opencode-hive@latest"`) during local testing.
 
 ---
 

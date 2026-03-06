@@ -73,9 +73,40 @@ During planning, "don't execute" means "don't implement" (no code edits, no work
 ### Worktree
 | Tool | Description |
 |------|-------------|
-| `hive_worktree_create` | Start work on task (creates worktree) |
+| `hive_worktree_start` | Start normal work on task (creates worktree) |
+| `hive_worktree_create` | Resume blocked task in existing worktree |
 | `hive_worktree_commit` | Complete task (applies changes) |
 | `hive_worktree_discard` | Abort task (discard changes) |
+
+### Troubleshooting
+
+#### Repeated blocked-resume errors / loop
+
+If you see repeated retries around `continueFrom: "blocked"`, use this protocol:
+
+1. Call `hive_status()` first.
+2. If status is `pending` / `in_progress` / any non-`blocked` status, start normally with:
+   - `hive_worktree_start({ feature, task })`
+3. Only use blocked resume when status is exactly `blocked`:
+   - `hive_worktree_create({ task, continueFrom: "blocked", decision })`
+
+Do not retry the same blocked-resume call on non-blocked statuses; re-check `hive_status()` and use `hive_worktree_start` for normal starts.
+
+#### Using with DCP plugin
+
+When using Dynamic Context Pruning (DCP), use a Hive-safe config in `~/.config/opencode/dcp.jsonc`:
+
+- `manualMode.enabled: true`
+- `manualMode.automaticStrategies: false`
+- `turnProtection.enabled: true` with `turnProtection.turns: 12`
+- `tools.settings.nudgeEnabled: false`
+- protect key tools in `tools.settings.protectedTools` (at least: `hive_status`, `hive_worktree_start`, `hive_worktree_create`, `hive_worktree_commit`, `hive_worktree_discard`, `question`)
+- disable aggressive auto strategies:
+  - `strategies.deduplication.enabled: false`
+  - `strategies.supersedeWrites.enabled: false`
+  - `strategies.purgeErrors.enabled: false`
+
+For local plugin testing, keep OpenCode plugin entry as `"opencode-hive"` (not `"opencode-hive@latest"`).
 
 ## Prompt Budgeting & Observability
 
@@ -94,7 +125,7 @@ When limits are exceeded, content is truncated with `...[truncated]` markers and
 
 ### Observability
 
-`hive_worktree_create` output includes metadata fields:
+`hive_worktree_start` and blocked-resume `hive_worktree_create` output include metadata fields:
 
 - **`promptMeta`**: Character counts for plan, context, previousTasks, spec, workerPrompt
 - **`payloadMeta`**: JSON payload size, whether prompt is inlined or referenced by file

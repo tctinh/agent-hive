@@ -242,14 +242,14 @@ This is a **bun workspaces** monorepo:
 
 Plan-first development: Write plan → User reviews → Approve → Execute tasks
 
-### Tools (16 total)
+### Tools (17 total)
 
 | Domain | Tools |
 |--------|-------|
 | Feature | hive_feature_create, hive_feature_complete |
 | Plan | hive_plan_write, hive_plan_read, hive_plan_approve |
 | Task | hive_tasks_sync, hive_task_create, hive_task_update |
-| Worktree | hive_worktree_create, hive_worktree_commit, hive_worktree_discard |
+| Worktree | hive_worktree_start, hive_worktree_create, hive_worktree_commit, hive_worktree_discard |
 | Merge | hive_merge |
 | Context | hive_context_write |
 | AGENTS.md | hive_agents_md |
@@ -257,8 +257,8 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Skill | hive_skill |
 
 **Tool access is filtered per agent role:**
-- **Hive** — all 16 tools (hybrid agent)
-- **Swarm** — hive_feature_create, hive_feature_complete, hive_plan_read, hive_plan_approve, hive_tasks_sync, hive_task_create, hive_task_update, hive_worktree_create, hive_worktree_discard, hive_merge, hive_context_write, hive_status, hive_skill, hive_agents_md (14 tools — excludes hive_worktree_commit, hive_plan_write)
+- **Hive** — all 17 tools (hybrid agent)
+- **Swarm** — hive_feature_create, hive_feature_complete, hive_plan_read, hive_plan_approve, hive_tasks_sync, hive_task_create, hive_task_update, hive_worktree_start, hive_worktree_create, hive_worktree_discard, hive_merge, hive_context_write, hive_status, hive_skill, hive_agents_md (15 tools — excludes hive_worktree_commit, hive_plan_write)
 - **Architect** — hive_feature_create, hive_plan_write, hive_plan_read, hive_context_write, hive_status, hive_skill (6 tools)
 - **Forager** — hive_plan_read, hive_worktree_commit, hive_context_write, hive_skill (4 tools)
 - **Scout** — hive_plan_read, hive_context_write, hive_status, hive_skill (4 tools)
@@ -271,7 +271,7 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 3. User adds comments in VSCode → `hive_plan_read` to see them
 4. Revise plan → User approves
 5. `hive_tasks_sync()` - Generate tasks from plan
-6. `hive_worktree_create(task)` → work in worktree → `hive_worktree_commit(task, summary)`
+6. `hive_worktree_start(task)` → work in worktree → `hive_worktree_commit(task, summary)`
 7. `hive_merge(task)` - Merge task branch into main (when ready)
 
 **Important:** `hive_worktree_commit` commits changes to task branch but does NOT merge.
@@ -279,9 +279,9 @@ Use `hive_merge` to explicitly integrate changes. Worktrees persist until manual
 
 ### Delegated Execution
 
-`hive_worktree_create` creates worktree and spawns worker automatically:
+`hive_worktree_start` creates worktree and spawns worker automatically:
 
-1. `hive_worktree_create(task)` → Creates worktree + spawns Forager (Worker/Coder) worker
+1. `hive_worktree_start(task)` → Creates worktree + spawns Forager (Worker/Coder) worker
 2. Worker executes → calls `hive_worktree_commit(status: "completed")`
 3. Worker blocked → calls `hive_worktree_commit(status: "blocked", blocker: {...})`
 

@@ -110,7 +110,7 @@ For each task in order:
 
 #### 1. Start (creates worktree)
 \`\`\`
-hive_worktree_create({ task: "01-task-name" })
+hive_worktree_start({ task: "01-task-name" })
 \`\`\`
 
 #### 2. Implement
@@ -147,7 +147,7 @@ hive_feature_complete({ name: "feature-name" })
 | Plan | \`hive_plan_read\` | Check for user comments |
 | Plan | \`hive_plan_approve\` | Approve plan |
 | Execute | \`hive_tasks_sync\` | Generate tasks from plan |
-| Execute | \`hive_worktree_create\` | Start task (creates worktree) |
+| Execute | \`hive_worktree_start\` | Start task (creates worktree) |
 | Execute | \`hive_worktree_commit\` | Finish task (commits changes) |
 | Execute | \`hive_merge\` | Integrate task to main |
 | Complete | \`hive_feature_complete\` | Mark feature done |
@@ -188,7 +188,7 @@ hive_feature_complete({ name: "feature-name" })
 ### Task Failed
 \`\`\`
 hive_worktree_discard(task="<task>")  # Discards changes
-hive_worktree_create(task="<task>")  # Fresh start
+hive_worktree_start(task="<task>")  # Fresh start
 \`\`\`
 
 ### Merge Conflicts

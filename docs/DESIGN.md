@@ -41,14 +41,14 @@ packages/
 3. User reviews in VSCode, adds comments
 4. User approves via `hive_plan_approve`
 5. Tasks synced via `hive_tasks_sync` (generates spec.md for each)
-6. Each task executed via `hive_worktree_create` -> work -> `hive_worktree_commit`
+6. Each task executed via `hive_worktree_start` -> work -> `hive_worktree_commit`
 7. Changes applied from worktree to main repo
 8. Report generated with diff stats and file list
 
 ## Prompt Management
 
 - `spec.md` is the single source for plan/context/prior task summaries in worker prompts to avoid duplication.
-- `hive_worktree_create` writes the full prompt to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` and returns `workerPromptPath` plus a short preview.
+- `hive_worktree_start` writes the full prompt to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` and returns `workerPromptPath` plus a short preview.
 - Prompt budgets default to last 10 tasks, 2000 chars per summary, 20KB per context file, 60KB total; `promptMeta`, `payloadMeta`, and `warnings` report sizes.
 
 ## Feature Resolution (v0.5.0)
@@ -149,7 +149,7 @@ Hive uses file-based state with clear ownership boundaries:
 | `status.json` (task) | Worker | Hive Master (read), Poller (read-only) |
 | `plan.md` | Hive Master | VS Code (read + comment) |
 | `comments.json` | VS Code | Hive Master (read-only) |
-| `spec.md` | `hive_worktree_create` | Worker (read-only) |
+| `spec.md` | `hive_worktree_start` / `hive_worktree_create` | Worker (read-only) |
 | `report.md` | Worker | All (read-only) |
 | `BLOCKED` | Beekeeper | All (read-only, blocks operations) |
 
@@ -170,9 +170,9 @@ Task `status.json` fields and who writes them:
 | `origin` | `hive_tasks_sync` | On task creation |
 | `planTitle` | `hive_tasks_sync` | On task creation |
 | `summary` | Worker via `hive_worktree_commit` | On completion |
-| `startedAt` | `hive_worktree_create` | On task start |
+| `startedAt` | `hive_worktree_start` / `hive_worktree_create` | On task start/resume |
 | `completedAt` | `hive_worktree_commit` | On completion |
-| `baseCommit` | `hive_worktree_create` | On worktree creation |
+| `baseCommit` | `hive_worktree_start` / `hive_worktree_create` | On worktree creation/resume |
 | `blocker` | Worker via `hive_worktree_commit` | When blocked |
 
 ## Idempotency Expectations
@@ -189,7 +189,8 @@ These operations have side effects:
 - `hive_feature_create` - Creates feature directory (errors if exists)
 - `hive_plan_write` - Overwrites plan.md, clears comments
 - `hive_tasks_sync` - Reconciles tasks (additive, removes orphans)
-- `hive_worktree_create` - Creates worktree (reuses if exists for blocked resume)
+- `hive_worktree_start` - Creates worktree for normal start
+- `hive_worktree_create` - Resumes blocked task in existing worktree
 - `hive_worktree_commit` - Commits changes, writes report (once per completion)
 - `hive_merge` - Merges branch (fails if already merged)
 
