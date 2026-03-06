@@ -13,6 +13,7 @@ import { SWARM_BEE_PROMPT } from './agents/swarm.js';
 import { SCOUT_BEE_PROMPT } from './agents/scout.js';
 import { FORAGER_BEE_PROMPT } from './agents/forager.js';
 import { HYGIENIC_BEE_PROMPT } from './agents/hygienic.js';
+import { buildCustomSubagents } from './agents/custom-agents.js';
 import { createBuiltinMcps } from './mcp/index.js';
 
 // ============================================================================
@@ -44,7 +45,7 @@ function formatSkillsXml(skills: SkillDefinition[]): string {
  * 3. Warn and skip if not found
  */
 async function buildAutoLoadedSkillsContent(
-  agentName: 'hive-master' | 'architect-planner' | 'swarm-orchestrator' | 'scout-researcher' | 'forager-worker' | 'hygienic-reviewer',
+  agentName: string,
   configService: ConfigService,
   projectRoot: string,
 ): Promise<string> {
@@ -1444,6 +1445,34 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         },
       };
 
+      const builtInAgentConfigs = {
+        'hive-master': hiveConfig,
+        'architect-planner': architectConfig,
+        'swarm-orchestrator': swarmConfig,
+        'scout-researcher': scoutConfig,
+        'forager-worker': foragerConfig,
+        'hygienic-reviewer': hygienicConfig,
+      };
+
+      const customAgentConfigs = configService.getCustomAgentConfigs();
+      const customAutoLoadedSkills = Object.fromEntries(
+        await Promise.all(
+          Object.keys(customAgentConfigs).map(async (customAgentName) => [
+            customAgentName,
+            await buildAutoLoadedSkillsContent(customAgentName, configService, directory),
+          ]),
+        ),
+      );
+
+      const customSubagents = buildCustomSubagents({
+        customAgents: customAgentConfigs,
+        baseAgents: {
+          'forager-worker': foragerConfig,
+          'hygienic-reviewer': hygienicConfig,
+        },
+        autoLoadedSkills: customAutoLoadedSkills,
+      });
+
       // Build agents map based on agentMode
       const hiveConfigData = configService.get();
       const agentMode = hiveConfigData.agentMode ?? 'unified';
@@ -1451,17 +1480,19 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       const allAgents: Record<string, unknown> = {};
       
       if (agentMode === 'unified') {
-        allAgents['hive-master'] = hiveConfig;
-        allAgents['scout-researcher'] = scoutConfig;
-        allAgents['forager-worker'] = foragerConfig;
-        allAgents['hygienic-reviewer'] = hygienicConfig;
+        allAgents['hive-master'] = builtInAgentConfigs['hive-master'];
+        allAgents['scout-researcher'] = builtInAgentConfigs['scout-researcher'];
+        allAgents['forager-worker'] = builtInAgentConfigs['forager-worker'];
+        allAgents['hygienic-reviewer'] = builtInAgentConfigs['hygienic-reviewer'];
       } else {
-        allAgents['architect-planner'] = architectConfig;
-        allAgents['swarm-orchestrator'] = swarmConfig;
-        allAgents['scout-researcher'] = scoutConfig;
-        allAgents['forager-worker'] = foragerConfig;
-        allAgents['hygienic-reviewer'] = hygienicConfig;
+        allAgents['architect-planner'] = builtInAgentConfigs['architect-planner'];
+        allAgents['swarm-orchestrator'] = builtInAgentConfigs['swarm-orchestrator'];
+        allAgents['scout-researcher'] = builtInAgentConfigs['scout-researcher'];
+        allAgents['forager-worker'] = builtInAgentConfigs['forager-worker'];
+        allAgents['hygienic-reviewer'] = builtInAgentConfigs['hygienic-reviewer'];
       }
+
+      Object.assign(allAgents, customSubagents);
 
       // Merge agents into opencodeConfig.agent (config hook is sufficient for agent discovery)
       const configAgent = opencodeConfig.agent as Record<string, unknown> | undefined;
