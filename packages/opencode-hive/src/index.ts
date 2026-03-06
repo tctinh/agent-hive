@@ -628,9 +628,29 @@ Expand your Discovery section and try again.`;
           if (!taskInfo) return `Error: Task "${task}" not found`;
 
           // Allow continuing blocked tasks, but not completed ones
-          if (taskInfo.status === 'done') return "Error: Task already completed";
+          if (taskInfo.status === 'done') {
+            return JSON.stringify({
+              success: false,
+              terminal: true,
+              error: `Task "${task}" is already completed (status: done). It cannot be restarted.`,
+              currentStatus: 'done',
+              hints: [
+                'Use hive_merge to integrate the completed task branch if not already merged.',
+                'Use hive_status to see all task states and find the next runnable task.',
+              ],
+            });
+          }
           if (continueFrom === 'blocked' && taskInfo.status !== 'blocked') {
-            return "Error: Task is not in blocked state. Use without continueFrom.";
+            return JSON.stringify({
+              success: false,
+              terminal: true,
+              error: `continueFrom: 'blocked' was specified but task "${task}" is not in blocked state (current status: ${taskInfo.status}).`,
+              currentStatus: taskInfo.status,
+              hints: [
+                'Remove continueFrom to start or resume the task normally.',
+                'Use hive_status to verify the current task status before retrying.',
+              ],
+            });
           }
 
           if (continueFrom !== 'blocked') {
@@ -651,7 +671,18 @@ Expand your Discovery section and try again.`;
           let worktree: Awaited<ReturnType<typeof worktreeService.create>>;
           if (continueFrom === 'blocked') {
             worktree = await worktreeService.get(feature, task);
-            if (!worktree) return "Error: No worktree found for blocked task";
+            if (!worktree) {
+              return JSON.stringify({
+                success: false,
+                terminal: true,
+                error: `Cannot resume blocked task "${task}": no existing worktree record found.`,
+                currentStatus: taskInfo.status,
+                hints: [
+                  'The worktree may have been removed manually. Use hive_worktree_discard to reset the task to pending, then restart it without continueFrom.',
+                  'Use hive_status to inspect the current state of the task and its worktree.',
+                ],
+              });
+            }
           } else {
             worktree = await worktreeService.create(feature, task);
           }
