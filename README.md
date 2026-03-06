@@ -140,6 +140,15 @@ Configure models for each agent role. **Update these to models available on your
 
 All agents: `hive-master`, `architect-planner`, `swarm-orchestrator`, `scout-researcher`, `forager-worker`, `hygienic-reviewer`.
 
+#### Custom Derived Subagents
+
+You can define plugin-only custom subagents with `customAgents` by deriving from either `forager-worker` or `hygienic-reviewer`.
+
+- Omitted `model`, `temperature`, `variant`, and `autoLoadSkills` inherit from the selected base agent.
+- Custom agent IDs cannot reuse built-in Hive IDs or plugin-reserved IDs (for example, `hive`, `architect`, `swarm`, `build`, `plan`, `code`).
+
+For the full published JSON example and complete inheritance details, see [`packages/opencode-hive/README.md`](./packages/opencode-hive/README.md#custom-derived-subagents).
+
 #### Skills
 
 Skills provide specialized workflows that agents can load on-demand via `hive_skill`.

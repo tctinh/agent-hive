@@ -104,7 +104,7 @@
     },
     "customAgents": {
       "type": "object",
-      "description": "Custom Hive subagent definitions derived from supported base agents",
+      "description": "Custom Hive subagent definitions derived from forager-worker or hygienic-reviewer. IDs cannot reuse built-in or plugin-reserved names.",
       "propertyNames": {
         "not": {
           "enum": [
@@ -207,7 +207,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Additional skills to auto-load for this custom agent"
+          "description": "Additional skills to auto-load for this custom agent (merged with inherited base autoLoadSkills and filtered by disableSkills)"
         }
       }
     }
