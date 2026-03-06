@@ -71,8 +71,8 @@ export function createVariantHook(configService: ConfigService) {
     // Skip if no agent specified
     if (!agent) return;
 
-    // Skip if not a Hive agent
-    if (!isHiveAgent(agent)) return;
+    // Skip if not a configured Hive agent (built-in or accepted custom)
+    if (!configService.hasConfiguredAgent(agent)) return;
 
     // Skip if variant is already set (respect explicit selection)
     if (output.message.variant !== undefined) return;

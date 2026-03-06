@@ -58,7 +58,11 @@ describe('HIVE_AGENT_NAMES', () => {
 
 describe('createVariantHook', () => {
   // Mock ConfigService
-  const createMockConfigService = (agentVariants: Record<string, string | undefined>) => ({
+  const createMockConfigService = (
+    agentVariants: Record<string, string | undefined>,
+    configuredAgents: string[] = Object.keys(agentVariants),
+  ) => ({
+    hasConfiguredAgent: (agent: string) => configuredAgents.includes(agent),
     getAgentConfig: (agent: string) => ({
       variant: agentVariants[agent],
     }),
@@ -115,6 +119,44 @@ describe('createVariantHook', () => {
 
         expect(output.message.variant).toBeDefined();
       }
+    });
+
+    it('applies variant to accepted custom forager-derived agent', async () => {
+      const configService = createMockConfigService(
+        {
+          'forager-ui': 'high',
+        },
+        ['forager-ui'],
+      );
+
+      const hook = createVariantHook(configService as any);
+      const output = createOutput(undefined);
+
+      await hook(
+        { sessionID: 'session-123', agent: 'forager-ui' },
+        output,
+      );
+
+      expect(output.message.variant).toBe('high');
+    });
+
+    it('applies variant to accepted custom hygienic-derived agent', async () => {
+      const configService = createMockConfigService(
+        {
+          'reviewer-security': 'medium',
+        },
+        ['reviewer-security'],
+      );
+
+      const hook = createVariantHook(configService as any);
+      const output = createOutput(undefined);
+
+      await hook(
+        { sessionID: 'session-123', agent: 'reviewer-security' },
+        output,
+      );
+
+      expect(output.message.variant).toBe('medium');
     });
   });
 

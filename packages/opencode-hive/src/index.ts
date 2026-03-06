@@ -164,7 +164,7 @@ import { calculatePromptMeta, calculatePayloadMeta, checkWarnings } from "./util
 import { applyTaskBudget, applyContextBudget, DEFAULT_BUDGET, type TruncationEvent } from "./utils/prompt-budgeting";
 import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { formatRelativeTime } from "./utils/format";
-import { HIVE_AGENT_NAMES, isHiveAgent, normalizeVariant } from "./hooks/variant-hook.js";
+import { createVariantHook } from "./hooks/variant-hook.js";
 import { HIVE_SYSTEM_PROMPT, shouldExecuteHook } from "./hooks/system-hook.js";
 import { buildCompactionPrompt } from "./utils/compaction-prompt.js";
 
@@ -353,43 +353,11 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       output.context.push(buildCompactionPrompt());
     },
 
-    // Apply per-agent variant to messages (covers built-in task() tool)
+    // Apply per-agent variant to messages (covers built-in and accepted custom task() agents)
     // Type assertion needed because TypeScript's contravariance rules are too strict
     // for the hook's output parameter type. The hook only accesses output.message.variant
     // which exists on UserMessage.
-    "chat.message": (async (
-      input: {
-        sessionID: string;
-        agent?: string;
-        model?: { providerID: string; modelID: string };
-        messageID?: string;
-        variant?: string;
-      },
-      output: {
-        message: { variant?: string };
-        parts: unknown[];
-      },
-    ): Promise<void> => {
-      const { agent } = input;
-
-      // Skip if no agent specified
-      if (!agent) return;
-
-      // Skip if not a Hive agent
-      if (!isHiveAgent(agent)) return;
-
-      // Skip if variant is already set (respect explicit selection)
-      if (output.message.variant !== undefined) return;
-
-      // Look up configured variant for this agent
-      const agentConfig = configService.getAgentConfig(agent);
-      const configuredVariant = normalizeVariant(agentConfig.variant);
-
-      // Apply configured variant if present
-      if (configuredVariant !== undefined) {
-        output.message.variant = configuredVariant;
-      }
-    }) as any,
+    "chat.message": createVariantHook(configService) as any,
 
     "tool.execute.before": async (input, output) => {
       // Cadence gate: check if this hook should execute this turn
