@@ -218,21 +218,33 @@ export class ConfigService {
 
       const descriptionValue = declaration['description'];
       const description = typeof descriptionValue === 'string'
-        ? descriptionValue
+        ? descriptionValue.trim()
         : '';
+      if (!description) {
+        console.warn(
+          `[hive:config] Skipping custom agent "${agentName}": description must be a non-empty string`,
+        );
+        continue;
+      }
 
       const modelValue = declaration['model'];
       const temperatureValue = declaration['temperature'];
       const variantValue = declaration['variant'];
+      const model = typeof modelValue === 'string'
+        ? modelValue.trim() || baseAgentConfig.model
+        : baseAgentConfig.model;
+      const variant = typeof variantValue === 'string'
+        ? variantValue.trim() || baseAgentConfig.variant
+        : baseAgentConfig.variant;
 
       resolved[agentName] = {
         baseAgent,
         description,
-        model: typeof modelValue === 'string' ? modelValue : baseAgentConfig.model,
+        model,
         temperature: typeof temperatureValue === 'number'
           ? temperatureValue
           : baseAgentConfig.temperature,
-        variant: typeof variantValue === 'string' ? variantValue : baseAgentConfig.variant,
+        variant,
         autoLoadSkills: effectiveAutoLoadSkills,
       };
     }

@@ -423,6 +423,83 @@ describe("ConfigService defaults", () => {
     warnSpy.mockRestore();
   });
 
+  it("skips custom agents with missing or whitespace description", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          customAgents: {
+            "missing-description": {
+              baseAgent: "forager-worker",
+            },
+            "blank-description": {
+              baseAgent: "forager-worker",
+              description: "   ",
+            },
+            "forager-ui": {
+              baseAgent: "forager-worker",
+              description: "Use for UI-heavy implementation tasks.",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const custom = service.getCustomAgentConfigs();
+    expect(custom).toHaveProperty("forager-ui");
+    expect(custom).not.toHaveProperty("missing-description");
+    expect(custom).not.toHaveProperty("blank-description");
+
+    const warnedLines = warnSpy.mock.calls.map((call) => call.join(" "));
+    expect(
+      warnedLines.some(
+        (line) => line.includes("description must be a non-empty string") && line.includes("\"missing-description\""),
+      ),
+    ).toBe(true);
+    expect(
+      warnedLines.some(
+        (line) => line.includes("description must be a non-empty string") && line.includes("\"blank-description\""),
+      ),
+    ).toBe(true);
+
+    warnSpy.mockRestore();
+  });
+
+  it("treats empty custom model and variant overrides as unset", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          customAgents: {
+            "forager-ui": {
+              baseAgent: "forager-worker",
+              description: "Use for UI-heavy implementation tasks.",
+              model: "   ",
+              variant: "   ",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const custom = service.getCustomAgentConfigs();
+    expect(custom["forager-ui"]?.model).toBe("github-copilot/gpt-5.2-codex");
+    expect(custom["forager-ui"]?.variant).toBeUndefined();
+  });
+
   it("caches custom agent resolution and emits warnings once per cache cycle", () => {
     const service = new ConfigService();
     const configPath = service.getPath();
