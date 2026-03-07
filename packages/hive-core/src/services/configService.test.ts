@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -48,6 +48,71 @@ describe("ConfigService defaults", () => {
     expect(config.agents?.["swarm-orchestrator"]?.model).toBe(
       "github-copilot/claude-opus-4.5",
     );
+    expect(config.customAgents).toEqual({});
+  });
+
+  it("loads customAgents from config", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          customAgents: {
+            "forager-ui": {
+              baseAgent: "forager-worker",
+              description: "Use for UI-heavy implementation tasks.",
+              model: "anthropic/claude-sonnet-4-20250514",
+              temperature: 0.2,
+              variant: "high",
+              autoLoadSkills: ["ui-focus"],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const config = service.get();
+    expect(config.customAgents?.["forager-ui"]).toEqual({
+      baseAgent: "forager-worker",
+      description: "Use for UI-heavy implementation tasks.",
+      model: "anthropic/claude-sonnet-4-20250514",
+      temperature: 0.2,
+      variant: "high",
+      autoLoadSkills: ["ui-focus"],
+    });
+  });
+
+  it("treats non-object customAgents as empty without dropping other config", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          agentMode: "dedicated",
+          customAgents: null,
+          agents: {
+            "forager-worker": {
+              variant: "high",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const config = service.get();
+    expect(config.agentMode).toBe("dedicated");
+    expect(config.customAgents).toEqual({});
+    expect(config.agents?.["forager-worker"]?.variant).toBe("high");
   });
 
   it("returns 'unified' as default agentMode", () => {
@@ -194,6 +259,284 @@ describe("ConfigService defaults", () => {
     const scoutConfig = service.getAgentConfig("scout-researcher");
 
     expect(scoutConfig.autoLoadSkills).not.toContain("parallel-exploration");
+  });
+
+  it("normalizes custom agents with base inheritance and overrides", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          agents: {
+            "forager-worker": {
+              variant: "high",
+              autoLoadSkills: ["verification-before-completion", "onboarding", "ui-focus"],
+            },
+          },
+          customAgents: {
+            "forager-lite": {
+              baseAgent: "forager-worker",
+              description: "General forager with inherited defaults.",
+            },
+            "forager-ui": {
+              baseAgent: "forager-worker",
+              description: "Forager focused on frontend tasks.",
+              autoLoadSkills: ["ui-focus"],
+            },
+            "reviewer-security": {
+              baseAgent: "hygienic-reviewer",
+              description: "Security-focused reviewer.",
+              model: "anthropic/claude-sonnet-4-20250514",
+              temperature: 0.1,
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const custom = service.getCustomAgentConfigs();
+
+    expect(custom["forager-lite"]).toMatchObject({
+      baseAgent: "forager-worker",
+      model: "github-copilot/gpt-5.2-codex",
+      temperature: 0.3,
+    });
+
+    expect(custom["forager-ui"]?.variant).toBe("high");
+    expect(custom["forager-ui"]?.autoLoadSkills).toEqual([
+      "test-driven-development",
+      "verification-before-completion",
+      "ui-focus",
+    ]);
+
+    expect(custom["reviewer-security"]?.temperature).toBe(0.1);
+    expect(custom["reviewer-security"]?.model).toBe(
+      "anthropic/claude-sonnet-4-20250514",
+    );
+  });
+
+  it("skips reserved/invalid custom agent names for runtime lookups", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          customAgents: {
+            "forager-worker": {
+              baseAgent: "forager-worker",
+              description: "Reserved built-in ID.",
+            },
+            build: {
+              baseAgent: "forager-worker",
+              description: "Reserved plugin alias.",
+            },
+            "unsupported-base": {
+              baseAgent: "hive-master",
+              description: "Should be skipped at runtime.",
+            },
+            "forager-ui": {
+              baseAgent: "forager-worker",
+              description: "Valid custom agent.",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const custom = service.getCustomAgentConfigs();
+    expect(custom).not.toHaveProperty("forager-worker");
+    expect(custom).not.toHaveProperty("build");
+    expect(custom).not.toHaveProperty("unsupported-base");
+    expect(custom).toHaveProperty("forager-ui");
+
+    const warnedLines = warnSpy.mock.calls.map((call) => call.join(" "));
+    const expectWarnedAboutReservedName = (name: string) => {
+      expect(
+        warnedLines.some(
+          (line) => line.includes("reserved") && line.includes(`\"${name}\"`),
+        ),
+      ).toBe(true);
+    };
+
+    expectWarnedAboutReservedName("build");
+    expect(service.hasConfiguredAgent("forager-worker")).toBe(true);
+    expect(service.hasConfiguredAgent("forager-ui")).toBe(true);
+    expect(service.hasConfiguredAgent("build")).toBe(false);
+    expect(service.hasConfiguredAgent("unsupported-base")).toBe(false);
+    expect(service.hasConfiguredAgent("missing-agent")).toBe(false);
+
+    warnSpy.mockRestore();
+  });
+
+  it("skips non-object custom agent declarations and keeps valid ones", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          customAgents: {
+            "forager-ui": {
+              baseAgent: "forager-worker",
+              description: "Valid custom agent.",
+            },
+            "broken-null": null,
+            "broken-string": "bad",
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const custom = service.getCustomAgentConfigs();
+    expect(custom).toHaveProperty("forager-ui");
+    expect(custom).not.toHaveProperty("broken-null");
+    expect(custom).not.toHaveProperty("broken-string");
+
+    const warnedLines = warnSpy.mock.calls.map((call) => call.join(" "));
+    expect(
+      warnedLines.some(
+        (line) => line.includes("invalid declaration") && line.includes("\"broken-null\""),
+      ),
+    ).toBe(true);
+    expect(
+      warnedLines.some(
+        (line) => line.includes("invalid declaration") && line.includes("\"broken-string\""),
+      ),
+    ).toBe(true);
+
+    warnSpy.mockRestore();
+  });
+
+  it("skips custom agents with missing or whitespace description", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          customAgents: {
+            "missing-description": {
+              baseAgent: "forager-worker",
+            },
+            "blank-description": {
+              baseAgent: "forager-worker",
+              description: "   ",
+            },
+            "forager-ui": {
+              baseAgent: "forager-worker",
+              description: "Use for UI-heavy implementation tasks.",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const custom = service.getCustomAgentConfigs();
+    expect(custom).toHaveProperty("forager-ui");
+    expect(custom).not.toHaveProperty("missing-description");
+    expect(custom).not.toHaveProperty("blank-description");
+
+    const warnedLines = warnSpy.mock.calls.map((call) => call.join(" "));
+    expect(
+      warnedLines.some(
+        (line) => line.includes("description must be a non-empty string") && line.includes("\"missing-description\""),
+      ),
+    ).toBe(true);
+    expect(
+      warnedLines.some(
+        (line) => line.includes("description must be a non-empty string") && line.includes("\"blank-description\""),
+      ),
+    ).toBe(true);
+
+    warnSpy.mockRestore();
+  });
+
+  it("treats empty custom model and variant overrides as unset", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          customAgents: {
+            "forager-ui": {
+              baseAgent: "forager-worker",
+              description: "Use for UI-heavy implementation tasks.",
+              model: "   ",
+              variant: "   ",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const custom = service.getCustomAgentConfigs();
+    expect(custom["forager-ui"]?.model).toBe("github-copilot/gpt-5.2-codex");
+    expect(custom["forager-ui"]?.variant).toBeUndefined();
+  });
+
+  it("caches custom agent resolution and emits warnings once per cache cycle", () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+    const warnSpy = spyOn(console, "warn").mockImplementation(() => {});
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          customAgents: {
+            build: {
+              baseAgent: "forager-worker",
+              description: "Reserved plugin alias.",
+            },
+            "forager-ui": {
+              baseAgent: "forager-worker",
+              description: "Valid custom agent.",
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    service.getCustomAgentConfigs();
+    service.hasConfiguredAgent("forager-ui");
+    service.hasConfiguredAgent("missing-agent");
+    service.getCustomAgentConfigs();
+
+    const reservedWarnings = warnSpy.mock.calls.filter((call) =>
+      call.join(" ").includes("Skipping custom agent \"build\": reserved name"),
+    );
+    expect(reservedWarnings.length).toBe(1);
+
+    warnSpy.mockRestore();
   });
 });
 

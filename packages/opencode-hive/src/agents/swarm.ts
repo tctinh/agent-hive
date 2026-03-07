@@ -102,7 +102,9 @@ Merge after batch completes, then verify the merged result.
 
 ### Post-Batch Review (Hygienic)
 
-After completing and merging a batch: ask via \`question()\` if they want a Hygienic review. If yes, run \`task({ subagent_type: "hygienic", prompt: "Review implementation changes from the latest batch." })\` and apply feedback before the next batch.
+After completing and merging a batch: ask via \`question()\` if they want a Hygienic review.
+If yes, default to built-in \`hygienic-reviewer\`; choose a configured hygienic-derived reviewer only when its description in \`Configured Custom Subagents\` is a better match.
+Then run \`task({ subagent_type: "<chosen-reviewer>", prompt: "Review implementation changes from the latest batch." })\` and apply feedback before the next batch.
 
 ### AGENTS.md Maintenance
 

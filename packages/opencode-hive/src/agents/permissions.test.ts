@@ -190,6 +190,55 @@ describe('Agent permissions', () => {
       expect(perm!.delegate).toBe('deny');
     }
   });
+
+  it('inherits subagent safety restrictions for custom forager and hygienic families', async () => {
+    spyOn(ConfigService.prototype, 'get').mockReturnValue({
+      agentMode: 'unified',
+      agents: {
+        'hive-master': {},
+      },
+      customAgents: {
+        'forager-ui': {
+          baseAgent: 'forager-worker',
+          description: 'UI-focused forager',
+          variant: 'high',
+        },
+        'reviewer-security': {
+          baseAgent: 'hygienic-reviewer',
+          description: 'Security-focused reviewer',
+          variant: 'medium',
+        },
+      },
+    } as any);
+
+    const repoRoot = path.resolve(import.meta.dir, '..', '..', '..', '..');
+
+    const ctx: PluginInput = {
+      directory: repoRoot,
+      worktree: repoRoot,
+      serverUrl: new URL('http://localhost:1'),
+      project: { id: 'test', worktree: repoRoot, time: { created: Date.now() } },
+      client: createStubClient(),
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx as any);
+    const opencodeConfig: {
+      agent?: Record<string, AgentConfig>;
+      default_agent?: string;
+    } = {};
+    await hooks.config?.(opencodeConfig);
+
+    expect(opencodeConfig.agent?.['forager-ui']).toBeTruthy();
+    expect(opencodeConfig.agent?.['reviewer-security']).toBeTruthy();
+
+    expect(opencodeConfig.agent?.['forager-ui']?.permission?.task).toBe('deny');
+    expect(opencodeConfig.agent?.['forager-ui']?.permission?.delegate).toBe('deny');
+    expect(opencodeConfig.agent?.['reviewer-security']?.permission?.edit).toBe('deny');
+    expect(opencodeConfig.agent?.['reviewer-security']?.tools).toEqual(
+      opencodeConfig.agent?.['hygienic-reviewer']?.tools,
+    );
+  });
 });
 
 describe('Per-agent tool filtering', () => {

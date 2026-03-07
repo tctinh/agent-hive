@@ -1,6 +1,18 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { HiveConfig, DEFAULT_HIVE_CONFIG } from '../types.js';
+import {
+  BUILT_IN_AGENT_NAMES,
+  CUSTOM_AGENT_BASES,
+  CUSTOM_AGENT_RESERVED_NAMES,
+  DEFAULT_HIVE_CONFIG,
+} from '../types.js';
+import type {
+  AgentModelConfig,
+  BuiltInAgentName,
+  CustomAgentBase,
+  HiveConfig,
+  ResolvedCustomAgentConfig,
+} from '../types.js';
 import type { SandboxConfig } from './dockerSandboxService.js';
 
 /**
@@ -14,6 +26,7 @@ import type { SandboxConfig } from './dockerSandboxService.js';
 export class ConfigService {
   private configPath: string;
   private cachedConfig: HiveConfig | null = null;
+  private cachedCustomAgentConfigs: Record<string, ResolvedCustomAgentConfig> | null = null;
 
   constructor() {
     const homeDir = process.env.HOME || process.env.USERPROFILE || '';
@@ -38,10 +51,25 @@ export class ConfigService {
     try {
       if (!fs.existsSync(this.configPath)) {
         this.cachedConfig = { ...DEFAULT_HIVE_CONFIG };
+        this.cachedCustomAgentConfigs = null;
         return this.cachedConfig;
       }
       const raw = fs.readFileSync(this.configPath, 'utf-8');
       const stored = JSON.parse(raw) as Partial<HiveConfig>;
+      const storedCustomAgents = this.isObjectRecord(stored.customAgents)
+        ? stored.customAgents
+        : {};
+
+      const mergedBuiltInAgents = BUILT_IN_AGENT_NAMES.reduce<NonNullable<HiveConfig['agents']>>(
+        (acc, agentName) => {
+          acc[agentName] = {
+            ...DEFAULT_HIVE_CONFIG.agents?.[agentName],
+            ...stored.agents?.[agentName],
+          };
+          return acc;
+        },
+        {},
+      );
 
       // Deep merge with defaults
       const merged: HiveConfig = {
@@ -50,42 +78,19 @@ export class ConfigService {
         agents: {
           ...DEFAULT_HIVE_CONFIG.agents,
           ...stored.agents,
-          // Deep merge hive-master agent config
-          'hive-master': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['hive-master'],
-            ...stored.agents?.['hive-master'],
-          },
-          // Deep merge architect-planner agent config
-          'architect-planner': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['architect-planner'],
-            ...stored.agents?.['architect-planner'],
-          },
-          // Deep merge swarm-orchestrator agent config
-          'swarm-orchestrator': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['swarm-orchestrator'],
-            ...stored.agents?.['swarm-orchestrator'],
-          },
-          // Deep merge scout-researcher agent config
-          'scout-researcher': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['scout-researcher'],
-            ...stored.agents?.['scout-researcher'],
-          },
-          // Deep merge forager-worker agent config
-          'forager-worker': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['forager-worker'],
-            ...stored.agents?.['forager-worker'],
-          },
-          // Deep merge hygienic-reviewer agent config
-          'hygienic-reviewer': {
-            ...DEFAULT_HIVE_CONFIG.agents?.['hygienic-reviewer'],
-            ...stored.agents?.['hygienic-reviewer'],
-          },
+          ...mergedBuiltInAgents,
+        },
+        customAgents: {
+          ...DEFAULT_HIVE_CONFIG.customAgents,
+          ...storedCustomAgents,
         },
       };
       this.cachedConfig = merged;
+      this.cachedCustomAgentConfigs = null;
       return this.cachedConfig;
     } catch {
       this.cachedConfig = { ...DEFAULT_HIVE_CONFIG };
+      this.cachedCustomAgentConfigs = null;
       return this.cachedConfig;
     }
   }
@@ -95,6 +100,7 @@ export class ConfigService {
    */
   set(updates: Partial<HiveConfig>): HiveConfig {
     this.cachedConfig = null; // invalidate cache on write
+    this.cachedCustomAgentConfigs = null;
     const current = this.get();
     
     const merged: HiveConfig = {
@@ -104,6 +110,12 @@ export class ConfigService {
         ...current.agents,
         ...updates.agents,
       } : current.agents,
+      customAgents: updates.customAgents
+        ? {
+            ...current.customAgents,
+            ...updates.customAgents,
+          }
+        : current.customAgents,
     };
 
     // Ensure config directory exists
@@ -114,6 +126,7 @@ export class ConfigService {
     
     fs.writeFileSync(this.configPath, JSON.stringify(merged, null, 2));
     this.cachedConfig = merged;
+    this.cachedCustomAgentConfigs = null;
     return merged;
   }
 
@@ -137,31 +150,150 @@ export class ConfigService {
   /**
    * Get agent-specific model config
    */
-  getAgentConfig(
-    agent: 'hive-master' | 'architect-planner' | 'swarm-orchestrator' | 'scout-researcher' | 'forager-worker' | 'hygienic-reviewer',
-  ): { model?: string; temperature?: number; skills?: string[]; autoLoadSkills?: string[]; variant?: string } {
+  getAgentConfig(agent: string): AgentModelConfig | ResolvedCustomAgentConfig {
     const config = this.get();
-    const agentConfig = config.agents?.[agent] ?? {};
-    const defaultAutoLoadSkills = DEFAULT_HIVE_CONFIG.agents?.[agent]?.autoLoadSkills ?? [];
-    const userAutoLoadSkills = agentConfig.autoLoadSkills ?? [];
-    const isPlannerAgent = agent === 'hive-master' || agent === 'architect-planner';
-    const effectiveUserAutoLoadSkills = isPlannerAgent
-      ? userAutoLoadSkills
-      : userAutoLoadSkills.filter((skill) => skill !== 'onboarding');
-    const effectiveDefaultAutoLoadSkills = isPlannerAgent
-      ? defaultAutoLoadSkills
-      : defaultAutoLoadSkills.filter((skill) => skill !== 'onboarding');
-    const combinedAutoLoadSkills = [...effectiveDefaultAutoLoadSkills, ...effectiveUserAutoLoadSkills];
-    const uniqueAutoLoadSkills = Array.from(new Set(combinedAutoLoadSkills));
-    const disabledSkills = config.disableSkills ?? [];
-    const effectiveAutoLoadSkills = uniqueAutoLoadSkills.filter(
-      (skill) => !disabledSkills.includes(skill),
-    );
 
-    return {
-      ...agentConfig,
-      autoLoadSkills: effectiveAutoLoadSkills,
-    };
+    if (this.isBuiltInAgent(agent)) {
+      const agentConfig = config.agents?.[agent] ?? {};
+      const defaultAutoLoadSkills = DEFAULT_HIVE_CONFIG.agents?.[agent]?.autoLoadSkills ?? [];
+      const effectiveAutoLoadSkills = this.resolveAutoLoadSkills(
+        defaultAutoLoadSkills,
+        agentConfig.autoLoadSkills ?? [],
+        this.isPlannerAgent(agent),
+      );
+
+      return {
+        ...agentConfig,
+        autoLoadSkills: effectiveAutoLoadSkills,
+      };
+    }
+
+    const customAgents = this.getCustomAgentConfigs();
+    return customAgents[agent] ?? {};
+  }
+
+  getCustomAgentConfigs(): Record<string, ResolvedCustomAgentConfig> {
+    if (this.cachedCustomAgentConfigs !== null) {
+      return this.cachedCustomAgentConfigs;
+    }
+
+    const config = this.get();
+    const customAgents = this.isObjectRecord(config.customAgents)
+      ? config.customAgents
+      : {};
+    const resolved: Record<string, ResolvedCustomAgentConfig> = {};
+
+    for (const [agentName, declaration] of Object.entries(customAgents)) {
+      if (this.isReservedCustomAgentName(agentName)) {
+        console.warn(`[hive:config] Skipping custom agent \"${agentName}\": reserved name`);
+        continue;
+      }
+
+      if (!this.isObjectRecord(declaration)) {
+        console.warn(
+          `[hive:config] Skipping custom agent \"${agentName}\": invalid declaration (expected object)`,
+        );
+        continue;
+      }
+
+      const baseAgent = declaration['baseAgent'];
+
+      if (typeof baseAgent !== 'string' || !this.isSupportedCustomAgentBase(baseAgent)) {
+        console.warn(
+          `[hive:config] Skipping custom agent \"${agentName}\": unsupported baseAgent \"${String(baseAgent)}\"`,
+        );
+        continue;
+      }
+
+      const autoLoadSkillsValue = declaration['autoLoadSkills'];
+      const additionalAutoLoadSkills = Array.isArray(autoLoadSkillsValue)
+        ? autoLoadSkillsValue.filter((skill): skill is string => typeof skill === 'string')
+        : [];
+      const baseAgentConfig = this.getAgentConfig(baseAgent) as AgentModelConfig;
+      const effectiveAutoLoadSkills = this.resolveAutoLoadSkills(
+        baseAgentConfig.autoLoadSkills ?? [],
+        additionalAutoLoadSkills,
+        this.isPlannerAgent(baseAgent),
+      );
+
+      const descriptionValue = declaration['description'];
+      const description = typeof descriptionValue === 'string'
+        ? descriptionValue.trim()
+        : '';
+      if (!description) {
+        console.warn(
+          `[hive:config] Skipping custom agent "${agentName}": description must be a non-empty string`,
+        );
+        continue;
+      }
+
+      const modelValue = declaration['model'];
+      const temperatureValue = declaration['temperature'];
+      const variantValue = declaration['variant'];
+      const model = typeof modelValue === 'string'
+        ? modelValue.trim() || baseAgentConfig.model
+        : baseAgentConfig.model;
+      const variant = typeof variantValue === 'string'
+        ? variantValue.trim() || baseAgentConfig.variant
+        : baseAgentConfig.variant;
+
+      resolved[agentName] = {
+        baseAgent,
+        description,
+        model,
+        temperature: typeof temperatureValue === 'number'
+          ? temperatureValue
+          : baseAgentConfig.temperature,
+        variant,
+        autoLoadSkills: effectiveAutoLoadSkills,
+      };
+    }
+
+    this.cachedCustomAgentConfigs = resolved;
+    return this.cachedCustomAgentConfigs;
+  }
+
+  hasConfiguredAgent(agent: string): boolean {
+    if (this.isBuiltInAgent(agent)) {
+      return true;
+    }
+
+    const customAgents = this.getCustomAgentConfigs();
+    return customAgents[agent] !== undefined;
+  }
+
+  private isBuiltInAgent(agent: string): agent is BuiltInAgentName {
+    return (BUILT_IN_AGENT_NAMES as readonly string[]).includes(agent);
+  }
+
+  private isReservedCustomAgentName(agent: string): boolean {
+    return (CUSTOM_AGENT_RESERVED_NAMES as readonly string[]).includes(agent);
+  }
+
+  private isSupportedCustomAgentBase(baseAgent: string): baseAgent is CustomAgentBase {
+    return (CUSTOM_AGENT_BASES as readonly string[]).includes(baseAgent);
+  }
+
+  private isPlannerAgent(agent: BuiltInAgentName | CustomAgentBase): boolean {
+    return agent === 'hive-master' || agent === 'architect-planner';
+  }
+
+  private isObjectRecord(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  private resolveAutoLoadSkills(
+    baseAutoLoadSkills: string[],
+    additionalAutoLoadSkills: string[],
+    isPlannerAgent: boolean,
+  ): string[] {
+    const effectiveAdditionalSkills = isPlannerAgent
+      ? additionalAutoLoadSkills
+      : additionalAutoLoadSkills.filter((skill) => skill !== 'onboarding');
+    const combinedAutoLoadSkills = [...baseAutoLoadSkills, ...effectiveAdditionalSkills];
+    const uniqueAutoLoadSkills = Array.from(new Set(combinedAutoLoadSkills));
+    const disabledSkills = this.getDisabledSkills();
+    return uniqueAutoLoadSkills.filter((skill) => !disabledSkills.includes(skill));
   }
 
   /**

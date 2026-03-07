@@ -13,6 +13,7 @@ import { SWARM_BEE_PROMPT } from './agents/swarm.js';
 import { SCOUT_BEE_PROMPT } from './agents/scout.js';
 import { FORAGER_BEE_PROMPT } from './agents/forager.js';
 import { HYGIENIC_BEE_PROMPT } from './agents/hygienic.js';
+import { buildCustomSubagents } from './agents/custom-agents.js';
 import { createBuiltinMcps } from './mcp/index.js';
 
 // ============================================================================
@@ -44,12 +45,12 @@ function formatSkillsXml(skills: SkillDefinition[]): string {
  * 3. Warn and skip if not found
  */
 async function buildAutoLoadedSkillsContent(
-  agentName: 'hive-master' | 'architect-planner' | 'swarm-orchestrator' | 'scout-researcher' | 'forager-worker' | 'hygienic-reviewer',
+  agentName: string,
   configService: ConfigService,
   projectRoot: string,
+  autoLoadSkillsOverride?: string[],
 ): Promise<string> {
-  const agentConfig = configService.getAgentConfig(agentName);
-  const autoLoadSkills = agentConfig.autoLoadSkills ?? [];
+  const autoLoadSkills = autoLoadSkillsOverride ?? (configService.getAgentConfig(agentName).autoLoadSkills ?? []);
 
   if (autoLoadSkills.length === 0) {
     return '';
@@ -149,7 +150,7 @@ import { calculatePromptMeta, calculatePayloadMeta, checkWarnings } from "./util
 import { applyTaskBudget, applyContextBudget, DEFAULT_BUDGET, type TruncationEvent } from "./utils/prompt-budgeting";
 import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { formatRelativeTime } from "./utils/format";
-import { HIVE_AGENT_NAMES, isHiveAgent, normalizeVariant } from "./hooks/variant-hook.js";
+import { createVariantHook } from "./hooks/variant-hook.js";
 import { HIVE_SYSTEM_PROMPT, shouldExecuteHook } from "./hooks/system-hook.js";
 import { buildCompactionPrompt } from "./utils/compaction-prompt.js";
 
@@ -338,43 +339,11 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       output.context.push(buildCompactionPrompt());
     },
 
-    // Apply per-agent variant to messages (covers built-in task() tool)
+    // Apply per-agent variant to messages (covers built-in and accepted custom task() agents)
     // Type assertion needed because TypeScript's contravariance rules are too strict
     // for the hook's output parameter type. The hook only accesses output.message.variant
     // which exists on UserMessage.
-    "chat.message": (async (
-      input: {
-        sessionID: string;
-        agent?: string;
-        model?: { providerID: string; modelID: string };
-        messageID?: string;
-        variant?: string;
-      },
-      output: {
-        message: { variant?: string };
-        parts: unknown[];
-      },
-    ): Promise<void> => {
-      const { agent } = input;
-
-      // Skip if no agent specified
-      if (!agent) return;
-
-      // Skip if not a Hive agent
-      if (!isHiveAgent(agent)) return;
-
-      // Skip if variant is already set (respect explicit selection)
-      if (output.message.variant !== undefined) return;
-
-      // Look up configured variant for this agent
-      const agentConfig = configService.getAgentConfig(agent);
-      const configuredVariant = normalizeVariant(agentConfig.variant);
-
-      // Apply configured variant if present
-      if (configuredVariant !== undefined) {
-        output.message.variant = configuredVariant;
-      }
-    }) as any,
+    "chat.message": createVariantHook(configService) as any,
 
     "tool.execute.before": async (input, output) => {
       // Cadence gate: check if this hook should execute this turn
@@ -750,10 +719,24 @@ Expand your Discovery section and try again.`;
             } : undefined,
           });
 
-          // Always use Forager (forager-worker) for task execution
-          // Forager knows Hive protocols (hive_worktree_commit, blocker protocol, Iron Laws)
-          // Forager can research via MCP tools (grep_app, context7, etc.)
-          const agent = 'forager-worker';
+          const customAgentConfigs = configService.getCustomAgentConfigs();
+          const defaultAgent = 'forager-worker';
+          const eligibleAgents = [
+            {
+              name: defaultAgent,
+              baseAgent: defaultAgent,
+              description: 'Default implementation worker',
+            },
+            ...Object.entries(customAgentConfigs)
+              .filter(([, config]) => config.baseAgent === 'forager-worker')
+              .sort(([left], [right]) => left.localeCompare(right))
+              .map(([name, config]) => ({
+                name,
+                baseAgent: config.baseAgent,
+                description: config.description,
+              })),
+          ];
+          const agent = defaultAgent;
 
           // Generate stable idempotency key for safe retries
           // Format: hive-<feature>-<task>-<attempt>
@@ -796,11 +779,17 @@ Expand your Discovery section and try again.`;
 
           const taskToolInstructions = `## Delegation Required
 
-Use OpenCode's built-in \`task\` tool to spawn a Forager (Worker/Coder) worker.
+Choose one of the eligible forager-derived agents below.
+Default to \`${defaultAgent}\` if no specialist is a better match.
+
+${eligibleAgents.map((candidate) => `- \`${candidate.name}\` — ${candidate.description}`).join('\n')}
+
+Use OpenCode's built-in \`task\` tool with the chosen \`subagent_type\` and the provided \`taskToolCall.prompt\` value.
+\`taskToolCall.subagent_type\` is prefilled with the default for convenience; override it when a specialist in \`eligibleAgents\` is a better match.
 
 \`\`\`
 task({
-  subagent_type: "${agent}",
+  subagent_type: "<chosen-agent>",
   description: "Hive: ${task}",
   prompt: "${taskToolPrompt}"
 })
@@ -819,6 +808,8 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
             branch: worktree.branch,
             mode: 'delegate',
             agent, // Canonical: top-level only
+            defaultAgent,
+            eligibleAgents,
             delegationRequired: true,
             workerPromptPath: relativePromptPath, // File reference (canonical)
             workerPromptPreview, // Truncated preview for display
@@ -1330,6 +1321,16 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       }
       // Auto-generate config file with defaults if it doesn't exist
       configService.init();
+      const hiveConfigData = configService.get();
+      const agentMode = hiveConfigData.agentMode ?? 'unified';
+
+      const customAgentConfigs = configService.getCustomAgentConfigs();
+      const customSubagentAppendix = Object.keys(customAgentConfigs).length === 0
+        ? ''
+        : `\n\n## Configured Custom Subagents\n${Object.entries(customAgentConfigs)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([name, config]) => `- \`${name}\` — derived from \`${config.baseAgent}\`; ${config.description}`)
+          .join('\n')}`;
 
       // Build auto-loaded skill content for each agent
       const hiveUserConfig = configService.getAgentConfig('hive-master');
@@ -1339,7 +1340,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         variant: hiveUserConfig.variant,
         temperature: hiveUserConfig.temperature ?? 0.5,
         description: 'Hive (Hybrid) - Plans + orchestrates. Detects phase, loads skills on-demand.',
-        prompt: QUEEN_BEE_PROMPT + hiveAutoLoadedSkills,
+        prompt: QUEEN_BEE_PROMPT + hiveAutoLoadedSkills + (agentMode === 'unified' ? customSubagentAppendix : ''),
         permission: {
           question: "allow",
           skill: "allow",
@@ -1355,7 +1356,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         variant: architectUserConfig.variant,
         temperature: architectUserConfig.temperature ?? 0.7,
         description: 'Architect (Planner) - Plans features, interviews, writes plans. NEVER executes.',
-        prompt: ARCHITECT_BEE_PROMPT + architectAutoLoadedSkills,
+        prompt: ARCHITECT_BEE_PROMPT + architectAutoLoadedSkills + (agentMode === 'dedicated' ? customSubagentAppendix : ''),
         tools: agentTools(['hive_feature_create', 'hive_plan_write', 'hive_plan_read', 'hive_context_write', 'hive_status', 'hive_skill']),
         permission: {
           edit: "deny",  // Planners don't edit code
@@ -1375,7 +1376,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         variant: swarmUserConfig.variant,
         temperature: swarmUserConfig.temperature ?? 0.5,
         description: 'Swarm (Orchestrator) - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
-        prompt: SWARM_BEE_PROMPT + swarmAutoLoadedSkills,
+        prompt: SWARM_BEE_PROMPT + swarmAutoLoadedSkills + (agentMode === 'dedicated' ? customSubagentAppendix : ''),
         tools: agentTools([
           'hive_feature_create', 'hive_feature_complete', 'hive_plan_read', 'hive_plan_approve',
           'hive_tasks_sync', 'hive_task_create', 'hive_task_update',
@@ -1444,24 +1445,59 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         },
       };
 
+      const builtInAgentConfigs = {
+        'hive-master': hiveConfig,
+        'architect-planner': architectConfig,
+        'swarm-orchestrator': swarmConfig,
+        'scout-researcher': scoutConfig,
+        'forager-worker': foragerConfig,
+        'hygienic-reviewer': hygienicConfig,
+      };
+
+      const customAutoLoadedSkills = Object.fromEntries(
+        await Promise.all(
+          Object.entries(customAgentConfigs).map(async ([customAgentName, customAgentConfig]) => {
+            const inheritedBaseSkills = customAgentConfig.baseAgent === 'forager-worker'
+              ? (foragerUserConfig.autoLoadSkills ?? [])
+              : (hygienicUserConfig.autoLoadSkills ?? []);
+            const deltaAutoLoadSkills = (customAgentConfig.autoLoadSkills ?? []).filter(
+              (skill) => !inheritedBaseSkills.includes(skill),
+            );
+
+            return [
+              customAgentName,
+              await buildAutoLoadedSkillsContent(customAgentName, configService, directory, deltaAutoLoadSkills),
+            ];
+          }),
+        ),
+      );
+
+      const customSubagents = buildCustomSubagents({
+        customAgents: customAgentConfigs,
+        baseAgents: {
+          'forager-worker': foragerConfig,
+          'hygienic-reviewer': hygienicConfig,
+        },
+        autoLoadedSkills: customAutoLoadedSkills,
+      });
+
       // Build agents map based on agentMode
-      const hiveConfigData = configService.get();
-      const agentMode = hiveConfigData.agentMode ?? 'unified';
-      
       const allAgents: Record<string, unknown> = {};
       
       if (agentMode === 'unified') {
-        allAgents['hive-master'] = hiveConfig;
-        allAgents['scout-researcher'] = scoutConfig;
-        allAgents['forager-worker'] = foragerConfig;
-        allAgents['hygienic-reviewer'] = hygienicConfig;
+        allAgents['hive-master'] = builtInAgentConfigs['hive-master'];
+        allAgents['scout-researcher'] = builtInAgentConfigs['scout-researcher'];
+        allAgents['forager-worker'] = builtInAgentConfigs['forager-worker'];
+        allAgents['hygienic-reviewer'] = builtInAgentConfigs['hygienic-reviewer'];
       } else {
-        allAgents['architect-planner'] = architectConfig;
-        allAgents['swarm-orchestrator'] = swarmConfig;
-        allAgents['scout-researcher'] = scoutConfig;
-        allAgents['forager-worker'] = foragerConfig;
-        allAgents['hygienic-reviewer'] = hygienicConfig;
+        allAgents['architect-planner'] = builtInAgentConfigs['architect-planner'];
+        allAgents['swarm-orchestrator'] = builtInAgentConfigs['swarm-orchestrator'];
+        allAgents['scout-researcher'] = builtInAgentConfigs['scout-researcher'];
+        allAgents['forager-worker'] = builtInAgentConfigs['forager-worker'];
+        allAgents['hygienic-reviewer'] = builtInAgentConfigs['hygienic-reviewer'];
       }
+
+      Object.assign(allAgents, customSubagents);
 
       // Merge agents into opencodeConfig.agent (config hook is sufficient for agent discovery)
       const configAgent = opencodeConfig.agent as Record<string, unknown> | undefined;

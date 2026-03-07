@@ -98,4 +98,52 @@ describe("agentMode gating", () => {
     expect(opencodeConfig.agent["hygienic-reviewer"]).toBeDefined();
     expect(opencodeConfig.default_agent).toBe("architect-planner");
   });
+
+  it("injects custom-subagent appendix into dedicated-mode primary prompts and registers custom agents", async () => {
+    const configPath = path.join(testRoot, ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agentMode: "dedicated",
+        customAgents: {
+          "forager-ui": {
+            baseAgent: "forager-worker",
+            description: "Use for UI-heavy implementation tasks.",
+            autoLoadSkills: [],
+          },
+          "reviewer-security": {
+            baseAgent: "hygienic-reviewer",
+            description: "Use for security-focused review passes.",
+            autoLoadSkills: [],
+          },
+        },
+      }),
+    );
+
+    const ctx: any = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+    };
+
+    const hooks = await plugin(ctx);
+    const opencodeConfig: any = { agent: {} };
+    await hooks.config!(opencodeConfig);
+
+    expect(opencodeConfig.agent["forager-ui"]).toBeDefined();
+    expect(opencodeConfig.agent["reviewer-security"]).toBeDefined();
+
+    const architectPrompt = opencodeConfig.agent["architect-planner"]?.prompt as string;
+    expect(architectPrompt).toContain("## Configured Custom Subagents");
+    expect(architectPrompt).toContain("forager-ui");
+
+    const swarmPrompt = opencodeConfig.agent["swarm-orchestrator"]?.prompt as string;
+    expect(swarmPrompt).toContain("## Configured Custom Subagents");
+    expect(swarmPrompt).toContain("reviewer-security");
+
+    expect(opencodeConfig.agent["hive-master"]).toBeUndefined();
+  });
 });

@@ -24,6 +24,14 @@ ${body}`;
   fs.writeFileSync(skillPath, content);
 }
 
+function countOccurrences(haystack: string, needle: string): number {
+  if (needle.length === 0) {
+    return 0;
+  }
+
+  return haystack.split(needle).length - 1;
+}
+
 const OPENCODE_CLIENT = createOpencodeClient({ baseUrl: "http://localhost:1" });
 
 const TEST_ROOT_BASE = "/tmp/hive-config-autoload-skills-test";
@@ -104,6 +112,57 @@ describe("config hook autoLoadSkills injection", () => {
     expect(foragerPrompt).toContain(verificationSkill!.template);
     // forager should NOT have parallel-exploration
     expect(foragerPrompt).not.toContain(parallelExplorationSkill!.template);
+  });
+
+  it("registers custom subagents and injects custom-subagent appendix in unified mode", async () => {
+    const configPath = path.join(testRoot, ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agentMode: "unified",
+        customAgents: {
+          "forager-ui": {
+            baseAgent: "forager-worker",
+            description: "Use for UI-heavy implementation tasks.",
+            autoLoadSkills: [],
+          },
+          "reviewer-security": {
+            baseAgent: "hygienic-reviewer",
+            description: "Use for security-focused review passes.",
+            autoLoadSkills: [],
+          },
+        },
+      }),
+    );
+
+    const ctx: any = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+    };
+
+    const hooks = await plugin(ctx);
+    const opencodeConfig: any = { agent: {} };
+    await hooks.config!(opencodeConfig);
+
+    expect(opencodeConfig.agent["forager-ui"]).toBeDefined();
+    expect(opencodeConfig.agent["reviewer-security"]).toBeDefined();
+
+    const hivePrompt = opencodeConfig.agent["hive-master"]?.prompt as string;
+    expect(hivePrompt).toBeDefined();
+    expect(hivePrompt).toContain("## Configured Custom Subagents");
+    expect(hivePrompt).toContain("forager-ui");
+    expect(hivePrompt).toContain("reviewer-security");
+
+    const foragerUiPrompt = opencodeConfig.agent["forager-ui"]?.prompt as string;
+    expect(foragerUiPrompt).toBeDefined();
+    const tddSkill = BUILTIN_SKILLS.find((skill) => skill.name === "test-driven-development");
+    expect(tddSkill).toBeDefined();
+    expect(countOccurrences(foragerUiPrompt, tddSkill!.template)).toBe(1);
+
   });
 
   it("injects user-configured autoLoadSkills into agent prompt in config hook", async () => {

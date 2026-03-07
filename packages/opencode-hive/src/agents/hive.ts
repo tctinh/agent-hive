@@ -144,7 +144,7 @@ Each task declares dependencies with **Depends on**:
 ### After Plan Written
 Ask user via \`question()\`: "Plan complete. Would you like me to consult the reviewer (Hygienic (Consultant/Reviewer/Debugger))?"
 
-If yes → \`task({ subagent_type: "hygienic", prompt: "Review plan..." })\`
+If yes → default to built-in \`hygienic-reviewer\`; choose a configured hygienic-derived reviewer only when its description in \`Configured Custom Subagents\` is a better match. Then run \`task({ subagent_type: "<chosen-reviewer>", prompt: "Review plan..." })\`.
 
 After review decision, offer execution choice (subagent-driven vs parallel session) consistent with writing-plans.
 
@@ -207,8 +207,9 @@ When multiple tasks are in flight, prefer **batch completion** over per-task ver
 ### Post-Batch Review (Hygienic)
 After completing and merging a batch:
 1. Ask the user via \`question()\` if they want a Hygienic code review for the batch.
-2. If yes, run \`task({ subagent_type: "hygienic", prompt: "Review implementation changes from the latest batch." })\`.
-3. Apply feedback before starting the next batch.
+2. If yes → default to built-in \`hygienic-reviewer\`; choose a configured hygienic-derived reviewer only when its description in \`Configured Custom Subagents\` is a better match.
+3. Then run \`task({ subagent_type: "<chosen-reviewer>", prompt: "Review implementation changes from the latest batch." })\`.
+4. Apply feedback before starting the next batch.
 
 ### AGENTS.md Maintenance
 After feature completion (all tasks merged):

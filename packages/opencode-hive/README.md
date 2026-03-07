@@ -278,6 +278,56 @@ The `variant` value must match a key in your OpenCode config at `provider.<provi
 
 **Precedence:** If a prompt already has an explicit variant set, the per-agent config acts as a default and will not override it. Invalid or missing variant keys are treated as no-op (the model runs with default settings).
 
+### Custom Derived Subagents
+
+Define plugin-only custom subagents with `customAgents`. Each custom agent must declare:
+
+- `baseAgent`: one of `forager-worker` or `hygienic-reviewer`
+- `description`: delegation guidance injected into primary planner/orchestrator prompts
+
+Published example (validated by `src/e2e/custom-agent-docs-example.test.ts`):
+
+```json
+{
+  "agents": {
+    "forager-worker": {
+      "variant": "medium"
+    },
+    "hygienic-reviewer": {
+      "model": "github-copilot/gpt-5.2-codex"
+    }
+  },
+  "customAgents": {
+    "forager-ui": {
+      "baseAgent": "forager-worker",
+      "description": "Use for UI-heavy implementation tasks.",
+      "model": "anthropic/claude-sonnet-4-20250514",
+      "temperature": 0.2,
+      "variant": "high"
+    },
+    "reviewer-security": {
+      "baseAgent": "hygienic-reviewer",
+      "description": "Use for security-focused review passes."
+    }
+  }
+}
+```
+
+Inheritance rules when a custom agent field is omitted:
+
+| Field | Inheritance behavior |
+|-------|----------------------|
+| `model` | Inherits resolved base agent model (including user overrides in `agents`) |
+| `temperature` | Inherits resolved base agent temperature |
+| `variant` | Inherits resolved base agent variant |
+| `autoLoadSkills` | Merges with base agent auto-load defaults/overrides, de-duplicates, and applies global `disableSkills` |
+
+ID guardrails:
+
+- `customAgents` keys cannot reuse built-in Hive agent IDs
+- plugin-reserved aliases are blocked (`hive`, `architect`, `swarm`, `scout`, `forager`, `hygienic`, `receiver`)
+- operational IDs are blocked (`build`, `plan`, `code`)
+
 ### Custom Models
 
 Override models for specific agents:

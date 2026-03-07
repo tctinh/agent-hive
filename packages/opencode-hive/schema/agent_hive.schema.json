@@ -101,6 +101,35 @@
           "description": "Hygienic Reviewer"
         }
       }
+    },
+    "customAgents": {
+      "type": "object",
+      "description": "Custom Hive subagent definitions derived from forager-worker or hygienic-reviewer. IDs cannot reuse built-in or plugin-reserved names.",
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "hive-master",
+            "architect-planner",
+            "swarm-orchestrator",
+            "scout-researcher",
+            "forager-worker",
+            "hygienic-reviewer",
+            "hive",
+            "architect",
+            "swarm",
+            "scout",
+            "forager",
+            "hygienic",
+            "receiver",
+            "build",
+            "plan",
+            "code"
+          ]
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/customAgentConfig"
+      }
     }
   },
   "$defs": {
@@ -135,6 +164,50 @@
         "variant": {
           "type": "string",
           "description": "Variant key for model reasoning/effort level (e.g., 'low', 'medium', 'high', 'max'). Must match a key in opencode.json provider.<provider>.models.<model>.variants"
+        }
+      }
+    },
+    "customAgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseAgent",
+        "description"
+      ],
+      "properties": {
+        "baseAgent": {
+          "type": "string",
+          "enum": [
+            "forager-worker",
+            "hygienic-reviewer"
+          ],
+          "description": "Built-in Hive agent to inherit prompt/tools/permissions from"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-facing description injected into delegation guidance"
+        },
+        "model": {
+          "type": "string",
+          "description": "Model override (provider/model-id)"
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Sampling temperature override"
+        },
+        "variant": {
+          "type": "string",
+          "description": "Variant override for model reasoning/effort level"
+        },
+        "autoLoadSkills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional skills to auto-load for this custom agent (merged with inherited base autoLoadSkills and filtered by disableSkills)"
         }
       }
     }
