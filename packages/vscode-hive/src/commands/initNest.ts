@@ -220,7 +220,7 @@ User reviews in VS Code, adds comments, approves when ready.
 ### Phase 3: Execution
 1. \\\`tasksSync()\\\` - Generate tasks from plan
 2. For each task:
-   - \\\`worktreeCreate({ task: "task-name" })\\\`
+   - \\\`worktreeStart({ task: "task-name" })\\\`
    - Implement
    - \\\`worktreeCommit({ task: "task-name", summary: "..." })\\\`
    - \\\`merge({ task: "task-name", strategy: "squash" })\\\`

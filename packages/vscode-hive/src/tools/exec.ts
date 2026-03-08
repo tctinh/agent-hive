@@ -74,6 +74,54 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
   const taskService = new TaskService(workspaceRoot);
 
   const startWorktree = async ({ feature, task }: { feature: string; task: string }) => {
+    const taskInfo = taskService.get(feature, task);
+    if (!taskInfo) {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: 'task_not_found',
+        feature,
+        task,
+        error: `Task "${task}" not found`,
+        hints: [
+          'Check the task folder name in tasks.json or hive_status output.',
+          'Run hive_tasks_sync if the approved plan has changed and tasks need regeneration.',
+        ],
+      });
+    }
+
+    if (taskInfo.status === 'done') {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: 'task_already_done',
+        feature,
+        task,
+        currentStatus: 'done',
+        error: `Task "${task}" is already completed (status: done). It cannot be restarted.`,
+        hints: [
+          'Use hive_merge to integrate the completed task branch if not already merged.',
+          'Use hive_status to see all task states and find the next runnable task.',
+        ],
+      });
+    }
+
+    if (taskInfo.status === 'blocked') {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: 'blocked_resume_required',
+        feature,
+        task,
+        currentStatus: 'blocked',
+        error: `Task "${task}" is blocked and must be resumed with hive_worktree_create using continueFrom: 'blocked'.`,
+        hints: [
+          'Ask the user the blocker question, then call hive_worktree_create({ task, continueFrom: "blocked", decision }).',
+          'Use hive_status to inspect blocker details before retrying.',
+        ],
+      });
+    }
+
     // Check dependencies before creating worktree
     const depCheck = checkDependencies(taskService, feature, task);
     if (!depCheck.allowed) {
@@ -92,9 +140,12 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
     }
 
     const worktree = await worktreeService.create(feature, task);
+    taskService.update(feature, task, { status: 'in_progress' });
     return JSON.stringify({
       success: true,
       terminal: false,
+      feature,
+      task,
       worktreePath: worktree.path,
       branch: worktree.branch,
       message: `Worktree created. Work in ${worktree.path}. When done, use hive_worktree_commit.`,
@@ -102,6 +153,101 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
         'Do all work inside this worktree. Ensure any subagents do the same.',
         'Context files are in .hive/features/<feature>/context/ if you need background.'
       ]
+    });
+  };
+
+  const resumeBlockedWorktree = async ({
+    feature,
+    task,
+    continueFrom,
+    decision,
+  }: {
+    feature: string;
+    task: string;
+    continueFrom?: 'blocked';
+    decision?: string;
+  }) => {
+    const taskInfo = taskService.get(feature, task);
+    if (!taskInfo) {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: 'task_not_found',
+        feature,
+        task,
+        error: `Task "${task}" not found`,
+        hints: [
+          'Check the task folder name in tasks.json or hive_status output.',
+          'Run hive_tasks_sync if the approved plan has changed and tasks need regeneration.',
+        ],
+      });
+    }
+
+    if (continueFrom !== 'blocked') {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: 'blocked_resume_required',
+        feature,
+        task,
+        currentStatus: taskInfo.status,
+        error: 'hive_worktree_create is only for resuming blocked tasks.',
+        hints: [
+          'Use hive_worktree_start({ feature, task }) to start a pending or in-progress task normally.',
+          'Use hive_worktree_create({ task, continueFrom: "blocked", decision }) only after hive_status confirms the task is blocked.',
+        ],
+      });
+    }
+
+    if (taskInfo.status !== 'blocked') {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: 'task_not_blocked',
+        feature,
+        task,
+        currentStatus: taskInfo.status,
+        error: `continueFrom: 'blocked' was specified but task "${task}" is not in blocked state (current status: ${taskInfo.status}).`,
+        hints: [
+          'Use hive_worktree_start({ feature, task }) for normal starts or re-dispatch.',
+          'Use hive_status to verify the current task status before retrying.',
+        ],
+      });
+    }
+
+    const worktree = await worktreeService.get(feature, task);
+    if (!worktree) {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: 'missing_worktree',
+        feature,
+        task,
+        currentStatus: taskInfo.status,
+        error: `Cannot resume blocked task "${task}": no existing worktree record found.`,
+        hints: [
+          'The worktree may have been removed manually. Use hive_worktree_discard to reset the task to pending, then restart it with hive_worktree_start.',
+          'Use hive_status to inspect the current state of the task and its worktree.',
+        ],
+      });
+    }
+
+    taskService.update(feature, task, { status: 'in_progress' });
+    return JSON.stringify({
+      success: true,
+      terminal: false,
+      feature,
+      task,
+      currentStatus: 'in_progress',
+      resumedFrom: 'blocked',
+      decision: decision ?? null,
+      worktreePath: worktree.path,
+      branch: worktree.branch,
+      message: `Blocked task resumed. Continue work in ${worktree.path}. When done, use hive_worktree_commit.`,
+      hints: [
+        'Continue from the existing worktree state and incorporate the user decision.',
+        'Do all work inside this worktree. Ensure any subagents do the same.',
+      ],
     });
   };
 
@@ -125,19 +271,26 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
     },
     {
       name: 'hive_worktree_create',
-      displayName: 'Create Task Worktree',
-      modelDescription: 'Legacy alias for starting a task worktree. Prefer hive_worktree_start for normal starts.',
+      displayName: 'Resume Blocked Task Worktree',
+      modelDescription: 'Resume a blocked task in its existing worktree. Requires continueFrom: "blocked" and a decision.',
       inputSchema: {
         type: 'object',
         properties: {
           feature: { type: 'string', description: 'Feature name' },
           task: { type: 'string', description: 'Task folder name' },
+          continueFrom: { type: 'string', enum: ['blocked'], description: 'Resume a blocked task' },
+          decision: { type: 'string', description: 'Answer to blocker question when continuing' },
         },
-        required: ['feature', 'task'],
+        required: ['feature', 'task', 'continueFrom'],
       },
       invoke: async (input) => {
-        const { feature, task } = input as { feature: string; task: string };
-        return startWorktree({ feature, task });
+        const { feature, task, continueFrom, decision } = input as {
+          feature: string;
+          task: string;
+          continueFrom?: 'blocked';
+          decision?: string;
+        };
+        return resumeBlockedWorktree({ feature, task, continueFrom, decision });
       },
     },
     {

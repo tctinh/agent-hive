@@ -85,7 +85,7 @@ During planning, "don't execute" means "don't implement" (no code edits, no work
 If you see repeated retries around `continueFrom: "blocked"`, use this protocol:
 
 1. Call `hive_status()` first.
-2. If status is `pending` / `in_progress` / any non-`blocked` status, start normally with:
+2. If status is `pending` or `in_progress`, start normally with:
    - `hive_worktree_start({ feature, task })`
 3. Only use blocked resume when status is exactly `blocked`:
    - `hive_worktree_create({ task, continueFrom: "blocked", decision })`

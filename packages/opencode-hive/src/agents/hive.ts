@@ -184,7 +184,7 @@ hive_worktree_start({ task: "01-task-name" })  // Creates worktree + Forager
 1. \`task()\` is blocking — when it returns, the worker is done
 2. After \`task()\` returns, immediately call \`hive_status()\` to check the new task state and find next runnable tasks before any resume attempt
 3. Use \`continueFrom: "blocked"\` only when status is exactly \`blocked\`
-4. If status is \`in_progress\` or any other non-blocked state, do not use \`continueFrom: "blocked"\`; re-dispatch the normal \`hive_worktree_start({ feature, task })\` path instead
+4. If status is not \`blocked\`, do not use \`continueFrom: "blocked"\`; use \`hive_worktree_start({ feature, task })\` only for normal starts (\`pending\` / \`in_progress\`)
 5. Never loop \`continueFrom: "blocked"\` on non-blocked statuses
 6. If task status is blocked: read blocker info → \`question()\` → user decision → resume with \`continueFrom: "blocked"\`
 7. Skip polling — the result is available when \`task()\` returns

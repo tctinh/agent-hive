@@ -58,15 +58,29 @@ var __getProtoOf2 = Object.getPrototypeOf;
 var __defProp2 = Object.defineProperty;
 var __getOwnPropNames2 = Object.getOwnPropertyNames;
 var __hasOwnProp2 = Object.prototype.hasOwnProperty;
+function __accessProp(key) {
+  return this[key];
+}
+var __toESMCache_node;
+var __toESMCache_esm;
 var __toESM2 = (mod, isNodeMode, target) => {
+  var canCache = mod != null && typeof mod === "object";
+  if (canCache) {
+    var cache2 = isNodeMode ? __toESMCache_node ??= /* @__PURE__ */ new WeakMap() : __toESMCache_esm ??= /* @__PURE__ */ new WeakMap();
+    var cached = cache2.get(mod);
+    if (cached)
+      return cached;
+  }
   target = mod != null ? __create2(__getProtoOf2(mod)) : {};
   const to = isNodeMode || !mod || !mod.__esModule ? __defProp2(target, "default", { value: mod, enumerable: true }) : target;
   for (let key of __getOwnPropNames2(mod))
     if (!__hasOwnProp2.call(to, key))
       __defProp2(to, key, {
-        get: () => mod[key],
+        get: __accessProp.bind(mod, key),
         enumerable: true
       });
+  if (canCache)
+    cache2.set(mod, to);
   return to;
 };
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
@@ -7324,7 +7338,7 @@ function getTaskTools(workspaceRoot) {
           manual: result.manual.length,
           message: `${result.created.length} tasks created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`,
           hints: [
-            "Use hive_worktree_create to begin work on a task.",
+            "Use hive_worktree_start to begin work on a task.",
             "Tasks should be executed in order unless explicitly parallelizable.",
             "Read context files before starting implementation.",
             "Update via hive_task_update when work progresses."
@@ -7358,7 +7372,7 @@ function getTaskTools(workspaceRoot) {
         const { feature, name, order } = input;
         const folder = taskService.create(feature, name, order);
         return `Created task "${folder}" with status: pending
-Reminder: run hive_worktree_create to work in its worktree, and ensure any subagents work in that worktree too.`;
+Reminder: run hive_worktree_start to work in its worktree, and ensure any subagents work in that worktree too.`;
       }
     },
     {
@@ -7446,11 +7460,173 @@ function getExecTools(workspaceRoot) {
     hiveDir: path7.join(workspaceRoot, ".hive")
   });
   const taskService = new TaskService(workspaceRoot);
+  const startWorktree = async ({ feature, task }) => {
+    const taskInfo = taskService.get(feature, task);
+    if (!taskInfo) {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: "task_not_found",
+        feature,
+        task,
+        error: `Task "${task}" not found`,
+        hints: [
+          "Check the task folder name in tasks.json or hive_status output.",
+          "Run hive_tasks_sync if the approved plan has changed and tasks need regeneration."
+        ]
+      });
+    }
+    if (taskInfo.status === "done") {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: "task_already_done",
+        feature,
+        task,
+        currentStatus: "done",
+        error: `Task "${task}" is already completed (status: done). It cannot be restarted.`,
+        hints: [
+          "Use hive_merge to integrate the completed task branch if not already merged.",
+          "Use hive_status to see all task states and find the next runnable task."
+        ]
+      });
+    }
+    if (taskInfo.status === "blocked") {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: "blocked_resume_required",
+        feature,
+        task,
+        currentStatus: "blocked",
+        error: `Task "${task}" is blocked and must be resumed with hive_worktree_create using continueFrom: 'blocked'.`,
+        hints: [
+          'Ask the user the blocker question, then call hive_worktree_create({ task, continueFrom: "blocked", decision }).',
+          "Use hive_status to inspect blocker details before retrying."
+        ]
+      });
+    }
+    const depCheck = checkDependencies(taskService, feature, task);
+    if (!depCheck.allowed) {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: "dependencies_not_done",
+        feature,
+        task,
+        error: depCheck.error,
+        hints: [
+          "Complete the required dependencies before starting this task.",
+          "Use hive_status to see current task states."
+        ]
+      });
+    }
+    const worktree = await worktreeService.create(feature, task);
+    taskService.update(feature, task, { status: "in_progress" });
+    return JSON.stringify({
+      success: true,
+      terminal: false,
+      feature,
+      task,
+      worktreePath: worktree.path,
+      branch: worktree.branch,
+      message: `Worktree created. Work in ${worktree.path}. When done, use hive_worktree_commit.`,
+      hints: [
+        "Do all work inside this worktree. Ensure any subagents do the same.",
+        "Context files are in .hive/features/<feature>/context/ if you need background."
+      ]
+    });
+  };
+  const resumeBlockedWorktree = async ({
+    feature,
+    task,
+    continueFrom,
+    decision
+  }) => {
+    const taskInfo = taskService.get(feature, task);
+    if (!taskInfo) {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: "task_not_found",
+        feature,
+        task,
+        error: `Task "${task}" not found`,
+        hints: [
+          "Check the task folder name in tasks.json or hive_status output.",
+          "Run hive_tasks_sync if the approved plan has changed and tasks need regeneration."
+        ]
+      });
+    }
+    if (continueFrom !== "blocked") {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: "blocked_resume_required",
+        feature,
+        task,
+        currentStatus: taskInfo.status,
+        error: "hive_worktree_create is only for resuming blocked tasks.",
+        hints: [
+          "Use hive_worktree_start({ feature, task }) to start a pending or in-progress task normally.",
+          'Use hive_worktree_create({ task, continueFrom: "blocked", decision }) only after hive_status confirms the task is blocked.'
+        ]
+      });
+    }
+    if (taskInfo.status !== "blocked") {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: "task_not_blocked",
+        feature,
+        task,
+        currentStatus: taskInfo.status,
+        error: `continueFrom: 'blocked' was specified but task "${task}" is not in blocked state (current status: ${taskInfo.status}).`,
+        hints: [
+          "Use hive_worktree_start({ feature, task }) for normal starts or re-dispatch.",
+          "Use hive_status to verify the current task status before retrying."
+        ]
+      });
+    }
+    const worktree = await worktreeService.get(feature, task);
+    if (!worktree) {
+      return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: "missing_worktree",
+        feature,
+        task,
+        currentStatus: taskInfo.status,
+        error: `Cannot resume blocked task "${task}": no existing worktree record found.`,
+        hints: [
+          "The worktree may have been removed manually. Use hive_worktree_discard to reset the task to pending, then restart it with hive_worktree_start.",
+          "Use hive_status to inspect the current state of the task and its worktree."
+        ]
+      });
+    }
+    taskService.update(feature, task, { status: "in_progress" });
+    return JSON.stringify({
+      success: true,
+      terminal: false,
+      feature,
+      task,
+      currentStatus: "in_progress",
+      resumedFrom: "blocked",
+      decision: decision ?? null,
+      worktreePath: worktree.path,
+      branch: worktree.branch,
+      message: `Blocked task resumed. Continue work in ${worktree.path}. When done, use hive_worktree_commit.`,
+      hints: [
+        "Continue from the existing worktree state and incorporate the user decision.",
+        "Do all work inside this worktree. Ensure any subagents do the same."
+      ]
+    });
+  };
   return [
     {
-      name: "hive_worktree_create",
-      displayName: "Create Task Worktree",
-      modelDescription: "Create a git worktree for a task. Isolates changes in a separate directory. Use when ready to implement a task.",
+      name: "hive_worktree_start",
+      displayName: "Start Task Worktree",
+      modelDescription: "Create a git worktree for a pending/in-progress task. Use for normal task starts.",
       inputSchema: {
         type: "object",
         properties: {
@@ -7461,28 +7637,26 @@ function getExecTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature, task } = input;
-        const depCheck = checkDependencies(taskService, feature, task);
-        if (!depCheck.allowed) {
-          return JSON.stringify({
-            success: false,
-            error: depCheck.error,
-            hints: [
-              "Complete the required dependencies before starting this task.",
-              "Use hive_status to see current task states."
-            ]
-          });
-        }
-        const worktree = await worktreeService.create(feature, task);
-        return JSON.stringify({
-          success: true,
-          worktreePath: worktree.path,
-          branch: worktree.branch,
-          message: `Worktree created. Work in ${worktree.path}. When done, use hive_worktree_commit.`,
-          hints: [
-            "Do all work inside this worktree. Ensure any subagents do the same.",
-            "Context files are in .hive/features/<feature>/context/ if you need background."
-          ]
-        });
+        return startWorktree({ feature, task });
+      }
+    },
+    {
+      name: "hive_worktree_create",
+      displayName: "Resume Blocked Task Worktree",
+      modelDescription: 'Resume a blocked task in its existing worktree. Requires continueFrom: "blocked" and a decision.',
+      inputSchema: {
+        type: "object",
+        properties: {
+          feature: { type: "string", description: "Feature name" },
+          task: { type: "string", description: "Task folder name" },
+          continueFrom: { type: "string", enum: ["blocked"], description: "Resume a blocked task" },
+          decision: { type: "string", description: "Answer to blocker question when continuing" }
+        },
+        required: ["feature", "task", "continueFrom"]
+      },
+      invoke: async (input) => {
+        const { feature, task, continueFrom, decision } = input;
+        return resumeBlockedWorktree({ feature, task, continueFrom, decision });
       }
     },
     {
@@ -7546,7 +7720,7 @@ ${summary}
         taskService.update(feature, task, { status: "pending", summary: "" });
         return JSON.stringify({
           success: true,
-          message: `Worktree removed. Task status reset to pending. Can restart with hive_worktree_create.`
+          message: `Worktree removed. Task status reset to pending. Can restart with hive_worktree_start.`
         });
       }
     }
@@ -7628,6 +7802,9 @@ function getStatusTools(workspaceRoot) {
     const feature = explicitFeature || featureService.getActive()?.name;
     if (!feature) {
       return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: "feature_required",
         error: "No feature specified and no active feature found",
         hint: "Use hive_feature_create to create a new feature"
       });
@@ -7635,6 +7812,9 @@ function getStatusTools(workspaceRoot) {
     const featureData = featureService.get(feature);
     if (!featureData) {
       return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: "feature_not_found",
         error: `Feature '${feature}' not found`,
         availableFeatures: featureService.list()
       });
@@ -7745,7 +7925,7 @@ function getNextAction(planStatus, tasks, runnable) {
     return `${runnable.length} tasks are ready to start in parallel: ${runnable.join(", ")}`;
   }
   if (runnable.length === 1) {
-    return `Start next task with hive_worktree_create: ${runnable[0]}`;
+    return `Start next task with hive_worktree_start: ${runnable[0]}`;
   }
   const pending = tasks.find((t) => t.status === "pending");
   if (pending) {
@@ -7866,7 +8046,7 @@ For each task in order:
 
 #### 1. Start (creates worktree)
 \`\`\`
-hive_worktree_create({ task: "01-task-name" })
+hive_worktree_start({ task: "01-task-name" })
 \`\`\`
 
 #### 2. Implement
@@ -7903,7 +8083,7 @@ hive_feature_complete({ name: "feature-name" })
 | Plan | \`hive_plan_read\` | Check for user comments |
 | Plan | \`hive_plan_approve\` | Approve plan |
 | Execute | \`hive_tasks_sync\` | Generate tasks from plan |
-| Execute | \`hive_worktree_create\` | Start task (creates worktree) |
+| Execute | \`hive_worktree_start\` | Start task (creates worktree) |
 | Execute | \`hive_worktree_commit\` | Finish task (commits changes) |
 | Execute | \`hive_merge\` | Integrate task to main |
 | Complete | \`hive_feature_complete\` | Mark feature done |
@@ -7944,7 +8124,7 @@ hive_feature_complete({ name: "feature-name" })
 ### Task Failed
 \`\`\`
 hive_worktree_discard(task="<task>")  # Discards changes
-hive_worktree_create(task="<task>")  # Fresh start
+hive_worktree_start(task="<task>")  # Fresh start
 \`\`\`
 
 ### Merge Conflicts
@@ -7954,7 +8134,7 @@ hive_worktree_create(task="<task>")  # Fresh start
 `;
 var COPILOT_AGENT_TEMPLATE = `---
 description: 'Plan-first feature development with isolated worktrees and persistent context.'
-tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveWorktreeCreate', 'tctinh.vscode-hive/hiveWorktreeCommit', 'tctinh.vscode-hive/hiveWorktreeDiscard', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveStatus']
+tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveWorktreeStart', 'tctinh.vscode-hive/hiveWorktreeCreate', 'tctinh.vscode-hive/hiveWorktreeCommit', 'tctinh.vscode-hive/hiveWorktreeDiscard', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveStatus']
 ---
 
 # Hive Agent
@@ -7975,7 +8155,7 @@ User reviews in VS Code, adds comments, approves when ready.
 ### Phase 3: Execution
 1. \\\`tasksSync()\\\` - Generate tasks from plan
 2. For each task:
-   - \\\`worktreeCreate({ task: "task-name" })\\\`
+   - \\\`worktreeStart({ task: "task-name" })\\\`
    - Implement
    - \\\`worktreeCommit({ task: "task-name", summary: "..." })\\\`
    - \\\`merge({ task: "task-name", strategy: "squash" })\\\`

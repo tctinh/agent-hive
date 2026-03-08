@@ -245,7 +245,7 @@ That's it. You're hiving.
 
 1. Run `hive_status({ feature })` before any resume attempt and read the current task status.
 2. Use `continueFrom: 'blocked'` only when the task is in the exact `blocked` state.
-3. For `pending`, `in_progress`, `done`, `failed`, or any non-blocked status, call normal `hive_worktree_start({ feature, task })`.
+3. For normal starts (for example `pending` / `in_progress`), call `hive_worktree_start({ feature, task })`.
 4. If a resume attempt is rejected, re-run `hive_status` and recover from the reported status instead of retrying the same blocked resume.
 
 #### Using with DCP plugin (recommended safety config)

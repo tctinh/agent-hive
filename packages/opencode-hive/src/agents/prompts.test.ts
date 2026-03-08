@@ -54,8 +54,9 @@ describe('Hive (Hybrid) prompt', () => {
     });
 
     it('redirects non-blocked unresolved tasks to normal dispatch', () => {
-      expect(QUEEN_BEE_PROMPT).toContain('If status is `in_progress` or any other non-blocked state');
+      expect(QUEEN_BEE_PROMPT).toContain('If status is not `blocked`');
       expect(QUEEN_BEE_PROMPT).toContain('do not use `continueFrom: "blocked"`');
+      expect(QUEEN_BEE_PROMPT).toContain('only for normal starts (`pending` / `in_progress`)');
       expect(QUEEN_BEE_PROMPT).toContain('hive_worktree_start({ feature, task })');
     });
   });
@@ -166,8 +167,9 @@ describe('Swarm (Orchestrator) prompt', () => {
     });
 
     it('redirects non-blocked unresolved tasks to normal dispatch', () => {
-      expect(SWARM_BEE_PROMPT).toContain('If status is `in_progress` or any other non-blocked state');
+      expect(SWARM_BEE_PROMPT).toContain('If status is not `blocked`');
       expect(SWARM_BEE_PROMPT).toContain('do not use `continueFrom: "blocked"`');
+      expect(SWARM_BEE_PROMPT).toContain('only for normal starts (`pending` / `in_progress`)');
       expect(SWARM_BEE_PROMPT).toContain('hive_worktree_start({ feature, task })');
     });
 

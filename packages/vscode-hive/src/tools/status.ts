@@ -14,6 +14,9 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
     const feature = explicitFeature || featureService.getActive()?.name;
     if (!feature) {
       return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: 'feature_required',
         error: 'No feature specified and no active feature found',
         hint: 'Use hive_feature_create to create a new feature',
       });
@@ -22,6 +25,9 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
     const featureData = featureService.get(feature);
     if (!featureData) {
       return JSON.stringify({
+        success: false,
+        terminal: true,
+        reason: 'feature_not_found',
         error: `Feature '${feature}' not found`,
         availableFeatures: featureService.list(),
       });

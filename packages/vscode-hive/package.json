@@ -424,8 +424,8 @@
       },
       {
         "name": "hive_worktree_create",
-        "displayName": "Create Task Worktree",
-        "modelDescription": "Legacy alias for starting a task worktree. Prefer hive_worktree_start for normal starts.",
+        "displayName": "Resume Blocked Task Worktree",
+        "modelDescription": "Resume a blocked task in its existing worktree. Requires continueFrom: \"blocked\" and a decision.",
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "hiveWorktreeCreate",
         "inputSchema": {
@@ -438,11 +438,23 @@
             "task": {
               "type": "string",
               "description": "Task folder name"
+            },
+            "continueFrom": {
+              "type": "string",
+              "enum": [
+                "blocked"
+              ],
+              "description": "Resume a blocked task"
+            },
+            "decision": {
+              "type": "string",
+              "description": "Answer to blocker question when continuing"
             }
           },
           "required": [
             "feature",
-            "task"
+            "task",
+            "continueFrom"
           ]
         }
       },
