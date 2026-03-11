@@ -709,9 +709,13 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       return respond({
         success: false,
         terminal: true,
+        reason: 'task_not_blocked',
+        canRetry: false,
+        retryReason: `Task is in ${taskInfo.status} state. Run hive_status() and follow the current status flow instead of blocked resume.`,
         error: `continueFrom: 'blocked' was specified but task "${task}" is not in blocked state (current status: ${taskInfo.status}).`,
         currentStatus: taskInfo.status,
         hints: [
+          'This blocked-resume call cannot be retried with the same parameters.',
           'Use hive_worktree_start({ feature, task }) for normal starts or re-dispatch.',
           'Use hive_status to verify the current task status before retrying.',
         ],

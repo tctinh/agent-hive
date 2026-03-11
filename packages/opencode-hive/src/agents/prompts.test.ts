@@ -53,6 +53,16 @@ describe('Hive (Hybrid) prompt', () => {
       expect(QUEEN_BEE_PROMPT).toContain('Never loop `continueFrom: "blocked"` on non-blocked statuses');
     });
 
+    it('requires immediate status re-check before blocked resume', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('Before every blocked resume, call `hive_status()` immediately beforehand');
+      expect(QUEEN_BEE_PROMPT).toContain('verify the task is still exactly `blocked`');
+    });
+
+    it('treats terminal tool responses as non-retriable for same parameters', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('If any Hive tool response has `terminal: true`');
+      expect(QUEEN_BEE_PROMPT).toContain('do not retry the same parameters');
+    });
+
     it('redirects non-blocked unresolved tasks to normal dispatch', () => {
       expect(QUEEN_BEE_PROMPT).toContain('If status is not `blocked`');
       expect(QUEEN_BEE_PROMPT).toContain('do not use `continueFrom: "blocked"`');
