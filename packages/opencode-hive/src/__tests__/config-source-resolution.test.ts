@@ -87,18 +87,18 @@ describe('plugin config source resolution', () => {
 
     const hooks = await plugin(ctx);
 
-      const toolContext = createToolContext('sess_config_resolution');
-      await hooks.tool!.hive_feature_create.execute({ name: 'warning-feature' }, toolContext);
+    const toolContext = createToolContext('sess_config_resolution');
+    await hooks.tool!.hive_feature_create.execute({ name: 'warning-feature' }, toolContext);
 
-      const firstStatusRaw = await hooks.tool!.hive_status.execute({ feature: 'warning-feature' }, toolContext);
-      const secondStatusRaw = await hooks.tool!.hive_status.execute({ feature: 'warning-feature' }, toolContext);
+    const firstStatusRaw = await hooks.tool!.hive_status.execute({ feature: 'warning-feature' }, toolContext);
+    const secondStatusRaw = await hooks.tool!.hive_status.execute({ feature: 'warning-feature' }, toolContext);
 
-      const hiveStatus = JSON.parse(firstStatusRaw as string) as { warning?: string };
-      const hiveStatusAgain = JSON.parse(secondStatusRaw as string) as { warning?: string };
+    const hiveStatus = JSON.parse(firstStatusRaw as string) as { warning?: string };
+    const hiveStatusAgain = JSON.parse(secondStatusRaw as string) as { warning?: string };
 
-      expect(notifications.length).toBe(1);
-      expect(notifications[0].message).toContain('[hive:config]');
-      expect(hiveStatus.warning).toBe(warningMessage);
-      expect(hiveStatusAgain.warning).toBe(hiveStatus.warning);
+    expect(notifications.length).toBe(1);
+    expect(notifications[0].message).toContain('[hive:config]');
+    expect(hiveStatus.warning).toBe(warningMessage);
+    expect(hiveStatusAgain.warning).toBe(hiveStatus.warning);
   });
 });

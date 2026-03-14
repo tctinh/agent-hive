@@ -74,7 +74,7 @@ export class ConfigService {
         return this.cachedConfig;
       }
 
-      const fallbackReason = projectStored.reason ?? 'read_error';
+      const fallbackReason = 'reason' in projectStored ? projectStored.reason : 'read_error';
       this.lastFallbackWarning = {
         message: `Failed to read project config at ${this.projectConfigPath}; using global config at ${this.configPath}`,
         sourceType: 'project',

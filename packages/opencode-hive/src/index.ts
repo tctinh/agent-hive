@@ -200,8 +200,7 @@ const plugin: Plugin = async (ctx) => {
   const taskService = new TaskService(directory);
   const contextService = new ContextService(directory);
   const agentsMdService = new AgentsMdService(directory, contextService);
-  const ConfigServiceCtor = ConfigService as unknown as new (projectRoot?: string) => ConfigService;
-  const configService = new ConfigServiceCtor(directory);
+  const configService = new ConfigService(directory);
   const disabledMcps = configService.getDisabledMcps();
   const disabledSkills = configService.getDisabledSkills();
   const configFallbackWarning = configService.getLastFallbackWarning()?.message ?? null;
