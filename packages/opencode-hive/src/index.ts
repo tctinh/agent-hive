@@ -167,14 +167,49 @@ type ToolContext = {
 const plugin: Plugin = async (ctx) => {
   const { directory, client } = ctx;
 
+  const emitConfigWarning = (message: string): void => {
+    const prefixedMessage = `[hive:config] ${message}`;
+    const maybeClient = client as unknown as {
+      notify?: (payload: { type?: string; level?: string; title?: string; message: string }) => unknown;
+      notification?: {
+        create?: (payload: { type?: string; level?: string; title?: string; message: string }) => unknown;
+      };
+    };
+
+    const notified =
+      (typeof maybeClient.notify === 'function' && maybeClient.notify({
+        type: 'warning',
+        level: 'warning',
+        title: 'Agent Hive Config Warning',
+        message: prefixedMessage,
+      })) ||
+      (typeof maybeClient.notification?.create === 'function' && maybeClient.notification.create({
+        type: 'warning',
+        level: 'warning',
+        title: 'Agent Hive Config Warning',
+        message: prefixedMessage,
+      }));
+
+    if (!notified) {
+      console.warn(prefixedMessage);
+    }
+  };
+
   const featureService = new FeatureService(directory);
   const planService = new PlanService(directory);
   const taskService = new TaskService(directory);
   const contextService = new ContextService(directory);
   const agentsMdService = new AgentsMdService(directory, contextService);
-  const configService = new ConfigService(); // User config at ~/.config/opencode/agent_hive.json
+  const ConfigServiceCtor = ConfigService as unknown as new (projectRoot?: string) => ConfigService;
+  const configService = new ConfigServiceCtor(directory);
   const disabledMcps = configService.getDisabledMcps();
   const disabledSkills = configService.getDisabledSkills();
+  const configFallbackWarning = (
+    configService as ConfigService & { getLastFallbackWarningMessage?: () => string | null }
+  ).getLastFallbackWarningMessage?.() ?? null;
+  if (configFallbackWarning) {
+    emitConfigWarning(configFallbackWarning);
+  }
   const builtinMcps = createBuiltinMcps(disabledMcps);
   
   // Get filtered skills (globally disabled skills removed)
@@ -1448,6 +1483,7 @@ Expand your Discovery section and try again.`;
               fileCount: contextFiles.length,
               files: contextSummary,
             },
+            warning: configFallbackWarning ?? undefined,
             nextAction: getNextAction(planStatus, tasksSummary, runnable),
           });
         },
