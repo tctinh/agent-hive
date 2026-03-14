@@ -25,13 +25,28 @@ import type { SandboxConfig } from './dockerSandboxService.js';
  */
 export class ConfigService {
   private configPath: string;
+  private projectConfigPath?: string;
   private cachedConfig: HiveConfig | null = null;
   private cachedCustomAgentConfigs: Record<string, ResolvedCustomAgentConfig> | null = null;
+  private activeReadSourceType: 'project' | 'global' = 'global';
+  private activeReadPath: string;
+  private lastFallbackWarning: {
+    message: string;
+    sourceType: 'project';
+    sourcePath: string;
+    fallbackType: 'global';
+    fallbackPath: string;
+    reason: 'parse_error' | 'validation_error' | 'read_error';
+  } | null = null;
 
-  constructor() {
+  constructor(projectRoot?: string) {
     const homeDir = process.env.HOME || process.env.USERPROFILE || '';
     const configDir = path.join(homeDir, '.config', 'opencode');
     this.configPath = path.join(configDir, 'agent_hive.json');
+    this.activeReadPath = this.configPath;
+    if (projectRoot) {
+      this.projectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
+    }
   }
 
   /**
@@ -48,8 +63,34 @@ export class ConfigService {
     if (this.cachedConfig !== null) {
       return this.cachedConfig;
     }
+
+    if (this.projectConfigPath && fs.existsSync(this.projectConfigPath)) {
+      const projectStored = this.readStoredConfig(this.projectConfigPath);
+      if (projectStored.ok) {
+        this.activeReadSourceType = 'project';
+        this.activeReadPath = this.projectConfigPath;
+        this.lastFallbackWarning = null;
+        this.cachedConfig = this.mergeWithDefaults(projectStored.value);
+        return this.cachedConfig;
+      }
+
+      const fallbackReason = projectStored.reason ?? 'read_error';
+      this.lastFallbackWarning = {
+        message: `Failed to read project config at ${this.projectConfigPath}; using global config at ${this.configPath}`,
+        sourceType: 'project',
+        sourcePath: this.projectConfigPath,
+        fallbackType: 'global',
+        fallbackPath: this.configPath,
+        reason: fallbackReason,
+      };
+    } else {
+      this.lastFallbackWarning = null;
+    }
+
     try {
       if (!fs.existsSync(this.configPath)) {
+        this.activeReadSourceType = 'global';
+        this.activeReadPath = this.configPath;
         this.cachedConfig = { ...DEFAULT_HIVE_CONFIG };
         this.cachedCustomAgentConfigs = null;
         return this.cachedConfig;
@@ -70,29 +111,38 @@ export class ConfigService {
         },
         {},
       );
-
-      // Deep merge with defaults
-      const merged: HiveConfig = {
-        ...DEFAULT_HIVE_CONFIG,
-        ...stored,
-        agents: {
-          ...DEFAULT_HIVE_CONFIG.agents,
-          ...stored.agents,
-          ...mergedBuiltInAgents,
-        },
-        customAgents: {
-          ...DEFAULT_HIVE_CONFIG.customAgents,
-          ...storedCustomAgents,
-        },
-      };
+      this.activeReadSourceType = 'global';
+      this.activeReadPath = this.configPath;
+      const merged = this.mergeWithDefaults(stored);
       this.cachedConfig = merged;
       this.cachedCustomAgentConfigs = null;
       return this.cachedConfig;
     } catch {
+      this.activeReadSourceType = 'global';
+      this.activeReadPath = this.configPath;
       this.cachedConfig = { ...DEFAULT_HIVE_CONFIG };
       this.cachedCustomAgentConfigs = null;
       return this.cachedConfig;
     }
+  }
+
+  getActiveReadSourceType(): 'project' | 'global' {
+    return this.activeReadSourceType;
+  }
+
+  getActiveReadPath(): string {
+    return this.activeReadPath;
+  }
+
+  getLastFallbackWarning(): {
+    message: string;
+    sourceType: 'project';
+    sourcePath: string;
+    fallbackType: 'global';
+    fallbackPath: string;
+    reason: 'parse_error' | 'validation_error' | 'read_error';
+  } | null {
+    return this.lastFallbackWarning;
   }
 
   /**
@@ -367,6 +417,55 @@ export class ConfigService {
     }
 
     return configuredCadence;
+  }
+
+  private readStoredConfig(configPath: string):
+    | { ok: true; value: Partial<HiveConfig> }
+    | { ok: false; reason: 'parse_error' | 'validation_error' | 'read_error' } {
+    try {
+      const raw = fs.readFileSync(configPath, 'utf-8');
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return { ok: false, reason: 'validation_error' };
+      }
+      return { ok: true, value: parsed as Partial<HiveConfig> };
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        return { ok: false, reason: 'parse_error' };
+      }
+      return { ok: false, reason: 'read_error' };
+    }
+  }
+
+  private mergeWithDefaults(stored: Partial<HiveConfig>): HiveConfig {
+    const storedCustomAgents = this.isObjectRecord(stored.customAgents)
+      ? stored.customAgents
+      : {};
+
+    const mergedBuiltInAgents = BUILT_IN_AGENT_NAMES.reduce<NonNullable<HiveConfig['agents']>>(
+      (acc, agentName) => {
+        acc[agentName] = {
+          ...DEFAULT_HIVE_CONFIG.agents?.[agentName],
+          ...stored.agents?.[agentName],
+        };
+        return acc;
+      },
+      {},
+    );
+
+    return {
+      ...DEFAULT_HIVE_CONFIG,
+      ...stored,
+      agents: {
+        ...DEFAULT_HIVE_CONFIG.agents,
+        ...stored.agents,
+        ...mergedBuiltInAgents,
+      },
+      customAgents: {
+        ...DEFAULT_HIVE_CONFIG.customAgents,
+        ...storedCustomAgents,
+      },
+    };
   }
 
 }
