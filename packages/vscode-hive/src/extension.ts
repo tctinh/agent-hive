@@ -15,6 +15,7 @@ import {
   getStatusTools
 } from './tools'
 import { initNest } from './commands/initNest'
+import { regenerateAgents } from './commands/regenerateAgents'
 
 function findHiveRoot(startPath: string): string | null {
   let current = startPath
@@ -129,6 +130,12 @@ class HiveExtension {
           }
         }
         this.sidebarProvider?.refresh()
+      }),
+
+      vscode.commands.registerCommand('hive.regenerateAgents', async () => {
+        if (this.workspaceRoot) {
+          await regenerateAgents(this.workspaceRoot)
+        }
       }),
 
       vscode.commands.registerCommand('hive.newFeature', async () => {

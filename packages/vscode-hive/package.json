@@ -441,6 +441,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "hive.regenerateAgents",
+        "title": "Hive: Regenerate Agents",
+        "icon": "$(sync)"
+      },
+      {
         "command": "hive.openFile",
         "title": "Open File"
       },
