@@ -12,7 +12,9 @@ import {
   getExecTools,
   getMergeTools,
   getContextTools,
-  getStatusTools
+  getStatusTools,
+  getAgentsMdTools,
+  getSkillTools
 } from './tools'
 import { initNest } from './commands/initNest'
 import { regenerateAgents } from './commands/regenerateAgents'
@@ -71,7 +73,9 @@ class HiveExtension {
       ...getExecTools(workspaceRoot),
       ...getMergeTools(workspaceRoot),
       ...getContextTools(workspaceRoot),
-      ...getStatusTools(workspaceRoot)
+      ...getStatusTools(workspaceRoot),
+      ...getAgentsMdTools(workspaceRoot),
+      ...getSkillTools(workspaceRoot)
     ])
 
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => {

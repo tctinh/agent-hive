@@ -402,6 +402,57 @@
             "content"
           ]
         }
+      },
+      {
+        "name": "hive_agents_md",
+        "displayName": "Manage AGENTS.md",
+        "modelDescription": "Initialize, sync, or apply changes to AGENTS.md. Actions: init (scan and generate), sync (update from context), apply (write to disk).",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveAgentsMd",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "init",
+                "sync",
+                "apply"
+              ],
+              "description": "Action to perform"
+            },
+            "feature": {
+              "type": "string",
+              "description": "Feature name (required for sync)"
+            },
+            "content": {
+              "type": "string",
+              "description": "Content to apply (required for apply)"
+            }
+          },
+          "required": [
+            "action"
+          ]
+        }
+      },
+      {
+        "name": "hive_skill",
+        "displayName": "Load Hive Skill",
+        "modelDescription": "Load a skill by name from .github/skills/, .claude/skills/, or .opencode/skill/. Returns the SKILL.md content with workflow instructions.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSkill",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Skill name (e.g. writing-plans, brainstorming, test-driven-development)"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
       }
     ],
     "viewsContainers": {
