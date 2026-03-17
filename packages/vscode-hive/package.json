@@ -1,7 +1,7 @@
 {
   "name": "vscode-hive",
   "displayName": "Agent Hive",
-  "description": "From Vibe Coding to Hive Coding - Review and approve AI-generated plans",
+  "description": "Plan-first AI development with GitHub Copilot custom agents, subagent delegation, and isolated worktrees",
   "version": "1.3.1",
   "publisher": "tctinh",
   "license": "MIT WITH Commons-Clause",
@@ -21,10 +21,14 @@
     "vibe-coding",
     "opencode",
     "planning",
-    "workflow"
+    "workflow",
+    "copilot",
+    "agents",
+    "subagent",
+    "multi-agent"
   ],
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.107.0"
   },
   "categories": [
     "Other"
@@ -420,7 +424,7 @@
     "viewsWelcome": [
       {
         "view": "hive.features",
-        "contents": "No Hive nest found in this workspace.\n\n[Init Hive Nest](command:hive.initNest)\n\nThis will create AI skill files for:\n- OpenCode (.opencode/skill/)\n- Claude (.claude/skills/)\n- GitHub Copilot (.github/agents/)",
+        "contents": "No Hive nest found in this workspace.\n\n[Init Hive Nest](command:hive.initNest)\n\nThis will create:\n- Copilot agents (.github/agents/)\n- Agent skills (.github/skills/)\n- Workflow hooks (.github/hooks/)\n- Instructions (.github/instructions/)\n- Plugin manifest (plugin.json)\n- Claude skills (.claude/skills/)\n- OpenCode skills (.opencode/skill/)",
         "when": "!hive.hasHiveRoot"
       }
     ],
@@ -567,7 +571,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@opencode-ai/sdk": "^1.1.1",
     "hive-core": "workspace:*"
   }
 }
