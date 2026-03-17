@@ -46,31 +46,6 @@ export interface StepStatus {
   execution?: ExecutionInfo | null
 }
 
-export interface StepReport {
-  filesChanged: number
-  insertions: number
-  deletions: number
-}
-
-export interface Batch {
-  order: number
-  steps: Step[]
-  isLatestDone: boolean
-  canExecute: boolean
-}
-
-export interface RequirementsDocs {
-  ticket?: string
-  requirements?: string
-  notes?: string
-}
-
-export interface ContextDocs {
-  decisions?: string
-  architecture?: string
-  constraints?: string
-}
-
 export type PlanStatusType = 'draft' | 'review' | 'approved' | 'locked'
 export type TaskStatusType = 'pending' | 'in_progress' | 'done' | 'blocked' | 'reverted' | 'failed' | 'cancelled'
 
