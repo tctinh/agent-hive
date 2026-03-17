@@ -670,7 +670,21 @@ We studied [Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode) (omo
 - **Documentation cleanup**: removed leaked task metadata/context dumps from Evolution Notes to keep philosophy focused on public design history
 
 **Design insight:** Cross-referencing multiple sources keeps Hive’s principles grounded and current while preserving scope — we adopt behaviors, not external infrastructure, and we keep the philosophy narrative clean of internal execution scaffolding.
+### v1.3.1 (Multi-Model Routing + Retry Loop Hardening)
 
+**Theme:** Let the right model do the right task. Close the doors that cause infinite loops.
+
+**Multi-model subagents:** Not all models are equal at all tasks. A "forager" executing UI work might perform better as Gemini; a "forager" doing algorithmic backend work might perform better as GPT-Codex; a "hygienic" reviewer running a security pass might work best with Sonnet. Up to now, these distinctions were invisible to Hive — every worker called `forager-worker`, every reviewer called `hygienic-reviewer`, and model selection was entirely manual.
+
+v1.3.1 adds `customAgents` to the Hive config. Users define derived agents with a `baseAgent`, a `description`, and optional runtime overrides (`model`, `temperature`, `variant`, `autoLoadSkills`). The orchestrator sees these descriptions in its system prompt and chooses the best-matching worker/reviewer at delegation time — no semantic router needed, no new infrastructure, just prompt-visible descriptions routing model selection through the orchestrator's existing reasoning.
+
+**Inheritance by composition:** Custom agents inherit the base system prompt, tools, and permission set. Only the configurable runtime fields change. This preserves Hive's prompt discipline (workers don't get planner-level tools, reviewers don't get edit access) without requiring users to maintain full prompt copies for each model variant.
+
+**Blocked-resume retry loops:** A class of orchestration failures emerged in practice: after compaction or state drift, orchestrators would call `hive_worktree_create({ ..., continueFrom: "blocked" })` on tasks that were `pending` or `in_progress`, not `blocked`. The call would fail or produce unexpected results, and the orchestrator — lacking a terminal signal — would retry the same call, looping indefinitely.
+
+The fix is a clean API split: `hive_worktree_start` for normal starts (pending/failed), `hive_worktree_create` exclusively for blocked resumes. Calling `hive_worktree_create` on a non-blocked task now returns `terminal: true, reason: "task_not_blocked", correctTool: "hive_worktree_start"` — a machine-readable dead-end signal that tells orchestrators exactly what went wrong and what to do instead.
+
+**Design insight:** P7 (Iron Laws + Hard Gates) says: build explicit gates, not soft suggestions. The old worktree API had a soft gate — it tried to do the "right thing" regardless of intent. The new split makes intent explicit. Orchestrators state whether they're starting fresh or resuming blocked, and the system rejects the wrong choice immediately. Hard gates prevent loops. Soft gates accumulate them.
 ---
 
 <p align="center">

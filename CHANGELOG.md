@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-03-17
+
+### Added
+- **Custom Multi-Model Subagents**: Users can now define `customAgents` in `~/.config/opencode/agent_hive.json` to create additional taskable workers and reviewers derived from `forager-worker` or `hygienic-reviewer`. Custom agents inherit the base prompt, tools, and permissions while allowing targeted overrides for `model`, `temperature`, `variant`, and `autoLoadSkills`
+- **`hive_worktree_start` Tool**: New dedicated tool for normal task starts, split from `hive_worktree_create`. `hive_worktree_start` handles pending/failed tasks; `hive_worktree_create` is now exclusively for resuming blocked tasks (`continueFrom: "blocked"`)
+- **Custom Agent Delegation in `hive_worktree_start`**: Returns `defaultAgent`, `eligibleAgents`, and delegation instructions so orchestrators can choose the best-matching configured worker instead of always using the built-in forager
+- **Custom Agent Prompt Injection**: Configured custom subagents are surfaced in primary orchestrator prompts (`hive-master`, `architect-planner`, `swarm-orchestrator`) under a "Configured Custom Subagents" section for routing guidance
+- **Reserved-Name Guardrails**: Custom agent IDs cannot shadow built-in Hive agents, plugin aliases, or OpenCode operational agent IDs
+- **Seeded Config Templates**: `hive_init` generates `agent_hive.json` with commented-out custom agent examples that are self-disqualifying, making it easy to define custom agents by filling in real values
+- **`compaction-hook.test.ts`** and **`hook-cadence.test.ts`**: New regression tests for hook behavior and cadence logic
+- **`HOOK_CADENCE.md`**: Documentation for the hook cadence system
+
+### Changed
+- **`hive_worktree_create` API Hardened**: Now exclusively for blocked-resume paths. Rejects calls where task state is not `blocked` with a structured `terminal: true` error to stop retry loops. Returns `reason: "task_not_blocked"` and `correctTool: "hive_worktree_start"` for clear orchestrator guidance
+- **Blocked-Resume Response Contracts**: All blocked-resume guard responses now include `success`, `terminal`, `reason`, and `nextAction` fields for machine-readable orchestration
+- **Agent Prompts (Hive, Swarm)**: Updated tool guidance to use `hive_worktree_start` for normal starts and `hive_worktree_create` strictly for blocked resumes. Added "Configured Custom Subagents" section with reviewer routing guidance
+- **Dependency Check responses**: `executeWorktreeStart` now returns `terminal: true` with `reason: "dependencies_not_done"` when task dependencies are unmet
+- **`hive_status` nextAction**: Updated to suggest `hive_worktree_start` for runnable tasks
+- **Skills Updated**: `dispatching-parallel-agents`, `executing-plans`, and `parallel-exploration` skills updated for `hive_worktree_start` / `hive_worktree_create` split
+- **ConfigService Extended**: Normalizes custom agents, inherits effective base-agent runtime config, and exposes lookup helpers for custom agent resolution
+- **Variant Hook Extended**: Applies configured variants to accepted custom agents through the shared `chat.message` variant hook path
+- **VSCode Extension Aligned**: `exec.ts`, `status.ts`, `task.ts`, and `initNest.ts` updated to reflect the `hive_worktree_start` / `hive_worktree_create` semantics split
+- **Version Bump**: Bumped root and package versions to `1.3.1` (`agent-hive`, `hive-core`, `opencode-hive`, `vscode-hive`)
+
+### Fixed
+- **Blocked-Resume Retry Loops**: Orchestrators that drifted into retrying `continueFrom: "blocked"` on non-blocked tasks now receive a hard terminal rejection with a corrective `nextAction`, breaking the loop
+- **Skill Template Reference**: `parallel-exploration` skill now references `hive_worktree_start` (not `hive_worktree_create`) for parallel implementation work
+- **Custom Agent Skill Deduplication**: Inherited `autoLoadSkills` are merged and deduplicated against base agent skills so skills are not loaded twice
+
+### Design Notes
+- Base agents supported for custom derivation: `forager-worker` and `hygienic-reviewer` only — primary planner/swarm/scout derivation explicitly out of scope (likely never supported)
+- No automatic semantic router added; orchestrators still choose the worker/reviewer from prompt-visible descriptions — keeps models in control of routing decisions
+- Custom prompt overrides not supported in this slice — the combination of Hive system prompt + role `description` field is sufficient for correct model "expert mode" activation
+- Self-disqualifying config templates chosen over JSONC comments to maintain JSON schema compatibility
+
 ## [1.3.0] - 2026-02-25
 
 ### Added
