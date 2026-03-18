@@ -427,6 +427,9 @@ export class ConfigService {
       if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
         return { ok: false, reason: 'validation_error' };
       }
+      if (!this.isValidStoredConfig(parsed)) {
+        return { ok: false, reason: 'validation_error' };
+      }
       return { ok: true, value: parsed as Partial<HiveConfig> };
     } catch (error) {
       if (error instanceof SyntaxError) {
@@ -465,6 +468,83 @@ export class ConfigService {
         ...storedCustomAgents,
       },
     };
+  }
+
+  private isValidStoredConfig(value: unknown): value is Partial<HiveConfig> {
+    if (!this.isObjectRecord(value)) {
+      return false;
+    }
+
+    const config = value as Record<string, unknown>;
+
+    if (config.$schema !== undefined && typeof config.$schema !== 'string') {
+      return false;
+    }
+
+    if (config.enableToolsFor !== undefined && !this.isStringArray(config.enableToolsFor)) {
+      return false;
+    }
+
+    if (config.disableSkills !== undefined && !this.isStringArray(config.disableSkills)) {
+      return false;
+    }
+
+    if (config.disableMcps !== undefined && !this.isStringArray(config.disableMcps)) {
+      return false;
+    }
+
+    if (config.omoSlimEnabled !== undefined && typeof config.omoSlimEnabled !== 'boolean') {
+      return false;
+    }
+
+    if (
+      config.agentMode !== undefined
+      && config.agentMode !== 'unified'
+      && config.agentMode !== 'dedicated'
+    ) {
+      return false;
+    }
+
+    if (config.agents !== undefined && !this.isObjectRecord(config.agents)) {
+      return false;
+    }
+
+    if (config.customAgents !== undefined && !this.isObjectRecord(config.customAgents)) {
+      return false;
+    }
+
+    if (config.sandbox !== undefined && config.sandbox !== 'none' && config.sandbox !== 'docker') {
+      return false;
+    }
+
+    if (config.dockerImage !== undefined && typeof config.dockerImage !== 'string') {
+      return false;
+    }
+
+    if (
+      config.persistentContainers !== undefined
+      && typeof config.persistentContainers !== 'boolean'
+    ) {
+      return false;
+    }
+
+    if (config.hook_cadence !== undefined && !this.isHookCadenceRecord(config.hook_cadence)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private isStringArray(value: unknown): value is string[] {
+    return Array.isArray(value) && value.every((item) => typeof item === 'string');
+  }
+
+  private isHookCadenceRecord(value: unknown): value is Record<string, number> {
+    if (!this.isObjectRecord(value)) {
+      return false;
+    }
+
+    return Object.values(value).every((entry) => typeof entry === 'number');
   }
 
 }

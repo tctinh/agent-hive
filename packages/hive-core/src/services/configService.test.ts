@@ -737,4 +737,43 @@ describe('ConfigService project-aware read source selection', () => {
 
     fs.rmSync(projectRoot, { recursive: true, force: true });
   });
+
+  it('falls back to global config when project config has invalid object field types', () => {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-project-'));
+    const projectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
+    const globalConfigPath = path.join(tempHome, '.config', 'opencode', 'agent_hive.json');
+
+    fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
+    fs.writeFileSync(
+      projectConfigPath,
+      JSON.stringify({
+        sandbox: 123,
+      }),
+    );
+
+    fs.mkdirSync(path.dirname(globalConfigPath), { recursive: true });
+    fs.writeFileSync(
+      globalConfigPath,
+      JSON.stringify({
+        sandbox: 'docker',
+      }),
+    );
+
+    const service = new ConfigService(projectRoot);
+    const config = service.get();
+
+    expect(config.sandbox).toBe('docker');
+    expect(service.getActiveReadSourceType()).toBe('global');
+    expect(service.getActiveReadPath()).toBe(globalConfigPath);
+    expect(service.getLastFallbackWarning()).toEqual({
+      message: `Failed to read project config at ${projectConfigPath}; using global config at ${globalConfigPath}`,
+      sourceType: 'project',
+      sourcePath: projectConfigPath,
+      fallbackType: 'global',
+      fallbackPath: globalConfigPath,
+      reason: 'validation_error',
+    });
+
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+  });
 });
