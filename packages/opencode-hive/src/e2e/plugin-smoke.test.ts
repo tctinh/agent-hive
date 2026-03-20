@@ -354,6 +354,107 @@ Do it
     expect(execStart.instructions).not.toContain("Read the prompt file");
   });
 
+  it("excludes reserved overview context from worker prompt payloads", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_reserved_overview");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "reserved-overview-feature" },
+      toolContext
+    );
+
+    const plan = `# Reserved Overview Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test validates that reserved overview context stays human-facing and is excluded from worker execution payloads.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "reserved-overview-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_approve.execute(
+      { feature: "reserved-overview-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_tasks_sync.execute(
+      { feature: "reserved-overview-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "reserved-overview-feature",
+        name: "overview",
+        content: "Human-facing overview that must stay out of worker execution context.",
+      },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "reserved-overview-feature",
+        name: "decisions",
+        content: "Technical decision that workers should receive.",
+      },
+      toolContext
+    );
+
+    const raw = await hooks.tool!.hive_worktree_start.execute(
+      { feature: "reserved-overview-feature", task: "01-first-task" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      worktreePath?: string;
+    };
+
+    expect(result.worktreePath).toBeDefined();
+
+    const specPath = path.join(
+      testRoot,
+      ".hive",
+      "features",
+      "reserved-overview-feature",
+      "tasks",
+      "01-first-task",
+      "spec.md"
+    );
+    const workerPromptPath = path.join(
+      testRoot,
+      ".hive",
+      "features",
+      "reserved-overview-feature",
+      "tasks",
+      "01-first-task",
+      "worker-prompt.md"
+    );
+
+    const specContent = fs.readFileSync(specPath, "utf-8");
+    const workerPromptContent = fs.readFileSync(workerPromptPath, "utf-8");
+
+    expect(specContent).toContain("## decisions");
+    expect(specContent).toContain("Technical decision that workers should receive.");
+    expect(specContent).not.toContain("## overview");
+    expect(specContent).not.toContain("Human-facing overview that must stay out of worker execution context.");
+    expect(workerPromptContent).toContain("Technical decision that workers should receive.");
+    expect(workerPromptContent).not.toContain("Human-facing overview that must stay out of worker execution context.");
+  });
+
   it("returns forager-derived eligible agents for worktree execution delegation", async () => {
     const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
