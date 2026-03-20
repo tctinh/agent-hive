@@ -50,7 +50,10 @@ async function buildAutoLoadedSkillsContent(
   projectRoot: string,
   autoLoadSkillsOverride?: string[],
 ): Promise<string> {
-  const autoLoadSkills = autoLoadSkillsOverride ?? (configService.getAgentConfig(agentName).autoLoadSkills ?? []);
+  const autoLoadSkills = autoLoadSkillsOverride
+    ?? (((configService as unknown as {
+      getAgentConfig: (name: string) => { autoLoadSkills?: string[] };
+    }).getAgentConfig(agentName).autoLoadSkills) ?? []);
 
   if (autoLoadSkills.length === 0) {
     return '';
@@ -84,6 +87,51 @@ async function buildAutoLoadedSkillsContent(
   }
 
   return '\n\n' + skillTemplates.join('\n\n');
+}
+
+type CompatibleCustomAgentConfig = {
+  baseAgent: 'forager-worker' | 'hygienic-reviewer';
+  description: string;
+  autoLoadSkills?: string[];
+};
+
+function getCustomAgentConfigsCompat(configService: ConfigService): Record<string, CompatibleCustomAgentConfig> {
+  const serviceWithMethod = configService as ConfigService & {
+    getCustomAgentConfigs?: () => Record<string, CompatibleCustomAgentConfig>;
+    get?: () => { customAgents?: Record<string, unknown> };
+  };
+
+  if (typeof serviceWithMethod.getCustomAgentConfigs === 'function') {
+    return serviceWithMethod.getCustomAgentConfigs();
+  }
+
+  const rawConfig = serviceWithMethod.get?.() as { customAgents?: Record<string, unknown> } | undefined;
+  const rawCustomAgents = rawConfig?.customAgents;
+  if (!rawCustomAgents || typeof rawCustomAgents !== 'object') {
+    return {};
+  }
+
+  const compatibleEntries = Object.entries(rawCustomAgents).flatMap(([name, config]) => {
+    if (!config || typeof config !== 'object') {
+      return [];
+    }
+
+    const record = config as Record<string, unknown>;
+    const baseAgent = record.baseAgent;
+    if (baseAgent !== 'forager-worker' && baseAgent !== 'hygienic-reviewer') {
+      return [];
+    }
+
+    return [[name, {
+      baseAgent,
+      description: typeof record.description === 'string' ? record.description : 'Custom subagent',
+      autoLoadSkills: Array.isArray(record.autoLoadSkills)
+        ? record.autoLoadSkills.filter((skill): skill is string => typeof skill === 'string')
+        : [],
+    } satisfies CompatibleCustomAgentConfig]];
+  });
+
+  return Object.fromEntries(compatibleEntries);
 }
 
 function createHiveSkillTool(filteredSkills: SkillDefinition[]): ToolDefinition {
@@ -324,7 +372,15 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
     const planResult = planService.read(feature);
     const allTasks = taskService.list(feature);
 
-    const rawContextFiles = contextService.list(feature).map(f => ({
+    const executionContextFiles = typeof (contextService as ContextService & {
+      listExecutionContext?: (featureName: string) => Array<{ name: string; content: string }>;
+    }).listExecutionContext === 'function'
+      ? (contextService as ContextService & {
+          listExecutionContext: (featureName: string) => Array<{ name: string; content: string }>;
+        }).listExecutionContext(feature)
+      : contextService.list(feature).filter(f => f.name !== 'overview');
+
+    const rawContextFiles = executionContextFiles.map(f => ({
       name: f.name,
       content: f.content,
     }));
@@ -393,7 +449,7 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       } : undefined,
     });
 
-    const customAgentConfigs = configService.getCustomAgentConfigs();
+    const customAgentConfigs = getCustomAgentConfigsCompat(configService);
     const defaultAgent = 'forager-worker';
     const eligibleAgents = [
       {
@@ -1523,7 +1579,7 @@ Expand your Discovery section and try again.`;
       const hiveConfigData = configService.get();
       const agentMode = hiveConfigData.agentMode ?? 'unified';
 
-      const customAgentConfigs = configService.getCustomAgentConfigs();
+      const customAgentConfigs = getCustomAgentConfigsCompat(configService);
       const customSubagentAppendix = Object.keys(customAgentConfigs).length === 0
         ? ''
         : `\n\n## Configured Custom Subagents\n${Object.entries(customAgentConfigs)
