@@ -1,6 +1,5 @@
 import {
   getPlanPath,
-  getCommentsPath,
   getFeatureJsonPath,
   getApprovedPath,
   readJson,
@@ -9,11 +8,22 @@ import {
   writeText,
   fileExists,
 } from '../utils/paths.js';
-import { FeatureJson, CommentsJson, PlanComment, PlanReadResult } from '../types.js';
+import type { FeatureJson, PlanComment, PlanReadResult } from '../types.js';
 import * as fs from 'fs';
+import { ReviewService } from './reviewService.js';
 
 export class PlanService {
+  private reviewService: ReviewService;
+
   constructor(private projectRoot: string) {}
+
+  private getReviewService(): ReviewService {
+    if (!this.reviewService) {
+      this.reviewService = new ReviewService(this.projectRoot);
+    }
+
+    return this.reviewService;
+  }
 
   write(featureName: string, content: string): string {
     const planPath = getPlanPath(this.projectRoot, featureName);
@@ -44,6 +54,10 @@ export class PlanService {
   approve(featureName: string): void {
     if (!fileExists(getPlanPath(this.projectRoot, featureName))) {
       throw new Error(`No plan.md found for feature '${featureName}'`);
+    }
+
+    if (this.getReviewService().hasUnresolvedThreads(featureName)) {
+      throw new Error(`Cannot approve feature '${featureName}' with unresolved review comments`);
     }
 
     const approvedPath = getApprovedPath(this.projectRoot, featureName);
@@ -81,29 +95,24 @@ export class PlanService {
   }
 
   getComments(featureName: string): PlanComment[] {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    const data = readJson<CommentsJson>(commentsPath);
-    return data?.threads || [];
+    return this.getReviewService().getThreads(featureName, 'plan');
   }
 
-  addComment(featureName: string, comment: Omit<PlanComment, 'id' | 'timestamp'>): PlanComment {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    const data = readJson<CommentsJson>(commentsPath) || { threads: [] };
-    
+  addComment(featureName: string, comment: Omit<PlanComment, 'id'>): PlanComment {
     const newComment: PlanComment = {
       ...comment,
       id: `comment-${Date.now()}`,
-      timestamp: new Date().toISOString(),
     };
-    
-    data.threads.push(newComment);
-    writeJson(commentsPath, data);
+
+    this.getReviewService().saveThreads(featureName, 'plan', [
+      ...this.getComments(featureName),
+      newComment,
+    ]);
     
     return newComment;
   }
 
   clearComments(featureName: string): void {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    writeJson(commentsPath, { threads: [] });
+    this.getReviewService().clear(featureName, 'plan');
   }
 }

@@ -1,12 +1,15 @@
 import * as path from 'path';
 import * as fs from 'fs';
+import type { ReviewDocument } from '../types.js';
 
 const HIVE_DIR = '.hive';
 const FEATURES_DIR = 'features';
 const TASKS_DIR = 'tasks';
 const CONTEXT_DIR = 'context';
+const REVIEW_COMMENTS_DIR = 'comments';
 const PLAN_FILE = 'plan.md';
 const COMMENTS_FILE = 'comments.json';
+const OVERVIEW_FILE = 'overview.md';
 const FEATURE_FILE = 'feature.json';
 const STATUS_FILE = 'status.json';
 const REPORT_FILE = 'report.md';
@@ -36,12 +39,20 @@ export function getCommentsPath(projectRoot: string, featureName: string): strin
   return path.join(getFeaturePath(projectRoot, featureName), COMMENTS_FILE);
 }
 
+export function getReviewCommentsPath(projectRoot: string, featureName: string, document: ReviewDocument): string {
+  return path.join(getFeaturePath(projectRoot, featureName), REVIEW_COMMENTS_DIR, `${document}.json`);
+}
+
 export function getFeatureJsonPath(projectRoot: string, featureName: string): string {
   return path.join(getFeaturePath(projectRoot, featureName), FEATURE_FILE);
 }
 
 export function getContextPath(projectRoot: string, featureName: string): string {
   return path.join(getFeaturePath(projectRoot, featureName), CONTEXT_DIR);
+}
+
+export function getOverviewPath(projectRoot: string, featureName: string): string {
+  return path.join(getContextPath(projectRoot, featureName), OVERVIEW_FILE);
 }
 
 export function getTasksPath(projectRoot: string, featureName: string): string {

@@ -74,22 +74,30 @@ export interface TaskStatus {
   dependsOn?: string[];
 }
 
-export interface PlanComment {
+export type ReviewDocument = 'plan' | 'overview';
+
+export interface ReviewThread {
   id: string;
   line: number;
   body: string;
-  author: string;
-  timestamp: string;
+  replies: string[];
 }
 
 export interface CommentsJson {
-  threads: PlanComment[];
+  threads: ReviewThread[];
 }
+
+export interface ReviewCounts {
+  plan: number;
+  overview: number;
+}
+
+export type PlanComment = ReviewThread;
 
 export interface PlanReadResult {
   content: string;
   status: FeatureStatusType;
-  comments: PlanComment[];
+  comments: ReviewThread[];
 }
 
 export interface TasksSyncResult {
@@ -113,7 +121,9 @@ export interface FeatureInfo {
   status: FeatureStatusType;
   tasks: TaskInfo[];
   hasPlan: boolean;
+  hasOverview: boolean;
   commentCount: number;
+  reviewCounts: ReviewCounts;
 }
 
 export interface ContextFile {
