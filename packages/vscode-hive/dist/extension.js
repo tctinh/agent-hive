@@ -38,7 +38,7 @@ var vscode7 = __toESM(require("vscode"));
 var fs12 = __toESM(require("fs"));
 var path11 = __toESM(require("path"));
 
-// ../../../../../../packages/hive-core/dist/index.js
+// ../hive-core/dist/index.js
 var import_node_module = require("node:module");
 var path = __toESM(require("path"), 1);
 var fs = __toESM(require("fs"), 1);
@@ -882,6 +882,27 @@ var require_dist2 = __commonJS((exports2) => {
   exports2.createDeferred = deferred;
   exports2.default = deferred;
 });
+var BUILT_IN_AGENT_NAMES = [
+  "hive-master",
+  "architect-planner",
+  "swarm-orchestrator",
+  "scout-researcher",
+  "forager-worker",
+  "hygienic-reviewer"
+];
+var CUSTOM_AGENT_RESERVED_NAMES = [
+  ...BUILT_IN_AGENT_NAMES,
+  "hive",
+  "architect",
+  "swarm",
+  "scout",
+  "forager",
+  "hygienic",
+  "receiver",
+  "build",
+  "plan",
+  "code"
+];
 var DEFAULT_AGENT_MODELS = {
   "hive-master": "github-copilot/claude-opus-4.5",
   "architect-planner": "github-copilot/gpt-5.2-codex",
@@ -897,6 +918,21 @@ var DEFAULT_HIVE_CONFIG = {
   disableMcps: [],
   agentMode: "unified",
   sandbox: "none",
+  customAgents: {
+    "forager-example-template": {
+      baseAgent: "forager-worker",
+      description: "Example template only: rename or delete this entry before use. Do not expect planners/orchestrators to select this placeholder agent as configured.",
+      model: "anthropic/claude-sonnet-4-20250514",
+      temperature: 0.2,
+      variant: "high",
+      autoLoadSkills: ["test-driven-development"]
+    },
+    "hygienic-example-template": {
+      baseAgent: "hygienic-reviewer",
+      description: "Example template only: rename or delete this entry before use. Do not expect planners/orchestrators to select this placeholder agent as configured.",
+      autoLoadSkills: ["code-reviewer"]
+    }
+  },
   agents: {
     "hive-master": {
       model: DEFAULT_AGENT_MODELS["hive-master"],
@@ -944,8 +980,10 @@ var HIVE_DIR = ".hive";
 var FEATURES_DIR = "features";
 var TASKS_DIR = "tasks";
 var CONTEXT_DIR = "context";
+var REVIEW_COMMENTS_DIR = "comments";
 var PLAN_FILE = "plan.md";
 var COMMENTS_FILE = "comments.json";
+var OVERVIEW_FILE = "overview.md";
 var FEATURE_FILE = "feature.json";
 var STATUS_FILE = "status.json";
 var REPORT_FILE = "report.md";
@@ -965,11 +1003,17 @@ function getPlanPath(projectRoot, featureName) {
 function getCommentsPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), COMMENTS_FILE);
 }
+function getReviewCommentsPath(projectRoot, featureName, document2) {
+  return path.join(getFeaturePath(projectRoot, featureName), REVIEW_COMMENTS_DIR, `${document2}.json`);
+}
 function getFeatureJsonPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), FEATURE_FILE);
 }
 function getContextPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), CONTEXT_DIR);
+}
+function getOverviewPath(projectRoot, featureName) {
+  return path.join(getContextPath(projectRoot, featureName), OVERVIEW_FILE);
 }
 function getTasksPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), TASKS_DIR);
@@ -1139,10 +1183,63 @@ function writeText(filePath, content) {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, content);
 }
-var FeatureService = class {
+var ReviewService = class {
   projectRoot;
   constructor(projectRoot) {
     this.projectRoot = projectRoot;
+  }
+  getThreads(featureName, document2) {
+    const data = this.readComments(featureName, document2);
+    return data?.threads ?? [];
+  }
+  saveThreads(featureName, document2, threads) {
+    writeJson(this.getCanonicalPath(featureName, document2), { threads });
+  }
+  clear(featureName, document2) {
+    this.saveThreads(featureName, document2, []);
+    if (document2 === "plan" && fileExists(getCommentsPath(this.projectRoot, featureName))) {
+      writeJson(getCommentsPath(this.projectRoot, featureName), { threads: [] });
+    }
+  }
+  countByDocument(featureName) {
+    return {
+      plan: this.getThreads(featureName, "plan").length,
+      overview: this.getThreads(featureName, "overview").length
+    };
+  }
+  hasUnresolvedThreads(featureName, document2) {
+    if (document2) {
+      return this.getThreads(featureName, document2).length > 0;
+    }
+    const counts = this.countByDocument(featureName);
+    return counts.plan > 0 || counts.overview > 0;
+  }
+  readComments(featureName, document2) {
+    const canonicalPath = this.getCanonicalPath(featureName, document2);
+    const canonical = readJson(canonicalPath);
+    if (canonical) {
+      return canonical;
+    }
+    if (document2 === "plan") {
+      return readJson(getCommentsPath(this.projectRoot, featureName));
+    }
+    return null;
+  }
+  getCanonicalPath(featureName, document2) {
+    return getReviewCommentsPath(this.projectRoot, featureName, document2);
+  }
+};
+var FeatureService = class {
+  projectRoot;
+  reviewService;
+  constructor(projectRoot) {
+    this.projectRoot = projectRoot;
+  }
+  getReviewService() {
+    if (!this.reviewService) {
+      this.reviewService = new ReviewService(this.projectRoot);
+    }
+    return this.reviewService;
   }
   create(name, ticket) {
     const featurePath = getFeaturePath(this.projectRoot, name);
@@ -1200,14 +1297,17 @@ var FeatureService = class {
       return null;
     const tasks = this.getTasks(name);
     const hasPlan = fileExists(getPlanPath(this.projectRoot, name));
-    const comments2 = readJson(getCommentsPath(this.projectRoot, name));
-    const commentCount = comments2?.threads?.length || 0;
+    const hasOverview = fileExists(getOverviewPath(this.projectRoot, name));
+    const reviewCounts = this.getReviewService().countByDocument(name);
+    const commentCount = reviewCounts.plan + reviewCounts.overview;
     return {
       name: feature.name,
       status: feature.status,
       tasks,
       hasPlan,
-      commentCount
+      hasOverview,
+      commentCount,
+      reviewCounts
     };
   }
   getTasks(featureName) {
@@ -1252,8 +1352,15 @@ var FeatureService = class {
 };
 var PlanService = class {
   projectRoot;
+  reviewService;
   constructor(projectRoot) {
     this.projectRoot = projectRoot;
+  }
+  getReviewService() {
+    if (!this.reviewService) {
+      this.reviewService = new ReviewService(this.projectRoot);
+    }
+    return this.reviewService;
   }
   write(featureName, content) {
     const planPath = getPlanPath(this.projectRoot, featureName);
@@ -1278,6 +1385,9 @@ var PlanService = class {
   approve(featureName) {
     if (!fileExists(getPlanPath(this.projectRoot, featureName))) {
       throw new Error(`No plan.md found for feature '${featureName}'`);
+    }
+    if (this.getReviewService().hasUnresolvedThreads(featureName)) {
+      throw new Error(`Cannot approve feature '${featureName}' with unresolved review comments`);
     }
     const approvedPath = getApprovedPath(this.projectRoot, featureName);
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
@@ -1308,25 +1418,21 @@ var PlanService = class {
     }
   }
   getComments(featureName) {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    const data = readJson(commentsPath);
-    return data?.threads || [];
+    return this.getReviewService().getThreads(featureName, "plan");
   }
   addComment(featureName, comment) {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    const data = readJson(commentsPath) || { threads: [] };
     const newComment = {
       ...comment,
-      id: `comment-${Date.now()}`,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      id: `comment-${Date.now()}`
     };
-    data.threads.push(newComment);
-    writeJson(commentsPath, data);
+    this.getReviewService().saveThreads(featureName, "plan", [
+      ...this.getComments(featureName),
+      newComment
+    ]);
     return newComment;
   }
   clearComments(featureName) {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    writeJson(commentsPath, { threads: [] });
+    this.getReviewService().clear(featureName, "plan");
   }
 };
 var TASK_STATUS_SCHEMA_VERSION = 1;
@@ -6334,6 +6440,7 @@ var WorktreeService = class {
     return conflicts2;
   }
 };
+var RESERVED_OVERVIEW_CONTEXT = "overview";
 var ContextService = class {
   projectRoot;
   constructor(projectRoot) {
@@ -6372,6 +6479,12 @@ var ContextService = class {
         updatedAt: stat2.mtime.toISOString()
       };
     });
+  }
+  getOverview(featureName) {
+    return this.list(featureName).find((file) => file.name === RESERVED_OVERVIEW_CONTEXT) ?? null;
+  }
+  listExecutionContext(featureName) {
+    return this.list(featureName).filter((file) => file.name !== RESERVED_OVERVIEW_CONTEXT);
   }
   delete(featureName, fileName) {
     const contextPath = getContextPath(this.projectRoot, featureName);
@@ -8328,7 +8441,7 @@ function getReviewTarget(workspaceRoot, filePath) {
   }
   return null;
 }
-function getReviewCommentsPath(workspaceRoot, featureName, document2) {
+function getReviewCommentsPath2(workspaceRoot, featureName, document2) {
   if (document2 === "plan") {
     const canonicalPath = path11.join(workspaceRoot, ".hive", "features", featureName, "comments", "plan.json");
     const legacyPath = path11.join(workspaceRoot, ".hive", "features", featureName, "comments.json");
@@ -8545,7 +8658,7 @@ var HiveExtension = class {
           vscode7.window.showErrorMessage("Not a reviewable plan.md or context/overview.md file");
           return;
         }
-        const commentsPath = getReviewCommentsPath(this.workspaceRoot, target.featureName, target.document);
+        const commentsPath = getReviewCommentsPath2(this.workspaceRoot, target.featureName, target.document);
         let comments2 = [];
         try {
           const commentsData = JSON.parse(fs12.readFileSync(commentsPath, "utf-8"));
