@@ -821,6 +821,103 @@ Do it
     expect(Array.isArray(result.availableFeatures)).toBe(true);
   });
 
+  it("reports overview metadata and review counts in hive_status", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_overview_status");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "overview-status-feature" },
+      toolContext
+    );
+
+    const plan = `# Overview Status Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test validates that hive_status exposes reserved overview metadata and document-aware review counts.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "overview-status-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "overview-status-feature",
+        name: "overview",
+        content: "# Overview\nHuman-facing summary",
+      },
+      toolContext
+    );
+
+    fs.mkdirSync(
+      path.join(testRoot, ".hive", "features", "overview-status-feature", "comments"),
+      { recursive: true }
+    );
+    fs.writeFileSync(
+      path.join(testRoot, ".hive", "features", "overview-status-feature", "comments", "plan.json"),
+      JSON.stringify({
+        threads: [{ id: "plan-thread", line: 1, body: "Plan review", replies: [] }],
+      }, null, 2)
+    );
+    fs.writeFileSync(
+      path.join(testRoot, ".hive", "features", "overview-status-feature", "comments", "overview.json"),
+      JSON.stringify({
+        threads: [{ id: "overview-thread", line: 2, body: "Overview review", replies: [] }],
+      }, null, 2)
+    );
+
+    const raw = await hooks.tool!.hive_status.execute(
+      { feature: "overview-status-feature" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      overview?: {
+        exists: boolean;
+        path: string;
+        updatedAt?: string;
+        primaryReview: boolean;
+      };
+      review?: {
+        unresolvedTotal: number;
+        byDocument: {
+          plan: number;
+          overview: number;
+        };
+      };
+    };
+
+    expect(result.overview).toMatchObject({
+      exists: true,
+      path: ".hive/features/overview-status-feature/context/overview.md",
+      primaryReview: true,
+    });
+    expect(typeof result.overview?.updatedAt).toBe("string");
+    expect(result.review).toEqual({
+      unresolvedTotal: 2,
+      byDocument: {
+        plan: 1,
+        overview: 1,
+      },
+    });
+  });
+
   it("returns explicit success and non-terminal contract fields on worktree start", async () => {
     const ctx: PluginInput = {
       directory: testRoot,

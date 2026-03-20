@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { FeatureService, TaskService, PlanService, ContextService, buildEffectiveDependencies, computeRunnableAndBlocked } from 'hive-core';
 import type { TaskWithDeps } from 'hive-core';
 import type { ToolRegistration } from './base';
@@ -36,6 +38,8 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
     const plan = planService.read(feature);
     const tasks = taskService.list(feature);
     const contextFiles = contextService.list(feature);
+    const overview = contextFiles.find(file => file.name === 'overview') ?? null;
+    const reviewCounts = readReviewCounts(workspaceRoot, feature);
 
     // Build task summaries with dependency info from raw status
     const tasksSummary = tasks.map(t => {
@@ -89,6 +93,19 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
         status: planStatus,
         approved: planStatus === 'approved' || planStatus === 'locked',
       },
+      overview: {
+        exists: !!overview,
+        path: `.hive/features/${feature}/context/overview.md`,
+        updatedAt: overview?.updatedAt ?? null,
+        primaryReview: true,
+      },
+      review: {
+        unresolvedTotal: reviewCounts.plan + reviewCounts.overview,
+        byDocument: {
+          overview: reviewCounts.overview,
+          plan: reviewCounts.plan,
+        },
+      },
       tasks: {
         total: tasks.length,
         pending: pendingTasks.length,
@@ -102,7 +119,7 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
         fileCount: contextFiles.length,
         files: contextSummary,
       },
-      nextAction: getNextAction(planStatus, tasksSummary, runnable),
+      nextAction: getNextAction(planStatus, tasksSummary, runnable, !!plan, !!overview),
     });
   };
 
@@ -134,7 +151,16 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
   ];
 }
 
-function getNextAction(planStatus: string | null, tasks: Array<{ status: string; folder: string }>, runnable: string[]): string {
+function getNextAction(
+  planStatus: string | null,
+  tasks: Array<{ status: string; folder: string }>,
+  runnable: string[],
+  hasPlan: boolean,
+  hasOverview: boolean,
+): string {
+  if (hasPlan && !hasOverview) {
+    return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content })';
+  }
   if (!planStatus || planStatus === 'draft') {
     return 'Write or revise plan with hive_plan_write, then get approval';
   }
@@ -160,4 +186,29 @@ function getNextAction(planStatus: string | null, tasks: Array<{ status: string;
     return `Pending tasks exist but are blocked by dependencies. Check blockedBy for details.`;
   }
   return 'All tasks complete. Review and merge or complete feature.';
+}
+
+function readReviewCounts(workspaceRoot: string, feature: string): { plan: number; overview: number } {
+  const featurePath = path.join(workspaceRoot, '.hive', 'features', feature);
+  const reviewDir = path.join(featurePath, 'comments');
+  const planThreads = readThreads(path.join(reviewDir, 'plan.json')) ?? readThreads(path.join(featurePath, 'comments.json'));
+  const overviewThreads = readThreads(path.join(reviewDir, 'overview.json'));
+
+  return {
+    plan: planThreads?.length ?? 0,
+    overview: overviewThreads?.length ?? 0,
+  };
+}
+
+function readThreads(filePath: string): Array<unknown> | null {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as { threads?: Array<unknown> };
+    return data.threads ?? [];
+  } catch {
+    return [];
+  }
 }

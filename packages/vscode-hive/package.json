@@ -857,7 +857,7 @@
       "editor/title": [
         {
           "command": "hive.plan.doneReview",
-          "when": "resourceFilename == plan.md",
+          "when": "resourceFilename =~ /^(plan|overview)\\.md$/",
           "group": "navigation"
         }
       ],
@@ -890,7 +890,8 @@
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --define:import.meta.url=__importMetaUrl --banner:js=\"const __importMetaUrl = require('url').pathToFileURL(__filename).href;\" && vsce package --no-dependencies -o vscode-hive.vsix",
     "watch": "npm run build -- --watch",
-    "build:types": "tsc --emitDeclarationOnly"
+    "build:types": "tsc --emitDeclarationOnly",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/vscode": "^1.100.0",

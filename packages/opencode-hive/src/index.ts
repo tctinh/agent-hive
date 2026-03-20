@@ -818,12 +818,22 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       if (activeFeature) {
         const info = featureService.getInfo(activeFeature);
         if (info) {
+          const featureInfo = info as typeof info & {
+            hasOverview?: boolean;
+            reviewCounts?: { plan: number; overview: number };
+          };
           let statusHint = `\n### Current Hive Status\n`;
           statusHint += `**Active Feature**: ${info.name} (${info.status})\n`;
           statusHint += `**Progress**: ${info.tasks.filter(t => t.status === 'done').length}/${info.tasks.length} tasks\n`;
 
+          if (featureInfo.hasOverview) {
+            statusHint += `**Overview**: available at .hive/features/${info.name}/context/overview.md (primary human-facing doc)\n`;
+          } else if (info.hasPlan) {
+            statusHint += `**Overview**: missing - write it with hive_context_write({ name: "overview", content })\n`;
+          }
+
           if (info.commentCount > 0) {
-            statusHint += `**Comments**: ${info.commentCount} unresolved - address with hive_plan_read\n`;
+            statusHint += `**Comments**: ${info.commentCount} unresolved (plan: ${featureInfo.reviewCounts?.plan ?? 0}, overview: ${featureInfo.reviewCounts?.overview ?? 0})\n`;
           }
 
           output.system.push(statusHint);
@@ -1401,6 +1411,27 @@ Expand your Discovery section and try again.`;
           const plan = planService.read(feature);
           const tasks = taskService.list(feature);
           const contextFiles = contextService.list(feature);
+          const overview = contextFiles.find(file => file.name === 'overview') ?? null;
+          const readThreads = (filePath: string): Array<unknown> | null => {
+            if (!fs.existsSync(filePath)) {
+              return null;
+            }
+
+            try {
+              const data = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as { threads?: Array<unknown> };
+              return data.threads ?? [];
+            } catch {
+              return [];
+            }
+          };
+          const featurePath = path.join(directory, '.hive', 'features', feature);
+          const reviewDir = path.join(featurePath, 'comments');
+          const planThreads = readThreads(path.join(reviewDir, 'plan.json')) ?? readThreads(path.join(featurePath, 'comments.json'));
+          const overviewThreads = readThreads(path.join(reviewDir, 'overview.json'));
+          const reviewCounts = {
+            plan: planThreads?.length ?? 0,
+            overview: overviewThreads?.length ?? 0,
+          };
 
           const tasksSummary = await Promise.all(tasks.map(async t => {
             const rawStatus = taskService.getRawStatus(feature, t.folder);
@@ -1444,7 +1475,16 @@ Expand your Discovery section and try again.`;
           }));
           const { runnable, blocked: blockedBy } = computeRunnableAndBlocked(normalizedTasks);
 
-          const getNextAction = (planStatus: string | null, tasks: Array<{ status: string; folder: string }>, runnableTasks: string[]): string => {
+          const getNextAction = (
+            planStatus: string | null,
+            tasks: Array<{ status: string; folder: string }>,
+            runnableTasks: string[],
+            hasPlan: boolean,
+            hasOverview: boolean,
+          ): string => {
+            if (hasPlan && !hasOverview) {
+              return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content })';
+            }
             if (!planStatus || planStatus === 'draft') {
               return 'Write or revise plan with hive_plan_write, then get approval';
             }
@@ -1487,6 +1527,19 @@ Expand your Discovery section and try again.`;
               status: planStatus,
               approved: planStatus === 'approved' || planStatus === 'locked',
             },
+            overview: {
+              exists: !!overview,
+              path: `.hive/features/${feature}/context/overview.md`,
+              updatedAt: overview?.updatedAt ?? null,
+              primaryReview: true,
+            },
+            review: {
+              unresolvedTotal: reviewCounts.plan + reviewCounts.overview,
+              byDocument: {
+                overview: reviewCounts.overview,
+                plan: reviewCounts.plan,
+              },
+            },
             tasks: {
               total: tasks.length,
               pending: pendingTasks.length,
@@ -1500,7 +1553,7 @@ Expand your Discovery section and try again.`;
               fileCount: contextFiles.length,
               files: contextSummary,
             },
-            nextAction: getNextAction(planStatus, tasksSummary, runnable),
+            nextAction: getNextAction(planStatus, tasksSummary, runnable, !!plan, !!overview),
           });
         },
       }),
