@@ -996,7 +996,7 @@ Expand your Discovery section and try again.`;
 
           captureSession(feature, toolContext);
           const planPath = planService.write(feature, content);
-          return `Plan written to ${planPath}. Comments cleared for fresh review.`;
+          return `Plan written to ${planPath}. Comments cleared for fresh review. Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History. Review context/overview.md first; plan.md remains execution truth.`;
         },
       }),
 
@@ -1029,7 +1029,7 @@ Expand your Discovery section and try again.`;
             return `Error: Cannot approve - ${comments.length} unresolved comment(s). Address them first.`;
           }
           planService.approve(feature);
-          return "Plan approved. Run hive_tasks_sync to generate tasks.";
+          return 'Plan approved. Run hive_tasks_sync to generate tasks. Refresh the overview if approval changed the plan narrative, workstreams, or milestones; context/overview.md is the primary human-facing surface and plan.md remains execution truth.';
         },
       }),
 
@@ -1483,10 +1483,13 @@ Expand your Discovery section and try again.`;
             hasOverview: boolean,
           ): string => {
             if (hasPlan && !hasOverview) {
-              return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content })';
+              return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content }). Use ## At a Glance, ## Workstreams, and ## Revision History.';
             }
             if (!planStatus || planStatus === 'draft') {
-              return 'Write or revise plan with hive_plan_write, then get approval';
+              return 'Write or revise plan with hive_plan_write, then refresh overview after significant plan changes with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History.';
+            }
+            if (hasPlan && hasOverview && (planStatus === 'approved' || planStatus === 'locked')) {
+              return 'Refresh overview after significant plan changes or milestone updates with hive_context_write({ name: "overview", content }). Keep ## At a Glance, ## Workstreams, and ## Revision History current.';
             }
             if (planStatus === 'review') {
               return 'Wait for plan approval or revise based on comments';

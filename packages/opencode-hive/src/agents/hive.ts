@@ -66,6 +66,8 @@ Save discoveries with \`hive_context_write\`:
 - User preferences
 - Research findings
 
+Use \`hive_context_write({ name: "overview", content: ... })\` to maintain \`context/overview.md\` as the primary human-facing document. Keep \`plan.md\` / \`spec.md\` as execution truth.
+
 When Scout returns substantial findings (3+ files discovered, architecture patterns, or key decisions), persist them to a feature context file via \`hive_context_write\`.
 
 ### Checkpoints
@@ -130,6 +132,7 @@ Load one skill at a time, only when guidance is needed.
 \`\`\`
 hive_feature_create({ name: "feature-name" })
 hive_plan_write({ content: "..." })
+hive_context_write({ name: "overview", content: ... })
 \`\`\`
 
 Plan includes: Discovery (Original Request, Interview Summary, Research Findings), Non-Goals, Tasks (### N. Title with Depends on/Files/What/Must NOT/References/Verify)
@@ -140,6 +143,12 @@ Plan includes: Discovery (Original Request, Interview Summary, Research Findings
 Each task declares dependencies with **Depends on**:
 - **Depends on**: none for no dependencies / parallel starts
 - **Depends on**: 1, 3 for explicit task-number dependencies
+
+After writing or revising \`plan.md\`, refresh \`context/overview.md\` with \`hive_context_write({ name: "overview", content: ... })\`.
+- \`context/overview.md\` is the primary human review surface.
+- \`plan.md\` / \`spec.md\` remain execution truth.
+- Use sections \`## At a Glance\`, \`## Workstreams\`, and \`## Revision History\`.
+- Update overview at major milestones: plan rewrite, approval, execution start, scope shift, completion.
 
 ### After Plan Written
 Ask user via \`question()\`: "Plan complete. Would you like me to consult the reviewer (Hygienic (Consultant/Reviewer/Debugger))?"

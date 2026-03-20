@@ -918,6 +918,71 @@ Do it
     });
   });
 
+  it("guides planners to refresh overview and uses overview-aware plan messaging", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_overview_guidance");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "overview-guidance-feature" },
+      toolContext
+    );
+
+    const plan = `# Overview Guidance Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test validates that plan messaging and hive_status guidance explicitly direct planners to maintain the reserved overview via hive_context_write.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    const planOutput = await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "overview-guidance-feature" },
+      toolContext
+    );
+    expect(planOutput).toContain('Refresh the primary human-facing overview');
+    expect(planOutput).toContain('hive_context_write({ name: "overview", content })');
+
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "overview-guidance-feature",
+        name: "overview",
+        content: '# Overview\n',
+      },
+      toolContext
+    );
+
+    const approveOutput = await hooks.tool!.hive_plan_approve.execute(
+      { feature: "overview-guidance-feature" },
+      toolContext
+    );
+    expect(approveOutput).toContain('Refresh the overview if approval changed the plan narrative');
+
+    const statusRaw = await hooks.tool!.hive_status.execute(
+      { feature: "overview-guidance-feature" },
+      toolContext
+    );
+    const status = JSON.parse(statusRaw as string) as { nextAction?: string };
+    expect(status.nextAction).toContain('Refresh overview');
+    expect(status.nextAction).toContain('significant plan changes');
+    expect(status.nextAction).toContain('At a Glance');
+    expect(status.nextAction).toContain('Workstreams');
+    expect(status.nextAction).toContain('Revision History');
+  });
+
   it("returns explicit success and non-terminal contract fields on worktree start", async () => {
     const ctx: PluginInput = {
       directory: testRoot,

@@ -13,9 +13,11 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** Planning is read-only. Use `hive_feature_create` + `hive_plan_write` and avoid worktrees during planning.
+**Context:** Planning is read-only. Use `hive_feature_create` + `hive_plan_write` + `hive_context_write` and avoid worktrees during planning.
 
 **Save plans to:** `hive_plan_write` (writes to `.hive/features/<feature>/plan.md`)
+
+**Maintain overview with:** `hive_context_write({ name: "overview", content: ... })` (writes `.hive/features/<feature>/context/overview.md` as the primary human-facing summary/history file)
 
 ## Bite-Sized Task Granularity
 
@@ -126,12 +128,18 @@ All verification MUST be agent-executable (no human intervention):
 - Reference relevant skills with @ syntax
 - DRY, YAGNI, TDD, frequent commits
 - All acceptance criteria must be agent-executable (zero human intervention)
+- After writing or revising `plan.md`, also refresh `context/overview.md` with `hive_context_write({ name: "overview", content: ... })`
+- Use fixed overview sections: `## At a Glance`, `## Workstreams`, `## Revision History`
+- Treat `context/overview.md` as the primary human review surface
+- Treat `plan.md` / `spec.md` as execution truth
+- Update overview at major milestones: plan rewrite, approval, execution start, scope shift, completion
 
 ## Execution Handoff
 
-After saving the plan, ask whether to consult Hygienic (Consultant/Reviewer/Debugger) before offering execution choice.
+After saving the plan, refresh `context/overview.md` with the latest human-facing summary/history, then ask whether to consult Hygienic (Consultant/Reviewer/Debugger) before offering execution choice.
 
 Plan complete and saved to `.hive/features/<feature>/plan.md`.
+Overview refreshed at `.hive/features/<feature>/context/overview.md`.
 
 Two execution options:
 1. Subagent-Driven (this session) - I dispatch fresh subagent per task, review between tasks, fast iteration

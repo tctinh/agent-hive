@@ -82,6 +82,26 @@ describe('getStatusTools', () => {
     expect(status.nextAction).toContain('hive_context_write');
     expect(status.nextAction).toContain('overview');
   });
+
+  it('tells planners to refresh overview after significant plan changes', async () => {
+    const featureName = 'refresh-overview-feature';
+    const featureService = new FeatureService(testRoot);
+    const planService = new PlanService(testRoot);
+    const contextService = new ContextService(testRoot);
+
+    featureService.create(featureName);
+    planService.write(featureName, '# Plan\n');
+    contextService.write(featureName, 'overview', '# Overview\n');
+
+    const status = await invokeStatus(testRoot, { feature: featureName });
+
+    expect(status.nextAction).toContain('Refresh overview');
+    expect(status.nextAction).toContain('significant plan changes');
+    expect(status.nextAction).toContain('hive_context_write');
+    expect(status.nextAction).toContain('At a Glance');
+    expect(status.nextAction).toContain('Workstreams');
+    expect(status.nextAction).toContain('Revision History');
+  });
 });
 
 async function invokeStatus(workspaceRoot: string, input: { feature: string }): Promise<any> {

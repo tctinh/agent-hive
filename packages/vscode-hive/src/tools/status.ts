@@ -159,10 +159,13 @@ function getNextAction(
   hasOverview: boolean,
 ): string {
   if (hasPlan && !hasOverview) {
-    return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content })';
+    return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content }). Use sections ## At a Glance, ## Workstreams, and ## Revision History.';
   }
   if (!planStatus || planStatus === 'draft') {
-    return 'Write or revise plan with hive_plan_write, then get approval';
+    return 'Write or revise plan with hive_plan_write, then Refresh overview after significant plan changes with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History.';
+  }
+  if (hasPlan && hasOverview && (planStatus === 'approved' || planStatus === 'locked')) {
+    return 'Refresh overview after significant plan changes or milestone updates with hive_context_write({ name: "overview", content }). Keep ## At a Glance, ## Workstreams, and ## Revision History current.';
   }
   if (planStatus === 'review') {
     return 'Wait for plan approval or revise based on comments';

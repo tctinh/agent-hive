@@ -7271,7 +7271,7 @@ function getPlanTools(workspaceRoot) {
     {
       name: "hive_plan_write",
       displayName: "Write Hive Plan",
-      modelDescription: "Write or update the plan.md for a feature. The plan defines tasks to execute. Use markdown with ### numbered headers for tasks. Clears existing comments when plan is rewritten.",
+      modelDescription: 'Write or update the plan.md for a feature. The plan defines execution truth and tasks to execute. After significant plan changes, also refresh context/overview.md via hive_context_write({ name: "overview", content }) as the primary human-facing review surface. Use markdown with ### numbered headers for tasks. Clears existing comments when plan is rewritten.',
       inputSchema: {
         type: "object",
         properties: {
@@ -7292,16 +7292,20 @@ function getPlanTools(workspaceRoot) {
         let contextWarning = "";
         try {
           const contexts = contextService.list(feature);
+          const hasOverview = contexts.some((context) => context.name === "overview");
+          if (!hasOverview) {
+            contextWarning += '\n\nNext: Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }). Use sections ## At a Glance, ## Workstreams, and ## Revision History.';
+          }
           if (contexts.length === 0) {
-            contextWarning = "\n\n\u26A0\uFE0F WARNING: No context files created yet! Workers need context to execute well. Use hive_context_write to document:\n- Research findings and patterns\n- User preferences and decisions\n- Architecture constraints\n- References to existing code";
+            contextWarning += "\n\n\u26A0\uFE0F WARNING: No context files created yet! Workers need context to execute well. Use hive_context_write to document:\n- Research findings and patterns\n- User preferences and decisions\n- Architecture constraints\n- References to existing code";
           }
         } catch {
-          contextWarning = "\n\n\u26A0\uFE0F WARNING: Could not check context files. Consider using hive_context_write to document findings for workers.";
+          contextWarning = '\n\n\u26A0\uFE0F WARNING: Could not check context files. Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }) and document findings for workers in context files.';
         }
         return JSON.stringify({
           success: true,
           path: planPath,
-          message: `Plan written. User can review and add comments. When ready, use hive_plan_approve.${contextWarning}`
+          message: `Plan written. User can review context/overview.md as the primary human-facing surface and plan.md as execution truth. When ready, use hive_plan_approve.${contextWarning}`
         });
       }
     },
@@ -7337,7 +7341,7 @@ function getPlanTools(workspaceRoot) {
     {
       name: "hive_plan_approve",
       displayName: "Approve Hive Plan",
-      modelDescription: "Approve a plan for execution. Use after user has reviewed the plan and resolved any comments. Changes feature status to approved.",
+      modelDescription: "Approve a plan for execution. Use after user has reviewed the overview as the primary human-facing surface, checked plan.md as execution truth, and resolved any comments. Changes feature status to approved.",
       inputSchema: {
         type: "object",
         properties: {
@@ -7353,15 +7357,21 @@ function getPlanTools(workspaceRoot) {
         let contextWarning = "";
         try {
           const contexts = contextService.list(feature);
+          const hasOverview = contexts.some((context) => context.name === "overview");
+          if (!hasOverview) {
+            contextWarning += '\n\n\u26A0\uFE0F Note: No overview found. Create or refresh it with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History.';
+          }
           if (contexts.length === 0) {
-            contextWarning = "\n\n\u26A0\uFE0F Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.";
+            contextWarning += "\n\n\u26A0\uFE0F Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.";
+          } else if (hasOverview) {
+            contextWarning += "\n\nRefresh the overview if approval changed the plan narrative, milestones, or workstreams.";
           }
         } catch {
         }
         planService.approve(feature);
         return JSON.stringify({
           success: true,
-          message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan.${contextWarning}`
+          message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan, and keep context/overview.md current as the primary human-facing summary.${contextWarning}`
         });
       }
     }
@@ -7830,12 +7840,12 @@ function getContextTools(workspaceRoot) {
     {
       name: "hive_context_write",
       displayName: "Write Context File",
-      modelDescription: "Write a context file to store research findings, decisions, or reference material. Context persists and helps workers understand background.",
+      modelDescription: 'Write a context file to store research findings, decisions, or reference material. Use name: "overview" for the canonical human-facing summary/history file at context/overview.md; refresh it after major planning or execution milestones while plan.md remains execution truth.',
       inputSchema: {
         type: "object",
         properties: {
           feature: { type: "string", description: "Feature name" },
-          name: { type: "string", description: "Context file name (without .md)" },
+          name: { type: "string", description: 'Context file name (without .md). Use "overview" for the primary human-facing summary/history file.' },
           content: { type: "string", description: "Context content in markdown" }
         },
         required: ["feature", "name", "content"]
@@ -7843,7 +7853,11 @@ function getContextTools(workspaceRoot) {
       invoke: async (input) => {
         const { feature, name, content } = input;
         const path12 = contextService.write(feature, name, content);
-        return JSON.stringify({ success: true, path: path12 });
+        return JSON.stringify({
+          success: true,
+          path: path12,
+          message: name === "overview" ? "Overview written as the primary human-facing summary/history file. Keep sections ## At a Glance, ## Workstreams, and ## Revision History current." : "Context file written."
+        });
       }
     }
   ];
@@ -7984,10 +7998,13 @@ function getStatusTools(workspaceRoot) {
 }
 function getNextAction(planStatus, tasks, runnable, hasPlan, hasOverview) {
   if (hasPlan && !hasOverview) {
-    return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content })';
+    return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content }). Use sections ## At a Glance, ## Workstreams, and ## Revision History.';
   }
   if (!planStatus || planStatus === "draft") {
-    return "Write or revise plan with hive_plan_write, then get approval";
+    return 'Write or revise plan with hive_plan_write, then Refresh overview after significant plan changes with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History.';
+  }
+  if (hasPlan && hasOverview && (planStatus === "approved" || planStatus === "locked")) {
+    return 'Refresh overview after significant plan changes or milestone updates with hive_context_write({ name: "overview", content }). Keep ## At a Glance, ## Workstreams, and ## Revision History current.';
   }
   if (planStatus === "review") {
     return "Wait for plan approval or revise based on comments";

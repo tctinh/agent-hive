@@ -87,6 +87,7 @@ hive_context_write({ name: "draft", content: "# Draft\\n## Requirements\\n## Dec
 \`\`\`
 hive_feature_create({ name: "feature-name" })
 hive_plan_write({ content: "..." })
+hive_context_write({ name: "overview", content: ... })
 \`\`\`
 
 Plan MUST include:
@@ -100,6 +101,12 @@ Plan MUST include:
 Each task MUST declare dependencies with **Depends on**:
 - **Depends on**: none for no dependencies / parallel starts
 - **Depends on**: 1, 3 for explicit task-number dependencies
+
+After writing or revising \`plan.md\`, also refresh \`context/overview.md\` via \`hive_context_write({ name: "overview", content: ... })\`.
+- \`context/overview.md\` is the primary human review surface.
+- \`plan.md\` remains the execution truth.
+- Use a fixed structure: \`## At a Glance\`, \`## Workstreams\`, \`## Revision History\`.
+- Update the overview at major milestones: plan rewrite, approval handoff, scope shift, execution start, completion.
 
 ## Iron Laws
 
