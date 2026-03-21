@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-03-21
+
+### Added
+- **Reserved Human-Facing Overview**: Features can now maintain `.hive/features/<feature>/context/overview.md` as the primary human-readable summary/history file while continuing to use existing context tooling for writes and updates
+- **Document-Aware Review Tracking**: Plan and overview reviews now store unresolved threads separately so status, approvals, and UI review flows can distinguish `plan` feedback from `overview` feedback
+- **Overview-First Status and VS Code Surfacing**: Hive status output and the VS Code extension now surface overview metadata, open overview first for humans when present, and keep the reserved overview out of generic context duplication
+- **Reserved-Overview Regression Coverage**: Added focused service, prompt, status, approval, and plugin smoke tests covering overview exclusion from worker execution context and document-aware approval behavior
+
+### Changed
+- **Planner and Orchestrator Guidance**: Plan-writing prompts, tool messaging, and planning skills now instruct agents to refresh `context/overview.md` as the primary human-facing review artifact after meaningful plan changes while keeping `plan.md`/`spec.md` as execution truth
+- **Approval Gate Semantics**: Plan approval now reports and blocks on unresolved comments in either `plan` or `overview`, including overview-first review flows in the VS Code extension and OpenCode plugin
+- **Release Verification Stability**: Stabilized the `writeAtomic()` regression coverage so full release verification no longer depends on environment-specific readonly-directory behavior
+- **Version Bump**: Bumped root and package versions to `1.4.0` (`agent-hive`, `hive-core`, `opencode-hive`, `vscode-hive`)
+
+### Fixed
+- **Worker Execution Context Purity**: Reserved `context/overview.md` is no longer injected into worker prompt/spec payloads, preserving `plan.md` as the execution contract
+- **Review Approval Feedback**: Approval flows now return document-aware unresolved-comment counts instead of overlooking overview comments or failing with less actionable messaging
+- **Release Lockfile Drift**: Updated tracked workspace/root versions in `package-lock.json` to match the current release line
+
 ## [1.3.1] - 2026-03-17
 
 ### Added
