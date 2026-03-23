@@ -303,12 +303,19 @@ export function getExecTools(workspaceRoot: string): ToolRegistration[] {
           feature: { type: 'string', description: 'Feature name' },
           task: { type: 'string', description: 'Task folder name' },
           summary: { type: 'string', description: 'Summary of what was done' },
+          message: { type: 'string', description: 'Optional git commit message; subject/body allowed. Empty uses default.' },
         },
         required: ['feature', 'task', 'summary'],
       },
       invoke: async (input) => {
-        const { feature, task, summary } = input as { feature: string; task: string; summary: string };
-        const result = await worktreeService.commitChanges(feature, task, summary);
+        const { feature, task, summary, message } = input as {
+          feature: string;
+          task: string;
+          summary: string;
+          message?: string;
+        };
+        const commitMessage = message || summary;
+        const result = await worktreeService.commitChanges(feature, task, commitMessage);
         
         // Mark task as done and create report if commit succeeded
         if (result.committed) {

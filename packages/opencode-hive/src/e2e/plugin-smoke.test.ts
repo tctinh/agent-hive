@@ -8,6 +8,7 @@ import plugin from "../index";
 import { BUILTIN_SKILLS } from "../skills/registry.generated.js";
 
 const OPENCODE_CLIENT = createOpencodeClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
+type PluginHooks = Awaited<ReturnType<typeof plugin>>;
 
 type ToolContext = {
   sessionID: string;
@@ -36,6 +37,7 @@ const EXPECTED_TOOLS = [
 ] as const;
 
 const TEST_ROOT_BASE = "/tmp/hive-e2e-plugin";
+const FIRST_TASK = "01-first-task";
 
 function createStubShell(): PluginInput["$"] {
   let shell: PluginInput["$"];
@@ -83,6 +85,79 @@ function createProject(worktree: string): PluginInput["project"] {
     worktree,
     time: { created: Date.now() },
   };
+}
+
+function readHeadBody(targetPath: string): string {
+  return execSync("git log -1 --format=%B", {
+    cwd: targetPath,
+    encoding: "utf-8",
+  }).trimEnd();
+}
+
+function createSingleTaskPlan(title: string, answer: string): string {
+  return `# ${title}
+
+## Discovery
+
+**Q: Is this a test?**
+A: ${answer}
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+}
+
+async function createHooksForTest(testRoot: string, sessionID: string): Promise<{
+  hooks: PluginHooks;
+  toolContext: ToolContext;
+}> {
+  const ctx: PluginInput = {
+    directory: testRoot,
+    worktree: testRoot,
+    serverUrl: new URL("http://localhost:1"),
+    project: createProject(testRoot),
+    client: OPENCODE_CLIENT,
+    $: createStubShell(),
+  };
+
+  return {
+    hooks: await plugin(ctx),
+    toolContext: createToolContext(sessionID),
+  };
+}
+
+async function createSingleTaskWorktree(
+  testRoot: string,
+  sessionID: string,
+  feature: string,
+  title: string,
+  answer: string,
+): Promise<{
+  hooks: PluginHooks;
+  toolContext: ToolContext;
+  worktreePath: string;
+}> {
+  const { hooks, toolContext } = await createHooksForTest(testRoot, sessionID);
+
+  await hooks.tool!.hive_feature_create.execute({ name: feature }, toolContext);
+  await hooks.tool!.hive_plan_write.execute(
+    { content: createSingleTaskPlan(title, answer), feature },
+    toolContext,
+  );
+  await hooks.tool!.hive_plan_approve.execute({ feature }, toolContext);
+  await hooks.tool!.hive_tasks_sync.execute({ feature }, toolContext);
+
+  const worktreeRaw = await hooks.tool!.hive_worktree_start.execute(
+    { feature, task: FIRST_TASK },
+    toolContext,
+  );
+  const { worktreePath } = JSON.parse(worktreeRaw as string) as {
+    worktreePath: string;
+  };
+
+  return { hooks, toolContext, worktreePath };
 }
 
 describe("e2e: opencode-hive plugin (in-process)", () => {
@@ -1564,6 +1639,171 @@ Do it
     expect(commitResult.taskState).toBe("done");
     expect(commitResult.commit?.sha).toBeDefined();
     expect(commitResult.nextAction).toContain("hive_merge");
+  });
+
+  it("uses custom commit message in task worktree head", async () => {
+    const feature = "commit-custom-message-feature";
+    const { hooks, toolContext, worktreePath } = await createSingleTaskWorktree(
+      testRoot,
+      "sess_commit_custom_message",
+      feature,
+      "Commit Custom Message Feature",
+      "Yes, this test validates custom commit message passthrough from the OpenCode tool layer.",
+    );
+
+    fs.writeFileSync(path.join(worktreePath, "task-note.txt"), "commit custom message test\n");
+
+    const customMessage = "feat(plugin): custom commit subject\n\ncustom body";
+    const commitRaw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        feature,
+        task: FIRST_TASK,
+        status: "completed",
+        summary: "Added task note. Tests pass (bun test).",
+        message: customMessage,
+      },
+      toolContext
+    );
+
+    const commitResult = JSON.parse(commitRaw as string) as {
+      ok: boolean;
+      terminal: boolean;
+      status: string;
+      commit?: { message?: string };
+    };
+
+    expect(commitResult.ok).toBe(true);
+    expect(commitResult.terminal).toBe(true);
+    expect(commitResult.status).toBe("completed");
+    expect(commitResult.commit?.message).toBe(customMessage);
+    expect(readHeadBody(worktreePath)).toBe(customMessage);
+  });
+
+  it("falls back when hive_worktree_commit message is empty string", async () => {
+    const feature = "commit-empty-message-feature";
+    const { hooks, toolContext, worktreePath } = await createSingleTaskWorktree(
+      testRoot,
+      "sess_commit_empty_message",
+      feature,
+      "Commit Empty Message Feature",
+      "Yes, this test validates empty-string message fallback in hive_worktree_commit.",
+    );
+
+    fs.writeFileSync(path.join(worktreePath, "task-note.txt"), "empty message fallback\n");
+
+    const summary = "Added fallback check for empty message. Tests pass (bun test).";
+    const expectedMessage = `hive(${FIRST_TASK}): ${summary.slice(0, 50)}`;
+
+    const commitRaw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        feature,
+        task: FIRST_TASK,
+        status: "completed",
+        summary,
+        message: "",
+      },
+      toolContext
+    );
+
+    const commitResult = JSON.parse(commitRaw as string) as {
+      ok: boolean;
+      terminal: boolean;
+      status: string;
+      commit?: { message?: string };
+    };
+
+    expect(commitResult.ok).toBe(true);
+    expect(commitResult.terminal).toBe(true);
+    expect(commitResult.status).toBe("completed");
+    expect(commitResult.commit?.message).toBe(expectedMessage);
+    expect(readHeadBody(worktreePath)).toBe(expectedMessage);
+  });
+
+  it("passes custom merge message through for merge strategy", async () => {
+    const feature = "merge-custom-message-feature";
+    const { hooks, toolContext, worktreePath } = await createSingleTaskWorktree(
+      testRoot,
+      "sess_merge_custom_message",
+      feature,
+      "Merge Custom Message Feature",
+      "Yes, this test validates custom merge commit message passthrough for the merge strategy.",
+    );
+
+    fs.writeFileSync(path.join(worktreePath, "task-note.txt"), "merge custom message\n");
+
+    const commitRaw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        feature,
+        task: FIRST_TASK,
+        status: "completed",
+        summary: "Prepared merge message test. Tests pass (bun test).",
+      },
+      toolContext
+    );
+    const commitResult = JSON.parse(commitRaw as string) as {
+      ok: boolean;
+      taskState?: string;
+    };
+
+    expect(commitResult.ok).toBe(true);
+    expect(commitResult.taskState).toBe("done");
+
+    const customMessage = "feat(plugin): merge subject\n\nmerge body";
+    const mergeRaw = await hooks.tool!.hive_merge.execute(
+      {
+        feature,
+        task: FIRST_TASK,
+        strategy: "merge",
+        message: customMessage,
+      },
+      toolContext
+    );
+
+    expect(mergeRaw).toContain("merged successfully using merge strategy");
+    expect(readHeadBody(testRoot)).toBe(customMessage);
+  });
+
+  it("rejects custom merge message for rebase strategy", async () => {
+    const feature = "rebase-message-rejection-feature";
+    const { hooks, toolContext, worktreePath } = await createSingleTaskWorktree(
+      testRoot,
+      "sess_rebase_message_rejection",
+      feature,
+      "Rebase Message Rejection Feature",
+      "Yes, this test validates rejection when custom message is used with rebase strategy.",
+    );
+
+    fs.writeFileSync(path.join(worktreePath, "task-note.txt"), "rebase custom message rejection\n");
+
+    const commitRaw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        feature,
+        task: FIRST_TASK,
+        status: "completed",
+        summary: "Prepared rebase rejection test. Tests pass (bun test).",
+      },
+      toolContext
+    );
+    const commitResult = JSON.parse(commitRaw as string) as {
+      ok: boolean;
+      taskState?: string;
+    };
+
+    expect(commitResult.ok).toBe(true);
+    expect(commitResult.taskState).toBe("done");
+
+    const mergeRaw = await hooks.tool!.hive_merge.execute(
+      {
+        feature,
+        task: FIRST_TASK,
+        strategy: "rebase",
+        message: "feat: custom\n\nbody",
+      },
+      toolContext
+    );
+
+    expect(mergeRaw).toContain("Merge failed:");
+    expect(mergeRaw).toContain("Custom merge message is not supported for rebase strategy");
   });
 
   it("auto-loads parallel exploration for planner agents by default", async () => {

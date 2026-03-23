@@ -1123,6 +1123,7 @@ Expand your Discovery section and try again.`;
         args: {
           task: tool.schema.string().describe('Task folder name'),
           summary: tool.schema.string().describe('Summary of what was done'),
+          message: tool.schema.string().optional().describe('Optional git commit message. Empty uses default.'),
           status: tool.schema.enum(['completed', 'blocked', 'failed', 'partial']).optional().default('completed').describe('Task completion status'),
           blocker: tool.schema.object({
             reason: tool.schema.string().describe('Why the task is blocked'),
@@ -1132,7 +1133,7 @@ Expand your Discovery section and try again.`;
           }).optional().describe('Blocker info when status is blocked'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
-        async execute({ task, summary, status = 'completed', blocker, feature: explicitFeature }) {
+        async execute({ task, summary, message, status = 'completed', blocker, feature: explicitFeature }) {
           const respond = (payload: Record<string, unknown>) => JSON.stringify(payload, null, 2);
           const feature = resolveFeature(explicitFeature);
           if (!feature) {
@@ -1215,7 +1216,8 @@ Expand your Discovery section and try again.`;
           }
 
           // For failed/partial, still commit what we have
-          const commitResult = await worktreeService.commitChanges(feature, task, `hive(${task}): ${summary.slice(0, 50)}`);
+          const commitMessage = message || `hive(${task}): ${summary.slice(0, 50)}`;
+          const commitResult = await worktreeService.commitChanges(feature, task, commitMessage);
 
           if (status === 'completed' && !commitResult.committed && commitResult.message !== 'No changes to commit') {
             return respond({
@@ -1331,9 +1333,10 @@ Expand your Discovery section and try again.`;
         args: {
           task: tool.schema.string().describe('Task folder name to merge'),
           strategy: tool.schema.enum(['merge', 'squash', 'rebase']).optional().describe('Merge strategy (default: merge)'),
+          message: tool.schema.string().optional().describe('Optional merge message for merge/squash. Empty uses default.'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
         },
-        async execute({ task, strategy = 'merge', feature: explicitFeature }) {
+        async execute({ task, strategy = 'merge', message, feature: explicitFeature }) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
@@ -1341,7 +1344,7 @@ Expand your Discovery section and try again.`;
           if (!taskInfo) return `Error: Task "${task}" not found`;
           if (taskInfo.status !== 'done') return "Error: Task must be completed before merging. Use hive_worktree_commit first.";
 
-          const result = await worktreeService.merge(feature, task, strategy);
+          const result = await worktreeService.merge(feature, task, strategy, message);
 
           if (!result.success) {
             if (result.conflicts && result.conflicts.length > 0) {
