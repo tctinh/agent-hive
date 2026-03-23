@@ -87,12 +87,12 @@ hive_context_write({ name: "draft", content: "# Draft\\n## Requirements\\n## Dec
 \`\`\`
 hive_feature_create({ name: "feature-name" })
 hive_plan_write({ content: "..." })
-hive_context_write({ name: "overview", content: ... })
 \`\`\`
 
 Plan MUST include:
 - ## Discovery (Original Request, Interview Summary, Research)
 - ## Non-Goals (Explicit exclusions)
+- ## Design Summary (human-facing summary before \`## Tasks\`; optional Mermaid for dependency or sequence overview only)
 - ## Tasks (### N. Title with Depends on/Files/What/Must NOT/References/Verify)
   - Files must list Create/Modify/Test with exact paths and line ranges where applicable
   - References must use file:line format
@@ -102,11 +102,11 @@ Each task MUST declare dependencies with **Depends on**:
 - **Depends on**: none for no dependencies / parallel starts
 - **Depends on**: 1, 3 for explicit task-number dependencies
 
-After writing or revising \`plan.md\`, also refresh \`context/overview.md\` via \`hive_context_write({ name: "overview", content: ... })\`.
-- \`context/overview.md\` is the primary human review surface.
-- \`plan.md\` remains the execution truth.
-- Use a fixed structure: \`## At a Glance\`, \`## Workstreams\`, \`## Revision History\`.
-- Update the overview at major milestones: plan rewrite, approval handoff, scope shift, execution start, completion.
+\`plan.md\` is the primary human-facing summary and the execution truth.
+- Keep the human-facing summary in \`plan.md\` before \`## Tasks\`.
+- Optional Mermaid is allowed only in the pre-task summary.
+- Mermaid is for dependency or sequence overview only and is never required.
+- Use context files only for durable notes that help future workers.
 
 ## Iron Laws
 

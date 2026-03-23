@@ -17,7 +17,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Save plans to:** `hive_plan_write` (writes to `.hive/features/<feature>/plan.md`)
 
-**Maintain overview with:** `hive_context_write({ name: "overview", content: ... })` (writes `.hive/features/<feature>/context/overview.md` as the primary human-facing summary/history file)
+**Maintain context with:** `hive_context_write({ name: "learnings", content: ... })` or another focused context name when durable notes would help future workers
 
 ## Bite-Sized Task Granularity
 
@@ -50,6 +50,12 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 ## Non-Goals (What we're NOT building)
 - {Explicit exclusion}
+
+---
+
+## Design Summary
+
+{Concise human-facing summary of the feature before task details. Optional Mermaid is allowed here for dependency or sequence overview only.}
 
 ---
 
@@ -128,18 +134,18 @@ All verification MUST be agent-executable (no human intervention):
 - Reference relevant skills with @ syntax
 - DRY, YAGNI, TDD, frequent commits
 - All acceptance criteria must be agent-executable (zero human intervention)
-- After writing or revising `plan.md`, also refresh `context/overview.md` with `hive_context_write({ name: "overview", content: ... })`
-- Use fixed overview sections: `## At a Glance`, `## Workstreams`, `## Revision History`
-- Treat `context/overview.md` as the primary human review surface
-- Treat `plan.md` / `spec.md` as execution truth
-- Update overview at major milestones: plan rewrite, approval, execution start, scope shift, completion
+- Treat `plan.md` as the human-facing review surface and execution truth
+- Every plan needs a concise human-facing summary before `## Tasks`
+- Optional Mermaid is allowed only in that pre-task summary section
+- Mermaid is for dependency or sequence overview only and is never required
+- Keep Discovery, Non-Goals, diagrams, and tasks in the same `plan.md` file
+- Use context files only for durable notes that help future workers
 
 ## Execution Handoff
 
-After saving the plan, refresh `context/overview.md` with the latest human-facing summary/history, then ask whether to consult Hygienic (Consultant/Reviewer/Debugger) before offering execution choice.
+After saving the plan, ask whether to consult Hygienic (Consultant/Reviewer/Debugger) before offering execution choice.
 
 Plan complete and saved to `.hive/features/<feature>/plan.md`.
-Overview refreshed at `.hive/features/<feature>/context/overview.md`.
 
 Two execution options:
 1. Subagent-Driven (this session) - I dispatch fresh subagent per task, review between tasks, fast iteration

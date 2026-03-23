@@ -80,7 +80,7 @@
       {
         "name": "hive_plan_write",
         "displayName": "Write Hive Plan",
-        "modelDescription": "Write or update the plan.md for a feature. The plan defines execution truth and tasks to execute. After significant plan changes, also refresh context/overview.md via hive_context_write({ name: \"overview\", content }) as the primary human-facing review surface. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.",
+        "modelDescription": "Write or update the plan.md for a feature. plan.md is the human-facing review surface and execution truth. Include a concise summary before ## Tasks, and optionally include a Mermaid dependency or sequence overview in that pre-task summary only. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.",
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "hivePlanWrite",
         "inputSchema": {
@@ -104,7 +104,7 @@
       {
         "name": "hive_plan_read",
         "displayName": "Read Hive Plan",
-        "modelDescription": "Read the plan.md and related review comments for a feature. Use to check plan content, status, and user feedback before making changes.",
+        "modelDescription": "Read the plan.md and related review comments for a feature. Use to check the in-plan human-facing summary, task structure, status, and user feedback before making changes.",
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "hivePlanRead",
         "inputSchema": {
@@ -123,7 +123,7 @@
       {
         "name": "hive_plan_approve",
         "displayName": "Approve Hive Plan",
-        "modelDescription": "Approve a plan for execution. Use after user has reviewed the overview as the primary human-facing surface, checked plan.md as execution truth, and resolved any comments. Changes feature status to approved.",
+        "modelDescription": "Approve a plan for execution. Use after the user has reviewed plan.md, including the human-facing summary before ## Tasks, and resolved any comments. Changes feature status to approved.",
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "hivePlanApprove",
         "inputSchema": {

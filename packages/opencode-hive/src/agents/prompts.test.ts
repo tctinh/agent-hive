@@ -139,13 +139,25 @@ describe('Architect (Planner) prompt', () => {
     expect(ARCHITECT_BEE_PROMPT).toContain('Test Strategy');
   });
 
-  it('teaches planners to refresh the reserved overview after plan changes', () => {
-    expect(ARCHITECT_BEE_PROMPT).toContain('hive_context_write({ name: "overview", content: ... })');
-    expect(ARCHITECT_BEE_PROMPT).toContain('## At a Glance');
-    expect(ARCHITECT_BEE_PROMPT).toContain('## Workstreams');
-    expect(ARCHITECT_BEE_PROMPT).toContain('## Revision History');
-    expect(ARCHITECT_BEE_PROMPT).toContain('primary human review surface');
-    expect(ARCHITECT_BEE_PROMPT).toContain('execution truth');
+  it('requires a human-facing summary in plan.md before tasks', () => {
+    expect(ARCHITECT_BEE_PROMPT).toContain('Design Summary');
+    expect(ARCHITECT_BEE_PROMPT).toContain('before `## Tasks`');
+    expect(ARCHITECT_BEE_PROMPT).toContain('human-facing summary');
+    expect(ARCHITECT_BEE_PROMPT).toContain('plan.md');
+  });
+
+  it('describes mermaid as optional in the plan preamble only', () => {
+    expect(ARCHITECT_BEE_PROMPT).toContain('optional Mermaid');
+    expect(ARCHITECT_BEE_PROMPT).toContain('dependency or sequence overview');
+    expect(ARCHITECT_BEE_PROMPT).not.toContain('context/overview.md');
+    expect(ARCHITECT_BEE_PROMPT).not.toContain('primary human review surface');
+  });
+
+  it('teaches hive hybrid planning to keep the summary in plan.md', () => {
+    expect(QUEEN_BEE_PROMPT).toContain('Design Summary');
+    expect(QUEEN_BEE_PROMPT).toContain('before `## Tasks`');
+    expect(QUEEN_BEE_PROMPT).toContain('optional Mermaid');
+    expect(QUEEN_BEE_PROMPT).not.toContain('context/overview.md');
   });
 });
 
