@@ -27,8 +27,15 @@
 |------|---------|
 | `hive_worktree_start` | Create worktree and begin normal work |
 | `hive_worktree_create` | Resume blocked task in existing worktree |
-| `hive_worktree_commit` | Commit changes, write report (does NOT merge), return JSON completion contract |
+| `hive_worktree_commit` | Commit changes, write report (does NOT merge), optional `message` controls git commit text |
 | `hive_worktree_discard` | Discard changes, reset status |
+
+#### hive_worktree_commit input notes
+
+- `summary`: task/report summary.
+- `message` (optional): git commit message text.
+- Multi-line `message` is allowed when creating a commit.
+- Omit `message` (or pass `''`) to use default commit message behavior.
 
 #### hive_worktree_commit output
 
@@ -49,7 +56,13 @@
 ### Merge (1 tool)
 | Tool | Purpose |
 |------|---------|
-| `hive_merge` | Merge task branch (strategies: merge/squash/rebase) |
+| `hive_merge` | Merge task branch (strategies: merge/squash/rebase); optional `message` for merge/squash |
+
+#### hive_merge input notes
+
+- `message` is optional and applies to `merge`/`squash` strategies.
+- Do not provide `message` with `strategy: 'rebase'`.
+- Omit `message` (or pass `''`) to use default merge/squash message behavior.
 
 ### Context (1 tool)
 | Tool | Purpose |

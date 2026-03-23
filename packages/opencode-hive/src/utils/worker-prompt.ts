@@ -151,9 +151,16 @@ hive_worktree_commit({
   task: "${task}",
   feature: "${feature}",
   status: "completed",
-  summary: "Concise summary of what you accomplished"
+  summary: "Concise summary of what you accomplished",
+  message: "Optional git commit subject\n\nOptional body"
 })
 \`\`\`
+
+- Use summary for task/report context.
+- Use optional message only to control git commit/merge text.
+- Multi-line message is supported where a new commit is created.
+- Omit message (or pass empty string) to use existing defaults.
+- Do not provide message with hive_merge(..., strategy: 'rebase').
 
 Then inspect the tool response fields:
 - If \`ok=true\` and \`terminal=true\`: stop the session

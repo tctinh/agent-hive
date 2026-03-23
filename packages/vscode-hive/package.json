@@ -478,6 +478,10 @@
             "summary": {
               "type": "string",
               "description": "Summary of what was done"
+            },
+            "message": {
+              "type": "string",
+              "description": "Optional git commit message; subject/body allowed. Empty uses default."
             }
           },
           "required": [
@@ -536,6 +540,10 @@
                 "rebase"
               ],
               "description": "Merge strategy (default: merge)"
+            },
+            "message": {
+              "type": "string",
+              "description": "Optional merge commit message for merge/squash only. Empty uses default."
             }
           },
           "required": [
