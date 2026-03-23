@@ -10,6 +10,12 @@ export interface FeatureJson {
   completedAt?: string;
 }
 
+export interface FeatureDirectoryInfo {
+  directoryName: string;
+  logicalName: string;
+  index: number | null;
+}
+
 export type TaskStatusType = 'pending' | 'in_progress' | 'done' | 'cancelled' | 'blocked' | 'failed' | 'partial';
 export type TaskOrigin = 'plan' | 'manual';
 export type SubtaskType = 'test' | 'implement' | 'review' | 'verify' | 'research' | 'debug' | 'custom';

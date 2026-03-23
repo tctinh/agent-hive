@@ -10,7 +10,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { normalizePath } from 'hive-core';
+import { normalizePath, resolveFeatureDirectoryName } from 'hive-core';
 
 /**
  * Result of resolving prompt content from a file.
@@ -141,7 +141,9 @@ export function writeWorkerPromptFile(
   prompt: string,
   hiveDir: string
 ): string {
-  const promptDir = path.join(hiveDir, 'features', feature, 'tasks', task);
+  const projectRoot = path.dirname(hiveDir);
+  const featureDir = resolveFeatureDirectoryName(projectRoot, feature);
+  const promptDir = path.join(hiveDir, 'features', featureDir, 'tasks', task);
   const promptPath = path.join(promptDir, 'worker-prompt.md');
 
   // Ensure directory exists

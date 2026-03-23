@@ -191,6 +191,7 @@ import {
   detectContext,
   listFeatures,
   normalizePath,
+  resolveFeatureDirectoryName,
   type WorktreeInfo,
 } from "hive-core";
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
@@ -274,7 +275,8 @@ const plugin: Plugin = async (ctx) => {
    */
   const checkBlocked = (feature: string): string | null => {
     const fs = require('fs');
-    const blockedPath = path.join(directory, '.hive', 'features', feature, 'BLOCKED');
+    const featureDir = resolveFeatureDirectoryName(directory, feature);
+    const blockedPath = path.join(directory, '.hive', 'features', featureDir, 'BLOCKED');
     if (fs.existsSync(blockedPath)) {
       const reason = fs.readFileSync(blockedPath, 'utf-8').trim();
       return `⛔ BLOCKED by Beekeeper
@@ -282,7 +284,7 @@ const plugin: Plugin = async (ctx) => {
 ${reason || '(No reason provided)'}
 
 The human has blocked this feature. Wait for them to unblock it.
-To unblock: Remove .hive/features/${feature}/BLOCKED`;
+To unblock: Remove .hive/features/${featureDir}/BLOCKED`;
     }
     return null;
   };
@@ -605,7 +607,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         task,
         hints: [
           'Wait for the human to unblock the feature before retrying.',
-          `If approved, remove .hive/features/${feature}/BLOCKED and retry hive_worktree_start.`,
+          `If approved, remove .hive/features/${resolveFeatureDirectoryName(directory, feature)}/BLOCKED and retry hive_worktree_start.`,
         ],
       });
     }
@@ -711,7 +713,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         task,
         hints: [
           'Wait for the human to unblock the feature before retrying.',
-          `If approved, remove .hive/features/${feature}/BLOCKED and retry hive_worktree_create.`,
+          `If approved, remove .hive/features/${resolveFeatureDirectoryName(directory, feature)}/BLOCKED and retry hive_worktree_create.`,
         ],
       });
     }
@@ -827,7 +829,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
           statusHint += `**Progress**: ${info.tasks.filter(t => t.status === 'done').length}/${info.tasks.length} tasks\n`;
 
           if (featureInfo.hasOverview) {
-            statusHint += `**Overview**: available at .hive/features/${info.name}/context/overview.md (primary human-facing doc)\n`;
+            statusHint += `**Overview**: available at .hive/features/${resolveFeatureDirectoryName(directory, info.name)}/context/overview.md (primary human-facing doc)\n`;
           } else if (info.hasPlan) {
             statusHint += `**Overview**: missing - write it with hive_context_write({ name: "overview", content })\n`;
           }
@@ -1413,7 +1415,7 @@ Expand your Discovery section and try again.`;
               error: blocked,
               hints: [
                 'Read the blocker details and resolve them before retrying hive_status.',
-                `Remove .hive/features/${feature}/BLOCKED once the blocker is resolved.`,
+                `Remove .hive/features/${resolveFeatureDirectoryName(directory, feature)}/BLOCKED once the blocker is resolved.`,
               ],
             });
           }
@@ -1434,7 +1436,7 @@ Expand your Discovery section and try again.`;
               return [];
             }
           };
-          const featurePath = path.join(directory, '.hive', 'features', feature);
+          const featurePath = path.join(directory, '.hive', 'features', resolveFeatureDirectoryName(directory, feature));
           const reviewDir = path.join(featurePath, 'comments');
           const planThreads = readThreads(path.join(reviewDir, 'plan.json')) ?? readThreads(path.join(featurePath, 'comments.json'));
           const overviewThreads = readThreads(path.join(reviewDir, 'overview.json'));
@@ -1542,7 +1544,7 @@ Expand your Discovery section and try again.`;
             },
             overview: {
               exists: !!overview,
-              path: `.hive/features/${feature}/context/overview.md`,
+              path: `.hive/features/${resolveFeatureDirectoryName(directory, feature)}/context/overview.md`,
               updatedAt: overview?.updatedAt ?? null,
               primaryReview: true,
             },

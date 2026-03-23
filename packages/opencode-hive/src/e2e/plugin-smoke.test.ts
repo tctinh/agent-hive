@@ -215,6 +215,7 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
       toolContext
     );
     expect(createOutput).toContain('Feature "smoke-feature" created');
+    expect(fs.existsSync(path.join(testRoot, '.hive', 'features', '01_smoke-feature'))).toBe(true);
 
     const plan = `# Smoke Feature
 
@@ -248,7 +249,7 @@ Do it
       testRoot,
       ".hive",
       "features",
-      "smoke-feature",
+      "01_smoke-feature",
       "tasks",
       "01-first-task"
     );
@@ -260,7 +261,7 @@ Do it
       testRoot,
       ".hive",
       "features",
-      "smoke-feature",
+      "01_smoke-feature",
       "feature.json"
     );
 
@@ -306,7 +307,7 @@ Do it
       testRoot,
       ".hive",
       "features",
-      "smoke-feature",
+      "01_smoke-feature",
       "tasks",
       "01-first-task",
       "spec.md"
@@ -396,7 +397,7 @@ Do it
     const expectedPromptPath = path.posix.join(
       ".hive",
       "features",
-      "task-mode-feature",
+      "01_task-mode-feature",
       "tasks",
       "01-first-task",
       "worker-prompt.md"
@@ -421,7 +422,7 @@ Do it
     expect(execStart.taskToolCall?.prompt).toContain(`@${expectedPromptPath}`);
     expect(execStart.instructions).toContain("task({");
     expect(execStart.instructions).toContain(
-      "prompt: \"Follow instructions in @.hive/features/task-mode-feature/tasks/01-first-task/worker-prompt.md\""
+      "prompt: \"Follow instructions in @.hive/features/01_task-mode-feature/tasks/01-first-task/worker-prompt.md\""
     );
     expect(execStart.instructions).toContain(
       "Use the `@path` attachment syntax in the prompt to reference the file. Do not inline the file contents."
@@ -504,7 +505,7 @@ Do it
       testRoot,
       ".hive",
       "features",
-      "reserved-overview-feature",
+      "01_reserved-overview-feature",
       "tasks",
       "01-first-task",
       "spec.md"
@@ -513,7 +514,7 @@ Do it
       testRoot,
       ".hive",
       "features",
-      "reserved-overview-feature",
+      "01_reserved-overview-feature",
       "tasks",
       "01-first-task",
       "worker-prompt.md"
@@ -729,7 +730,7 @@ Do it
       testRoot,
       ".hive",
       "features",
-      "blocked-feature",
+      "01_blocked-feature",
       "BLOCKED"
     );
     fs.writeFileSync(blockedPath, "Need approval from Beekeeper.");
@@ -801,14 +802,14 @@ Do it
       testRoot,
       ".hive",
       "features",
-      "blocked-status-feature",
+      "01_blocked-status-feature",
       "BLOCKED"
     );
     const blockedContextPath = path.join(
       testRoot,
       ".hive",
       "features",
-      "blocked-status-feature",
+      "01_blocked-status-feature",
       "context",
       "BLOCKED.md"
     );
@@ -941,17 +942,17 @@ Do it
     );
 
     fs.mkdirSync(
-      path.join(testRoot, ".hive", "features", "overview-status-feature", "comments"),
+      path.join(testRoot, ".hive", "features", "01_overview-status-feature", "comments"),
       { recursive: true }
     );
     fs.writeFileSync(
-      path.join(testRoot, ".hive", "features", "overview-status-feature", "comments", "plan.json"),
+      path.join(testRoot, ".hive", "features", "01_overview-status-feature", "comments", "plan.json"),
       JSON.stringify({
         threads: [{ id: "plan-thread", line: 1, body: "Plan review", replies: [] }],
       }, null, 2)
     );
     fs.writeFileSync(
-      path.join(testRoot, ".hive", "features", "overview-status-feature", "comments", "overview.json"),
+      path.join(testRoot, ".hive", "features", "01_overview-status-feature", "comments", "overview.json"),
       JSON.stringify({
         threads: [{ id: "overview-thread", line: 2, body: "Overview review", replies: [] }],
       }, null, 2)
@@ -980,7 +981,7 @@ Do it
 
     expect(result.overview).toMatchObject({
       exists: true,
-      path: ".hive/features/overview-status-feature/context/overview.md",
+      path: ".hive/features/01_overview-status-feature/context/overview.md",
       primaryReview: true,
     });
     expect(typeof result.overview?.updatedAt).toBe("string");
@@ -1103,11 +1104,11 @@ Do it
     );
 
     fs.mkdirSync(
-      path.join(testRoot, ".hive", "features", "overview-approval-blocked-feature", "comments"),
+      path.join(testRoot, ".hive", "features", "01_overview-approval-blocked-feature", "comments"),
       { recursive: true }
     );
     fs.writeFileSync(
-      path.join(testRoot, ".hive", "features", "overview-approval-blocked-feature", "comments", "overview.json"),
+      path.join(testRoot, ".hive", "features", "01_overview-approval-blocked-feature", "comments", "overview.json"),
       JSON.stringify({
         threads: [{ id: "overview-thread", line: 1, body: "Need clearer overview", replies: [] }],
       }, null, 2)

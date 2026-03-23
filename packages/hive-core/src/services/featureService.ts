@@ -1,12 +1,15 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import {
   getFeaturePath,
   getFeaturesPath,
+  getNextIndexedFeatureDirectoryName,
   getFeatureJsonPath,
   getContextPath,
   getTasksPath,
   getPlanPath,
   getOverviewPath,
+  listFeatureDirectories,
   ensureDir,
   readJson,
   writeJson,
@@ -29,11 +32,12 @@ export class FeatureService {
   }
 
   create(name: string, ticket?: string): FeatureJson {
-    const featurePath = getFeaturePath(this.projectRoot, name);
-    
-    if (fileExists(featurePath)) {
+    const existingFeature = listFeatureDirectories(this.projectRoot).find((feature) => feature.logicalName === name);
+    if (existingFeature) {
       throw new Error(`Feature '${name}' already exists`);
     }
+
+    const featurePath = path.join(getFeaturesPath(this.projectRoot), getNextIndexedFeatureDirectoryName(this.projectRoot, name));
 
     ensureDir(featurePath);
     ensureDir(getContextPath(this.projectRoot, name));
@@ -56,12 +60,7 @@ export class FeatureService {
   }
 
   list(): string[] {
-    const featuresPath = getFeaturesPath(this.projectRoot);
-    if (!fileExists(featuresPath)) return [];
-    
-    return fs.readdirSync(featuresPath, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
+    return listFeatureDirectories(this.projectRoot).map((feature) => feature.logicalName);
   }
 
   getActive(): FeatureJson | null {
