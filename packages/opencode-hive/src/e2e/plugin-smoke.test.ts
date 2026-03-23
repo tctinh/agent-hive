@@ -429,6 +429,107 @@ Do it
     expect(execStart.instructions).not.toContain("Read the prompt file");
   });
 
+  it("excludes reserved overview context from worker prompt payloads", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_reserved_overview");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "reserved-overview-feature" },
+      toolContext
+    );
+
+    const plan = `# Reserved Overview Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test validates that reserved overview context stays human-facing and is excluded from worker execution payloads.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "reserved-overview-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_approve.execute(
+      { feature: "reserved-overview-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_tasks_sync.execute(
+      { feature: "reserved-overview-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "reserved-overview-feature",
+        name: "overview",
+        content: "Human-facing overview that must stay out of worker execution context.",
+      },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "reserved-overview-feature",
+        name: "decisions",
+        content: "Technical decision that workers should receive.",
+      },
+      toolContext
+    );
+
+    const raw = await hooks.tool!.hive_worktree_start.execute(
+      { feature: "reserved-overview-feature", task: "01-first-task" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      worktreePath?: string;
+    };
+
+    expect(result.worktreePath).toBeDefined();
+
+    const specPath = path.join(
+      testRoot,
+      ".hive",
+      "features",
+      "reserved-overview-feature",
+      "tasks",
+      "01-first-task",
+      "spec.md"
+    );
+    const workerPromptPath = path.join(
+      testRoot,
+      ".hive",
+      "features",
+      "reserved-overview-feature",
+      "tasks",
+      "01-first-task",
+      "worker-prompt.md"
+    );
+
+    const specContent = fs.readFileSync(specPath, "utf-8");
+    const workerPromptContent = fs.readFileSync(workerPromptPath, "utf-8");
+
+    expect(specContent).toContain("## decisions");
+    expect(specContent).toContain("Technical decision that workers should receive.");
+    expect(specContent).not.toContain("## overview");
+    expect(specContent).not.toContain("Human-facing overview that must stay out of worker execution context.");
+    expect(workerPromptContent).toContain("Technical decision that workers should receive.");
+    expect(workerPromptContent).not.toContain("Human-facing overview that must stay out of worker execution context.");
+  });
+
   it("returns forager-derived eligible agents for worktree execution delegation", async () => {
     const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
@@ -793,6 +894,232 @@ Do it
     expect(result.reason).toBe("feature_not_found");
     expect(result.error).toContain("Feature 'does-not-exist' not found");
     expect(Array.isArray(result.availableFeatures)).toBe(true);
+  });
+
+  it("reports overview metadata and review counts in hive_status", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_overview_status");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "overview-status-feature" },
+      toolContext
+    );
+
+    const plan = `# Overview Status Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test validates that hive_status exposes reserved overview metadata and document-aware review counts.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "overview-status-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "overview-status-feature",
+        name: "overview",
+        content: "# Overview\nHuman-facing summary",
+      },
+      toolContext
+    );
+
+    fs.mkdirSync(
+      path.join(testRoot, ".hive", "features", "overview-status-feature", "comments"),
+      { recursive: true }
+    );
+    fs.writeFileSync(
+      path.join(testRoot, ".hive", "features", "overview-status-feature", "comments", "plan.json"),
+      JSON.stringify({
+        threads: [{ id: "plan-thread", line: 1, body: "Plan review", replies: [] }],
+      }, null, 2)
+    );
+    fs.writeFileSync(
+      path.join(testRoot, ".hive", "features", "overview-status-feature", "comments", "overview.json"),
+      JSON.stringify({
+        threads: [{ id: "overview-thread", line: 2, body: "Overview review", replies: [] }],
+      }, null, 2)
+    );
+
+    const raw = await hooks.tool!.hive_status.execute(
+      { feature: "overview-status-feature" },
+      toolContext
+    );
+
+    const result = JSON.parse(raw as string) as {
+      overview?: {
+        exists: boolean;
+        path: string;
+        updatedAt?: string;
+        primaryReview: boolean;
+      };
+      review?: {
+        unresolvedTotal: number;
+        byDocument: {
+          plan: number;
+          overview: number;
+        };
+      };
+    };
+
+    expect(result.overview).toMatchObject({
+      exists: true,
+      path: ".hive/features/overview-status-feature/context/overview.md",
+      primaryReview: true,
+    });
+    expect(typeof result.overview?.updatedAt).toBe("string");
+    expect(result.review).toEqual({
+      unresolvedTotal: 2,
+      byDocument: {
+        plan: 1,
+        overview: 1,
+      },
+    });
+  });
+
+  it("guides planners to refresh overview and uses overview-aware plan messaging", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_overview_guidance");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "overview-guidance-feature" },
+      toolContext
+    );
+
+    const plan = `# Overview Guidance Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test validates that plan messaging and hive_status guidance explicitly direct planners to maintain the reserved overview via hive_context_write.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    const planOutput = await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "overview-guidance-feature" },
+      toolContext
+    );
+    expect(planOutput).toContain('Refresh the primary human-facing overview');
+    expect(planOutput).toContain('hive_context_write({ name: "overview", content })');
+
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "overview-guidance-feature",
+        name: "overview",
+        content: '# Overview\n',
+      },
+      toolContext
+    );
+
+    const approveOutput = await hooks.tool!.hive_plan_approve.execute(
+      { feature: "overview-guidance-feature" },
+      toolContext
+    );
+    expect(approveOutput).toContain('Refresh the overview if approval changed the plan narrative');
+
+    const statusRaw = await hooks.tool!.hive_status.execute(
+      { feature: "overview-guidance-feature" },
+      toolContext
+    );
+    const status = JSON.parse(statusRaw as string) as { nextAction?: string };
+    expect(status.nextAction).toContain('Refresh overview');
+    expect(status.nextAction).toContain('significant plan changes');
+    expect(status.nextAction).toContain('At a Glance');
+    expect(status.nextAction).toContain('Workstreams');
+    expect(status.nextAction).toContain('Revision History');
+  });
+
+  it("blocks plan approval when overview review comments remain", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_overview_approval_blocked");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "overview-approval-blocked-feature" },
+      toolContext
+    );
+
+    const plan = `# Overview Approval Blocked Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test proves approval must report unresolved overview review comments before execution can proceed.
+
+## Tasks
+
+### 1. First Task
+Do it
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "overview-approval-blocked-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "overview-approval-blocked-feature",
+        name: "overview",
+        content: "# Overview\n",
+      },
+      toolContext
+    );
+
+    fs.mkdirSync(
+      path.join(testRoot, ".hive", "features", "overview-approval-blocked-feature", "comments"),
+      { recursive: true }
+    );
+    fs.writeFileSync(
+      path.join(testRoot, ".hive", "features", "overview-approval-blocked-feature", "comments", "overview.json"),
+      JSON.stringify({
+        threads: [{ id: "overview-thread", line: 1, body: "Need clearer overview", replies: [] }],
+      }, null, 2)
+    );
+
+    const approveOutput = await hooks.tool!.hive_plan_approve.execute(
+      { feature: "overview-approval-blocked-feature" },
+      toolContext
+    );
+
+    expect(approveOutput).toContain("Cannot approve");
+    expect(approveOutput).toContain("overview");
   });
 
   it("returns explicit success and non-terminal contract fields on worktree start", async () => {

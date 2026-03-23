@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import * as fs from 'fs'
 import * as path from 'path'
 
 /**
@@ -9,7 +10,7 @@ export class Launcher {
   constructor(private workspaceRoot: string) {}
 
   /**
-   * Open a feature's plan in VS Code and show instructions
+   * Open a feature's overview in VS Code and show instructions
    */
   async openFeature(feature: string): Promise<void> {
     if (!feature || !this.workspaceRoot) {
@@ -17,16 +18,18 @@ export class Launcher {
       return
     }
 
+    const overviewPath = path.join(this.workspaceRoot, '.hive', 'features', feature, 'context', 'overview.md')
     const planPath = path.join(this.workspaceRoot, '.hive', 'features', feature, 'plan.md')
+    const targetPath = fs.existsSync(overviewPath) ? overviewPath : planPath
     try {
-      const uri = vscode.Uri.file(planPath)
+      const uri = vscode.Uri.file(targetPath)
       await vscode.workspace.openTextDocument(uri)
       await vscode.window.showTextDocument(uri)
       vscode.window.showInformationMessage(
-        `Hive: Opened ${feature} plan. Use @Hive in Copilot Chat to continue.`
+        `Hive: Opened ${feature} ${fs.existsSync(overviewPath) ? 'overview' : 'plan'}. Use @Hive in Copilot Chat to continue.`
       )
     } catch (error: any) {
-      vscode.window.showWarningMessage(`Hive: No plan found for feature "${feature}" - ${error}`)
+      vscode.window.showWarningMessage(`Hive: No overview or plan found for feature "${feature}" - ${error}`)
     }
   }
 

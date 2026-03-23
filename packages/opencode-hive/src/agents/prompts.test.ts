@@ -138,6 +138,15 @@ describe('Architect (Planner) prompt', () => {
   it('contains test strategy assessment', () => {
     expect(ARCHITECT_BEE_PROMPT).toContain('Test Strategy');
   });
+
+  it('teaches planners to refresh the reserved overview after plan changes', () => {
+    expect(ARCHITECT_BEE_PROMPT).toContain('hive_context_write({ name: "overview", content: ... })');
+    expect(ARCHITECT_BEE_PROMPT).toContain('## At a Glance');
+    expect(ARCHITECT_BEE_PROMPT).toContain('## Workstreams');
+    expect(ARCHITECT_BEE_PROMPT).toContain('## Revision History');
+    expect(ARCHITECT_BEE_PROMPT).toContain('primary human review surface');
+    expect(ARCHITECT_BEE_PROMPT).toContain('execution truth');
+  });
 });
 
 describe('Swarm (Orchestrator) prompt', () => {
@@ -200,6 +209,15 @@ describe('Swarm (Orchestrator) prompt', () => {
 
   it('contains verification checklist', () => {
     expect(SWARM_BEE_PROMPT).toContain('After Delegation - VERIFY');
+  });
+
+  it('teaches orchestrators to maintain overview at execution milestones', () => {
+    expect(SWARM_BEE_PROMPT).toContain('hive_context_write({ name: "overview", content: ... })');
+    expect(SWARM_BEE_PROMPT).toContain('execution start');
+    expect(SWARM_BEE_PROMPT).toContain('scope shift');
+    expect(SWARM_BEE_PROMPT).toContain('completion');
+    expect(SWARM_BEE_PROMPT).toContain('primary human-facing document');
+    expect(SWARM_BEE_PROMPT).toContain('plan.md');
   });
 });
 

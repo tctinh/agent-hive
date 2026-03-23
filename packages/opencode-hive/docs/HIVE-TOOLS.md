@@ -11,8 +11,8 @@
 ### Plan Management (3 tools)
 | Tool | Purpose |
 |------|---------|
-| `hive_plan_write` | Write plan.md (clears comments) |
-| `hive_plan_read` | Read plan.md and user comments |
+| `hive_plan_write` | Write plan.md (execution truth; clears plan review comments) |
+| `hive_plan_read` | Read plan.md and related review comments so approval can account for overview + plan feedback |
 | `hive_plan_approve` | Approve plan for execution |
 
 ### Task Management (3 tools)
@@ -67,12 +67,12 @@
 ### Context (1 tool)
 | Tool | Purpose |
 |------|---------|
-| `hive_context_write` | Write context file |
+| `hive_context_write` | Write context file, including reserved `context/overview.md` via `name: "overview"` |
 
 ### Status (1 tool)
 | Tool | Purpose |
 |------|---------|
-| `hive_status` | Get comprehensive feature status as JSON |
+| `hive_status` | Get comprehensive feature status as JSON, including overview metadata and per-document review counts |
 
 ### Steering (1 tool)
 | Tool | Purpose |
@@ -105,3 +105,10 @@
 | Status | 1 | status |
 | Steering | 1 | steering |
 | **Total** | **15** | |
+
+## Reserved Overview Convention
+
+- There is no dedicated overview write tool.
+- Use `hive_context_write({ name: "overview", content })` to maintain `.hive/features/<feature>/context/overview.md`.
+- Humans review `context/overview.md` first; `plan.md` stays authoritative for execution and task parsing.
+- `hive_status` and the VS Code extension surface the overview as the primary human-facing document.

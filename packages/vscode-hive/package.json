@@ -2,7 +2,7 @@
   "name": "vscode-hive",
   "displayName": "Agent Hive",
   "description": "From Vibe Coding to Hive Coding - Review and approve AI-generated plans",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "publisher": "tctinh",
   "license": "MIT WITH Commons-Clause",
   "icon": "icon.png",
@@ -80,7 +80,7 @@
       {
         "name": "hive_plan_write",
         "displayName": "Write Hive Plan",
-        "modelDescription": "Write or update the plan.md for a feature. The plan defines tasks to execute. Use markdown with ### numbered headers for tasks. Clears existing comments when plan is rewritten.",
+        "modelDescription": "Write or update the plan.md for a feature. The plan defines execution truth and tasks to execute. After significant plan changes, also refresh context/overview.md via hive_context_write({ name: \"overview\", content }) as the primary human-facing review surface. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.",
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "hivePlanWrite",
         "inputSchema": {
@@ -104,7 +104,7 @@
       {
         "name": "hive_plan_read",
         "displayName": "Read Hive Plan",
-        "modelDescription": "Read the plan.md and any user comments for a feature. Use to check plan content, status, and user feedback before making changes.",
+        "modelDescription": "Read the plan.md and related review comments for a feature. Use to check plan content, status, and user feedback before making changes.",
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "hivePlanRead",
         "inputSchema": {
@@ -123,7 +123,7 @@
       {
         "name": "hive_plan_approve",
         "displayName": "Approve Hive Plan",
-        "modelDescription": "Approve a plan for execution. Use after user has reviewed the plan and resolved any comments. Changes feature status to approved.",
+        "modelDescription": "Approve a plan for execution. Use after user has reviewed the overview as the primary human-facing surface, checked plan.md as execution truth, and resolved any comments. Changes feature status to approved.",
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "hivePlanApprove",
         "inputSchema": {
@@ -865,7 +865,7 @@
       "editor/title": [
         {
           "command": "hive.plan.doneReview",
-          "when": "resourceFilename == plan.md",
+          "when": "resourceFilename =~ /^(plan|overview)\\.md$/",
           "group": "navigation"
         }
       ],
@@ -898,7 +898,8 @@
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --define:import.meta.url=__importMetaUrl --banner:js=\"const __importMetaUrl = require('url').pathToFileURL(__filename).href;\" && vsce package --no-dependencies -o vscode-hive.vsix",
     "watch": "npm run build -- --watch",
-    "build:types": "tsc --emitDeclarationOnly"
+    "build:types": "tsc --emitDeclarationOnly",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/vscode": "^1.100.0",

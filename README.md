@@ -374,11 +374,12 @@ Convert all routes to use the new AuthService.
 
 ### Step 2: Review in VS Code
 
-Open VS Code. The Hive sidebar shows your plan. You can:
+Open VS Code. The Hive sidebar opens the feature's human-facing overview first, with the execution plan one click deeper. You can:
 
-- Read through each task
-- Add comments ("Use httpOnly cookies for tokens")
-- Approve when ready
+- Review `context/overview.md` first for the plain-language summary, workstreams, and revision history
+- Open `plan.md` when you want the execution contract and numbered task details
+- Add comments on either document (for example, "Use httpOnly cookies for tokens")
+- Approve when the overview story and the plan both look right
 
 ### Step 3: Execute
 
@@ -399,9 +400,13 @@ When done, you have:
 ```
 .hive/features/user-auth/
 ├── feature.json         # Feature metadata
-├── plan.md              # Your approved plan
+├── plan.md              # Execution plan and task source of truth
 ├── tasks.json           # Task list with status
-├── contexts/            # Decisions and calibration
+├── comments/            # Document-aware review threads
+│   ├── overview.json
+│   └── plan.json
+├── context/             # Persistent knowledge + human-facing summary
+│   ├── overview.md      # Primary review surface for humans
 │   └── architecture.md
 └── tasks/
     ├── 01-extract-auth-logic/
@@ -431,7 +436,7 @@ When done, you have:
 │  Agent creates structured plan in .hive/                    │
 ├─────────────────────────────────────────────────────────────┤
 │  2. REVIEW (in VS Code)                                     │
-│  See the plan in sidebar                                    │
+│  Read overview first, inspect plan second                   │
 │  Add inline comments, refine, approve                       │
 ├─────────────────────────────────────────────────────────────┤
 │  3. EXECUTE (parallel-friendly)                             │
@@ -451,7 +456,8 @@ When done, you have:
 Visual management without leaving your editor:
 
 - **Sidebar** — See all features and progress at a glance
-- **Inline Comments** — Add review comments directly on plan.md
+- **Overview-First Review** — Open `context/overview.md` as the primary human-facing summary
+- **Inline Comments** — Add review comments on `context/overview.md` or `plan.md`
 - **Approve Button** — One-click plan approval
 - **Real-time Updates** — Watches `.hive/` for changes
 - **Launch Tasks** — Open tasks in OpenCode from VS Code
@@ -472,17 +478,17 @@ Visual management without leaving your editor:
 └─────────────────────────────────────┘
 ```
 
-**Review plans, add comments, approve — all without leaving VS Code.**
+**Review the overview first, drill into the plan when needed, add comments, approve — all without leaving VS Code.**
 
 ### Extension Features
 
 | Feature | Description |
 |---------|-------------|
 | **Feature Tree** | Hierarchical view of all features, tasks, and their status |
-| **Plan Review** | Open plan.md with syntax highlighting and inline commenting |
+| **Overview + Plan Review** | Open `context/overview.md` for human review, then `plan.md` for execution details and inline commenting |
 | **Task Details** | Expand any task to see spec.md (context) and report.md (results) |
 | **Status Icons** | Visual indicators: ✅ done, 🔄 in-progress, ⏳ pending, ❌ failed |
-| **Context Files** | Browse and edit context files stored per-feature |
+| **Context Files** | Browse per-feature context files while keeping reserved `context/overview.md` pinned as the primary summary |
 | **Session History** | View feature history and status |
 
 ### Extension Requirements
@@ -501,10 +507,11 @@ The extension watches your `.hive/` directory and displays the current state. Al
 1. **Open your project** in VS Code (must have `.hive/` directory)
 2. **Click the Hive icon** in the Activity Bar (left sidebar)
 3. **Browse features** — Expand to see tasks, context, sessions
-4. **Review plans** — Click on plan.md to open with inline commenting
-5. **Add comments** — Use VS Code's comment feature on plan.md lines
-6. **Approve plans** — Click the approve button when ready
-7. **Monitor progress** — Watch task status update in real-time as OpenCode executes
+4. **Review overview first** — Click `context/overview.md` for the high-level summary and recent revisions
+5. **Open the plan for detail** — Use `plan.md` when you want numbered tasks and execution specifics
+6. **Add comments** — Use VS Code's comment feature on overview or plan lines
+7. **Approve plans** — Click the approve button when the overview and plan are aligned
+8. **Monitor progress** — Watch task status update in real-time as OpenCode executes
 
 ---
 

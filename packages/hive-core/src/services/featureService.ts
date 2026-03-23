@@ -6,16 +6,27 @@ import {
   getContextPath,
   getTasksPath,
   getPlanPath,
-  getCommentsPath,
+  getOverviewPath,
   ensureDir,
   readJson,
   writeJson,
   fileExists,
 } from '../utils/paths.js';
-import { FeatureJson, FeatureStatusType, TaskInfo, FeatureInfo, CommentsJson, TaskStatus } from '../types.js';
+import type { FeatureJson, FeatureStatusType, TaskInfo, FeatureInfo, TaskStatus } from '../types.js';
+import { ReviewService } from './reviewService.js';
 
 export class FeatureService {
+  private reviewService: ReviewService;
+
   constructor(private projectRoot: string) {}
+
+  private getReviewService(): ReviewService {
+    if (!this.reviewService) {
+      this.reviewService = new ReviewService(this.projectRoot);
+    }
+
+    return this.reviewService;
+  }
 
   create(name: string, ticket?: string): FeatureJson {
     const featurePath = getFeaturePath(this.projectRoot, name);
@@ -87,15 +98,18 @@ export class FeatureService {
 
     const tasks = this.getTasks(name);
     const hasPlan = fileExists(getPlanPath(this.projectRoot, name));
-    const comments = readJson<CommentsJson>(getCommentsPath(this.projectRoot, name));
-    const commentCount = comments?.threads?.length || 0;
+    const hasOverview = fileExists(getOverviewPath(this.projectRoot, name));
+    const reviewCounts = this.getReviewService().countByDocument(name);
+    const commentCount = reviewCounts.plan + reviewCounts.overview;
 
     return {
       name: feature.name,
       status: feature.status,
       tasks,
       hasPlan,
+      hasOverview,
       commentCount,
+      reviewCounts,
     };
   }
 

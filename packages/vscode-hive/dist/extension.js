@@ -35,10 +35,10 @@ __export(extension_exports, {
 });
 module.exports = __toCommonJS(extension_exports);
 var vscode7 = __toESM(require("vscode"));
-var fs10 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
+var fs12 = __toESM(require("fs"));
+var path11 = __toESM(require("path"));
 
-// ../hive-core/dist/index.js
+// ../../../../../../packages/hive-core/dist/index.js
 var import_node_module = require("node:module");
 var path = __toESM(require("path"), 1);
 var fs = __toESM(require("fs"), 1);
@@ -980,8 +980,10 @@ var HIVE_DIR = ".hive";
 var FEATURES_DIR = "features";
 var TASKS_DIR = "tasks";
 var CONTEXT_DIR = "context";
+var REVIEW_COMMENTS_DIR = "comments";
 var PLAN_FILE = "plan.md";
 var COMMENTS_FILE = "comments.json";
+var OVERVIEW_FILE = "overview.md";
 var FEATURE_FILE = "feature.json";
 var STATUS_FILE = "status.json";
 var REPORT_FILE = "report.md";
@@ -1001,11 +1003,17 @@ function getPlanPath(projectRoot, featureName) {
 function getCommentsPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), COMMENTS_FILE);
 }
+function getReviewCommentsPath(projectRoot, featureName, document2) {
+  return path.join(getFeaturePath(projectRoot, featureName), REVIEW_COMMENTS_DIR, `${document2}.json`);
+}
 function getFeatureJsonPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), FEATURE_FILE);
 }
 function getContextPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), CONTEXT_DIR);
+}
+function getOverviewPath(projectRoot, featureName) {
+  return path.join(getContextPath(projectRoot, featureName), OVERVIEW_FILE);
 }
 function getTasksPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), TASKS_DIR);
@@ -1175,10 +1183,63 @@ function writeText(filePath, content) {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, content);
 }
-var FeatureService = class {
+var ReviewService = class {
   projectRoot;
   constructor(projectRoot) {
     this.projectRoot = projectRoot;
+  }
+  getThreads(featureName, document2) {
+    const data = this.readComments(featureName, document2);
+    return data?.threads ?? [];
+  }
+  saveThreads(featureName, document2, threads) {
+    writeJson(this.getCanonicalPath(featureName, document2), { threads });
+  }
+  clear(featureName, document2) {
+    this.saveThreads(featureName, document2, []);
+    if (document2 === "plan" && fileExists(getCommentsPath(this.projectRoot, featureName))) {
+      writeJson(getCommentsPath(this.projectRoot, featureName), { threads: [] });
+    }
+  }
+  countByDocument(featureName) {
+    return {
+      plan: this.getThreads(featureName, "plan").length,
+      overview: this.getThreads(featureName, "overview").length
+    };
+  }
+  hasUnresolvedThreads(featureName, document2) {
+    if (document2) {
+      return this.getThreads(featureName, document2).length > 0;
+    }
+    const counts = this.countByDocument(featureName);
+    return counts.plan > 0 || counts.overview > 0;
+  }
+  readComments(featureName, document2) {
+    const canonicalPath = this.getCanonicalPath(featureName, document2);
+    const canonical = readJson(canonicalPath);
+    if (canonical) {
+      return canonical;
+    }
+    if (document2 === "plan") {
+      return readJson(getCommentsPath(this.projectRoot, featureName));
+    }
+    return null;
+  }
+  getCanonicalPath(featureName, document2) {
+    return getReviewCommentsPath(this.projectRoot, featureName, document2);
+  }
+};
+var FeatureService = class {
+  projectRoot;
+  reviewService;
+  constructor(projectRoot) {
+    this.projectRoot = projectRoot;
+  }
+  getReviewService() {
+    if (!this.reviewService) {
+      this.reviewService = new ReviewService(this.projectRoot);
+    }
+    return this.reviewService;
   }
   create(name, ticket) {
     const featurePath = getFeaturePath(this.projectRoot, name);
@@ -1236,14 +1297,17 @@ var FeatureService = class {
       return null;
     const tasks = this.getTasks(name);
     const hasPlan = fileExists(getPlanPath(this.projectRoot, name));
-    const comments2 = readJson(getCommentsPath(this.projectRoot, name));
-    const commentCount = comments2?.threads?.length || 0;
+    const hasOverview = fileExists(getOverviewPath(this.projectRoot, name));
+    const reviewCounts = this.getReviewService().countByDocument(name);
+    const commentCount = reviewCounts.plan + reviewCounts.overview;
     return {
       name: feature.name,
       status: feature.status,
       tasks,
       hasPlan,
-      commentCount
+      hasOverview,
+      commentCount,
+      reviewCounts
     };
   }
   getTasks(featureName) {
@@ -1288,8 +1352,15 @@ var FeatureService = class {
 };
 var PlanService = class {
   projectRoot;
+  reviewService;
   constructor(projectRoot) {
     this.projectRoot = projectRoot;
+  }
+  getReviewService() {
+    if (!this.reviewService) {
+      this.reviewService = new ReviewService(this.projectRoot);
+    }
+    return this.reviewService;
   }
   write(featureName, content) {
     const planPath = getPlanPath(this.projectRoot, featureName);
@@ -1314,6 +1385,9 @@ var PlanService = class {
   approve(featureName) {
     if (!fileExists(getPlanPath(this.projectRoot, featureName))) {
       throw new Error(`No plan.md found for feature '${featureName}'`);
+    }
+    if (this.getReviewService().hasUnresolvedThreads(featureName)) {
+      throw new Error(`Cannot approve feature '${featureName}' with unresolved review comments`);
     }
     const approvedPath = getApprovedPath(this.projectRoot, featureName);
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
@@ -1344,25 +1418,21 @@ var PlanService = class {
     }
   }
   getComments(featureName) {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    const data = readJson(commentsPath);
-    return data?.threads || [];
+    return this.getReviewService().getThreads(featureName, "plan");
   }
   addComment(featureName, comment) {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    const data = readJson(commentsPath) || { threads: [] };
     const newComment = {
       ...comment,
-      id: `comment-${Date.now()}`,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      id: `comment-${Date.now()}`
     };
-    data.threads.push(newComment);
-    writeJson(commentsPath, data);
+    this.getReviewService().saveThreads(featureName, "plan", [
+      ...this.getComments(featureName),
+      newComment
+    ]);
     return newComment;
   }
   clearComments(featureName) {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    writeJson(commentsPath, { threads: [] });
+    this.getReviewService().clear(featureName, "plan");
   }
 };
 var TASK_STATUS_SCHEMA_VERSION = 1;
@@ -6370,6 +6440,7 @@ var WorktreeService = class {
     return conflicts2;
   }
 };
+var RESERVED_OVERVIEW_CONTEXT = "overview";
 var ContextService = class {
   projectRoot;
   constructor(projectRoot) {
@@ -6408,6 +6479,12 @@ var ContextService = class {
         updatedAt: stat2.mtime.toISOString()
       };
     });
+  }
+  getOverview(featureName) {
+    return this.list(featureName).find((file) => file.name === RESERVED_OVERVIEW_CONTEXT) ?? null;
+  }
+  listExecutionContext(featureName) {
+    return this.list(featureName).filter((file) => file.name !== RESERVED_OVERVIEW_CONTEXT);
   }
   delete(featureName, fileName) {
     const contextPath = getContextPath(this.projectRoot, featureName);
@@ -6545,29 +6622,32 @@ var HiveWatcher = class {
 
 // src/services/launcher.ts
 var vscode2 = __toESM(require("vscode"));
+var fs2 = __toESM(require("fs"));
 var path2 = __toESM(require("path"));
 var Launcher = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
   }
   /**
-   * Open a feature's plan in VS Code and show instructions
+   * Open a feature's overview in VS Code and show instructions
    */
   async openFeature(feature) {
     if (!feature || !this.workspaceRoot) {
       vscode2.window.showWarningMessage("Hive: Invalid feature name or workspace root");
       return;
     }
+    const overviewPath = path2.join(this.workspaceRoot, ".hive", "features", feature, "context", "overview.md");
     const planPath = path2.join(this.workspaceRoot, ".hive", "features", feature, "plan.md");
+    const targetPath = fs2.existsSync(overviewPath) ? overviewPath : planPath;
     try {
-      const uri = vscode2.Uri.file(planPath);
+      const uri = vscode2.Uri.file(targetPath);
       await vscode2.workspace.openTextDocument(uri);
       await vscode2.window.showTextDocument(uri);
       vscode2.window.showInformationMessage(
-        `Hive: Opened ${feature} plan. Use @Hive in Copilot Chat to continue.`
+        `Hive: Opened ${feature} ${fs2.existsSync(overviewPath) ? "overview" : "plan"}. Use @Hive in Copilot Chat to continue.`
       );
     } catch (error) {
-      vscode2.window.showWarningMessage(`Hive: No plan found for feature "${feature}" - ${error}`);
+      vscode2.window.showWarningMessage(`Hive: No overview or plan found for feature "${feature}" - ${error}`);
     }
   }
   /**
@@ -6606,7 +6686,7 @@ var Launcher = class {
 
 // src/providers/sidebarProvider.ts
 var vscode3 = __toESM(require("vscode"));
-var fs2 = __toESM(require("fs"));
+var fs6 = __toESM(require("fs"));
 var path5 = __toESM(require("path"));
 var ActionItem = class extends vscode3.TreeItem {
   constructor(label, commandId, iconName) {
@@ -6677,6 +6757,22 @@ var PlanItem = class extends vscode3.TreeItem {
       command: "vscode.open",
       title: "Open Plan",
       arguments: [vscode3.Uri.file(planPath)]
+    };
+  }
+};
+var OverviewItem = class extends vscode3.TreeItem {
+  constructor(featureName, overviewPath, commentCount) {
+    super("Overview", vscode3.TreeItemCollapsibleState.None);
+    this.featureName = featureName;
+    this.overviewPath = overviewPath;
+    this.commentCount = commentCount;
+    this.description = commentCount > 0 ? `${commentCount} comment(s)` : "";
+    this.contextValue = "overview-file";
+    this.iconPath = new vscode3.ThemeIcon("book");
+    this.command = {
+      command: "vscode.open",
+      title: "Open Overview",
+      arguments: [vscode3.Uri.file(overviewPath)]
     };
   }
 };
@@ -6827,14 +6923,14 @@ var HiveSidebarProvider = class {
   }
   getAllFeatures() {
     const featuresPath = path5.join(this.workspaceRoot, ".hive", "features");
-    if (!fs2.existsSync(featuresPath)) return [];
+    if (!fs6.existsSync(featuresPath)) return [];
     const activeFeature = this.getActiveFeature();
     const features = [];
-    const dirs = fs2.readdirSync(featuresPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    const dirs = fs6.readdirSync(featuresPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
     for (const name of dirs) {
       const featureJsonPath = path5.join(featuresPath, name, "feature.json");
-      if (!fs2.existsSync(featureJsonPath)) continue;
-      const feature = JSON.parse(fs2.readFileSync(featureJsonPath, "utf-8"));
+      if (!fs6.existsSync(featureJsonPath)) continue;
+      const feature = JSON.parse(fs6.readFileSync(featureJsonPath, "utf-8"));
       const taskStats = this.getTaskStats(name);
       const isActive = name === activeFeature;
       features.push(new FeatureItem(name, feature, taskStats, isActive));
@@ -6850,22 +6946,27 @@ var HiveSidebarProvider = class {
     const featurePath = path5.join(this.workspaceRoot, ".hive", "features", featureName);
     const items = [];
     const featureJsonPath = path5.join(featurePath, "feature.json");
-    const feature = JSON.parse(fs2.readFileSync(featureJsonPath, "utf-8"));
+    const feature = JSON.parse(fs6.readFileSync(featureJsonPath, "utf-8"));
+    const overviewPath = path5.join(featurePath, "context", "overview.md");
+    if (fs6.existsSync(overviewPath)) {
+      const commentCount = this.getCommentCount(featureName, "overview");
+      items.push(new OverviewItem(featureName, overviewPath, commentCount));
+    }
     const planPath = path5.join(featurePath, "plan.md");
-    if (fs2.existsSync(planPath)) {
-      const commentCount = this.getCommentCount(featureName);
+    if (fs6.existsSync(planPath)) {
+      const commentCount = this.getCommentCount(featureName, "plan");
       items.push(new PlanItem(featureName, planPath, feature.status, commentCount));
     }
     const contextPath = path5.join(featurePath, "context");
-    const contextFiles = fs2.existsSync(contextPath) ? fs2.readdirSync(contextPath).filter((f) => !f.startsWith(".")) : [];
+    const contextFiles = fs6.existsSync(contextPath) ? fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".") && f !== "overview.md") : [];
     items.push(new ContextFolderItem(featureName, contextPath, contextFiles.length));
     const tasks = this.getTaskList(featureName);
     items.push(new TasksGroupItem(featureName, tasks));
     return items;
   }
   getContextFiles(featureName, contextPath) {
-    if (!fs2.existsSync(contextPath)) return [];
-    return fs2.readdirSync(contextPath).filter((f) => !f.startsWith(".")).map((f) => new ContextFileItem(f, path5.join(contextPath, f)));
+    if (!fs6.existsSync(contextPath)) return [];
+    return fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".") && f !== "overview.md").map((f) => new ContextFileItem(f, path5.join(contextPath, f)));
   }
   getTasks(featureName, tasks) {
     const featurePath = path5.join(this.workspaceRoot, ".hive", "features", featureName);
@@ -6873,8 +6974,8 @@ var HiveSidebarProvider = class {
       const taskDir = path5.join(featurePath, "tasks", t.folder);
       const specPath = path5.join(taskDir, "spec.md");
       const reportPath = path5.join(taskDir, "report.md");
-      const hasSpec = fs2.existsSync(specPath);
-      const hasReport = fs2.existsSync(reportPath);
+      const hasSpec = fs6.existsSync(specPath);
+      const hasReport = fs6.existsSync(reportPath);
       return new TaskItem(featureName, t.folder, t.status, hasSpec ? specPath : null, hasReport ? reportPath : null);
     });
   }
@@ -6890,11 +6991,11 @@ var HiveSidebarProvider = class {
   }
   getTaskList(featureName) {
     const tasksPath = path5.join(this.workspaceRoot, ".hive", "features", featureName, "tasks");
-    if (!fs2.existsSync(tasksPath)) return [];
-    const folders = fs2.readdirSync(tasksPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
+    if (!fs6.existsSync(tasksPath)) return [];
+    const folders = fs6.readdirSync(tasksPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
     return folders.map((folder) => {
       const statusPath = path5.join(tasksPath, folder, "status.json");
-      const status = fs2.existsSync(statusPath) ? JSON.parse(fs2.readFileSync(statusPath, "utf-8")) : { status: "pending", origin: "plan" };
+      const status = fs6.existsSync(statusPath) ? JSON.parse(fs6.readFileSync(statusPath, "utf-8")) : { status: "pending", origin: "plan" };
       return { folder, status };
     });
   }
@@ -6907,24 +7008,31 @@ var HiveSidebarProvider = class {
   }
   getActiveFeature() {
     const activePath = path5.join(this.workspaceRoot, ".hive", "active-feature");
-    if (!fs2.existsSync(activePath)) return null;
-    return fs2.readFileSync(activePath, "utf-8").trim();
+    if (!fs6.existsSync(activePath)) return null;
+    return fs6.readFileSync(activePath, "utf-8").trim();
   }
-  getCommentCount(featureName) {
-    const commentsPath = path5.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
-    if (!fs2.existsSync(commentsPath)) return 0;
+  getCommentCount(featureName, document2) {
+    const featurePath = path5.join(this.workspaceRoot, ".hive", "features", featureName);
+    const commentsPath = document2 === "plan" ? this.firstExistingPath([
+      path5.join(featurePath, "comments", "plan.json"),
+      path5.join(featurePath, "comments.json")
+    ]) : path5.join(featurePath, "comments", "overview.json");
+    if (!commentsPath || !fs6.existsSync(commentsPath)) return 0;
     try {
-      const data = JSON.parse(fs2.readFileSync(commentsPath, "utf-8"));
+      const data = JSON.parse(fs6.readFileSync(commentsPath, "utf-8"));
       return data.threads?.length || 0;
     } catch {
       return 0;
     }
   }
+  firstExistingPath(paths) {
+    return paths.find((candidate) => fs6.existsSync(candidate)) ?? null;
+  }
 };
 
 // src/providers/planCommentController.ts
 var vscode4 = __toESM(require("vscode"));
-var fs6 = __toESM(require("fs"));
+var fs9 = __toESM(require("fs"));
 var path6 = __toESM(require("path"));
 var PlanCommentController = class {
   constructor(workspaceRoot) {
@@ -6932,31 +7040,34 @@ var PlanCommentController = class {
     this.normalizedWorkspaceRoot = this.normalizePath(workspaceRoot);
     this.controller = vscode4.comments.createCommentController(
       "hive-plan-review",
-      "Plan Review"
+      "Hive Review"
     );
     this.controller.commentingRangeProvider = {
       provideCommentingRanges: (document2) => {
-        if (path6.basename(document2.fileName) !== "plan.md") return [];
+        if (!this.getReviewTarget(document2.fileName)) return [];
         return [new vscode4.Range(0, 0, document2.lineCount - 1, 0)];
       }
     };
-    const pattern = new vscode4.RelativePattern(
-      workspaceRoot,
-      ".hive/features/*/comments.json"
-    );
-    this.commentsWatcher = vscode4.workspace.createFileSystemWatcher(pattern);
-    this.commentsWatcher.onDidChange((uri) => this.onCommentsFileChanged(uri));
-    this.commentsWatcher.onDidDelete((uri) => this.onCommentsFileChanged(uri));
+    const patterns = [
+      new vscode4.RelativePattern(workspaceRoot, ".hive/features/*/comments.json"),
+      new vscode4.RelativePattern(workspaceRoot, ".hive/features/*/comments/*.json")
+    ];
+    const rootWatcher = vscode4.workspace.createFileSystemWatcher(patterns[0]);
+    const nestedWatcher = vscode4.workspace.createFileSystemWatcher(patterns[1]);
+    rootWatcher.onDidChange((uri) => this.onCommentsFileChanged(uri));
+    rootWatcher.onDidDelete((uri) => this.onCommentsFileChanged(uri));
+    nestedWatcher.onDidChange((uri) => this.onCommentsFileChanged(uri));
+    nestedWatcher.onDidDelete((uri) => this.onCommentsFileChanged(uri));
+    this.commentsWatchers = [rootWatcher, nestedWatcher];
   }
   controller;
   threads = /* @__PURE__ */ new Map();
-  commentsWatcher;
+  commentsWatchers = [];
   normalizedWorkspaceRoot;
   onCommentsFileChanged(commentsUri) {
-    const featureMatch = this.getFeatureMatch(commentsUri.fsPath);
-    if (!featureMatch) return;
-    const planPath = path6.join(this.workspaceRoot, ".hive", "features", featureMatch, "plan.md");
-    this.loadComments(vscode4.Uri.file(planPath));
+    const target = this.getCommentsTarget(commentsUri.fsPath);
+    if (!target) return;
+    this.loadComments(vscode4.Uri.file(this.getDocumentPath(target.featureName, target.document)));
   }
   registerCommands(context) {
     context.subscriptions.push(
@@ -6986,30 +7097,49 @@ var PlanCommentController = class {
         }
       }),
       vscode4.workspace.onDidOpenTextDocument((doc) => {
-        if (path6.basename(doc.fileName) === "plan.md") {
+        if (this.getReviewTarget(doc.fileName)) {
           this.loadComments(doc.uri);
         }
       }),
       vscode4.workspace.onDidSaveTextDocument((doc) => {
-        if (path6.basename(doc.fileName) === "plan.md") {
+        if (this.getReviewTarget(doc.fileName)) {
           this.saveComments(doc.uri);
         }
       })
     );
     vscode4.workspace.textDocuments.forEach((doc) => {
-      if (path6.basename(doc.fileName) === "plan.md") {
+      if (this.getReviewTarget(doc.fileName)) {
         this.loadComments(doc.uri);
       }
     });
   }
-  getFeatureMatch(filePath) {
+  getReviewTarget(filePath) {
     const normalized = this.normalizePath(filePath);
     const normalizedWorkspace = this.normalizedWorkspaceRoot.replace(/\/+$/, "");
     const compareNormalized = process.platform === "win32" ? normalized.toLowerCase() : normalized;
     const compareWorkspace = process.platform === "win32" ? normalizedWorkspace.toLowerCase() : normalizedWorkspace;
     if (!compareNormalized.startsWith(`${compareWorkspace}/`)) return null;
-    const match = filePath.replace(/\\/g, "/").match(/\.hive\/features\/([^/]+)\/(?:plan\.md|comments\.json)$/);
-    return match ? match[1] : null;
+    const planMatch = normalized.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
+    if (planMatch) {
+      return { featureName: planMatch[1], document: "plan" };
+    }
+    const overviewMatch = normalized.match(/\.hive\/features\/([^/]+)\/context\/overview\.md$/);
+    if (overviewMatch) {
+      return { featureName: overviewMatch[1], document: "overview" };
+    }
+    return null;
+  }
+  getCommentsTarget(filePath) {
+    const normalized = this.normalizePath(filePath);
+    const reviewMatch = normalized.match(/\.hive\/features\/([^/]+)\/comments\/(plan|overview)\.json$/);
+    if (reviewMatch) {
+      return { featureName: reviewMatch[1], document: reviewMatch[2] };
+    }
+    const legacyMatch = normalized.match(/\.hive\/features\/([^/]+)\/comments\.json$/);
+    if (legacyMatch) {
+      return { featureName: legacyMatch[1], document: "plan" };
+    }
+    return null;
   }
   normalizePath(filePath) {
     return filePath.replace(/\\/g, "/");
@@ -7050,21 +7180,40 @@ var PlanCommentController = class {
     this.saveComments(reply.thread.uri);
   }
   getCommentsPath(uri) {
-    const featureMatch = this.getFeatureMatch(uri.fsPath);
-    if (!featureMatch) return null;
-    return path6.join(this.workspaceRoot, ".hive", "features", featureMatch, "comments.json");
+    const target = this.getReviewTarget(uri.fsPath);
+    if (!target) return null;
+    return path6.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", `${target.document}.json`);
+  }
+  getReadableCommentsPath(uri) {
+    const target = this.getReviewTarget(uri.fsPath);
+    if (!target) return null;
+    if (target.document === "plan") {
+      const canonicalPath = path6.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", "plan.json");
+      if (fs9.existsSync(canonicalPath)) {
+        return canonicalPath;
+      }
+      const legacyPath = path6.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments.json");
+      if (fs9.existsSync(legacyPath)) {
+        return legacyPath;
+      }
+      return canonicalPath;
+    }
+    return path6.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", `${target.document}.json`);
+  }
+  getDocumentPath(featureName, document2) {
+    return document2 === "overview" ? path6.join(this.workspaceRoot, ".hive", "features", featureName, "context", "overview.md") : path6.join(this.workspaceRoot, ".hive", "features", featureName, "plan.md");
   }
   loadComments(uri) {
-    const commentsPath = this.getCommentsPath(uri);
-    if (!commentsPath || !fs6.existsSync(commentsPath)) return;
+    const commentsPath = this.getReadableCommentsPath(uri);
+    this.threads.forEach((thread, id) => {
+      if (this.isSamePath(thread.uri.fsPath, uri.fsPath)) {
+        thread.dispose();
+        this.threads.delete(id);
+      }
+    });
+    if (!commentsPath || !fs9.existsSync(commentsPath)) return;
     try {
-      const data = JSON.parse(fs6.readFileSync(commentsPath, "utf-8"));
-      this.threads.forEach((thread, id) => {
-        if (this.isSamePath(thread.uri.fsPath, uri.fsPath)) {
-          thread.dispose();
-          this.threads.delete(id);
-        }
-      });
+      const data = JSON.parse(fs9.readFileSync(commentsPath, "utf-8"));
       for (const stored of data.threads) {
         const comments2 = [
           {
@@ -7110,14 +7259,14 @@ var PlanCommentController = class {
     });
     const data = { threads };
     try {
-      fs6.mkdirSync(path6.dirname(commentsPath), { recursive: true });
-      fs6.writeFileSync(commentsPath, JSON.stringify(data, null, 2));
+      fs9.mkdirSync(path6.dirname(commentsPath), { recursive: true });
+      fs9.writeFileSync(commentsPath, JSON.stringify(data, null, 2));
     } catch (error) {
       console.error("Failed to save comments:", error);
     }
   }
   dispose() {
-    this.commentsWatcher?.dispose();
+    this.commentsWatchers.forEach((watcher) => watcher.dispose());
     this.controller.dispose();
   }
 };
@@ -7229,13 +7378,14 @@ function getFeatureTools(workspaceRoot) {
 
 // src/tools/plan.ts
 function getPlanTools(workspaceRoot) {
+  const featureService = new FeatureService(workspaceRoot);
   const planService = new PlanService(workspaceRoot);
   const contextService = new ContextService(workspaceRoot);
   return [
     {
       name: "hive_plan_write",
       displayName: "Write Hive Plan",
-      modelDescription: "Write or update the plan.md for a feature. The plan defines tasks to execute. Use markdown with ### numbered headers for tasks. Clears existing comments when plan is rewritten.",
+      modelDescription: 'Write or update the plan.md for a feature. The plan defines execution truth and tasks to execute. After significant plan changes, also refresh context/overview.md via hive_context_write({ name: "overview", content }) as the primary human-facing review surface. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.',
       inputSchema: {
         type: "object",
         properties: {
@@ -7256,23 +7406,27 @@ function getPlanTools(workspaceRoot) {
         let contextWarning = "";
         try {
           const contexts = contextService.list(feature);
+          const hasOverview = contexts.some((context) => context.name === "overview");
+          if (!hasOverview) {
+            contextWarning += '\n\nNext: Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }). Use sections ## At a Glance, ## Workstreams, and ## Revision History.';
+          }
           if (contexts.length === 0) {
-            contextWarning = "\n\n\u26A0\uFE0F WARNING: No context files created yet! Workers need context to execute well. Use hive_context_write to document:\n- Research findings and patterns\n- User preferences and decisions\n- Architecture constraints\n- References to existing code";
+            contextWarning += "\n\n\u26A0\uFE0F WARNING: No context files created yet! Workers need context to execute well. Use hive_context_write to document:\n- Research findings and patterns\n- User preferences and decisions\n- Architecture constraints\n- References to existing code";
           }
         } catch {
-          contextWarning = "\n\n\u26A0\uFE0F WARNING: Could not check context files. Consider using hive_context_write to document findings for workers.";
+          contextWarning = '\n\n\u26A0\uFE0F WARNING: Could not check context files. Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }) and document findings for workers in context files.';
         }
         return JSON.stringify({
           success: true,
           path: planPath,
-          message: `Plan written. User can review and add comments. When ready, use hive_plan_approve.${contextWarning}`
+          message: `Plan written. User can review context/overview.md as the primary human-facing surface and plan.md as execution truth. When ready, use hive_plan_approve.${contextWarning}`
         });
       }
     },
     {
       name: "hive_plan_read",
       displayName: "Read Hive Plan",
-      modelDescription: "Read the plan.md and any user comments for a feature. Use to check plan content, status, and user feedback before making changes.",
+      modelDescription: "Read the plan.md and related review comments for a feature. Use to check plan content, status, and user feedback before making changes.",
       readOnly: true,
       inputSchema: {
         type: "object",
@@ -7301,7 +7455,7 @@ function getPlanTools(workspaceRoot) {
     {
       name: "hive_plan_approve",
       displayName: "Approve Hive Plan",
-      modelDescription: "Approve a plan for execution. Use after user has reviewed the plan and resolved any comments. Changes feature status to approved.",
+      modelDescription: "Approve a plan for execution. Use after user has reviewed the overview as the primary human-facing surface, checked plan.md as execution truth, and resolved any comments. Changes feature status to approved.",
       inputSchema: {
         type: "object",
         properties: {
@@ -7314,18 +7468,44 @@ function getPlanTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature } = input;
+        let contexts = [];
         let contextWarning = "";
         try {
-          const contexts = contextService.list(feature);
+          contexts = contextService.list(feature);
+          const hasOverview = contexts.some((context) => context.name === "overview");
+          if (!hasOverview) {
+            contextWarning += '\n\n\u26A0\uFE0F Note: No overview found. Create or refresh it with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History.';
+          }
           if (contexts.length === 0) {
-            contextWarning = "\n\n\u26A0\uFE0F Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.";
+            contextWarning += "\n\n\u26A0\uFE0F Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.";
+          } else if (hasOverview) {
+            contextWarning += "\n\nRefresh the overview if approval changed the plan narrative, milestones, or workstreams.";
           }
         } catch {
         }
-        planService.approve(feature);
+        try {
+          planService.approve(feature);
+        } catch (error) {
+          if (error instanceof Error && /unresolved review comments/i.test(error.message)) {
+            const hasOverview = contexts.some((context) => context.name === "overview");
+            const reviewCounts = featureService.getInfo(feature)?.reviewCounts ?? { plan: 0, overview: 0 };
+            const planComments = reviewCounts.plan;
+            const overviewComments = hasOverview ? reviewCounts.overview : 0;
+            const unresolvedTotal = planComments + overviewComments;
+            const documents = [
+              planComments > 0 ? `plan (${planComments})` : null,
+              overviewComments > 0 ? `overview (${overviewComments})` : null
+            ].filter(Boolean).join(", ");
+            return JSON.stringify({
+              success: false,
+              message: `Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`
+            });
+          }
+          throw error;
+        }
         return JSON.stringify({
           success: true,
-          message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan.${contextWarning}`
+          message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan, and keep context/overview.md current as the primary human-facing summary.${contextWarning}`
         });
       }
     }
@@ -7794,26 +7974,32 @@ function getContextTools(workspaceRoot) {
     {
       name: "hive_context_write",
       displayName: "Write Context File",
-      modelDescription: "Write a context file to store research findings, decisions, or reference material. Context persists and helps workers understand background.",
+      modelDescription: 'Write a context file to store research findings, decisions, or reference material. Use name: "overview" for the canonical human-facing summary/history file at context/overview.md; refresh it after major planning or execution milestones while plan.md remains execution truth.',
       inputSchema: {
         type: "object",
         properties: {
           feature: { type: "string", description: "Feature name" },
-          name: { type: "string", description: "Context file name (without .md)" },
+          name: { type: "string", description: 'Context file name (without .md). Use "overview" for the primary human-facing summary/history file.' },
           content: { type: "string", description: "Context content in markdown" }
         },
         required: ["feature", "name", "content"]
       },
       invoke: async (input) => {
         const { feature, name, content } = input;
-        const path11 = contextService.write(feature, name, content);
-        return JSON.stringify({ success: true, path: path11 });
+        const path12 = contextService.write(feature, name, content);
+        return JSON.stringify({
+          success: true,
+          path: path12,
+          message: name === "overview" ? "Overview written as the primary human-facing summary/history file. Keep sections ## At a Glance, ## Workstreams, and ## Revision History current." : "Context file written."
+        });
       }
     }
   ];
 }
 
 // src/tools/status.ts
+var fs10 = __toESM(require("fs"));
+var path9 = __toESM(require("path"));
 function getStatusTools(workspaceRoot) {
   const featureService = new FeatureService(workspaceRoot);
   const taskService = new TaskService(workspaceRoot);
@@ -7844,6 +8030,8 @@ function getStatusTools(workspaceRoot) {
     const plan = planService.read(feature);
     const tasks = taskService.list(feature);
     const contextFiles = contextService.list(feature);
+    const overview = contextFiles.find((file) => file.name === "overview") ?? null;
+    const reviewCounts = readReviewCounts(workspaceRoot, feature);
     const tasksSummary = tasks.map((t) => {
       const rawStatus = taskService.getRawStatus(feature, t.folder);
       return {
@@ -7887,6 +8075,19 @@ function getStatusTools(workspaceRoot) {
         status: planStatus,
         approved: planStatus === "approved" || planStatus === "locked"
       },
+      overview: {
+        exists: !!overview,
+        path: `.hive/features/${feature}/context/overview.md`,
+        updatedAt: overview?.updatedAt ?? null,
+        primaryReview: true
+      },
+      review: {
+        unresolvedTotal: reviewCounts.plan + reviewCounts.overview,
+        byDocument: {
+          overview: reviewCounts.overview,
+          plan: reviewCounts.plan
+        }
+      },
       tasks: {
         total: tasks.length,
         pending: pendingTasks.length,
@@ -7900,7 +8101,7 @@ function getStatusTools(workspaceRoot) {
         fileCount: contextFiles.length,
         files: contextSummary
       },
-      nextAction: getNextAction(planStatus, tasksSummary, runnable)
+      nextAction: getNextAction(planStatus, tasksSummary, runnable, !!plan, !!overview)
     });
   };
   const baseStatusTool = {
@@ -7929,9 +8130,15 @@ function getStatusTools(workspaceRoot) {
     }
   ];
 }
-function getNextAction(planStatus, tasks, runnable) {
+function getNextAction(planStatus, tasks, runnable, hasPlan, hasOverview) {
+  if (hasPlan && !hasOverview) {
+    return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content }). Use sections ## At a Glance, ## Workstreams, and ## Revision History.';
+  }
   if (!planStatus || planStatus === "draft") {
-    return "Write or revise plan with hive_plan_write, then get approval";
+    return 'Write or revise plan with hive_plan_write, then Refresh overview after significant plan changes with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History.';
+  }
+  if (hasPlan && hasOverview && (planStatus === "approved" || planStatus === "locked")) {
+    return 'Refresh overview after significant plan changes or milestone updates with hive_context_write({ name: "overview", content }). Keep ## At a Glance, ## Workstreams, and ## Revision History current.';
   }
   if (planStatus === "review") {
     return "Wait for plan approval or revise based on comments";
@@ -7955,11 +8162,32 @@ function getNextAction(planStatus, tasks, runnable) {
   }
   return "All tasks complete. Review and merge or complete feature.";
 }
+function readReviewCounts(workspaceRoot, feature) {
+  const featurePath = path9.join(workspaceRoot, ".hive", "features", feature);
+  const reviewDir = path9.join(featurePath, "comments");
+  const planThreads = readThreads(path9.join(reviewDir, "plan.json")) ?? readThreads(path9.join(featurePath, "comments.json"));
+  const overviewThreads = readThreads(path9.join(reviewDir, "overview.json"));
+  return {
+    plan: planThreads?.length ?? 0,
+    overview: overviewThreads?.length ?? 0
+  };
+}
+function readThreads(filePath) {
+  if (!fs10.existsSync(filePath)) {
+    return null;
+  }
+  try {
+    const data = JSON.parse(fs10.readFileSync(filePath, "utf-8"));
+    return data.threads ?? [];
+  } catch {
+    return [];
+  }
+}
 
 // src/commands/initNest.ts
 var vscode6 = __toESM(require("vscode"));
-var fs9 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var fs11 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
 var HIVE_SKILL_TEMPLATE = `---
 name: hive
 description: Plan-first AI development with isolated git worktrees and human review. Use for any feature development.
@@ -8197,32 +8425,58 @@ User reviews in VS Code, adds comments, approves when ready.
 Use \`#tool:runSubagent\` for parallel work. Do not switch models; delegate only with runSubagent.
 `;
 function createSkill(basePath) {
-  const skillPath = path9.join(basePath, "hive");
-  fs9.mkdirSync(skillPath, { recursive: true });
-  fs9.writeFileSync(path9.join(skillPath, "SKILL.md"), HIVE_SKILL_TEMPLATE);
+  const skillPath = path10.join(basePath, "hive");
+  fs11.mkdirSync(skillPath, { recursive: true });
+  fs11.writeFileSync(path10.join(skillPath, "SKILL.md"), HIVE_SKILL_TEMPLATE);
 }
 async function initNest(projectRoot) {
-  const hivePath = path9.join(projectRoot, ".hive");
-  fs9.mkdirSync(path9.join(hivePath, "features"), { recursive: true });
-  fs9.mkdirSync(path9.join(hivePath, "skills"), { recursive: true });
-  const opencodePath = path9.join(projectRoot, ".opencode", "skill");
+  const hivePath = path10.join(projectRoot, ".hive");
+  fs11.mkdirSync(path10.join(hivePath, "features"), { recursive: true });
+  fs11.mkdirSync(path10.join(hivePath, "skills"), { recursive: true });
+  const opencodePath = path10.join(projectRoot, ".opencode", "skill");
   createSkill(opencodePath);
-  const claudePath = path9.join(projectRoot, ".claude", "skills");
+  const claudePath = path10.join(projectRoot, ".claude", "skills");
   createSkill(claudePath);
-  const agentPath = path9.join(projectRoot, ".github", "agents");
-  fs9.mkdirSync(agentPath, { recursive: true });
-  fs9.writeFileSync(path9.join(agentPath, "Hive.agent.md"), COPILOT_AGENT_TEMPLATE);
+  const agentPath = path10.join(projectRoot, ".github", "agents");
+  fs11.mkdirSync(agentPath, { recursive: true });
+  fs11.writeFileSync(path10.join(agentPath, "Hive.agent.md"), COPILOT_AGENT_TEMPLATE);
   vscode6.window.showInformationMessage("\u{1F41D} Hive Nest initialized! Skills created for OpenCode, Claude, and GitHub Copilot.");
 }
 
 // src/extension.ts
+function getReviewTarget(workspaceRoot, filePath) {
+  const normalizedWorkspace = workspaceRoot.replace(/\\/g, "/").replace(/\/+$/, "");
+  const normalizedPath = filePath.replace(/\\/g, "/");
+  const compareWorkspace = process.platform === "win32" ? normalizedWorkspace.toLowerCase() : normalizedWorkspace;
+  const comparePath = process.platform === "win32" ? normalizedPath.toLowerCase() : normalizedPath;
+  if (!comparePath.startsWith(`${compareWorkspace}/`)) {
+    return null;
+  }
+  const planMatch = normalizedPath.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
+  if (planMatch) {
+    return { featureName: planMatch[1], document: "plan" };
+  }
+  const overviewMatch = normalizedPath.match(/\.hive\/features\/([^/]+)\/context\/overview\.md$/);
+  if (overviewMatch) {
+    return { featureName: overviewMatch[1], document: "overview" };
+  }
+  return null;
+}
+function getReviewCommentsPath2(workspaceRoot, featureName, document2) {
+  if (document2 === "plan") {
+    const canonicalPath = path11.join(workspaceRoot, ".hive", "features", featureName, "comments", "plan.json");
+    const legacyPath = path11.join(workspaceRoot, ".hive", "features", featureName, "comments.json");
+    return fs12.existsSync(canonicalPath) ? canonicalPath : fs12.existsSync(legacyPath) ? legacyPath : canonicalPath;
+  }
+  return path11.join(workspaceRoot, ".hive", "features", featureName, "comments", "overview.json");
+}
 function findHiveRoot(startPath) {
   let current = startPath;
-  while (current !== path10.dirname(current)) {
-    if (fs10.existsSync(path10.join(current, ".hive"))) {
+  while (current !== path11.dirname(current)) {
+    if (fs12.existsSync(path11.join(current, ".hive"))) {
       return current;
     }
-    current = path10.dirname(current);
+    current = path11.dirname(current);
   }
   return null;
 }
@@ -8328,8 +8582,8 @@ var HiveExtension = class {
             vscode7.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
           }
         } else if (name) {
-          const hiveDir = path10.join(workspaceFolder, ".hive");
-          fs10.mkdirSync(hiveDir, { recursive: true });
+          const hiveDir = path11.join(workspaceFolder, ".hive");
+          fs12.mkdirSync(hiveDir, { recursive: true });
           this.workspaceRoot = workspaceFolder;
           this.initializeWithHive(workspaceFolder);
           const featureService = new FeatureService(workspaceFolder);
@@ -8353,10 +8607,16 @@ var HiveExtension = class {
       }),
       vscode7.commands.registerCommand("hive.approvePlan", async (item) => {
         if (item?.featureName && this.workspaceRoot) {
+          const featureService = new FeatureService(this.workspaceRoot);
           const planService = new PlanService(this.workspaceRoot);
-          const comments2 = planService.getComments(item.featureName);
-          if (comments2.length > 0) {
-            vscode7.window.showWarningMessage(`Hive: Cannot approve - ${comments2.length} unresolved comment(s). Address them first.`);
+          const reviewCounts = featureService.getInfo(item.featureName)?.reviewCounts ?? { plan: 0, overview: 0 };
+          const unresolvedTotal = reviewCounts.plan + reviewCounts.overview;
+          if (unresolvedTotal > 0) {
+            const documents = [
+              reviewCounts.plan > 0 ? `plan (${reviewCounts.plan})` : null,
+              reviewCounts.overview > 0 ? `overview (${reviewCounts.overview})` : null
+            ].filter(Boolean).join(", ");
+            vscode7.window.showWarningMessage(`Hive: Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`);
             return;
           }
           try {
@@ -8393,7 +8653,7 @@ var HiveExtension = class {
         if (item?.featureName && item?.folder && this.workspaceRoot) {
           const worktreeService = new WorktreeService({
             baseDir: this.workspaceRoot,
-            hiveDir: path10.join(this.workspaceRoot, ".hive")
+            hiveDir: path11.join(this.workspaceRoot, ".hive")
           });
           const taskService = new TaskService(this.workspaceRoot);
           try {
@@ -8420,22 +8680,21 @@ var HiveExtension = class {
           return;
         }
         const filePath = editor.document.uri.fsPath;
-        const normalized = filePath.replace(/\\/g, "/");
-        const featureMatch = normalized.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
-        if (!featureMatch) {
-          vscode7.window.showErrorMessage("Not a plan.md file");
+        const target = getReviewTarget(this.workspaceRoot, filePath);
+        if (!target) {
+          vscode7.window.showErrorMessage("Not a reviewable plan.md or context/overview.md file");
           return;
         }
-        const featureName = featureMatch[1];
-        const commentsPath = path10.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
+        const commentsPath = getReviewCommentsPath2(this.workspaceRoot, target.featureName, target.document);
         let comments2 = [];
         try {
-          const commentsData = JSON.parse(fs10.readFileSync(commentsPath, "utf-8"));
+          const commentsData = JSON.parse(fs12.readFileSync(commentsPath, "utf-8"));
           comments2 = commentsData.threads || [];
         } catch (error) {
         }
         const hasComments = comments2.length > 0;
-        const inputPrompt = hasComments ? `${comments2.length} comment(s) found. Add feedback or leave empty to submit comments only` : "Enter your review feedback (or leave empty to approve)";
+        const documentLabel = target.document === "overview" ? "Overview" : "Plan";
+        const inputPrompt = hasComments ? `${documentLabel}: ${comments2.length} comment(s) found. Add feedback or leave empty to submit comments only` : `Enter your ${documentLabel.toLowerCase()} review feedback (or leave empty to approve)`;
         const userInput = await vscode7.window.showInputBox({
           prompt: inputPrompt,
           placeHolder: hasComments ? "Additional feedback (optional)" : 'e.g., "looks good" to approve, or describe changes needed'
@@ -8444,13 +8703,13 @@ var HiveExtension = class {
         let feedback;
         if (hasComments) {
           const allComments = comments2.map((c) => `Line ${c.line}: ${c.body}`).join("\n");
-          feedback = userInput === "" ? `Review comments:
-${allComments}` : `Review comments:
+          feedback = userInput === "" ? `${documentLabel} review comments:
+${allComments}` : `${documentLabel} review comments:
 ${allComments}
 
 Additional feedback: ${userInput}`;
         } else {
-          feedback = userInput === "" ? "Plan approved" : `Review feedback: ${userInput}`;
+          feedback = userInput === "" ? `${documentLabel} approved` : `${documentLabel} review feedback: ${userInput}`;
         }
         vscode7.window.showInformationMessage(
           `Hive: ${hasComments ? "Comments submitted" : "Review submitted"}. Use @Hive in Copilot Chat to continue.`
