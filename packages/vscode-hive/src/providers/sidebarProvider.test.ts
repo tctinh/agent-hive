@@ -164,6 +164,25 @@ describe('HiveSidebarProvider', () => {
     expect(completedGroup?.features.map(feature => feature.name)).toEqual(['completed-feature']);
     expect(completedGroup?.features[0]?.description).toBe('Completed · 1/1');
   });
+
+  it('shows overview alongside plan and context for feature children', async () => {
+    const featureService = new FeatureService(testRoot);
+    const planService = new PlanService(testRoot);
+
+    featureService.create('alpha-feature');
+    planService.write('alpha-feature', '# Plan\n');
+
+    const featurePath = path.join(testRoot, '.hive', 'features', '01_alpha-feature');
+    fs.mkdirSync(path.join(featurePath, 'context'), { recursive: true });
+    fs.writeFileSync(path.join(featurePath, 'context', 'overview.md'), '# Overview\n');
+
+    const provider = new HiveSidebarProvider(testRoot);
+    const [{ features }] = (await provider.getChildren()).filter(item => 'features' in item);
+    const [featureItem] = features;
+    const children = await provider.getChildren(featureItem);
+
+    expect(children.map(item => item.label)).toEqual(['Overview', 'Plan', 'Context', 'Tasks']);
+  });
 });
 
 function setFeatureStatus(featurePath: string, status: 'planning' | 'executing' | 'completed'): void {

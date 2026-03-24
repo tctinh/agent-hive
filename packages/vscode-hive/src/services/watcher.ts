@@ -1,22 +1,31 @@
 import * as vscode from 'vscode'
-import * as path from 'path'
 
 export class HiveWatcher {
-  private watcher: vscode.FileSystemWatcher
+  private hiveWatcher: vscode.FileSystemWatcher
+  private githubWatcher: vscode.FileSystemWatcher
+  private pluginWatcher: vscode.FileSystemWatcher
 
   constructor(workspaceRoot: string, onChange: () => void) {
-    const pattern = new vscode.RelativePattern(
-      workspaceRoot,
-      '.hive/**/*'
+    this.hiveWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(workspaceRoot, '.hive/**/*')
     )
-    this.watcher = vscode.workspace.createFileSystemWatcher(pattern)
+    this.githubWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(workspaceRoot, '.github/**/*')
+    )
+    this.pluginWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(workspaceRoot, 'plugin.json')
+    )
 
-    this.watcher.onDidCreate(onChange)
-    this.watcher.onDidChange(onChange)
-    this.watcher.onDidDelete(onChange)
+    for (const watcher of [this.hiveWatcher, this.githubWatcher, this.pluginWatcher]) {
+      watcher.onDidCreate(onChange)
+      watcher.onDidChange(onChange)
+      watcher.onDidDelete(onChange)
+    }
   }
 
   dispose(): void {
-    this.watcher.dispose()
+    this.hiveWatcher.dispose()
+    this.githubWatcher.dispose()
+    this.pluginWatcher.dispose()
   }
 }

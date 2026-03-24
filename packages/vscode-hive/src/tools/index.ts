@@ -7,3 +7,5 @@ export { getExecTools } from './exec';
 export { getMergeTools } from './merge';
 export { getContextTools } from './context';
 export { getStatusTools } from './status';
+export { getAgentsMdTools } from './agentsMd';
+export { getSkillTools } from './skill';
