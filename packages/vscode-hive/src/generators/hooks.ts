@@ -52,7 +52,8 @@ fi
 has_approved_plan=false
 
 for feature_json in .hive/features/*/feature.json; do
-  if [[ "$(jq -r '.status // empty' "$feature_json")" == 'approved' ]]; then
+  status="$(jq -r '.status // empty' "$feature_json")"
+  if [[ "$status" == 'approved' || "$status" == 'executing' ]]; then
     has_approved_plan=true
     break
   fi
@@ -93,15 +94,58 @@ export function generateContextInjectionHook(): HookOutput {
 
 active_feature=''
 
-for feature_json in .hive/features/*/feature.json; do
-  status="$(jq -r '.status // empty' "$feature_json")"
+logical_name_for_feature() {
+  local feature_json="$1"
+  local directory_name logical_name
 
-  if [[ "$status" != 'completed' ]]; then
-    active_feature="\${feature_json%/feature.json}"
-    active_feature="\${active_feature##*/}"
-    break
+  logical_name="$(jq -r '.name // empty' "$feature_json")"
+  if [[ -n "$logical_name" ]]; then
+    printf '%s' "$logical_name"
+    return
   fi
-done
+
+  directory_name="\${feature_json%/feature.json}"
+  directory_name="\${directory_name##*/}"
+  if [[ "$directory_name" =~ ^[0-9]+[_-](.+)$ ]]; then
+    printf '%s' "\${BASH_REMATCH[1]}"
+    return
+  fi
+
+  printf '%s' "$directory_name"
+}
+
+if [[ -f .hive/active-feature ]]; then
+  active_feature="$(tr -d '\r\n' < .hive/active-feature)"
+fi
+
+if [[ -n "$active_feature" ]]; then
+  resolved_active_feature=''
+
+  for feature_json in .hive/features/*/feature.json; do
+    status="$(jq -r '.status // empty' "$feature_json")"
+    logical_name="$(logical_name_for_feature "$feature_json")"
+
+    if [[ "$status" != 'completed' && "$logical_name" == "$active_feature" ]]; then
+      resolved_active_feature="\${feature_json%/feature.json}"
+      resolved_active_feature="\${resolved_active_feature##*/}"
+      break
+    fi
+  done
+
+  active_feature="$resolved_active_feature"
+fi
+
+if [[ -z "$active_feature" ]]; then
+  for feature_json in .hive/features/*/feature.json; do
+    status="$(jq -r '.status // empty' "$feature_json")"
+
+    if [[ "$status" != 'completed' ]]; then
+      active_feature="\${feature_json%/feature.json}"
+      active_feature="\${active_feature##*/}"
+      break
+    fi
+  done
+fi
 
 if [[ -z "$active_feature" ]]; then
   jq -n '{}'
