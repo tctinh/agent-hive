@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { getFeaturesPath, getFeaturePath, listFeatureDirectories, readJson, normalizePath } from './paths.js';
+import { getFeaturesPath, getFeaturePath, getActiveFeaturePath, listFeatureDirectories, readJson, normalizePath } from './paths.js';
 import type { FeatureJson } from '../types.js';
 
 function toLogicalFeatureName(featureName: string): string {
@@ -69,7 +69,37 @@ export function listFeatures(projectRoot: string): string[] {
   const featuresPath = getFeaturesPath(projectRoot);
   if (!fs.existsSync(featuresPath)) return [];
 
-  return listFeatureDirectories(projectRoot).map((feature) => feature.logicalName);
+  return listFeatureDirectories(projectRoot)
+    .map((feature) => feature.logicalName)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+export function getActiveFeatureName(projectRoot: string): string | null {
+  const activeFeaturePath = getActiveFeaturePath(projectRoot);
+  if (!fs.existsSync(activeFeaturePath)) {
+    return null;
+  }
+
+  const activeFeatureName = fs.readFileSync(activeFeaturePath, 'utf-8').trim();
+  if (!activeFeatureName) {
+    return null;
+  }
+
+  const feature = getFeatureData(projectRoot, activeFeatureName);
+  if (!feature || feature.status === 'completed') {
+    return null;
+  }
+
+  return activeFeatureName;
+}
+
+export function resolveActiveFeatureName(projectRoot: string): string | null {
+  const activeFeatureName = getActiveFeatureName(projectRoot);
+  if (activeFeatureName) {
+    return activeFeatureName;
+  }
+
+  return listFeatures(projectRoot).find((featureName) => getFeatureData(projectRoot, featureName)?.status !== 'completed') ?? null;
 }
 
 export function getFeatureData(projectRoot: string, featureName: string): FeatureJson | null {

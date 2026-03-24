@@ -33,6 +33,11 @@ function setupIndexedFeature(directoryName: string, logicalName: string): string
   return featurePath;
 }
 
+function writeActiveFeature(name: string): void {
+  fs.mkdirSync(path.join(TEST_DIR, '.hive'), { recursive: true });
+  fs.writeFileSync(path.join(TEST_DIR, '.hive', 'active-feature'), name);
+}
+
 describe('FeatureService', () => {
   let service: FeatureService;
 
@@ -90,7 +95,8 @@ describe('FeatureService', () => {
     expect(feature.name).toBe('new-feature');
     expect(fs.existsSync(indexedPath)).toBe(true);
     expect(service.get('new-feature')).toMatchObject({ name: 'new-feature' });
-    expect(service.list()).toEqual(['legacy-feature', 'existing-feature', 'new-feature']);
+    expect(service.list()).toEqual(['existing-feature', 'legacy-feature', 'new-feature']);
+    expect(fs.readFileSync(path.join(TEST_DIR, '.hive', 'active-feature'), 'utf-8')).toBe('new-feature');
   });
 
   it('rejects duplicate logical feature names across legacy and indexed folders', () => {
@@ -99,5 +105,27 @@ describe('FeatureService', () => {
 
     expect(() => service.create('legacy-feature')).toThrow("Feature 'legacy-feature' already exists");
     expect(() => service.create('duplicate-feature')).toThrow("Feature 'duplicate-feature' already exists");
+  });
+
+  it('getActive prefers the active-feature pointer when it references a non-completed feature', () => {
+    setupFeature('beta-feature');
+    setupIndexedFeature('01_alpha-feature', 'alpha-feature');
+    writeActiveFeature('beta-feature');
+
+    expect(service.list()).toEqual(['alpha-feature', 'beta-feature']);
+    expect(service.getActive()).toMatchObject({ name: 'beta-feature' });
+  });
+
+  it('getActive ignores stale and completed pointers and falls back deterministically', () => {
+    setupFeature('zeta-feature');
+    setupIndexedFeature('01_alpha-feature', 'alpha-feature');
+    setupIndexedFeature('02_done-feature', 'done-feature');
+    service.updateStatus('done-feature', 'completed');
+
+    writeActiveFeature('missing-feature');
+    expect(service.getActive()).toMatchObject({ name: 'alpha-feature' });
+
+    writeActiveFeature('done-feature');
+    expect(service.getActive()).toMatchObject({ name: 'alpha-feature' });
   });
 });

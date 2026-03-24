@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  getActiveFeaturePath,
   getFeaturePath,
   getFeaturesPath,
   getNextIndexedFeatureDirectoryName,
@@ -51,6 +52,8 @@ export class FeatureService {
     };
 
     writeJson(getFeatureJsonPath(this.projectRoot, name), feature);
+    ensureDir(path.dirname(getActiveFeaturePath(this.projectRoot)));
+    fs.writeFileSync(getActiveFeaturePath(this.projectRoot), name, 'utf-8');
 
     return feature;
   }
@@ -60,10 +63,20 @@ export class FeatureService {
   }
 
   list(): string[] {
-    return listFeatureDirectories(this.projectRoot).map((feature) => feature.logicalName);
+    return listFeatureDirectories(this.projectRoot)
+      .map((feature) => feature.logicalName)
+      .sort((left, right) => left.localeCompare(right));
   }
 
   getActive(): FeatureJson | null {
+    const activeName = this.readActiveFeatureName();
+    if (activeName) {
+      const activeFeature = this.get(activeName);
+      if (activeFeature && activeFeature.status !== 'completed') {
+        return activeFeature;
+      }
+    }
+
     const features = this.list();
     for (const name of features) {
       const feature = this.get(name);
@@ -72,6 +85,16 @@ export class FeatureService {
       }
     }
     return null;
+  }
+
+  setActive(name: string): void {
+    const feature = this.get(name);
+    if (!feature) {
+      throw new Error(`Feature '${name}' not found`);
+    }
+
+    ensureDir(path.dirname(getActiveFeaturePath(this.projectRoot)));
+    fs.writeFileSync(getActiveFeaturePath(this.projectRoot), name, 'utf-8');
   }
 
   updateStatus(name: string, status: FeatureStatusType): FeatureJson {
@@ -159,5 +182,15 @@ export class FeatureService {
   getSession(name: string): string | undefined {
     const feature = this.get(name);
     return feature?.sessionId;
+  }
+
+  private readActiveFeatureName(): string | null {
+    const activeFeaturePath = getActiveFeaturePath(this.projectRoot);
+    if (!fileExists(activeFeaturePath)) {
+      return null;
+    }
+
+    const activeFeature = fs.readFileSync(activeFeaturePath, 'utf-8').trim();
+    return activeFeature || null;
   }
 }
