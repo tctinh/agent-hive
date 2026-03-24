@@ -21,10 +21,14 @@
     "vibe-coding",
     "opencode",
     "planning",
-    "workflow"
+    "workflow",
+    "copilot",
+    "agents",
+    "subagent",
+    "multi-agent"
   ],
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.107.0"
   },
   "categories": [
     "Other"
@@ -221,180 +225,6 @@
           "required": [
             "feature",
             "task"
-          ]
-        }
-      },
-      {
-        "name": "hive_subtask_create",
-        "displayName": "Create Subtask",
-        "modelDescription": "Create a subtask within a task. Use for TDD workflows: test -> implement -> verify. Types: test, implement, review, verify, research, debug, custom.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveSubtaskCreate",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": {
-              "type": "string",
-              "description": "Feature name"
-            },
-            "task": {
-              "type": "string",
-              "description": "Task folder name"
-            },
-            "name": {
-              "type": "string",
-              "description": "Subtask name"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "test",
-                "implement",
-                "review",
-                "verify",
-                "research",
-                "debug",
-                "custom"
-              ],
-              "description": "Subtask type"
-            }
-          },
-          "required": [
-            "feature",
-            "task",
-            "name"
-          ]
-        }
-      },
-      {
-        "name": "hive_subtask_update",
-        "displayName": "Update Subtask",
-        "modelDescription": "Update subtask status. Track progress through TDD cycle: pending -> in_progress -> done.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveSubtaskUpdate",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": {
-              "type": "string",
-              "description": "Feature name"
-            },
-            "task": {
-              "type": "string",
-              "description": "Task folder name"
-            },
-            "subtask": {
-              "type": "string",
-              "description": "Subtask ID (e.g., 1.1)"
-            },
-            "status": {
-              "type": "string",
-              "enum": [
-                "pending",
-                "in_progress",
-                "done",
-                "cancelled"
-              ],
-              "description": "New status"
-            }
-          },
-          "required": [
-            "feature",
-            "task",
-            "subtask",
-            "status"
-          ]
-        }
-      },
-      {
-        "name": "hive_subtask_list",
-        "displayName": "List Subtasks",
-        "modelDescription": "List all subtasks for a task. Check TDD progress or see what work remains.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveSubtaskList",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": {
-              "type": "string",
-              "description": "Feature name"
-            },
-            "task": {
-              "type": "string",
-              "description": "Task folder name"
-            }
-          },
-          "required": [
-            "feature",
-            "task"
-          ]
-        }
-      },
-      {
-        "name": "hive_subtask_spec_write",
-        "displayName": "Write Subtask Spec",
-        "modelDescription": "Write detailed instructions for a subtask in spec.md. Define what the subtask should accomplish.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveSubtaskSpecWrite",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": {
-              "type": "string",
-              "description": "Feature name"
-            },
-            "task": {
-              "type": "string",
-              "description": "Task folder name"
-            },
-            "subtask": {
-              "type": "string",
-              "description": "Subtask ID (e.g., 1.1)"
-            },
-            "content": {
-              "type": "string",
-              "description": "Spec content in markdown"
-            }
-          },
-          "required": [
-            "feature",
-            "task",
-            "subtask",
-            "content"
-          ]
-        }
-      },
-      {
-        "name": "hive_subtask_report_write",
-        "displayName": "Write Subtask Report",
-        "modelDescription": "Write completion report for a subtask in report.md. Document what was done and any findings.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveSubtaskReportWrite",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": {
-              "type": "string",
-              "description": "Feature name"
-            },
-            "task": {
-              "type": "string",
-              "description": "Task folder name"
-            },
-            "subtask": {
-              "type": "string",
-              "description": "Subtask ID (e.g., 1.1)"
-            },
-            "content": {
-              "type": "string",
-              "description": "Report content in markdown"
-            }
-          },
-          "required": [
-            "feature",
-            "task",
-            "subtask",
-            "content"
           ]
         }
       },
@@ -598,86 +428,53 @@
         }
       },
       {
-        "name": "hive_context_read",
-        "displayName": "Read Context",
-        "modelDescription": "Read a specific context file or all context for a feature. Use to understand background before starting work.",
+        "name": "hive_agents_md",
+        "displayName": "Manage AGENTS.md",
+        "modelDescription": "Initialize, sync, or apply changes to AGENTS.md. Actions: init (scan and generate), sync (update from context), apply (write to disk).",
         "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveContextRead",
+        "toolReferenceName": "hiveAgentsMd",
         "inputSchema": {
           "type": "object",
           "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "init",
+                "sync",
+                "apply"
+              ],
+              "description": "Action to perform"
+            },
             "feature": {
               "type": "string",
-              "description": "Feature name"
+              "description": "Feature name (required for sync)"
             },
+            "content": {
+              "type": "string",
+              "description": "Content to apply (required for apply)"
+            }
+          },
+          "required": [
+            "action"
+          ]
+        }
+      },
+      {
+        "name": "hive_skill",
+        "displayName": "Load Hive Skill",
+        "modelDescription": "Load a skill by name from .github/skills/, .claude/skills/, or .opencode/skill/. Returns the SKILL.md content with workflow instructions.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveSkill",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
             "name": {
               "type": "string",
-              "description": "Context file name (optional)"
+              "description": "Skill name (e.g. writing-plans, brainstorming, test-driven-development)"
             }
           },
           "required": [
-            "feature"
-          ]
-        }
-      },
-      {
-        "name": "hive_context_list",
-        "displayName": "List Context Files",
-        "modelDescription": "List all context files for a feature. Shows what background information is available.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveContextList",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": {
-              "type": "string",
-              "description": "Feature name"
-            }
-          },
-          "required": [
-            "feature"
-          ]
-        }
-      },
-      {
-        "name": "hive_session_open",
-        "displayName": "Open Hive Session",
-        "modelDescription": "Open a session and get full feature context. Returns plan, tasks, context files, and session history. Use at the start of work to understand current state.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveSessionOpen",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": {
-              "type": "string",
-              "description": "Feature name"
-            },
-            "task": {
-              "type": "string",
-              "description": "Optional task to focus on"
-            }
-          },
-          "required": [
-            "feature"
-          ]
-        }
-      },
-      {
-        "name": "hive_session_list",
-        "displayName": "List Sessions",
-        "modelDescription": "List all sessions for a feature. Shows active and past sessions to understand who else is working.",
-        "canBeReferencedInPrompt": true,
-        "toolReferenceName": "hiveSessionList",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": {
-              "type": "string",
-              "description": "Feature name"
-            }
-          },
-          "required": [
-            "feature"
+            "name"
           ]
         }
       }
@@ -702,7 +499,7 @@
     "viewsWelcome": [
       {
         "view": "hive.features",
-        "contents": "No Hive nest found in this workspace.\n\n[Init Hive Nest](command:hive.initNest)\n\nThis will create AI skill files for:\n- OpenCode (.opencode/skill/)\n- Claude (.claude/skills/)\n- GitHub Copilot (.github/agents/)",
+        "contents": "No Hive nest found in this workspace.\n\n[Init Hive Nest](command:hive.initNest)\n\nThis will create:\n- Copilot agents (.github/agents/)\n- Agent skills (.github/skills/)\n- Workflow hooks (.github/hooks/)\n- Instructions (.github/instructions/)\n- Plugin manifest (plugin.json)\n- Claude skills (.claude/skills/)\n- OpenCode skills (.opencode/skill/)",
         "when": "!hive.hasHiveRoot"
       }
     ],
@@ -723,43 +520,13 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "hive.openInOpenCode",
-        "title": "Open in OpenCode",
-        "icon": "$(terminal)"
-      },
-      {
-        "command": "hive.viewReport",
-        "title": "View Report",
-        "icon": "$(book)"
+        "command": "hive.regenerateAgents",
+        "title": "Hive: Regenerate Agents",
+        "icon": "$(sync)"
       },
       {
         "command": "hive.openFile",
         "title": "Open File"
-      },
-      {
-        "command": "hive.viewFeatureDetails",
-        "title": "View Details",
-        "icon": "$(info)"
-      },
-      {
-        "command": "hive.openSession",
-        "title": "Open Session in OpenCode",
-        "icon": "$(link-external)"
-      },
-      {
-        "command": "hive.revertStep",
-        "title": "Revert Step",
-        "icon": "$(discard)"
-      },
-      {
-        "command": "hive.revertBatch",
-        "title": "Revert Batch",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "hive.executeBatch",
-        "title": "Execute Batch",
-        "icon": "$(run)"
       },
       {
         "command": "hive.plan.doneReview",
@@ -798,11 +565,6 @@
         "command": "hive.startTask",
         "title": "Start Task",
         "icon": "$(play)"
-      },
-      {
-        "command": "hive.openSession",
-        "title": "Open Session",
-        "icon": "$(link-external)"
       }
     ],
     "menus": {
@@ -820,42 +582,8 @@
       ],
       "view/item/context": [
         {
-          "command": "hive.viewFeatureDetails",
-          "when": "viewItem == feature",
-          "group": "inline"
-        },
-        {
-          "command": "hive.openInOpenCode",
-          "when": "viewItem == step",
-          "group": "inline"
-        },
-        {
-          "command": "hive.viewReport",
-          "when": "viewItem == feature"
-        },
-        {
           "command": "hive.openFile",
           "when": "viewItem == file"
-        },
-        {
-          "command": "hive.openSession",
-          "when": "viewItem == session",
-          "group": "inline"
-        },
-        {
-          "command": "hive.revertStep",
-          "when": "viewItem == stepWithRevert",
-          "group": "inline"
-        },
-        {
-          "command": "hive.revertBatch",
-          "when": "viewItem == batch",
-          "group": "inline"
-        },
-        {
-          "command": "hive.executeBatch",
-          "when": "viewItem == batchPending",
-          "group": "inline"
         },
         {
           "command": "hive.approvePlan",
@@ -870,11 +598,6 @@
         {
           "command": "hive.startTask",
           "when": "viewItem == task-pending",
-          "group": "inline"
-        },
-        {
-          "command": "hive.openSession",
-          "when": "viewItem == session",
           "group": "inline"
         }
       ],
@@ -924,7 +647,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@opencode-ai/sdk": "^1.1.1",
     "hive-core": "workspace:*"
   }
 }

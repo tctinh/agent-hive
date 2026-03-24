@@ -12,9 +12,12 @@ import {
   getExecTools,
   getMergeTools,
   getContextTools,
-  getStatusTools
+  getStatusTools,
+  getAgentsMdTools,
+  getSkillTools
 } from './tools'
 import { initNest } from './commands/initNest'
+import { regenerateAgents } from './commands/regenerateAgents'
 
 type ReviewDocument = 'plan' | 'overview'
 
@@ -105,7 +108,9 @@ class HiveExtension {
       ...getExecTools(workspaceRoot),
       ...getMergeTools(workspaceRoot),
       ...getContextTools(workspaceRoot),
-      ...getStatusTools(workspaceRoot)
+      ...getStatusTools(workspaceRoot),
+      ...getAgentsMdTools(workspaceRoot),
+      ...getSkillTools(workspaceRoot)
     ])
 
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => {
@@ -164,6 +169,12 @@ class HiveExtension {
           }
         }
         this.sidebarProvider?.refresh()
+      }),
+
+      vscode.commands.registerCommand('hive.regenerateAgents', async () => {
+        if (this.workspaceRoot) {
+          await regenerateAgents(this.workspaceRoot)
+        }
       }),
 
       vscode.commands.registerCommand('hive.newFeature', async () => {

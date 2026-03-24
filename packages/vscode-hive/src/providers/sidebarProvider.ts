@@ -5,6 +5,7 @@ import { getFeaturePath, listFeatureDirectories } from 'hive-core'
 import type { FeatureJson, TaskStatus } from 'hive-core'
 
 type SidebarItem = ActionItem | StatusGroupItem | FeatureItem | OverviewItem | PlanItem | ContextFolderItem | ContextFileItem | TasksGroupItem | TaskItem | TaskFileItem
+  | CopilotArtifactsGroupItem | ArtifactCategoryItem | ArtifactFileItem
 
 // Quick action button
 class ActionItem extends vscode.TreeItem {
@@ -205,6 +206,42 @@ class TaskFileItem extends vscode.TreeItem {
   }
 }
 
+export class CopilotArtifactsGroupItem extends vscode.TreeItem {
+  constructor(public readonly workspaceRoot: string) {
+    super('Copilot Artifacts', vscode.TreeItemCollapsibleState.Collapsed)
+    this.contextValue = 'copilot-artifacts'
+    this.iconPath = new vscode.ThemeIcon('github')
+  }
+}
+
+export class ArtifactFileItem extends vscode.TreeItem {
+  constructor(
+    label: string,
+    public readonly filePath: string,
+    iconName: string
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.None)
+    this.iconPath = new vscode.ThemeIcon(iconName)
+    this.command = {
+      command: 'vscode.open',
+      title: 'Open',
+      arguments: [vscode.Uri.file(filePath)]
+    }
+  }
+}
+
+export class ArtifactCategoryItem extends vscode.TreeItem {
+  constructor(
+    label: string,
+    public readonly files: ArtifactFileItem[],
+    iconName: string
+  ) {
+    super(label, files.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None)
+    this.description = `${files.length}`
+    this.iconPath = new vscode.ThemeIcon(iconName)
+  }
+}
+
 export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<SidebarItem | undefined>()
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event
@@ -224,6 +261,10 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
       const items: SidebarItem[] = [
         new ActionItem('Init Skills', 'hive.initNest', 'symbol-misc')
       ]
+      const githubDir = path.join(this.workspaceRoot, '.github')
+      if (fs.existsSync(githubDir)) {
+        items.push(new CopilotArtifactsGroupItem(this.workspaceRoot))
+      }
       const statusGroups = await this.getStatusGroups()
       return [...items, ...statusGroups]
     }
@@ -238,6 +279,14 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
 
     if (element instanceof FeatureItem) {
       return this.getFeatureChildren(element.name)
+    }
+
+    if (element instanceof CopilotArtifactsGroupItem) {
+      return this.getCopilotArtifactCategories(element.workspaceRoot)
+    }
+
+    if (element instanceof ArtifactCategoryItem) {
+      return element.files
     }
 
     if (element instanceof ContextFolderItem) {
@@ -345,6 +394,67 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
     items.push(new TasksGroupItem(featureName, tasks))
 
     return items
+  }
+
+  private getCopilotArtifactCategories(workspaceRoot: string): SidebarItem[] {
+    const githubRoot = path.join(workspaceRoot, '.github')
+    const agentsDir = path.join(githubRoot, 'agents')
+    const skillsDir = path.join(githubRoot, 'skills')
+    const hooksDir = path.join(githubRoot, 'hooks')
+    const instructionsDir = path.join(githubRoot, 'instructions')
+    const pluginPath = path.join(workspaceRoot, 'plugin.json')
+
+    const categories: SidebarItem[] = [
+      new ArtifactCategoryItem(
+        'Agents',
+        this.getArtifactFiles(agentsDir, file => file.endsWith('.agent.md'), 'person'),
+        'person'
+      ),
+      new ArtifactCategoryItem(
+        'Skills',
+        this.getArtifactFiles(skillsDir, file => file === 'SKILL.md', 'book', true),
+        'book'
+      ),
+      new ArtifactCategoryItem(
+        'Hooks',
+        this.getArtifactFiles(hooksDir, file => file.endsWith('.json'), 'zap'),
+        'zap'
+      ),
+      new ArtifactCategoryItem(
+        'Instructions',
+        this.getArtifactFiles(instructionsDir, file => file.endsWith('.instructions.md'), 'note'),
+        'note'
+      )
+    ]
+
+    if (fs.existsSync(pluginPath)) {
+      categories.push(new ArtifactFileItem('Plugin Manifest', pluginPath, 'package'))
+    }
+
+    return categories
+  }
+
+  private getArtifactFiles(
+    basePath: string,
+    matches: (filename: string) => boolean,
+    iconName: string,
+    nestedSkillDirs: boolean = false
+  ): ArtifactFileItem[] {
+    if (!fs.existsSync(basePath)) return []
+
+    if (nestedSkillDirs) {
+      return fs.readdirSync(basePath, { withFileTypes: true })
+        .filter(entry => entry.isDirectory())
+        .map(entry => path.join(basePath, entry.name, 'SKILL.md'))
+        .filter(filePath => fs.existsSync(filePath))
+        .map(filePath => new ArtifactFileItem(path.basename(path.dirname(filePath)), filePath, iconName))
+        .sort((a, b) => String(a.label).localeCompare(String(b.label)))
+    }
+
+    return fs.readdirSync(basePath, { withFileTypes: true })
+      .filter(entry => entry.isFile() && matches(entry.name))
+      .map(entry => new ArtifactFileItem(entry.name, path.join(basePath, entry.name), iconName))
+      .sort((a, b) => String(a.label).localeCompare(String(b.label)))
   }
 
   private getContextFiles(featureName: string, contextPath: string): ContextFileItem[] {
