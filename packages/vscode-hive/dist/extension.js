@@ -734,15 +734,9 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-<<<<<<< HEAD
-var vscode7 = __toESM(require("vscode"));
-var fs12 = __toESM(require("fs"));
-var path12 = __toESM(require("path"));
-=======
 var vscode6 = __toESM(require("vscode"));
-var fs13 = __toESM(require("fs"));
-var path13 = __toESM(require("path"));
->>>>>>> pr-57
+var fs15 = __toESM(require("fs"));
+var path15 = __toESM(require("path"));
 
 // ../hive-core/dist/index.js
 var import_node_module = require("node:module");
@@ -759,41 +753,23 @@ var import_child_process = require("child_process");
 var import_node_path = require("node:path");
 var import_node_events = require("node:events");
 var fs8 = __toESM(require("fs"), 1);
-<<<<<<< HEAD
 var path5 = __toESM(require("path"), 1);
-=======
-var path4 = __toESM(require("path"), 1);
 var fs11 = __toESM(require("fs"), 1);
-var path7 = __toESM(require("path"), 1);
->>>>>>> pr-57
+var path8 = __toESM(require("path"), 1);
 var __create2 = Object.create;
 var __getProtoOf2 = Object.getPrototypeOf;
 var __defProp2 = Object.defineProperty;
 var __getOwnPropNames2 = Object.getOwnPropertyNames;
 var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-function __accessProp(key) {
-  return this[key];
-}
-var __toESMCache_node;
-var __toESMCache_esm;
 var __toESM2 = (mod, isNodeMode, target) => {
-  var canCache = mod != null && typeof mod === "object";
-  if (canCache) {
-    var cache2 = isNodeMode ? __toESMCache_node ??= /* @__PURE__ */ new WeakMap() : __toESMCache_esm ??= /* @__PURE__ */ new WeakMap();
-    var cached = cache2.get(mod);
-    if (cached)
-      return cached;
-  }
   target = mod != null ? __create2(__getProtoOf2(mod)) : {};
   const to = isNodeMode || !mod || !mod.__esModule ? __defProp2(target, "default", { value: mod, enumerable: true }) : target;
   for (let key of __getOwnPropNames2(mod))
     if (!__hasOwnProp2.call(to, key))
       __defProp2(to, key, {
-        get: __accessProp.bind(mod, key),
+        get: () => mod[key],
         enumerable: true
       });
-  if (canCache)
-    cache2.set(mod, to);
   return to;
 };
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
@@ -7367,7 +7343,7 @@ var AgentsMdService = class {
     this.contextService = contextService;
   }
   async init() {
-    const agentsMdPath = path7.join(this.rootDir, "AGENTS.md");
+    const agentsMdPath = path8.join(this.rootDir, "AGENTS.md");
     const existed = fileExists(agentsMdPath);
     if (existed) {
       const existing = readText(agentsMdPath);
@@ -7378,14 +7354,14 @@ var AgentsMdService = class {
   }
   async sync(featureName) {
     const contexts = this.contextService.list(featureName);
-    const agentsMdPath = path7.join(this.rootDir, "AGENTS.md");
+    const agentsMdPath = path8.join(this.rootDir, "AGENTS.md");
     const current = await fs11.promises.readFile(agentsMdPath, "utf-8").catch(() => "");
     const findings = this.extractFindings(contexts);
     const proposals = this.generateProposals(findings, current);
     return { proposals, diff: this.formatDiff(current, proposals) };
   }
   apply(content) {
-    const agentsMdPath = path7.join(this.rootDir, "AGENTS.md");
+    const agentsMdPath = path8.join(this.rootDir, "AGENTS.md");
     const isNew = !fileExists(agentsMdPath);
     writeText(agentsMdPath, content);
     return { path: agentsMdPath, chars: content.length, isNew };
@@ -7445,7 +7421,7 @@ var AgentsMdService = class {
     return this.generateTemplate(detections);
   }
   async detectProjectInfo() {
-    const packageJsonPath = path7.join(this.rootDir, "package.json");
+    const packageJsonPath = path8.join(this.rootDir, "package.json");
     let packageJson = null;
     if (fileExists(packageJsonPath)) {
       try {
@@ -7466,26 +7442,26 @@ var AgentsMdService = class {
     return info;
   }
   detectPackageManager() {
-    if (fileExists(path7.join(this.rootDir, "bun.lockb")))
+    if (fileExists(path8.join(this.rootDir, "bun.lockb")))
       return "bun";
-    if (fileExists(path7.join(this.rootDir, "pnpm-lock.yaml")))
+    if (fileExists(path8.join(this.rootDir, "pnpm-lock.yaml")))
       return "pnpm";
-    if (fileExists(path7.join(this.rootDir, "yarn.lock")))
+    if (fileExists(path8.join(this.rootDir, "yarn.lock")))
       return "yarn";
-    if (fileExists(path7.join(this.rootDir, "package-lock.json")))
+    if (fileExists(path8.join(this.rootDir, "package-lock.json")))
       return "npm";
     return "npm";
   }
   detectLanguage() {
-    if (fileExists(path7.join(this.rootDir, "tsconfig.json")))
+    if (fileExists(path8.join(this.rootDir, "tsconfig.json")))
       return "TypeScript";
-    if (fileExists(path7.join(this.rootDir, "package.json")))
+    if (fileExists(path8.join(this.rootDir, "package.json")))
       return "JavaScript";
-    if (fileExists(path7.join(this.rootDir, "requirements.txt")))
+    if (fileExists(path8.join(this.rootDir, "requirements.txt")))
       return "Python";
-    if (fileExists(path7.join(this.rootDir, "go.mod")))
+    if (fileExists(path8.join(this.rootDir, "go.mod")))
       return "Go";
-    if (fileExists(path7.join(this.rootDir, "Cargo.toml")))
+    if (fileExists(path8.join(this.rootDir, "Cargo.toml")))
       return "Rust";
     return "Unknown";
   }
@@ -7933,8 +7909,8 @@ var HiveSidebarProvider = class {
       const items = [
         new ActionItem("Init Skills", "hive.initNest", "symbol-misc")
       ];
-      const githubDir = path5.join(this.workspaceRoot, ".github");
-      if (fs2.existsSync(githubDir)) {
+      const githubDir = path6.join(this.workspaceRoot, ".github");
+      if (fs6.existsSync(githubDir)) {
         items.push(new CopilotArtifactsGroupItem(this.workspaceRoot));
       }
       const statusGroups = await this.getStatusGroups();
@@ -8034,12 +8010,12 @@ var HiveSidebarProvider = class {
     return items;
   }
   getCopilotArtifactCategories(workspaceRoot) {
-    const githubRoot = path5.join(workspaceRoot, ".github");
-    const agentsDir = path5.join(githubRoot, "agents");
-    const skillsDir = path5.join(githubRoot, "skills");
-    const hooksDir = path5.join(githubRoot, "hooks");
-    const instructionsDir = path5.join(githubRoot, "instructions");
-    const pluginPath = path5.join(workspaceRoot, "plugin.json");
+    const githubRoot = path6.join(workspaceRoot, ".github");
+    const agentsDir = path6.join(githubRoot, "agents");
+    const skillsDir = path6.join(githubRoot, "skills");
+    const hooksDir = path6.join(githubRoot, "hooks");
+    const instructionsDir = path6.join(githubRoot, "instructions");
+    const pluginPath = path6.join(workspaceRoot, "plugin.json");
     const categories = [
       new ArtifactCategoryItem(
         "Agents",
@@ -8062,17 +8038,17 @@ var HiveSidebarProvider = class {
         "note"
       )
     ];
-    if (fs2.existsSync(pluginPath)) {
+    if (fs6.existsSync(pluginPath)) {
       categories.push(new ArtifactFileItem("Plugin Manifest", pluginPath, "package"));
     }
     return categories;
   }
   getArtifactFiles(basePath, matches, iconName, nestedSkillDirs = false) {
-    if (!fs2.existsSync(basePath)) return [];
+    if (!fs6.existsSync(basePath)) return [];
     if (nestedSkillDirs) {
-      return fs2.readdirSync(basePath, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => path5.join(basePath, entry.name, "SKILL.md")).filter((filePath) => fs2.existsSync(filePath)).map((filePath) => new ArtifactFileItem(path5.basename(path5.dirname(filePath)), filePath, iconName)).sort((a, b) => String(a.label).localeCompare(String(b.label)));
+      return fs6.readdirSync(basePath, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => path6.join(basePath, entry.name, "SKILL.md")).filter((filePath) => fs6.existsSync(filePath)).map((filePath) => new ArtifactFileItem(path6.basename(path6.dirname(filePath)), filePath, iconName)).sort((a, b) => String(a.label).localeCompare(String(b.label)));
     }
-    return fs2.readdirSync(basePath, { withFileTypes: true }).filter((entry) => entry.isFile() && matches(entry.name)).map((entry) => new ArtifactFileItem(entry.name, path5.join(basePath, entry.name), iconName)).sort((a, b) => String(a.label).localeCompare(String(b.label)));
+    return fs6.readdirSync(basePath, { withFileTypes: true }).filter((entry) => entry.isFile() && matches(entry.name)).map((entry) => new ArtifactFileItem(entry.name, path6.join(basePath, entry.name), iconName)).sort((a, b) => String(a.label).localeCompare(String(b.label)));
   }
   getContextFiles(featureName, contextPath) {
     if (!fs6.existsSync(contextPath)) return [];
@@ -8733,7 +8709,7 @@ Reminder: run hive_worktree_start to work in its worktree, and ensure any subage
 }
 
 // src/tools/exec.ts
-var path8 = __toESM(require("path"));
+var path9 = __toESM(require("path"));
 function checkDependencies(taskService, feature, taskFolder) {
   const taskStatus = taskService.getRawStatus(feature, taskFolder);
   if (!taskStatus) {
@@ -8774,7 +8750,7 @@ function checkDependencies(taskService, feature, taskFolder) {
 function getExecTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
-    hiveDir: path8.join(workspaceRoot, ".hive")
+    hiveDir: path9.join(workspaceRoot, ".hive")
   });
   const taskService = new TaskService(workspaceRoot);
   const startWorktree = async ({ feature, task }) => {
@@ -9047,11 +9023,11 @@ ${summary}
 }
 
 // src/tools/merge.ts
-var path9 = __toESM(require("path"));
+var path10 = __toESM(require("path"));
 function getMergeTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
-    hiveDir: path9.join(workspaceRoot, ".hive")
+    hiveDir: path10.join(workspaceRoot, ".hive")
   });
   return [
     {
@@ -9104,17 +9080,12 @@ function getContextTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature, name, content } = input;
-<<<<<<< HEAD
-        const path13 = contextService.write(feature, name, content);
+        const path16 = contextService.write(feature, name, content);
         return JSON.stringify({
           success: true,
-          path: path13,
+          path: path16,
           message: name === "overview" ? "Overview written as the primary human-facing summary/history file. Keep sections ## At a Glance, ## Workstreams, and ## Revision History current." : "Context file written."
         });
-=======
-        const path14 = contextService.write(feature, name, content);
-        return JSON.stringify({ success: true, path: path14 });
->>>>>>> pr-57
       }
     }
   ];
@@ -9122,7 +9093,7 @@ function getContextTools(workspaceRoot) {
 
 // src/tools/status.ts
 var fs10 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
+var path11 = __toESM(require("path"));
 function getStatusTools(workspaceRoot) {
   const featureService = new FeatureService(workspaceRoot);
   const taskService = new TaskService(workspaceRoot);
@@ -9280,9 +9251,9 @@ function getNextAction(planStatus, tasks, runnable, hasPlan, hasOverview) {
 }
 function readReviewCounts(workspaceRoot, feature) {
   const featurePath = getFeaturePath(workspaceRoot, feature);
-  const reviewDir = path10.join(featurePath, "comments");
-  const planThreads = readThreads(path10.join(reviewDir, "plan.json")) ?? readThreads(path10.join(featurePath, "comments.json"));
-  const overviewThreads = readThreads(path10.join(reviewDir, "overview.json"));
+  const reviewDir = path11.join(featurePath, "comments");
+  const planThreads = readThreads(path11.join(reviewDir, "plan.json")) ?? readThreads(path11.join(featurePath, "comments.json"));
+  const overviewThreads = readThreads(path11.join(reviewDir, "overview.json"));
   return {
     plan: planThreads?.length ?? 0,
     overview: overviewThreads?.length ?? 0
@@ -9300,15 +9271,6 @@ function readThreads(filePath) {
   }
 }
 
-<<<<<<< HEAD
-// src/commands/initNest.ts
-var vscode6 = __toESM(require("vscode"));
-var fs11 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
-var HIVE_SKILL_TEMPLATE = `---
-name: hive
-description: Plan-first AI development with isolated git worktrees and human review. Use for any feature development.
-=======
 // src/tools/agentsMd.ts
 function getAgentsMdTools(workspaceRoot) {
   return [
@@ -9361,8 +9323,8 @@ function getAgentsMdTools(workspaceRoot) {
 }
 
 // src/tools/skill.ts
-var fs9 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
+var fs12 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
 function getSkillTools(workspaceRoot) {
   return [
     {
@@ -9383,13 +9345,13 @@ function getSkillTools(workspaceRoot) {
       invoke: async (input) => {
         const { name } = input;
         const searchPaths = [
-          path10.join(workspaceRoot, ".github", "skills", name, "SKILL.md"),
-          path10.join(workspaceRoot, ".claude", "skills", name, "SKILL.md"),
-          path10.join(workspaceRoot, ".opencode", "skill", name, "SKILL.md")
+          path12.join(workspaceRoot, ".github", "skills", name, "SKILL.md"),
+          path12.join(workspaceRoot, ".claude", "skills", name, "SKILL.md"),
+          path12.join(workspaceRoot, ".opencode", "skill", name, "SKILL.md")
         ];
         for (const skillPath of searchPaths) {
-          if (fs9.existsSync(skillPath)) {
-            return fs9.readFileSync(skillPath, "utf-8");
+          if (fs12.existsSync(skillPath)) {
+            return fs12.readFileSync(skillPath, "utf-8");
           }
         }
         return JSON.stringify({
@@ -9402,8 +9364,8 @@ function getSkillTools(workspaceRoot) {
 }
 
 // src/commands/initNest.ts
-var fs10 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
+var fs13 = __toESM(require("fs"));
+var path13 = __toESM(require("path"));
 init_agents();
 
 // src/generators/hooks.ts
@@ -9434,7 +9396,8 @@ fi
 has_approved_plan=false
 
 for feature_json in .hive/features/*/feature.json; do
-  if [[ "$(jq -r '.status // empty' "$feature_json")" == 'approved' ]]; then
+  status="$(jq -r '.status // empty' "$feature_json")"
+  if [[ "$status" == 'approved' || "$status" == 'executing' ]]; then
     has_approved_plan=true
     break
   fi
@@ -9473,15 +9436,59 @@ function generateContextInjectionHook() {
 
 active_feature=''
 
-for feature_json in .hive/features/*/feature.json; do
-  status="$(jq -r '.status // empty' "$feature_json")"
+logical_name_for_feature() {
+  local feature_json="$1"
+  local directory_name logical_name
 
-  if [[ "$status" != 'completed' ]]; then
-    active_feature="\${feature_json%/feature.json}"
-    active_feature="\${active_feature##*/}"
-    break
+  logical_name="$(jq -r '.name // empty' "$feature_json")"
+  if [[ -n "$logical_name" ]]; then
+    printf '%s' "$logical_name"
+    return
   fi
-done
+
+  directory_name="\${feature_json%/feature.json}"
+  directory_name="\${directory_name##*/}"
+  if [[ "$directory_name" =~ ^[0-9]+[_-](.+)$ ]]; then
+    printf '%s' "\${BASH_REMATCH[1]}"
+    return
+  fi
+
+  printf '%s' "$directory_name"
+}
+
+if [[ -f .hive/active-feature ]]; then
+  active_feature="$(tr -d '\r
+' < .hive/active-feature)"
+fi
+
+if [[ -n "$active_feature" ]]; then
+  resolved_active_feature=''
+
+  for feature_json in .hive/features/*/feature.json; do
+    status="$(jq -r '.status // empty' "$feature_json")"
+    logical_name="$(logical_name_for_feature "$feature_json")"
+
+    if [[ "$status" != 'completed' && "$logical_name" == "$active_feature" ]]; then
+      resolved_active_feature="\${feature_json%/feature.json}"
+      resolved_active_feature="\${resolved_active_feature##*/}"
+      break
+    fi
+  done
+
+  active_feature="$resolved_active_feature"
+fi
+
+if [[ -z "$active_feature" ]]; then
+  for feature_json in .hive/features/*/feature.json; do
+    status="$(jq -r '.status // empty' "$feature_json")"
+
+    if [[ "$status" != 'completed' ]]; then
+      active_feature="\${feature_json%/feature.json}"
+      active_feature="\${active_feature##*/}"
+      break
+    fi
+  done
+fi
 
 if [[ -z "$active_feature" ]]; then
   jq -n '{}'
@@ -9562,7 +9569,6 @@ function buildInstructionBody(description, applyTo, content) {
   return `---
 description: "${description}"
 applyTo: "${applyTo}"
->>>>>>> pr-57
 ---
 
 ${content.trim()}
@@ -12019,73 +12025,12 @@ description: Hive plan-first development workflow
 
 ${generateHiveWorkflowInstructions().body.split(/^---$/m).slice(2).join("---").trim()}
 `;
-<<<<<<< HEAD
-var COPILOT_AGENT_TEMPLATE = `---
-description: 'Plan-first feature development with isolated worktrees and persistent context.'
-tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveWorktreeStart', 'tctinh.vscode-hive/hiveWorktreeCreate', 'tctinh.vscode-hive/hiveWorktreeCommit', 'tctinh.vscode-hive/hiveWorktreeDiscard', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveStatus']
----
-
-# Hive Agent
-
-You are a plan-first development orchestrator. Follow this workflow: Plan -> Review -> Approve -> Execute -> Merge.
-
-## Core Workflow
-
-### Phase 1: Planning
-1. \\\`featureCreate({ name: "feature-name" })\\\` - Create feature
-2. Research codebase, save with \\\`contextWrite\\\`
-3. \\\`planWrite({ content: "# Feature\\\\n\\\\n## Tasks\\\\n\\\\n### 1. First task..." })\\\`
-4. **STOP** - Tell user: "Plan ready. Please review and approve."
-
-### Phase 2: User Review
-User reviews in VS Code, adds comments, approves when ready.
-
-### Phase 3: Execution
-1. \\\`tasksSync()\\\` - Generate tasks from plan
-2. For each task:
-   - \\\`worktreeStart({ task: "task-name" })\\\`
-   - Implement
-   - \\\`worktreeCommit({ task: "task-name", summary: "..." })\\\`
-   - \\\`merge({ task: "task-name", strategy: "squash" })\\\`
-
-### Phase 4: Completion
-\\\`featureComplete({ name: "feature-name" })\\\`
-
-## Rules
-1. Never skip planning
-2. Save context with \`contextWrite\`
-3. Wait for approval before execution
-4. One task at a time
-5. Squash merges for clean history
-6. Copilot does not support \`question()\`; ask only when critical and batch all questions into a single ask
-
-## Delegation with runSubagent
-Use \`#tool:runSubagent\` for parallel work. Do not switch models; delegate only with runSubagent.
-`;
-function createSkill(basePath) {
-  const skillPath = path11.join(basePath, "hive");
-  fs11.mkdirSync(skillPath, { recursive: true });
-  fs11.writeFileSync(path11.join(skillPath, "SKILL.md"), HIVE_SKILL_TEMPLATE);
-}
-async function initNest(projectRoot) {
-  const hivePath = path11.join(projectRoot, ".hive");
-  fs11.mkdirSync(path11.join(hivePath, "features"), { recursive: true });
-  fs11.mkdirSync(path11.join(hivePath, "skills"), { recursive: true });
-  const opencodePath = path11.join(projectRoot, ".opencode", "skill");
-  createSkill(opencodePath);
-  const claudePath = path11.join(projectRoot, ".claude", "skills");
-  createSkill(claudePath);
-  const agentPath = path11.join(projectRoot, ".github", "agents");
-  fs11.mkdirSync(agentPath, { recursive: true });
-  fs11.writeFileSync(path11.join(agentPath, "Hive.agent.md"), COPILOT_AGENT_TEMPLATE);
-  vscode6.window.showInformationMessage("\u{1F41D} Hive Nest initialized! Skills created for OpenCode, Claude, and GitHub Copilot.");
-=======
 function ensureDir2(dirPath) {
-  fs10.mkdirSync(dirPath, { recursive: true });
+  fs13.mkdirSync(dirPath, { recursive: true });
 }
 function writeFile2(filePath, content) {
-  ensureDir2(path11.dirname(filePath));
-  fs10.writeFileSync(filePath, content);
+  ensureDir2(path13.dirname(filePath));
+  fs13.writeFileSync(filePath, content);
 }
 async function loadVscode() {
   return await import("vscode");
@@ -12102,8 +12047,8 @@ function generateInstructions() {
 function generatePlugin() {
   return generatePluginManifest();
 }
-async function initNest(projectRoot) {
-  const vscode7 = await loadVscode();
+async function initNest(projectRoot, deps) {
+  const vscode7 = deps?.vscodeApi ?? await loadVscode();
   await vscode7.window.withProgress(
     {
       location: vscode7.ProgressLocation.Notification,
@@ -12111,46 +12056,46 @@ async function initNest(projectRoot) {
     },
     async (progress) => {
       progress.report({ message: "Creating Hive directories..." });
-      ensureDir2(path11.join(projectRoot, ".hive"));
-      ensureDir2(path11.join(projectRoot, ".hive", "features"));
-      ensureDir2(path11.join(projectRoot, ".hive", "skills"));
-      ensureDir2(path11.join(projectRoot, ".claude", "skills"));
-      ensureDir2(path11.join(projectRoot, ".opencode", "skill"));
+      ensureDir2(path13.join(projectRoot, ".hive"));
+      ensureDir2(path13.join(projectRoot, ".hive", "features"));
+      ensureDir2(path13.join(projectRoot, ".hive", "skills"));
+      ensureDir2(path13.join(projectRoot, ".claude", "skills"));
+      ensureDir2(path13.join(projectRoot, ".opencode", "skill"));
       progress.report({ message: "Generating Copilot agents..." });
       for (const agent of generateAgents()) {
-        writeFile2(path11.join(projectRoot, ".github", "agents", agent.filename), agent.content);
+        writeFile2(path13.join(projectRoot, ".github", "agents", agent.filename), agent.content);
       }
       progress.report({ message: "Generating builtin skills..." });
       for (const skill of generateBuiltinSkills()) {
-        writeFile2(path11.join(projectRoot, ".github", "skills", skill.name, "SKILL.md"), skill.content);
+        writeFile2(path13.join(projectRoot, ".github", "skills", skill.name, "SKILL.md"), skill.content);
       }
       progress.report({ message: "Generating hooks..." });
       for (const hook of generateAllHooks()) {
-        writeFile2(path11.join(projectRoot, ".github", "hooks", hook.configFilename), `${JSON.stringify(hook.config, null, 2)}
+        writeFile2(path13.join(projectRoot, ".github", "hooks", hook.configFilename), `${JSON.stringify(hook.config, null, 2)}
 `);
         for (const script of hook.scripts) {
-          const scriptPath = path11.join(projectRoot, ".github", "hooks", "scripts", script.filename);
+          const scriptPath = path13.join(projectRoot, ".github", "hooks", "scripts", script.filename);
           writeFile2(scriptPath, script.content);
-          fs10.chmodSync(scriptPath, 493);
+          fs13.chmodSync(scriptPath, 493);
         }
       }
       progress.report({ message: "Generating instructions..." });
       for (const instruction of generateInstructions()) {
-        writeFile2(path11.join(projectRoot, ".github", "instructions", instruction.filename), instruction.body);
+        writeFile2(path13.join(projectRoot, ".github", "instructions", instruction.filename), instruction.body);
       }
       progress.report({ message: "Generating plugin manifest..." });
-      writeFile2(path11.join(projectRoot, "plugin.json"), `${JSON.stringify(generatePlugin(), null, 2)}
+      writeFile2(path13.join(projectRoot, "plugin.json"), `${JSON.stringify(generatePlugin(), null, 2)}
 `);
-      writeFile2(path11.join(projectRoot, ".claude", "skills", "hive", "SKILL.md"), BACKWARD_COMPAT_SKILL);
-      writeFile2(path11.join(projectRoot, ".opencode", "skill", "hive", "SKILL.md"), BACKWARD_COMPAT_SKILL);
+      writeFile2(path13.join(projectRoot, ".claude", "skills", "hive", "SKILL.md"), BACKWARD_COMPAT_SKILL);
+      writeFile2(path13.join(projectRoot, ".opencode", "skill", "hive", "SKILL.md"), BACKWARD_COMPAT_SKILL);
     }
   );
   await vscode7.window.showInformationMessage("Hive Nest initialized! Created 4 agents, 11 skills, 2 hooks, 2 instructions.");
 }
 
 // src/commands/regenerateAgents.ts
-var fs12 = __toESM(require("fs"));
-var path12 = __toESM(require("path"));
+var fs14 = __toESM(require("fs"));
+var path14 = __toESM(require("path"));
 var EXTENSION_ID2 = "tctinh.vscode-hive";
 async function loadVscode2() {
   return await import("vscode");
@@ -12173,17 +12118,16 @@ async function regenerateAgents(workspaceRoot, deps = {}) {
     return;
   }
   const agents = generateAgents2();
-  const agentsDir = path12.join(workspaceRoot, ".github", "agents");
-  fs12.mkdirSync(agentsDir, { recursive: true });
-  const existingFiles = fs12.readdirSync(agentsDir).filter((filename) => filename.endsWith(".agent.md"));
+  const agentsDir = path14.join(workspaceRoot, ".github", "agents");
+  fs14.mkdirSync(agentsDir, { recursive: true });
+  const existingFiles = fs14.readdirSync(agentsDir).filter((filename) => filename.endsWith(".agent.md"));
   for (const filename of existingFiles) {
-    fs12.unlinkSync(path12.join(agentsDir, filename));
+    fs14.unlinkSync(path14.join(agentsDir, filename));
   }
   for (const agent of agents) {
-    fs12.writeFileSync(path12.join(agentsDir, agent.filename), agent.content);
+    fs14.writeFileSync(path14.join(agentsDir, agent.filename), agent.content);
   }
   await vscode7.window.showInformationMessage(`Hive: Regenerated ${agents.length} agents`);
->>>>>>> pr-57
 }
 
 // src/extension.ts
@@ -12207,27 +12151,19 @@ function getReviewTarget(workspaceRoot, filePath) {
 }
 function getReviewCommentsPath2(workspaceRoot, featureName, document2) {
   if (document2 === "plan") {
-    const canonicalPath = path12.join(workspaceRoot, ".hive", "features", featureName, "comments", "plan.json");
-    const legacyPath = path12.join(workspaceRoot, ".hive", "features", featureName, "comments.json");
-    return fs12.existsSync(canonicalPath) ? canonicalPath : fs12.existsSync(legacyPath) ? legacyPath : canonicalPath;
+    const canonicalPath = path15.join(workspaceRoot, ".hive", "features", featureName, "comments", "plan.json");
+    const legacyPath = path15.join(workspaceRoot, ".hive", "features", featureName, "comments.json");
+    return fs15.existsSync(canonicalPath) ? canonicalPath : fs15.existsSync(legacyPath) ? legacyPath : canonicalPath;
   }
-  return path12.join(workspaceRoot, ".hive", "features", featureName, "comments", "overview.json");
+  return path15.join(workspaceRoot, ".hive", "features", featureName, "comments", "overview.json");
 }
 function findHiveRoot(startPath) {
   let current = startPath;
-<<<<<<< HEAD
-  while (current !== path12.dirname(current)) {
-    if (fs12.existsSync(path12.join(current, ".hive"))) {
+  while (current !== path15.dirname(current)) {
+    if (fs15.existsSync(path15.join(current, ".hive"))) {
       return current;
     }
-    current = path12.dirname(current);
-=======
-  while (current !== path13.dirname(current)) {
-    if (fs13.existsSync(path13.join(current, ".hive"))) {
-      return current;
-    }
-    current = path13.dirname(current);
->>>>>>> pr-57
+    current = path15.dirname(current);
   }
   return null;
 }
@@ -12340,13 +12276,8 @@ var HiveExtension = class {
             vscode6.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
           }
         } else if (name) {
-<<<<<<< HEAD
-          const hiveDir = path12.join(workspaceFolder, ".hive");
-          fs12.mkdirSync(hiveDir, { recursive: true });
-=======
-          const hiveDir = path13.join(workspaceFolder, ".hive");
-          fs13.mkdirSync(hiveDir, { recursive: true });
->>>>>>> pr-57
+          const hiveDir = path15.join(workspaceFolder, ".hive");
+          fs15.mkdirSync(hiveDir, { recursive: true });
           this.workspaceRoot = workspaceFolder;
           this.initializeWithHive(workspaceFolder);
           const featureService = new FeatureService(workspaceFolder);
@@ -12372,7 +12303,6 @@ var HiveExtension = class {
         if (item?.featureName && this.workspaceRoot) {
           const featureService = new FeatureService(this.workspaceRoot);
           const planService = new PlanService(this.workspaceRoot);
-<<<<<<< HEAD
           const reviewCounts = featureService.getInfo(item.featureName)?.reviewCounts ?? { plan: 0, overview: 0 };
           const unresolvedTotal = reviewCounts.plan + reviewCounts.overview;
           if (unresolvedTotal > 0) {
@@ -12380,12 +12310,7 @@ var HiveExtension = class {
               reviewCounts.plan > 0 ? `plan (${reviewCounts.plan})` : null,
               reviewCounts.overview > 0 ? `overview (${reviewCounts.overview})` : null
             ].filter(Boolean).join(", ");
-            vscode7.window.showWarningMessage(`Hive: Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`);
-=======
-          const comments2 = planService.getComments(item.featureName);
-          if (comments2.length > 0) {
-            vscode6.window.showWarningMessage(`Hive: Cannot approve - ${comments2.length} unresolved comment(s). Address them first.`);
->>>>>>> pr-57
+            vscode6.window.showWarningMessage(`Hive: Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`);
             return;
           }
           try {
@@ -12422,11 +12347,7 @@ var HiveExtension = class {
         if (item?.featureName && item?.folder && this.workspaceRoot) {
           const worktreeService = new WorktreeService({
             baseDir: this.workspaceRoot,
-<<<<<<< HEAD
-            hiveDir: path12.join(this.workspaceRoot, ".hive")
-=======
-            hiveDir: path13.join(this.workspaceRoot, ".hive")
->>>>>>> pr-57
+            hiveDir: path15.join(this.workspaceRoot, ".hive")
           });
           const taskService = new TaskService(this.workspaceRoot);
           try {
@@ -12453,41 +12374,22 @@ var HiveExtension = class {
           return;
         }
         const filePath = editor.document.uri.fsPath;
-<<<<<<< HEAD
         const target = getReviewTarget(this.workspaceRoot, filePath);
         if (!target) {
-          vscode7.window.showErrorMessage("Not a reviewable plan.md or context/overview.md file");
+          vscode6.window.showErrorMessage("Not a reviewable plan.md or context/overview.md file");
           return;
         }
         const commentsPath = getReviewCommentsPath2(this.workspaceRoot, target.featureName, target.document);
         let comments2 = [];
         try {
-          const commentsData = JSON.parse(fs12.readFileSync(commentsPath, "utf-8"));
-=======
-        const normalized = filePath.replace(/\\/g, "/");
-        const featureMatch = normalized.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
-        if (!featureMatch) {
-          vscode6.window.showErrorMessage("Not a plan.md file");
-          return;
-        }
-        const featureName = featureMatch[1];
-        const commentsPath = path13.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
-        let comments2 = [];
-        try {
-          const commentsData = JSON.parse(fs13.readFileSync(commentsPath, "utf-8"));
->>>>>>> pr-57
+          const commentsData = JSON.parse(fs15.readFileSync(commentsPath, "utf-8"));
           comments2 = commentsData.threads || [];
         } catch (error) {
         }
         const hasComments = comments2.length > 0;
-<<<<<<< HEAD
         const documentLabel = target.document === "overview" ? "Overview" : "Plan";
         const inputPrompt = hasComments ? `${documentLabel}: ${comments2.length} comment(s) found. Add feedback or leave empty to submit comments only` : `Enter your ${documentLabel.toLowerCase()} review feedback (or leave empty to approve)`;
-        const userInput = await vscode7.window.showInputBox({
-=======
-        const inputPrompt = hasComments ? `${comments2.length} comment(s) found. Add feedback or leave empty to submit comments only` : "Enter your review feedback (or leave empty to approve)";
         const userInput = await vscode6.window.showInputBox({
->>>>>>> pr-57
           prompt: inputPrompt,
           placeHolder: hasComments ? "Additional feedback (optional)" : 'e.g., "looks good" to approve, or describe changes needed'
         });
