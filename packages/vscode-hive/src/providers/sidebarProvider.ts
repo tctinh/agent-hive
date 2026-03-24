@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
-import { FeatureService, getFeaturePath } from 'hive-core'
+import { getFeaturePath, listFeatureDirectories } from 'hive-core'
 import type { FeatureJson, TaskStatus } from 'hive-core'
 
 type SidebarItem = ActionItem | StatusGroupItem | FeatureItem | OverviewItem | PlanItem | ContextFolderItem | ContextFileItem | TasksGroupItem | TaskItem | TaskFileItem
@@ -66,9 +66,7 @@ class FeatureItem extends vscode.TreeItem {
     super(name, vscode.TreeItemCollapsibleState.Collapsed)
     
     const statusLabel = feature.status.charAt(0).toUpperCase() + feature.status.slice(1)
-    this.description = isActive 
-      ? `${statusLabel} · ${taskStats.done}/${taskStats.total}` 
-      : `${taskStats.done}/${taskStats.total}`
+    this.description = `${statusLabel} · ${taskStats.done}/${taskStats.total}`
     
     this.contextValue = `feature-${feature.status}`
     this.iconPath = new vscode.ThemeIcon(STATUS_ICONS[feature.status] || 'package')
@@ -210,11 +208,8 @@ class TaskFileItem extends vscode.TreeItem {
 export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<SidebarItem | undefined>()
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event
-  private readonly featureService: FeatureService
 
-  constructor(private workspaceRoot: string) {
-    this.featureService = new FeatureService(workspaceRoot)
-  }
+  constructor(private workspaceRoot: string) {}
 
   refresh(): void {
     this._onDidChangeTreeData.fire(undefined)
@@ -294,24 +289,27 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
   }
 
   private getAllFeatures(): FeatureItem[] {
-    const activeFeature = this.featureService.getActive()?.name
+    const activeFeature = this.getActiveFeature()
     const features: FeatureItem[] = []
 
-    for (const name of this.featureService.list()) {
-      const feature = this.featureService.get(name)
-      if (!feature) continue
+    const dirs = listFeatureDirectories(this.workspaceRoot)
 
-      const taskStats = this.getTaskStats(name)
-      const isActive = name === activeFeature
+    for (const dir of dirs) {
+      const featureJsonPath = path.join(getFeaturePath(this.workspaceRoot, dir.logicalName), 'feature.json')
+      if (!fs.existsSync(featureJsonPath)) continue
 
-      features.push(new FeatureItem(name, feature, taskStats, isActive))
+      const feature: FeatureJson = JSON.parse(fs.readFileSync(featureJsonPath, 'utf-8'))
+      const taskStats = this.getTaskStats(dir.logicalName)
+      const isActive = dir.logicalName === activeFeature
+
+      features.push(new FeatureItem(dir.logicalName, feature, taskStats, isActive))
     }
 
-    // Sort by active first, then by creation date
+    // Sort by active first, then by deterministic logical name
     features.sort((a, b) => {
-      if (a.isActive) return -1
-      if (b.isActive) return 1
-      return 0
+      if (a.isActive && !b.isActive) return -1
+      if (!a.isActive && b.isActive) return 1
+      return a.name.localeCompare(b.name)
     })
 
     return features
@@ -324,12 +322,6 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
     const featureJsonPath = path.join(featurePath, 'feature.json')
     const feature: FeatureJson = JSON.parse(fs.readFileSync(featureJsonPath, 'utf-8'))
 
-    const overviewPath = path.join(featurePath, 'context', 'overview.md')
-    if (fs.existsSync(overviewPath)) {
-      const commentCount = this.getCommentCount(featureName, 'overview')
-      items.push(new OverviewItem(featureName, overviewPath, commentCount))
-    }
-
     const planPath = path.join(featurePath, 'plan.md')
     if (fs.existsSync(planPath)) {
       const commentCount = this.getCommentCount(featureName, 'plan')
@@ -338,7 +330,7 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
 
     const contextPath = path.join(featurePath, 'context')
     const contextFiles = fs.existsSync(contextPath) 
-      ? fs.readdirSync(contextPath).filter(f => !f.startsWith('.') && f !== 'overview.md')
+      ? fs.readdirSync(contextPath).filter(f => !f.startsWith('.'))
       : []
     items.push(new ContextFolderItem(featureName, contextPath, contextFiles.length))
 
@@ -352,7 +344,7 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
     if (!fs.existsSync(contextPath)) return []
 
     return fs.readdirSync(contextPath)
-      .filter(f => !f.startsWith('.') && f !== 'overview.md')
+      .filter(f => !f.startsWith('.'))
       .map(f => new ContextFileItem(f, path.join(contextPath, f)))
   }
 
@@ -407,6 +399,37 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
       total: tasks.length,
       done: tasks.filter(t => t.status.status === 'done').length
     }
+  }
+
+  private getActiveFeature(): string | null {
+    const activePath = path.join(this.workspaceRoot, '.hive', 'active-feature')
+    const configuredActive = fs.existsSync(activePath)
+      ? fs.readFileSync(activePath, 'utf-8').trim()
+      : null
+
+    if (configuredActive) {
+      const feature = this.readFeature(configuredActive)
+      if (feature && feature.status !== 'completed') {
+        return configuredActive
+      }
+    }
+
+    const available = listFeatureDirectories(this.workspaceRoot)
+      .map(entry => entry.logicalName)
+      .filter(name => {
+        const feature = this.readFeature(name)
+        return feature !== null && feature.status !== 'completed'
+      })
+      .sort((a, b) => a.localeCompare(b))
+
+    return available[0] ?? null
+  }
+
+  private readFeature(featureName: string): FeatureJson | null {
+    const featureJsonPath = path.join(getFeaturePath(this.workspaceRoot, featureName), 'feature.json')
+    if (!fs.existsSync(featureJsonPath)) return null
+
+    return JSON.parse(fs.readFileSync(featureJsonPath, 'utf-8'))
   }
 
   private getCommentCount(featureName: string, document: 'plan' | 'overview'): number {

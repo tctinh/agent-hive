@@ -53,7 +53,6 @@ describe('getStatusTools', () => {
     expect(status.overview).toMatchObject({
       exists: true,
       path: `.hive/features/${featureName}/context/overview.md`,
-      primaryReview: true,
     });
     expect(typeof status.overview.updatedAt).toBe('string');
     expect(status.review).toEqual({
@@ -65,8 +64,8 @@ describe('getStatusTools', () => {
     });
   });
 
-  it('suggests writing overview when plan exists but overview is missing', async () => {
-    const featureName = 'missing-overview-feature';
+  it('reports logical feature names in hive_status even when storage is indexed', async () => {
+    const featureName = 'logical-name-status-feature';
     const featureService = new FeatureService(testRoot);
     const planService = new PlanService(testRoot);
 
@@ -75,17 +74,30 @@ describe('getStatusTools', () => {
 
     const status = await invokeStatus(testRoot, { feature: featureName });
 
+    expect(status.feature.name).toBe(featureName);
+    expect(status.overview.path).toBe(`.hive/features/${featureName}/context/overview.md`);
+  });
+
+  it('suggests plan work when plan exists but overview is missing', async () => {
+    const featureName = 'missing-overview-feature';
+    const featureService = new FeatureService(testRoot);
+    const planService = new PlanService(testRoot);
+
+    featureService.create(featureName);
+    planService.write(featureName, '# Plan\n');
+    featureService.updateStatus(featureName, 'approved');
+
+    const status = await invokeStatus(testRoot, { feature: featureName });
+
     expect(status.plan.exists).toBe(true);
     expect(status.overview).toMatchObject({
       exists: false,
       path: `.hive/features/${featureName}/context/overview.md`,
-      primaryReview: true,
     });
-    expect(status.nextAction).toContain('hive_context_write');
-    expect(status.nextAction).toContain('overview');
+    expect(status.nextAction).toBe('Generate tasks from plan with hive_tasks_sync');
   });
 
-  it('tells planners to refresh overview after significant plan changes', async () => {
+  it('tells planners that plan md is the human-facing review artifact', async () => {
     const featureName = 'refresh-overview-feature';
     const featureService = new FeatureService(testRoot);
     const planService = new PlanService(testRoot);
@@ -94,15 +106,11 @@ describe('getStatusTools', () => {
     featureService.create(featureName);
     planService.write(featureName, '# Plan\n');
     contextService.write(featureName, 'overview', '# Overview\n');
+    featureService.updateStatus(featureName, 'approved');
 
     const status = await invokeStatus(testRoot, { feature: featureName });
 
-    expect(status.nextAction).toContain('Refresh overview');
-    expect(status.nextAction).toContain('significant plan changes');
-    expect(status.nextAction).toContain('hive_context_write');
-    expect(status.nextAction).toContain('At a Glance');
-    expect(status.nextAction).toContain('Workstreams');
-    expect(status.nextAction).toContain('Revision History');
+    expect(status.nextAction).toBe('Generate tasks from plan with hive_tasks_sync');
   });
 });
 

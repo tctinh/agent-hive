@@ -1019,7 +1019,6 @@ Do it
         exists: boolean;
         path: string;
         updatedAt?: string;
-        primaryReview: boolean;
       };
       review?: {
         unresolvedTotal: number;
@@ -1032,8 +1031,7 @@ Do it
 
     expect(result.overview).toMatchObject({
       exists: true,
-      path: ".hive/features/01_overview-status-feature/context/overview.md",
-      primaryReview: true,
+      path: ".hive/features/overview-status-feature/context/overview.md",
     });
     expect(typeof result.overview?.updatedAt).toBe("string");
     expect(result.review).toEqual({
@@ -1045,7 +1043,7 @@ Do it
     });
   });
 
-  it("guides planners to refresh overview and uses overview-aware plan messaging", async () => {
+  it("guides planners to plan-centered status messaging", async () => {
     const ctx: PluginInput = {
       directory: testRoot,
       worktree: testRoot,
@@ -1080,34 +1078,18 @@ Do it
       { content: plan, feature: "overview-guidance-feature" },
       toolContext
     );
-    expect(planOutput).toContain('Refresh the primary human-facing overview');
-    expect(planOutput).toContain('hive_context_write({ name: "overview", content })');
-
-    await hooks.tool!.hive_context_write.execute(
-      {
-        feature: "overview-guidance-feature",
-        name: "overview",
-        content: '# Overview\n',
-      },
-      toolContext
-    );
-
     const approveOutput = await hooks.tool!.hive_plan_approve.execute(
       { feature: "overview-guidance-feature" },
       toolContext
     );
-    expect(approveOutput).toContain('Refresh the overview if approval changed the plan narrative');
+    expect(approveOutput).toContain('Plan approved');
 
     const statusRaw = await hooks.tool!.hive_status.execute(
       { feature: "overview-guidance-feature" },
       toolContext
     );
     const status = JSON.parse(statusRaw as string) as { nextAction?: string };
-    expect(status.nextAction).toContain('Refresh overview');
-    expect(status.nextAction).toContain('significant plan changes');
-    expect(status.nextAction).toContain('At a Glance');
-    expect(status.nextAction).toContain('Workstreams');
-    expect(status.nextAction).toContain('Revision History');
+    expect(status.nextAction).toBe('Generate tasks from plan with hive_tasks_sync');
   });
 
   it("blocks plan approval when overview review comments remain", async () => {

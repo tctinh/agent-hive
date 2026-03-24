@@ -36,23 +36,24 @@ __export(extension_exports, {
 module.exports = __toCommonJS(extension_exports);
 var vscode7 = __toESM(require("vscode"));
 var fs12 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
+var path12 = __toESM(require("path"));
 
-// ../../../../../../packages/hive-core/dist/index.js
+// ../hive-core/dist/index.js
 var import_node_module = require("node:module");
 var path = __toESM(require("path"), 1);
 var fs = __toESM(require("fs"), 1);
 var fs3 = __toESM(require("fs"), 1);
+var path3 = __toESM(require("path"), 1);
 var fs4 = __toESM(require("fs"), 1);
 var fs5 = __toESM(require("fs"), 1);
 var fs7 = __toESM(require("fs/promises"), 1);
-var path3 = __toESM(require("path"), 1);
+var path4 = __toESM(require("path"), 1);
 var import_node_buffer = require("node:buffer");
 var import_child_process = require("child_process");
 var import_node_path = require("node:path");
 var import_node_events = require("node:events");
 var fs8 = __toESM(require("fs"), 1);
-var path4 = __toESM(require("path"), 1);
+var path5 = __toESM(require("path"), 1);
 var __create2 = Object.create;
 var __getProtoOf2 = Object.getPrototypeOf;
 var __defProp2 = Object.defineProperty;
@@ -805,10 +806,10 @@ var require_src2 = __commonJS((exports2) => {
   var fs_1 = __require("fs");
   var debug_1 = __importDefault(require_src());
   var log = debug_1.default("@kwsites/file-exists");
-  function check(path32, isFile, isDirectory) {
-    log(`checking %s`, path32);
+  function check(path42, isFile, isDirectory) {
+    log(`checking %s`, path42);
     try {
-      const stat2 = fs_1.statSync(path32);
+      const stat2 = fs_1.statSync(path42);
       if (stat2.isFile() && isFile) {
         log(`[OK] path represents a file`);
         return true;
@@ -828,8 +829,8 @@ var require_src2 = __commonJS((exports2) => {
       throw e;
     }
   }
-  function exists(path32, type = exports2.READABLE) {
-    return check(path32, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
+  function exists(path42, type = exports2.READABLE) {
+    return check(path42, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
   }
   exports2.exists = exists;
   exports2.FILE = 1;
@@ -988,14 +989,69 @@ var FEATURE_FILE = "feature.json";
 var STATUS_FILE = "status.json";
 var REPORT_FILE = "report.md";
 var APPROVED_FILE = "APPROVED";
+var ACTIVE_FEATURE_FILE = "active-feature";
 function getHivePath(projectRoot) {
   return path.join(projectRoot, HIVE_DIR);
 }
 function getFeaturesPath(projectRoot) {
   return path.join(getHivePath(projectRoot), FEATURES_DIR);
 }
+function getActiveFeaturePath(projectRoot) {
+  return path.join(getHivePath(projectRoot), ACTIVE_FEATURE_FILE);
+}
+function parseIndexedFeatureDirectoryName(directoryName) {
+  const match = directoryName.match(/^(\d+)[_-](.+)$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    index: Number.parseInt(match[1], 10),
+    logicalName: match[2]
+  };
+}
+function listFeatureDirectories(projectRoot) {
+  const featuresPath = getFeaturesPath(projectRoot);
+  if (!fs.existsSync(featuresPath)) {
+    return [];
+  }
+  return fs.readdirSync(featuresPath, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => {
+    const directoryName = entry.name;
+    const parsed = parseIndexedFeatureDirectoryName(directoryName);
+    const featureJsonPath = path.join(featuresPath, directoryName, FEATURE_FILE);
+    const featureJson = readJson(featureJsonPath);
+    return {
+      directoryName,
+      logicalName: featureJson?.name || parsed?.logicalName || directoryName,
+      index: parsed?.index ?? null
+    };
+  }).sort((left, right) => {
+    if (left.index !== null && right.index !== null) {
+      return left.index - right.index;
+    }
+    if (left.index !== null) {
+      return 1;
+    }
+    if (right.index !== null) {
+      return -1;
+    }
+    return left.logicalName.localeCompare(right.logicalName);
+  });
+}
+function resolveFeatureDirectoryName(projectRoot, featureName) {
+  const directPath = path.join(getFeaturesPath(projectRoot), featureName);
+  if (fs.existsSync(directPath)) {
+    return featureName;
+  }
+  const match = listFeatureDirectories(projectRoot).find((entry) => entry.logicalName === featureName);
+  return match?.directoryName || featureName;
+}
+function getNextIndexedFeatureDirectoryName(projectRoot, featureName) {
+  const indexedEntries = listFeatureDirectories(projectRoot).filter((entry) => entry.index !== null);
+  const nextIndex = indexedEntries.reduce((max, entry) => Math.max(max, entry.index ?? 0), 0) + 1;
+  return `${String(nextIndex).padStart(2, "0")}_${featureName}`;
+}
 function getFeaturePath(projectRoot, featureName) {
-  return path.join(getFeaturesPath(projectRoot), featureName);
+  return path.join(getFeaturesPath(projectRoot), resolveFeatureDirectoryName(projectRoot, featureName));
 }
 function getPlanPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), PLAN_FILE);
@@ -1242,10 +1298,11 @@ var FeatureService = class {
     return this.reviewService;
   }
   create(name, ticket) {
-    const featurePath = getFeaturePath(this.projectRoot, name);
-    if (fileExists(featurePath)) {
+    const existingFeature = listFeatureDirectories(this.projectRoot).find((feature2) => feature2.logicalName === name);
+    if (existingFeature) {
       throw new Error(`Feature '${name}' already exists`);
     }
+    const featurePath = path3.join(getFeaturesPath(this.projectRoot), getNextIndexedFeatureDirectoryName(this.projectRoot, name));
     ensureDir(featurePath);
     ensureDir(getContextPath(this.projectRoot, name));
     ensureDir(getTasksPath(this.projectRoot, name));
@@ -1256,18 +1313,24 @@ var FeatureService = class {
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     writeJson(getFeatureJsonPath(this.projectRoot, name), feature);
+    ensureDir(path3.dirname(getActiveFeaturePath(this.projectRoot)));
+    fs3.writeFileSync(getActiveFeaturePath(this.projectRoot), name, "utf-8");
     return feature;
   }
   get(name) {
     return readJson(getFeatureJsonPath(this.projectRoot, name));
   }
   list() {
-    const featuresPath = getFeaturesPath(this.projectRoot);
-    if (!fileExists(featuresPath))
-      return [];
-    return fs3.readdirSync(featuresPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    return listFeatureDirectories(this.projectRoot).map((feature) => feature.logicalName).sort((left, right) => left.localeCompare(right));
   }
   getActive() {
+    const activeName = this.readActiveFeatureName();
+    if (activeName) {
+      const activeFeature = this.get(activeName);
+      if (activeFeature && activeFeature.status !== "completed") {
+        return activeFeature;
+      }
+    }
     const features = this.list();
     for (const name of features) {
       const feature = this.get(name);
@@ -1276,6 +1339,14 @@ var FeatureService = class {
       }
     }
     return null;
+  }
+  setActive(name) {
+    const feature = this.get(name);
+    if (!feature) {
+      throw new Error(`Feature '${name}' not found`);
+    }
+    ensureDir(path3.dirname(getActiveFeaturePath(this.projectRoot)));
+    fs3.writeFileSync(getActiveFeaturePath(this.projectRoot), name, "utf-8");
   }
   updateStatus(name, status) {
     const feature = this.get(name);
@@ -1348,6 +1419,14 @@ var FeatureService = class {
   getSession(name) {
     const feature = this.get(name);
     return feature?.sessionId;
+  }
+  readActiveFeatureName() {
+    const activeFeaturePath = getActiveFeaturePath(this.projectRoot);
+    if (!fileExists(activeFeaturePath)) {
+      return null;
+    }
+    const activeFeature = fs3.readFileSync(activeFeaturePath, "utf-8").trim();
+    return activeFeature || null;
   }
 };
 var PlanService = class {
@@ -1648,20 +1727,20 @@ ${f.content}`).join(`
       return [task.order - 1];
     };
     const visited = /* @__PURE__ */ new Map();
-    const path32 = [];
+    const path42 = [];
     const dfs = (taskOrder) => {
       const state = visited.get(taskOrder);
       if (state === 2) {
         return;
       }
       if (state === 1) {
-        const cycleStart = path32.indexOf(taskOrder);
-        const cyclePath = [...path32.slice(cycleStart), taskOrder];
+        const cycleStart = path42.indexOf(taskOrder);
+        const cyclePath = [...path42.slice(cycleStart), taskOrder];
         const cycleDesc = cyclePath.join(" -> ");
         throw new Error(`Invalid dependency graph in plan.md: Cycle detected in task dependencies: ${cycleDesc}. Tasks cannot have circular dependencies. Please fix the "Depends on:" lines in plan.md.`);
       }
       visited.set(taskOrder, 1);
-      path32.push(taskOrder);
+      path42.push(taskOrder);
       const task = taskByOrder.get(taskOrder);
       if (task) {
         const deps = getDependencies(task);
@@ -1669,7 +1748,7 @@ ${f.content}`).join(`
           dfs(depOrder);
         }
       }
-      path32.pop();
+      path42.pop();
       visited.set(taskOrder, 2);
     };
     for (const task of tasks) {
@@ -2015,8 +2094,8 @@ function pathspec(...paths) {
   cache.set(key, paths);
   return key;
 }
-function isPathSpec(path32) {
-  return path32 instanceof String && cache.has(path32);
+function isPathSpec(path42) {
+  return path42 instanceof String && cache.has(path42);
 }
 function toPaths(pathSpec) {
   return cache.get(pathSpec) || [];
@@ -2102,8 +2181,8 @@ function toLinesWithContent(input = "", trimmed2 = true, separator = `
 function forEachLineWithContent(input, callback) {
   return toLinesWithContent(input, true).map((line) => callback(line));
 }
-function folderExists(path32) {
-  return import_file_exists.exists(path32, import_file_exists.FOLDER);
+function folderExists(path42) {
+  return import_file_exists.exists(path42, import_file_exists.FOLDER);
 }
 function append(target, item) {
   if (Array.isArray(target)) {
@@ -2495,8 +2574,8 @@ function checkIsRepoRootTask() {
     commands: commands4,
     format: "utf-8",
     onError,
-    parser(path32) {
-      return /^\.(git)?$/.test(path32.trim());
+    parser(path42) {
+      return /^\.(git)?$/.test(path42.trim());
     }
   };
 }
@@ -2907,11 +2986,11 @@ function parseGrep(grep) {
   const paths = /* @__PURE__ */ new Set();
   const results = {};
   forEachLineWithContent(grep, (input) => {
-    const [path32, line, preview] = input.split(NULL);
-    paths.add(path32);
-    (results[path32] = results[path32] || []).push({
+    const [path42, line, preview] = input.split(NULL);
+    paths.add(path42);
+    (results[path42] = results[path42] || []).push({
       line: asNumber(line),
-      path: path32,
+      path: path42,
       preview
     });
   });
@@ -3577,14 +3656,14 @@ var init_hash_object = __esm({
     init_task();
   }
 });
-function parseInit(bare, path32, text) {
+function parseInit(bare, path42, text) {
   const response = String(text).trim();
   let result;
   if (result = initResponseRegex.exec(response)) {
-    return new InitSummary(bare, path32, false, result[1]);
+    return new InitSummary(bare, path42, false, result[1]);
   }
   if (result = reInitResponseRegex.exec(response)) {
-    return new InitSummary(bare, path32, true, result[1]);
+    return new InitSummary(bare, path42, true, result[1]);
   }
   let gitDir = "";
   const tokens = response.split(" ");
@@ -3595,7 +3674,7 @@ function parseInit(bare, path32, text) {
       break;
     }
   }
-  return new InitSummary(bare, path32, /^re/i.test(response), gitDir);
+  return new InitSummary(bare, path42, /^re/i.test(response), gitDir);
 }
 var InitSummary;
 var initResponseRegex;
@@ -3603,9 +3682,9 @@ var reInitResponseRegex;
 var init_InitSummary = __esm({
   "src/lib/responses/InitSummary.ts"() {
     InitSummary = class {
-      constructor(bare, path32, existing, gitDir) {
+      constructor(bare, path42, existing, gitDir) {
         this.bare = bare;
-        this.path = path32;
+        this.path = path42;
         this.existing = existing;
         this.gitDir = gitDir;
       }
@@ -3617,7 +3696,7 @@ var init_InitSummary = __esm({
 function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
-function initTask(bare = false, path32, customArgs) {
+function initTask(bare = false, path42, customArgs) {
   const commands4 = ["init", ...customArgs];
   if (bare && !hasBareCommand(commands4)) {
     commands4.splice(1, 0, bareCommand);
@@ -3626,7 +3705,7 @@ function initTask(bare = false, path32, customArgs) {
     commands: commands4,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands4.includes("--bare"), path32, text);
+      return parseInit(commands4.includes("--bare"), path42, text);
     }
   };
 }
@@ -4341,12 +4420,12 @@ var init_FileStatusSummary = __esm({
   "src/lib/responses/FileStatusSummary.ts"() {
     fromPathRegex = /^(.+)\0(.+)$/;
     FileStatusSummary = class {
-      constructor(path32, index, working_dir) {
-        this.path = path32;
+      constructor(path42, index, working_dir) {
+        this.path = path42;
         this.index = index;
         this.working_dir = working_dir;
         if (index === "R" || working_dir === "R") {
-          const detail = fromPathRegex.exec(path32) || [null, path32, path32];
+          const detail = fromPathRegex.exec(path42) || [null, path42, path42];
           this.from = detail[2] || "";
           this.path = detail[1] || "";
         }
@@ -4377,14 +4456,14 @@ function splitLine(result, lineStr) {
     default:
       return;
   }
-  function data(index, workingDir, path32) {
+  function data(index, workingDir, path42) {
     const raw = `${index}${workingDir}`;
     const handler = parsers6.get(raw);
     if (handler) {
-      handler(result, path32);
+      handler(result, path42);
     }
     if (raw !== "##" && raw !== "!!") {
-      result.files.push(new FileStatusSummary(path32, index, workingDir));
+      result.files.push(new FileStatusSummary(path42, index, workingDir));
     }
   }
 }
@@ -4616,8 +4695,8 @@ var init_simple_git_api = __esm({
         }
         return this._runTask(configurationErrorTask("Git.cwd: workingDirectory must be supplied as a string"), next);
       }
-      hashObject(path32, write) {
-        return this._runTask(hashObjectTask(path32, write === true), trailingFunctionArgument(arguments));
+      hashObject(path42, write) {
+        return this._runTask(hashObjectTask(path42, write === true), trailingFunctionArgument(arguments));
       }
       init(bare) {
         return this._runTask(initTask(bare === true, this._executor.cwd, getTrailingOptions(arguments)), trailingFunctionArgument(arguments));
@@ -4910,8 +4989,8 @@ var init_branch = __esm({
   }
 });
 function toPath(input) {
-  const path32 = input.trim().replace(/^["']|["']$/g, "");
-  return path32 && (0, import_node_path.normalize)(path32);
+  const path42 = input.trim().replace(/^["']|["']$/g, "");
+  return path42 && (0, import_node_path.normalize)(path42);
 }
 var parseCheckIgnore;
 var init_CheckIgnore = __esm({
@@ -5204,8 +5283,8 @@ __export2(sub_module_exports, {
   subModuleTask: () => subModuleTask,
   updateSubModuleTask: () => updateSubModuleTask
 });
-function addSubModuleTask(repo, path32) {
-  return subModuleTask(["add", repo, path32]);
+function addSubModuleTask(repo, path42) {
+  return subModuleTask(["add", repo, path42]);
 }
 function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
@@ -5473,8 +5552,8 @@ var require_git = __commonJS2({
       }
       return this._runTask(straightThroughStringTask2(command, this._trimmed), next);
     };
-    Git2.prototype.submoduleAdd = function(repo, path32, then) {
-      return this._runTask(addSubModuleTask2(repo, path32), trailingFunctionArgument2(arguments));
+    Git2.prototype.submoduleAdd = function(repo, path42, then) {
+      return this._runTask(addSubModuleTask2(repo, path42), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.submoduleUpdate = function(args, then) {
       return this._runTask(updateSubModuleTask2(getTrailingOptions2(arguments, true)), trailingFunctionArgument2(arguments));
@@ -5993,20 +6072,21 @@ var WorktreeService = class {
     return esm_default(cwd || this.config.baseDir);
   }
   getWorktreesDir() {
-    return path3.join(this.config.hiveDir, ".worktrees");
+    return path4.join(this.config.hiveDir, ".worktrees");
   }
   getWorktreePath(feature, step) {
-    return path3.join(this.getWorktreesDir(), feature, step);
+    return path4.join(this.getWorktreesDir(), feature, step);
   }
   async getStepStatusPath(feature, step) {
-    const featurePath = path3.join(this.config.hiveDir, "features", feature);
-    const tasksPath = path3.join(featurePath, "tasks", step, "status.json");
+    const featureDir = resolveFeatureDirectoryName(this.config.baseDir, feature);
+    const featurePath = path4.join(this.config.hiveDir, "features", featureDir);
+    const tasksPath = path4.join(featurePath, "tasks", step, "status.json");
     try {
       await fs7.access(tasksPath);
       return tasksPath;
     } catch {
     }
-    return path3.join(featurePath, "execution", step, "status.json");
+    return path4.join(featurePath, "execution", step, "status.json");
   }
   getBranchName(feature, step) {
     return `hive/${feature}/${step}`;
@@ -6015,7 +6095,7 @@ var WorktreeService = class {
     const worktreePath = this.getWorktreePath(feature, step);
     const branchName = this.getBranchName(feature, step);
     const git = this.getGit();
-    await fs7.mkdir(path3.dirname(worktreePath), { recursive: true });
+    await fs7.mkdir(path4.dirname(worktreePath), { recursive: true });
     const base = baseBranch || (await git.revparse(["HEAD"])).trim();
     const existing = await this.get(feature, step);
     if (existing) {
@@ -6111,7 +6191,7 @@ var WorktreeService = class {
   }
   async exportPatch(feature, step, baseBranch) {
     const worktreePath = this.getWorktreePath(feature, step);
-    const patchPath = path3.join(worktreePath, "..", `${step}.patch`);
+    const patchPath = path4.join(worktreePath, "..", `${step}.patch`);
     const base = baseBranch || "HEAD~1";
     const worktreeGit = this.getGit(worktreePath);
     const diff = await worktreeGit.diff([`${base}...HEAD`]);
@@ -6123,7 +6203,7 @@ var WorktreeService = class {
     if (!hasDiff) {
       return { success: true, filesAffected: [] };
     }
-    const patchPath = path3.join(this.config.hiveDir, ".worktrees", feature, `${step}.patch`);
+    const patchPath = path4.join(this.config.hiveDir, ".worktrees", feature, `${step}.patch`);
     try {
       await fs7.writeFile(patchPath, diffContent);
       const git = this.getGit();
@@ -6147,7 +6227,7 @@ var WorktreeService = class {
     if (!hasDiff) {
       return { success: true, filesAffected: [] };
     }
-    const patchPath = path3.join(this.config.hiveDir, ".worktrees", feature, `${step}.patch`);
+    const patchPath = path4.join(this.config.hiveDir, ".worktrees", feature, `${step}.patch`);
     try {
       await fs7.writeFile(patchPath, diffContent);
       const git = this.getGit();
@@ -6220,7 +6300,7 @@ var WorktreeService = class {
     try {
       const features = feature ? [feature] : await fs7.readdir(worktreesDir);
       for (const feat of features) {
-        const featurePath = path3.join(worktreesDir, feat);
+        const featurePath = path4.join(worktreesDir, feat);
         const stat2 = await fs7.stat(featurePath).catch(() => null);
         if (!stat2?.isDirectory())
           continue;
@@ -6246,13 +6326,13 @@ var WorktreeService = class {
     const worktreesDir = this.getWorktreesDir();
     const features = feature ? [feature] : await fs7.readdir(worktreesDir).catch(() => []);
     for (const feat of features) {
-      const featurePath = path3.join(worktreesDir, feat);
+      const featurePath = path4.join(worktreesDir, feat);
       const stat2 = await fs7.stat(featurePath).catch(() => null);
       if (!stat2?.isDirectory())
         continue;
       const steps = await fs7.readdir(featurePath).catch(() => []);
       for (const step of steps) {
-        const worktreePath = path3.join(featurePath, step);
+        const worktreePath = path4.join(featurePath, step);
         const stepStat = await fs7.stat(worktreePath).catch(() => null);
         if (!stepStat?.isDirectory())
           continue;
@@ -6272,7 +6352,7 @@ var WorktreeService = class {
     if (!hasDiff) {
       return [];
     }
-    const patchPath = path3.join(this.config.hiveDir, ".worktrees", feature, `${step}-check.patch`);
+    const patchPath = path4.join(this.config.hiveDir, ".worktrees", feature, `${step}-check.patch`);
     try {
       await fs7.writeFile(patchPath, diffContent);
       const git = this.getGit();
@@ -6348,9 +6428,16 @@ var WorktreeService = class {
       };
     }
   }
-  async merge(feature, step, strategy = "merge") {
+  async merge(feature, step, strategy = "merge", message) {
     const branchName = this.getBranchName(feature, step);
     const git = this.getGit();
+    if (strategy === "rebase" && message) {
+      return {
+        success: false,
+        merged: false,
+        error: "Custom merge message is not supported for rebase strategy"
+      };
+    }
     try {
       const branches = await git.branch();
       if (!branches.all.includes(branchName)) {
@@ -6362,7 +6449,8 @@ var WorktreeService = class {
 `).filter((l) => l.trim() && l.includes("|")).map((l) => l.split("|")[0].trim());
       if (strategy === "squash") {
         await git.raw(["merge", "--squash", branchName]);
-        const result = await git.commit(`hive: merge ${step} (squashed)`);
+        const squashMessage = message || `hive: merge ${step} (squashed)`;
+        const result = await git.commit(squashMessage);
         return {
           success: true,
           merged: true,
@@ -6383,7 +6471,8 @@ var WorktreeService = class {
           filesChanged
         };
       } else {
-        const result = await git.merge([branchName, "--no-ff", "-m", `hive: merge ${step}`]);
+        const mergeMessage = message || `hive: merge ${step}`;
+        const result = await git.merge([branchName, "--no-ff", "-m", mergeMessage]);
         const head = (await git.revparse(["HEAD"])).trim();
         return {
           success: true,
@@ -6449,7 +6538,7 @@ var ContextService = class {
   write(featureName, fileName, content) {
     const contextPath = getContextPath(this.projectRoot, featureName);
     ensureDir(contextPath);
-    const filePath = path4.join(contextPath, this.normalizeFileName(fileName));
+    const filePath = path5.join(contextPath, this.normalizeFileName(fileName));
     writeText(filePath, content);
     const totalChars = this.list(featureName).reduce((sum, c) => sum + c.content.length, 0);
     if (totalChars > 2e4) {
@@ -6461,7 +6550,7 @@ var ContextService = class {
   }
   read(featureName, fileName) {
     const contextPath = getContextPath(this.projectRoot, featureName);
-    const filePath = path4.join(contextPath, this.normalizeFileName(fileName));
+    const filePath = path5.join(contextPath, this.normalizeFileName(fileName));
     return readText(filePath);
   }
   list(featureName) {
@@ -6470,7 +6559,7 @@ var ContextService = class {
       return [];
     const files = fs8.readdirSync(contextPath, { withFileTypes: true }).filter((f) => f.isFile() && f.name.endsWith(".md")).map((f) => f.name);
     return files.map((name) => {
-      const filePath = path4.join(contextPath, name);
+      const filePath = path5.join(contextPath, name);
       const stat2 = fs8.statSync(filePath);
       const content = readText(filePath) || "";
       return {
@@ -6488,7 +6577,7 @@ var ContextService = class {
   }
   delete(featureName, fileName) {
     const contextPath = getContextPath(this.projectRoot, featureName);
-    const filePath = path4.join(contextPath, this.normalizeFileName(fileName));
+    const filePath = path5.join(contextPath, this.normalizeFileName(fileName));
     if (fileExists(filePath)) {
       fs8.unlinkSync(filePath);
       return true;
@@ -6513,14 +6602,14 @@ ${f.content}`);
     if (contexts.length === 0)
       return { archived: [], archivePath: "" };
     const contextPath = getContextPath(this.projectRoot, featureName);
-    const archiveDir = path4.join(contextPath, "..", "archive");
+    const archiveDir = path5.join(contextPath, "..", "archive");
     ensureDir(archiveDir);
     const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
     const archived = [];
     for (const ctx of contexts) {
       const archiveName = `${timestamp}_${ctx.name}.md`;
-      const src = path4.join(contextPath, `${ctx.name}.md`);
-      const dest = path4.join(archiveDir, archiveName);
+      const src = path5.join(contextPath, `${ctx.name}.md`);
+      const dest = path5.join(archiveDir, archiveName);
       fs8.copyFileSync(src, dest);
       fs8.unlinkSync(src);
       archived.push(ctx.name);
@@ -6636,8 +6725,12 @@ var Launcher = class {
       vscode2.window.showWarningMessage("Hive: Invalid feature name or workspace root");
       return;
     }
-    const overviewPath = path2.join(this.workspaceRoot, ".hive", "features", feature, "context", "overview.md");
-    const planPath = path2.join(this.workspaceRoot, ".hive", "features", feature, "plan.md");
+    const activeFeaturePath = path2.join(this.workspaceRoot, ".hive", "active-feature");
+    fs2.mkdirSync(path2.dirname(activeFeaturePath), { recursive: true });
+    fs2.writeFileSync(activeFeaturePath, feature, "utf-8");
+    const featurePath = getFeaturePath(this.workspaceRoot, feature);
+    const overviewPath = `${featurePath}/context/overview.md`;
+    const planPath = `${featurePath}/plan.md`;
     const targetPath = fs2.existsSync(overviewPath) ? overviewPath : planPath;
     try {
       const uri = vscode2.Uri.file(targetPath);
@@ -6687,7 +6780,7 @@ var Launcher = class {
 // src/providers/sidebarProvider.ts
 var vscode3 = __toESM(require("vscode"));
 var fs6 = __toESM(require("fs"));
-var path5 = __toESM(require("path"));
+var path6 = __toESM(require("path"));
 var ActionItem = class extends vscode3.TreeItem {
   constructor(label, commandId, iconName) {
     super(label, vscode3.TreeItemCollapsibleState.None);
@@ -6735,7 +6828,7 @@ var FeatureItem = class extends vscode3.TreeItem {
     this.taskStats = taskStats;
     this.isActive = isActive;
     const statusLabel = feature.status.charAt(0).toUpperCase() + feature.status.slice(1);
-    this.description = isActive ? `${statusLabel} \xB7 ${taskStats.done}/${taskStats.total}` : `${taskStats.done}/${taskStats.total}`;
+    this.description = `${statusLabel} \xB7 ${taskStats.done}/${taskStats.total}`;
     this.contextValue = `feature-${feature.status}`;
     this.iconPath = new vscode3.ThemeIcon(STATUS_ICONS[feature.status] || "package");
     if (isActive) {
@@ -6757,22 +6850,6 @@ var PlanItem = class extends vscode3.TreeItem {
       command: "vscode.open",
       title: "Open Plan",
       arguments: [vscode3.Uri.file(planPath)]
-    };
-  }
-};
-var OverviewItem = class extends vscode3.TreeItem {
-  constructor(featureName, overviewPath, commentCount) {
-    super("Overview", vscode3.TreeItemCollapsibleState.None);
-    this.featureName = featureName;
-    this.overviewPath = overviewPath;
-    this.commentCount = commentCount;
-    this.description = commentCount > 0 ? `${commentCount} comment(s)` : "";
-    this.contextValue = "overview-file";
-    this.iconPath = new vscode3.ThemeIcon("book");
-    this.command = {
-      command: "vscode.open",
-      title: "Open Overview",
-      arguments: [vscode3.Uri.file(overviewPath)]
     };
   }
 };
@@ -6922,43 +6999,36 @@ var HiveSidebarProvider = class {
     return groups;
   }
   getAllFeatures() {
-    const featuresPath = path5.join(this.workspaceRoot, ".hive", "features");
-    if (!fs6.existsSync(featuresPath)) return [];
     const activeFeature = this.getActiveFeature();
     const features = [];
-    const dirs = fs6.readdirSync(featuresPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
-    for (const name of dirs) {
-      const featureJsonPath = path5.join(featuresPath, name, "feature.json");
+    const dirs = listFeatureDirectories(this.workspaceRoot);
+    for (const dir of dirs) {
+      const featureJsonPath = path6.join(getFeaturePath(this.workspaceRoot, dir.logicalName), "feature.json");
       if (!fs6.existsSync(featureJsonPath)) continue;
       const feature = JSON.parse(fs6.readFileSync(featureJsonPath, "utf-8"));
-      const taskStats = this.getTaskStats(name);
-      const isActive = name === activeFeature;
-      features.push(new FeatureItem(name, feature, taskStats, isActive));
+      const taskStats = this.getTaskStats(dir.logicalName);
+      const isActive = dir.logicalName === activeFeature;
+      features.push(new FeatureItem(dir.logicalName, feature, taskStats, isActive));
     }
     features.sort((a, b) => {
-      if (a.isActive) return -1;
-      if (b.isActive) return 1;
-      return 0;
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      return a.name.localeCompare(b.name);
     });
     return features;
   }
   getFeatureChildren(featureName) {
-    const featurePath = path5.join(this.workspaceRoot, ".hive", "features", featureName);
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName);
     const items = [];
-    const featureJsonPath = path5.join(featurePath, "feature.json");
+    const featureJsonPath = path6.join(featurePath, "feature.json");
     const feature = JSON.parse(fs6.readFileSync(featureJsonPath, "utf-8"));
-    const overviewPath = path5.join(featurePath, "context", "overview.md");
-    if (fs6.existsSync(overviewPath)) {
-      const commentCount = this.getCommentCount(featureName, "overview");
-      items.push(new OverviewItem(featureName, overviewPath, commentCount));
-    }
-    const planPath = path5.join(featurePath, "plan.md");
+    const planPath = path6.join(featurePath, "plan.md");
     if (fs6.existsSync(planPath)) {
       const commentCount = this.getCommentCount(featureName, "plan");
       items.push(new PlanItem(featureName, planPath, feature.status, commentCount));
     }
-    const contextPath = path5.join(featurePath, "context");
-    const contextFiles = fs6.existsSync(contextPath) ? fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".") && f !== "overview.md") : [];
+    const contextPath = path6.join(featurePath, "context");
+    const contextFiles = fs6.existsSync(contextPath) ? fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".")) : [];
     items.push(new ContextFolderItem(featureName, contextPath, contextFiles.length));
     const tasks = this.getTaskList(featureName);
     items.push(new TasksGroupItem(featureName, tasks));
@@ -6966,14 +7036,14 @@ var HiveSidebarProvider = class {
   }
   getContextFiles(featureName, contextPath) {
     if (!fs6.existsSync(contextPath)) return [];
-    return fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".") && f !== "overview.md").map((f) => new ContextFileItem(f, path5.join(contextPath, f)));
+    return fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".")).map((f) => new ContextFileItem(f, path6.join(contextPath, f)));
   }
   getTasks(featureName, tasks) {
-    const featurePath = path5.join(this.workspaceRoot, ".hive", "features", featureName);
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName);
     return tasks.map((t) => {
-      const taskDir = path5.join(featurePath, "tasks", t.folder);
-      const specPath = path5.join(taskDir, "spec.md");
-      const reportPath = path5.join(taskDir, "report.md");
+      const taskDir = path6.join(featurePath, "tasks", t.folder);
+      const specPath = path6.join(taskDir, "spec.md");
+      const reportPath = path6.join(taskDir, "report.md");
       const hasSpec = fs6.existsSync(specPath);
       const hasReport = fs6.existsSync(reportPath);
       return new TaskItem(featureName, t.folder, t.status, hasSpec ? specPath : null, hasReport ? reportPath : null);
@@ -6990,11 +7060,11 @@ var HiveSidebarProvider = class {
     return items;
   }
   getTaskList(featureName) {
-    const tasksPath = path5.join(this.workspaceRoot, ".hive", "features", featureName, "tasks");
+    const tasksPath = path6.join(getFeaturePath(this.workspaceRoot, featureName), "tasks");
     if (!fs6.existsSync(tasksPath)) return [];
     const folders = fs6.readdirSync(tasksPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
     return folders.map((folder) => {
-      const statusPath = path5.join(tasksPath, folder, "status.json");
+      const statusPath = path6.join(tasksPath, folder, "status.json");
       const status = fs6.existsSync(statusPath) ? JSON.parse(fs6.readFileSync(statusPath, "utf-8")) : { status: "pending", origin: "plan" };
       return { folder, status };
     });
@@ -7007,16 +7077,31 @@ var HiveSidebarProvider = class {
     };
   }
   getActiveFeature() {
-    const activePath = path5.join(this.workspaceRoot, ".hive", "active-feature");
-    if (!fs6.existsSync(activePath)) return null;
-    return fs6.readFileSync(activePath, "utf-8").trim();
+    const activePath = path6.join(this.workspaceRoot, ".hive", "active-feature");
+    const configuredActive = fs6.existsSync(activePath) ? fs6.readFileSync(activePath, "utf-8").trim() : null;
+    if (configuredActive) {
+      const feature = this.readFeature(configuredActive);
+      if (feature && feature.status !== "completed") {
+        return configuredActive;
+      }
+    }
+    const available = listFeatureDirectories(this.workspaceRoot).map((entry) => entry.logicalName).filter((name) => {
+      const feature = this.readFeature(name);
+      return feature !== null && feature.status !== "completed";
+    }).sort((a, b) => a.localeCompare(b));
+    return available[0] ?? null;
+  }
+  readFeature(featureName) {
+    const featureJsonPath = path6.join(getFeaturePath(this.workspaceRoot, featureName), "feature.json");
+    if (!fs6.existsSync(featureJsonPath)) return null;
+    return JSON.parse(fs6.readFileSync(featureJsonPath, "utf-8"));
   }
   getCommentCount(featureName, document2) {
-    const featurePath = path5.join(this.workspaceRoot, ".hive", "features", featureName);
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName);
     const commentsPath = document2 === "plan" ? this.firstExistingPath([
-      path5.join(featurePath, "comments", "plan.json"),
-      path5.join(featurePath, "comments.json")
-    ]) : path5.join(featurePath, "comments", "overview.json");
+      path6.join(featurePath, "comments", "plan.json"),
+      path6.join(featurePath, "comments.json")
+    ]) : path6.join(featurePath, "comments", "overview.json");
     if (!commentsPath || !fs6.existsSync(commentsPath)) return 0;
     try {
       const data = JSON.parse(fs6.readFileSync(commentsPath, "utf-8"));
@@ -7033,7 +7118,7 @@ var HiveSidebarProvider = class {
 // src/providers/planCommentController.ts
 var vscode4 = __toESM(require("vscode"));
 var fs9 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var path7 = __toESM(require("path"));
 var PlanCommentController = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
@@ -7182,26 +7267,26 @@ var PlanCommentController = class {
   getCommentsPath(uri) {
     const target = this.getReviewTarget(uri.fsPath);
     if (!target) return null;
-    return path6.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", `${target.document}.json`);
+    return path7.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", `${target.document}.json`);
   }
   getReadableCommentsPath(uri) {
     const target = this.getReviewTarget(uri.fsPath);
     if (!target) return null;
     if (target.document === "plan") {
-      const canonicalPath = path6.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", "plan.json");
+      const canonicalPath = path7.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", "plan.json");
       if (fs9.existsSync(canonicalPath)) {
         return canonicalPath;
       }
-      const legacyPath = path6.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments.json");
+      const legacyPath = path7.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments.json");
       if (fs9.existsSync(legacyPath)) {
         return legacyPath;
       }
       return canonicalPath;
     }
-    return path6.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", `${target.document}.json`);
+    return path7.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", `${target.document}.json`);
   }
   getDocumentPath(featureName, document2) {
-    return document2 === "overview" ? path6.join(this.workspaceRoot, ".hive", "features", featureName, "context", "overview.md") : path6.join(this.workspaceRoot, ".hive", "features", featureName, "plan.md");
+    return document2 === "overview" ? path7.join(this.workspaceRoot, ".hive", "features", featureName, "context", "overview.md") : path7.join(this.workspaceRoot, ".hive", "features", featureName, "plan.md");
   }
   loadComments(uri) {
     const commentsPath = this.getReadableCommentsPath(uri);
@@ -7259,7 +7344,7 @@ var PlanCommentController = class {
     });
     const data = { threads };
     try {
-      fs9.mkdirSync(path6.dirname(commentsPath), { recursive: true });
+      fs9.mkdirSync(path7.dirname(commentsPath), { recursive: true });
       fs9.writeFileSync(commentsPath, JSON.stringify(data, null, 2));
     } catch (error) {
       console.error("Failed to save comments:", error);
@@ -7385,7 +7470,7 @@ function getPlanTools(workspaceRoot) {
     {
       name: "hive_plan_write",
       displayName: "Write Hive Plan",
-      modelDescription: 'Write or update the plan.md for a feature. The plan defines execution truth and tasks to execute. After significant plan changes, also refresh context/overview.md via hive_context_write({ name: "overview", content }) as the primary human-facing review surface. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.',
+      modelDescription: "Write or update the plan.md for a feature. plan.md is the human-facing review surface and execution truth. Include a concise summary before ## Tasks, and optionally include a Mermaid dependency or sequence overview in that pre-task summary only. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.",
       inputSchema: {
         type: "object",
         properties: {
@@ -7406,27 +7491,23 @@ function getPlanTools(workspaceRoot) {
         let contextWarning = "";
         try {
           const contexts = contextService.list(feature);
-          const hasOverview = contexts.some((context) => context.name === "overview");
-          if (!hasOverview) {
-            contextWarning += '\n\nNext: Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }). Use sections ## At a Glance, ## Workstreams, and ## Revision History.';
-          }
           if (contexts.length === 0) {
-            contextWarning += "\n\n\u26A0\uFE0F WARNING: No context files created yet! Workers need context to execute well. Use hive_context_write to document:\n- Research findings and patterns\n- User preferences and decisions\n- Architecture constraints\n- References to existing code";
+            contextWarning += "\n\n\u26A0\uFE0F WARNING: No context files created yet. If workers will need durable notes, use hive_context_write to document research findings, user decisions, architecture constraints, or references to existing code.";
           }
         } catch {
-          contextWarning = '\n\n\u26A0\uFE0F WARNING: Could not check context files. Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }) and document findings for workers in context files.';
+          contextWarning = "\n\n\u26A0\uFE0F WARNING: Could not check context files. If needed, use hive_context_write to document durable findings for workers.";
         }
         return JSON.stringify({
           success: true,
           path: planPath,
-          message: `Plan written. User can review context/overview.md as the primary human-facing surface and plan.md as execution truth. When ready, use hive_plan_approve.${contextWarning}`
+          message: `Plan written. User can review plan.md as the human-facing surface and execution truth. When ready, use hive_plan_approve.${contextWarning}`
         });
       }
     },
     {
       name: "hive_plan_read",
       displayName: "Read Hive Plan",
-      modelDescription: "Read the plan.md and related review comments for a feature. Use to check plan content, status, and user feedback before making changes.",
+      modelDescription: "Read the plan.md and related review comments for a feature. Use to check the in-plan human-facing summary, task structure, status, and user feedback before making changes.",
       readOnly: true,
       inputSchema: {
         type: "object",
@@ -7455,7 +7536,7 @@ function getPlanTools(workspaceRoot) {
     {
       name: "hive_plan_approve",
       displayName: "Approve Hive Plan",
-      modelDescription: "Approve a plan for execution. Use after user has reviewed the overview as the primary human-facing surface, checked plan.md as execution truth, and resolved any comments. Changes feature status to approved.",
+      modelDescription: "Approve a plan for execution. Use after the user has reviewed plan.md, including the human-facing summary before ## Tasks, and resolved any comments. Changes feature status to approved.",
       inputSchema: {
         type: "object",
         properties: {
@@ -7472,14 +7553,8 @@ function getPlanTools(workspaceRoot) {
         let contextWarning = "";
         try {
           contexts = contextService.list(feature);
-          const hasOverview = contexts.some((context) => context.name === "overview");
-          if (!hasOverview) {
-            contextWarning += '\n\n\u26A0\uFE0F Note: No overview found. Create or refresh it with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History.';
-          }
           if (contexts.length === 0) {
             contextWarning += "\n\n\u26A0\uFE0F Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.";
-          } else if (hasOverview) {
-            contextWarning += "\n\nRefresh the overview if approval changed the plan narrative, milestones, or workstreams.";
           }
         } catch {
         }
@@ -7505,7 +7580,7 @@ function getPlanTools(workspaceRoot) {
         }
         return JSON.stringify({
           success: true,
-          message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan, and keep context/overview.md current as the primary human-facing summary.${contextWarning}`
+          message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan.${contextWarning}`
         });
       }
     }
@@ -7618,7 +7693,7 @@ Reminder: run hive_worktree_start to work in its worktree, and ensure any subage
 }
 
 // src/tools/exec.ts
-var path7 = __toESM(require("path"));
+var path8 = __toESM(require("path"));
 function checkDependencies(taskService, feature, taskFolder) {
   const taskStatus = taskService.getRawStatus(feature, taskFolder);
   if (!taskStatus) {
@@ -7659,7 +7734,7 @@ function checkDependencies(taskService, feature, taskFolder) {
 function getExecTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
-    hiveDir: path7.join(workspaceRoot, ".hive")
+    hiveDir: path8.join(workspaceRoot, ".hive")
   });
   const taskService = new TaskService(workspaceRoot);
   const startWorktree = async ({ feature, task }) => {
@@ -7870,13 +7945,15 @@ function getExecTools(workspaceRoot) {
         properties: {
           feature: { type: "string", description: "Feature name" },
           task: { type: "string", description: "Task folder name" },
-          summary: { type: "string", description: "Summary of what was done" }
+          summary: { type: "string", description: "Summary of what was done" },
+          message: { type: "string", description: "Optional git commit message; subject/body allowed. Empty uses default." }
         },
         required: ["feature", "task", "summary"]
       },
       invoke: async (input) => {
-        const { feature, task, summary } = input;
-        const result = await worktreeService.commitChanges(feature, task, summary);
+        const { feature, task, summary, message } = input;
+        const commitMessage = message || summary;
+        const result = await worktreeService.commitChanges(feature, task, commitMessage);
         if (result.committed) {
           taskService.update(feature, task, { status: "done", summary });
           const reportContent = `# Task Completion Report
@@ -7930,11 +8007,11 @@ ${summary}
 }
 
 // src/tools/merge.ts
-var path8 = __toESM(require("path"));
+var path9 = __toESM(require("path"));
 function getMergeTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
-    hiveDir: path8.join(workspaceRoot, ".hive")
+    hiveDir: path9.join(workspaceRoot, ".hive")
   });
   return [
     {
@@ -7950,13 +8027,14 @@ function getMergeTools(workspaceRoot) {
             type: "string",
             enum: ["merge", "squash", "rebase"],
             description: "Merge strategy (default: merge)"
-          }
+          },
+          message: { type: "string", description: "Optional merge commit message for merge/squash only. Empty uses default." }
         },
         required: ["feature", "task"]
       },
       invoke: async (input) => {
-        const { feature, task, strategy = "merge" } = input;
-        const result = await worktreeService.merge(feature, task, strategy);
+        const { feature, task, strategy = "merge", message } = input;
+        const result = await worktreeService.merge(feature, task, strategy, message);
         return JSON.stringify({
           success: result.success,
           strategy,
@@ -7986,10 +8064,10 @@ function getContextTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature, name, content } = input;
-        const path12 = contextService.write(feature, name, content);
+        const path13 = contextService.write(feature, name, content);
         return JSON.stringify({
           success: true,
-          path: path12,
+          path: path13,
           message: name === "overview" ? "Overview written as the primary human-facing summary/history file. Keep sections ## At a Glance, ## Workstreams, and ## Revision History current." : "Context file written."
         });
       }
@@ -7999,7 +8077,7 @@ function getContextTools(workspaceRoot) {
 
 // src/tools/status.ts
 var fs10 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var path10 = __toESM(require("path"));
 function getStatusTools(workspaceRoot) {
   const featureService = new FeatureService(workspaceRoot);
   const taskService = new TaskService(workspaceRoot);
@@ -8077,9 +8155,8 @@ function getStatusTools(workspaceRoot) {
       },
       overview: {
         exists: !!overview,
-        path: `.hive/features/${feature}/context/overview.md`,
-        updatedAt: overview?.updatedAt ?? null,
-        primaryReview: true
+        path: [".hive", "features", feature, "context", "overview.md"].join("/"),
+        updatedAt: overview?.updatedAt ?? null
       },
       review: {
         unresolvedTotal: reviewCounts.plan + reviewCounts.overview,
@@ -8131,17 +8208,11 @@ function getStatusTools(workspaceRoot) {
   ];
 }
 function getNextAction(planStatus, tasks, runnable, hasPlan, hasOverview) {
-  if (hasPlan && !hasOverview) {
-    return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content }). Use sections ## At a Glance, ## Workstreams, and ## Revision History.';
-  }
-  if (!planStatus || planStatus === "draft") {
-    return 'Write or revise plan with hive_plan_write, then Refresh overview after significant plan changes with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History.';
-  }
-  if (hasPlan && hasOverview && (planStatus === "approved" || planStatus === "locked")) {
-    return 'Refresh overview after significant plan changes or milestone updates with hive_context_write({ name: "overview", content }). Keep ## At a Glance, ## Workstreams, and ## Revision History current.';
-  }
   if (planStatus === "review") {
     return "Wait for plan approval or revise based on comments";
+  }
+  if (!hasPlan || planStatus === "draft") {
+    return "Write or revise plan with hive_plan_write. Keep plan.md as the human-facing review artifact; pre-task Mermaid overview diagrams are optional.";
   }
   if (tasks.length === 0) {
     return "Generate tasks from plan with hive_tasks_sync";
@@ -8163,10 +8234,10 @@ function getNextAction(planStatus, tasks, runnable, hasPlan, hasOverview) {
   return "All tasks complete. Review and merge or complete feature.";
 }
 function readReviewCounts(workspaceRoot, feature) {
-  const featurePath = path9.join(workspaceRoot, ".hive", "features", feature);
-  const reviewDir = path9.join(featurePath, "comments");
-  const planThreads = readThreads(path9.join(reviewDir, "plan.json")) ?? readThreads(path9.join(featurePath, "comments.json"));
-  const overviewThreads = readThreads(path9.join(reviewDir, "overview.json"));
+  const featurePath = getFeaturePath(workspaceRoot, feature);
+  const reviewDir = path10.join(featurePath, "comments");
+  const planThreads = readThreads(path10.join(reviewDir, "plan.json")) ?? readThreads(path10.join(featurePath, "comments.json"));
+  const overviewThreads = readThreads(path10.join(reviewDir, "overview.json"));
   return {
     plan: planThreads?.length ?? 0,
     overview: overviewThreads?.length ?? 0
@@ -8187,7 +8258,7 @@ function readThreads(filePath) {
 // src/commands/initNest.ts
 var vscode6 = __toESM(require("vscode"));
 var fs11 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
+var path11 = __toESM(require("path"));
 var HIVE_SKILL_TEMPLATE = `---
 name: hive
 description: Plan-first AI development with isolated git worktrees and human review. Use for any feature development.
@@ -8425,21 +8496,21 @@ User reviews in VS Code, adds comments, approves when ready.
 Use \`#tool:runSubagent\` for parallel work. Do not switch models; delegate only with runSubagent.
 `;
 function createSkill(basePath) {
-  const skillPath = path10.join(basePath, "hive");
+  const skillPath = path11.join(basePath, "hive");
   fs11.mkdirSync(skillPath, { recursive: true });
-  fs11.writeFileSync(path10.join(skillPath, "SKILL.md"), HIVE_SKILL_TEMPLATE);
+  fs11.writeFileSync(path11.join(skillPath, "SKILL.md"), HIVE_SKILL_TEMPLATE);
 }
 async function initNest(projectRoot) {
-  const hivePath = path10.join(projectRoot, ".hive");
-  fs11.mkdirSync(path10.join(hivePath, "features"), { recursive: true });
-  fs11.mkdirSync(path10.join(hivePath, "skills"), { recursive: true });
-  const opencodePath = path10.join(projectRoot, ".opencode", "skill");
+  const hivePath = path11.join(projectRoot, ".hive");
+  fs11.mkdirSync(path11.join(hivePath, "features"), { recursive: true });
+  fs11.mkdirSync(path11.join(hivePath, "skills"), { recursive: true });
+  const opencodePath = path11.join(projectRoot, ".opencode", "skill");
   createSkill(opencodePath);
-  const claudePath = path10.join(projectRoot, ".claude", "skills");
+  const claudePath = path11.join(projectRoot, ".claude", "skills");
   createSkill(claudePath);
-  const agentPath = path10.join(projectRoot, ".github", "agents");
+  const agentPath = path11.join(projectRoot, ".github", "agents");
   fs11.mkdirSync(agentPath, { recursive: true });
-  fs11.writeFileSync(path10.join(agentPath, "Hive.agent.md"), COPILOT_AGENT_TEMPLATE);
+  fs11.writeFileSync(path11.join(agentPath, "Hive.agent.md"), COPILOT_AGENT_TEMPLATE);
   vscode6.window.showInformationMessage("\u{1F41D} Hive Nest initialized! Skills created for OpenCode, Claude, and GitHub Copilot.");
 }
 
@@ -8464,19 +8535,19 @@ function getReviewTarget(workspaceRoot, filePath) {
 }
 function getReviewCommentsPath2(workspaceRoot, featureName, document2) {
   if (document2 === "plan") {
-    const canonicalPath = path11.join(workspaceRoot, ".hive", "features", featureName, "comments", "plan.json");
-    const legacyPath = path11.join(workspaceRoot, ".hive", "features", featureName, "comments.json");
+    const canonicalPath = path12.join(workspaceRoot, ".hive", "features", featureName, "comments", "plan.json");
+    const legacyPath = path12.join(workspaceRoot, ".hive", "features", featureName, "comments.json");
     return fs12.existsSync(canonicalPath) ? canonicalPath : fs12.existsSync(legacyPath) ? legacyPath : canonicalPath;
   }
-  return path11.join(workspaceRoot, ".hive", "features", featureName, "comments", "overview.json");
+  return path12.join(workspaceRoot, ".hive", "features", featureName, "comments", "overview.json");
 }
 function findHiveRoot(startPath) {
   let current = startPath;
-  while (current !== path11.dirname(current)) {
-    if (fs12.existsSync(path11.join(current, ".hive"))) {
+  while (current !== path12.dirname(current)) {
+    if (fs12.existsSync(path12.join(current, ".hive"))) {
       return current;
     }
-    current = path11.dirname(current);
+    current = path12.dirname(current);
   }
   return null;
 }
@@ -8582,7 +8653,7 @@ var HiveExtension = class {
             vscode7.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
           }
         } else if (name) {
-          const hiveDir = path11.join(workspaceFolder, ".hive");
+          const hiveDir = path12.join(workspaceFolder, ".hive");
           fs12.mkdirSync(hiveDir, { recursive: true });
           this.workspaceRoot = workspaceFolder;
           this.initializeWithHive(workspaceFolder);
@@ -8653,7 +8724,7 @@ var HiveExtension = class {
         if (item?.featureName && item?.folder && this.workspaceRoot) {
           const worktreeService = new WorktreeService({
             baseDir: this.workspaceRoot,
-            hiveDir: path11.join(this.workspaceRoot, ".hive")
+            hiveDir: path12.join(this.workspaceRoot, ".hive")
           });
           const taskService = new TaskService(this.workspaceRoot);
           try {

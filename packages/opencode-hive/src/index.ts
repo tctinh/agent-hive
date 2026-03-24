@@ -189,7 +189,6 @@ import {
   buildEffectiveDependencies,
   computeRunnableAndBlocked,
   detectContext,
-  resolveActiveFeatureName,
   normalizePath,
   resolveFeatureDirectoryName,
   type WorktreeInfo,
@@ -249,7 +248,7 @@ const plugin: Plugin = async (ctx) => {
     const context = detectContext(directory);
     if (context.feature) return context.feature;
 
-    return resolveActiveFeatureName(directory);
+    return featureService.getActive()?.name ?? null;
   };
 
   const captureSession = (feature: string, toolContext: unknown) => {
@@ -1491,17 +1490,11 @@ Expand your Discovery section and try again.`;
             hasPlan: boolean,
             hasOverview: boolean,
           ): string => {
-            if (hasPlan && !hasOverview) {
-              return 'Write or update the human-facing overview with hive_context_write({ name: "overview", content }). Use ## At a Glance, ## Workstreams, and ## Revision History.';
-            }
-            if (!planStatus || planStatus === 'draft') {
-              return 'Write or revise plan with hive_plan_write, then refresh overview after significant plan changes with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History.';
-            }
-            if (hasPlan && hasOverview && (planStatus === 'approved' || planStatus === 'locked')) {
-              return 'Refresh overview after significant plan changes or milestone updates with hive_context_write({ name: "overview", content }). Keep ## At a Glance, ## Workstreams, and ## Revision History current.';
-            }
             if (planStatus === 'review') {
               return 'Wait for plan approval or revise based on comments';
+            }
+            if (!hasPlan || planStatus === 'draft') {
+              return 'Write or revise plan with hive_plan_write. Keep plan.md as the human-facing review artifact; pre-task Mermaid overview diagrams are optional.';
             }
             if (tasks.length === 0) {
               return 'Generate tasks from plan with hive_tasks_sync';
@@ -1541,9 +1534,8 @@ Expand your Discovery section and try again.`;
             },
             overview: {
               exists: !!overview,
-              path: `.hive/features/${resolveFeatureDirectoryName(directory, feature)}/context/overview.md`,
+              path: `.hive/features/${feature}/context/overview.md`,
               updatedAt: overview?.updatedAt ?? null,
-              primaryReview: true,
             },
             review: {
               unresolvedTotal: reviewCounts.plan + reviewCounts.overview,
