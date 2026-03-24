@@ -164,6 +164,48 @@ describe('HiveSidebarProvider', () => {
     expect(completedGroup?.features.map(feature => feature.name)).toEqual(['completed-feature']);
     expect(completedGroup?.features[0]?.description).toBe('Completed · 1/1');
   });
+
+  it('shows reserved overview ahead of context and tasks for a feature', async () => {
+    const featureName = 'overview-sidebar-feature';
+    const featureService = new FeatureService(testRoot);
+    const planService = new PlanService(testRoot);
+
+    featureService.create(featureName);
+    planService.write(featureName, '# Plan\n');
+
+    const featurePath = path.join(testRoot, '.hive', 'features', '01_overview-sidebar-feature');
+    fs.mkdirSync(path.join(featurePath, 'context'), { recursive: true });
+    fs.writeFileSync(path.join(featurePath, 'context', 'overview.md'), '# Overview\n');
+    fs.writeFileSync(path.join(featurePath, 'context', 'notes.md'), '# Notes\n');
+    fs.mkdirSync(path.join(featurePath, 'comments'), { recursive: true });
+    fs.writeFileSync(
+      path.join(featurePath, 'comments', 'overview.json'),
+      JSON.stringify({
+        threads: [
+          { id: 'overview-thread', line: 1, body: 'Clarify overview', replies: [] },
+        ],
+      }, null, 2)
+    );
+
+    const provider = new HiveSidebarProvider(testRoot);
+    const rootItems = await provider.getChildren();
+    const pendingGroup = rootItems.find(item => 'groupName' in item && item.groupName === 'Pending');
+    if (!pendingGroup || !('features' in pendingGroup)) {
+      throw new Error('Pending group not found');
+    }
+
+    const featureItem = pendingGroup.features.find(feature => feature.name === featureName);
+    if (!featureItem) {
+      throw new Error('Feature item not found');
+    }
+
+    const children = await provider.getChildren(featureItem);
+
+    expect(children.map(child => child.label)).toEqual(['Plan', 'Overview', 'Context', 'Tasks']);
+    expect((children[1] as any).description).toBe('1 comment(s)');
+    expect((children[1] as any).contextValue).toBe('overview-file');
+    expect((children[2] as any).description).toBe('1 file(s)');
+  });
 });
 
 function setFeatureStatus(featurePath: string, status: 'planning' | 'executing' | 'completed'): void {
