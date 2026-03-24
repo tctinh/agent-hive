@@ -1,28 +1,44 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import {
+  getActiveFeaturePath,
   getFeaturePath,
   getFeaturesPath,
+  getNextIndexedFeatureDirectoryName,
   getFeatureJsonPath,
   getContextPath,
   getTasksPath,
   getPlanPath,
-  getCommentsPath,
+  getOverviewPath,
+  listFeatureDirectories,
   ensureDir,
   readJson,
   writeJson,
   fileExists,
 } from '../utils/paths.js';
-import { FeatureJson, FeatureStatusType, TaskInfo, FeatureInfo, CommentsJson, TaskStatus } from '../types.js';
+import type { FeatureJson, FeatureStatusType, TaskInfo, FeatureInfo, TaskStatus } from '../types.js';
+import { ReviewService } from './reviewService.js';
 
 export class FeatureService {
+  private reviewService: ReviewService;
+
   constructor(private projectRoot: string) {}
 
+  private getReviewService(): ReviewService {
+    if (!this.reviewService) {
+      this.reviewService = new ReviewService(this.projectRoot);
+    }
+
+    return this.reviewService;
+  }
+
   create(name: string, ticket?: string): FeatureJson {
-    const featurePath = getFeaturePath(this.projectRoot, name);
-    
-    if (fileExists(featurePath)) {
+    const existingFeature = listFeatureDirectories(this.projectRoot).find((feature) => feature.logicalName === name);
+    if (existingFeature) {
       throw new Error(`Feature '${name}' already exists`);
     }
+
+    const featurePath = path.join(getFeaturesPath(this.projectRoot), getNextIndexedFeatureDirectoryName(this.projectRoot, name));
 
     ensureDir(featurePath);
     ensureDir(getContextPath(this.projectRoot, name));
@@ -36,6 +52,8 @@ export class FeatureService {
     };
 
     writeJson(getFeatureJsonPath(this.projectRoot, name), feature);
+    ensureDir(path.dirname(getActiveFeaturePath(this.projectRoot)));
+    fs.writeFileSync(getActiveFeaturePath(this.projectRoot), name, 'utf-8');
 
     return feature;
   }
@@ -45,15 +63,20 @@ export class FeatureService {
   }
 
   list(): string[] {
-    const featuresPath = getFeaturesPath(this.projectRoot);
-    if (!fileExists(featuresPath)) return [];
-    
-    return fs.readdirSync(featuresPath, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name);
+    return listFeatureDirectories(this.projectRoot)
+      .map((feature) => feature.logicalName)
+      .sort((left, right) => left.localeCompare(right));
   }
 
   getActive(): FeatureJson | null {
+    const activeName = this.readActiveFeatureName();
+    if (activeName) {
+      const activeFeature = this.get(activeName);
+      if (activeFeature && activeFeature.status !== 'completed') {
+        return activeFeature;
+      }
+    }
+
     const features = this.list();
     for (const name of features) {
       const feature = this.get(name);
@@ -62,6 +85,16 @@ export class FeatureService {
       }
     }
     return null;
+  }
+
+  setActive(name: string): void {
+    const feature = this.get(name);
+    if (!feature) {
+      throw new Error(`Feature '${name}' not found`);
+    }
+
+    ensureDir(path.dirname(getActiveFeaturePath(this.projectRoot)));
+    fs.writeFileSync(getActiveFeaturePath(this.projectRoot), name, 'utf-8');
   }
 
   updateStatus(name: string, status: FeatureStatusType): FeatureJson {
@@ -87,15 +120,18 @@ export class FeatureService {
 
     const tasks = this.getTasks(name);
     const hasPlan = fileExists(getPlanPath(this.projectRoot, name));
-    const comments = readJson<CommentsJson>(getCommentsPath(this.projectRoot, name));
-    const commentCount = comments?.threads?.length || 0;
+    const hasOverview = fileExists(getOverviewPath(this.projectRoot, name));
+    const reviewCounts = this.getReviewService().countByDocument(name);
+    const commentCount = reviewCounts.plan + reviewCounts.overview;
 
     return {
       name: feature.name,
       status: feature.status,
       tasks,
       hasPlan,
+      hasOverview,
       commentCount,
+      reviewCounts,
     };
   }
 
@@ -146,5 +182,15 @@ export class FeatureService {
   getSession(name: string): string | undefined {
     const feature = this.get(name);
     return feature?.sessionId;
+  }
+
+  private readActiveFeatureName(): string | null {
+    const activeFeaturePath = getActiveFeaturePath(this.projectRoot);
+    if (!fileExists(activeFeaturePath)) {
+      return null;
+    }
+
+    const activeFeature = fs.readFileSync(activeFeaturePath, 'utf-8').trim();
+    return activeFeature || null;
   }
 }

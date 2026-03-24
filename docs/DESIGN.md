@@ -13,10 +13,11 @@ PROBLEM  -> CONTEXT  -> EXECUTION -> REPORT
 
 ```
 .hive/                    <- Shared data (all clients)
+├── active-feature        <- Active feature logical name pointer
 ├── features/             <- Feature-scoped work
-│   └── {feature}/
+│   └── 01_feature-name/
 │       ├── feature.json  <- Feature metadata and state
-│       ├── plan.md       <- Approved execution plan
+│       ├── plan.md       <- Human-facing plan artifact and execution truth
 │       ├── tasks.json    <- Task list with status
 │       ├── contexts/     <- Persistent knowledge files
 │       └── tasks/        <- Individual task folders
@@ -53,29 +54,34 @@ packages/
 
 ## Feature Resolution (v0.5.0)
 
-All tools use detection-based feature resolution instead of global state:
+All tools use logical feature names with `.hive/active-feature` as the shared active-feature pointer. Storage may be indexed for new features (`01_feature-name`) while tool input/output stays logical:
 
 ```typescript
 function resolveFeature(explicit?: string): string | null {
   // 1. Use explicit parameter if provided
   if (explicit) return explicit
   
-  // 2. Detect from worktree path (.hive/.worktrees/{feature}/{task}/)
+  // 2. Use .hive/active-feature when it points at a live feature
+  const active = readActiveFeature()
+  if (active) return active
+
+  // 3. Detect from worktree path (.hive/.worktrees/{feature}/{task}/)
   const detected = detectContext(cwd)
   if (detected?.feature) return detected.feature
   
-  // 3. Fall back to single feature if only one exists
+  // 4. Fall back to the first non-completed feature in deterministic order
   const features = listFeatures()
-  if (features.length === 1) return features[0]
+  if (features.length > 0) return features[0]
   
-  // 4. Require explicit parameter if multiple features
+  // 5. Require explicit parameter if none can be resolved
   return null
 }
 ```
 
 This enables:
 - Multi-session support (parallel agents on different features)
-- Worktree detection (agent knows which feature from its cwd)
+- Stable active-feature behavior via `.hive/active-feature`
+- Indexed storage without leaking folder names into status output
 - Explicit override (always specify feature when needed)
 
 ## Session Tracking
@@ -147,8 +153,8 @@ Hive uses file-based state with clear ownership boundaries:
 | `feature.json` | Hive Master | VS Code (read-only) |
 | `tasks.json` | Hive Master | VS Code (read-only) |
 | `status.json` (task) | Worker | Hive Master (read), Poller (read-only) |
-| `plan.md` | Hive Master | VS Code (read + comment) |
-| `comments.json` | VS Code | Hive Master (read-only) |
+| `plan.md` | Hive Master | VS Code (read + comment, execution source of truth) |
+| `comments/plan.json` | VS Code | Hive Master (read-only) |
 | `spec.md` | `hive_worktree_start` / `hive_worktree_create` | Worker (read-only) |
 | `report.md` | Worker | All (read-only) |
 | `BLOCKED` | Beekeeper | All (read-only, blocks operations) |

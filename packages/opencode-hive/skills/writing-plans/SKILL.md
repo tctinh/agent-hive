@@ -13,9 +13,11 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** Planning is read-only. Use `hive_feature_create` + `hive_plan_write` and avoid worktrees during planning.
+**Context:** Planning is read-only. Use `hive_feature_create` + `hive_plan_write` + `hive_context_write` and avoid worktrees during planning.
 
 **Save plans to:** `hive_plan_write` (writes to `.hive/features/<feature>/plan.md`)
+
+**Maintain context with:** `hive_context_write({ name: "learnings", content: ... })` or another focused context name when durable notes would help future workers
 
 ## Bite-Sized Task Granularity
 
@@ -48,6 +50,12 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 ## Non-Goals (What we're NOT building)
 - {Explicit exclusion}
+
+---
+
+## Design Summary
+
+{Concise human-facing summary of the feature before task details. Optional Mermaid is allowed here for dependency or sequence overview only.}
 
 ---
 
@@ -126,6 +134,12 @@ All verification MUST be agent-executable (no human intervention):
 - Reference relevant skills with @ syntax
 - DRY, YAGNI, TDD, frequent commits
 - All acceptance criteria must be agent-executable (zero human intervention)
+- Treat `plan.md` as the human-facing review surface and execution truth
+- Every plan needs a concise human-facing summary before `## Tasks`
+- Optional Mermaid is allowed only in that pre-task summary section
+- Mermaid is for dependency or sequence overview only and is never required
+- Keep Discovery, Non-Goals, diagrams, and tasks in the same `plan.md` file
+- Use context files only for durable notes that help future workers
 
 ## Execution Handoff
 

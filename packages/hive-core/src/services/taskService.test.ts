@@ -853,6 +853,107 @@ Merge both branches.
   });
 
   describe("sync() - dependency parsing edge cases", () => {
+    it("ignores a human-facing summary section before tasks", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      const planContent = `# Plan
+
+## Discovery
+
+- Keep the plan human-friendly.
+
+## Design Summary
+
+This section helps humans review the plan before execution starts.
+
+### Sequence Overview
+
+- Setup first
+- Build second
+
+## Tasks
+
+### 1. Setup
+
+**Depends on**: none
+
+Prepare the environment.
+
+### 2. Build
+
+**Depends on**: 1
+
+Build the implementation.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      const result = service.sync(featureName);
+
+      expect(result.created).toEqual(["01-setup", "02-build"]);
+      expect(service.getRawStatus(featureName, "01-setup")?.dependsOn).toEqual([]);
+      expect(service.getRawStatus(featureName, "02-build")?.dependsOn).toEqual(["01-setup"]);
+    });
+
+    it("ignores optional mermaid blocks in the pre-task summary when parsing tasks and spec sections", () => {
+      const featureName = "test-feature";
+      const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);
+      fs.mkdirSync(featurePath, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(featurePath, "feature.json"),
+        JSON.stringify({ name: featureName, status: "executing", createdAt: new Date().toISOString() })
+      );
+
+      const planContent = `# Plan
+
+## Design Summary
+
+Quick sequence for humans.
+
+\`\`\`mermaid
+sequenceDiagram
+    participant Human
+    participant Hive
+    Human->>Hive: Review summary
+    Hive->>Human: Show tasks
+\`\`\`
+
+## Tasks
+
+### 1. Setup
+
+**Depends on**: none
+
+Setup task.
+
+### 2. Build
+
+**Depends on**: 1
+
+Build task.
+`;
+      fs.writeFileSync(path.join(featurePath, "plan.md"), planContent);
+
+      const result = service.sync(featureName);
+
+      expect(result.created).toEqual(["01-setup", "02-build"]);
+      expect(service.getRawStatus(featureName, "02-build")?.dependsOn).toEqual(["01-setup"]);
+
+      const specPath = path.join(featurePath, "tasks", "02-build", "spec.md");
+      const specContent = fs.readFileSync(specPath, "utf-8");
+
+      expect(specContent).toContain("### 2. Build");
+      expect(specContent).not.toContain("sequenceDiagram");
+      expect(specContent).not.toContain("### Sequence Overview");
+    });
+
     it("handles whitespace variations in Depends on line", () => {
       const featureName = "test-feature";
       const featurePath = path.join(TEST_DIR, ".hive", "features", featureName);

@@ -162,23 +162,29 @@ describe("Atomic + Locked JSON Utilities", () => {
       expect(fs.readFileSync(filePath, "utf-8")).toBe("nested content");
     });
 
-    it("cleans up temp file on failure", () => {
-      const filePath = path.join(TEST_DIR, "readonly", "fail.txt");
-
-      // Create readonly directory
-      const readonlyDir = path.join(TEST_DIR, "readonly");
-      fs.mkdirSync(readonlyDir);
-      fs.chmodSync(readonlyDir, 0o444);
+    it("cleans up temp file when rename fails", () => {
+      const filePath = path.join(TEST_DIR, "cleanup", "fail.txt");
+      const tempPath = `${filePath}.tmp.${process.pid}.12345`;
+      const dateSpy = spyOn(Date, "now").mockReturnValue(12345);
+      const renameSpy = spyOn(fs, "renameSync").mockImplementation(
+        ((oldPath: fs.PathLike, newPath: fs.PathLike) => {
+          expect(String(oldPath)).toBe(tempPath);
+          expect(String(newPath)).toBe(filePath);
+          const err = new Error("rename failed") as NodeJS.ErrnoException;
+          err.code = "EACCES";
+          throw err;
+        }) as typeof fs.renameSync
+      );
 
       try {
-        expect(() => writeAtomic(filePath, "should fail")).toThrow();
+        expect(() => writeAtomic(filePath, "should fail")).toThrow(/rename failed/);
       } finally {
-        fs.chmodSync(readonlyDir, 0o755);
+        renameSpy.mockRestore();
+        dateSpy.mockRestore();
       }
 
-      // No temp files should remain
-      const files = fs.readdirSync(readonlyDir);
-      expect(files.filter((f) => f.includes(".tmp."))).toHaveLength(0);
+      expect(fs.existsSync(tempPath)).toBe(false);
+      expect(fs.existsSync(filePath)).toBe(false);
     });
   });
 

@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-03-24
+
+### Added
+- **Recovered PR #57 payload**: Restored the missing VS Code / Copilot rewrite that should have been present on the release branch, including generated Copilot artifacts, updated LM tool wiring, regenerate-agents support, and the intended extension/sidebar cleanup
+
+### Changed
+- **Historical release notes corrected**: Split the published `v1.3.2` narrative from the actual `v1.3.3` recovery scope so the changelog no longer claims PR #57 shipped in `v1.3.2`
+- **Version Bump**: Bumped root and package versions to `1.3.3` (`agent-hive`, `hive-core`, `opencode-hive`, `vscode-hive`)
+
+### Fixed
+- **Release lockfile repair**: Regenerated `package-lock.json` from corrected manifests so workspace versions now match `1.3.3` without corrupting the third-party `node_modules/once` entry
+- **Undocumented shipped `v1.3.2` fix now recorded**: The release history now acknowledges the `6a2d870` status manifest test stabilization that shipped in `v1.3.2` but was omitted from the original notes
+
+## [1.3.2] - 2026-03-21
+
+### Added
+- **Reserved Human-Facing Overview (PR #62)**: Features can now maintain `.hive/features/<feature>/context/overview.md` as the primary human-readable summary/history file while continuing to use existing context tooling for writes and updates
+- **Document-Aware Review Tracking**: Plan and overview reviews now store unresolved threads separately so status, approvals, and UI review flows can distinguish `plan` feedback from `overview` feedback
+- **Overview-First Status and VS Code Surfacing**: Hive status output and the VS Code extension now surface overview metadata, open overview first for humans when present, and keep the reserved overview out of generic context duplication
+- **Reserved-Overview and Release-Branch Regression Coverage**: Added focused service, prompt, status, approval, sidebar, and plugin smoke tests covering overview exclusion from worker execution context, document-aware approval behavior, and the restored release-branch UX behavior
+
+### Changed
+- **Planner and Orchestrator Guidance**: Plan-writing prompts, tool messaging, and planning skills now instruct agents to refresh `context/overview.md` as the primary human-facing review artifact after meaningful plan changes while keeping `plan.md`/`spec.md` as execution truth
+- **Approval Gate Semantics**: Plan approval now reports and blocks on unresolved comments in either `plan` or `overview`, including overview-first review flows in the VS Code extension and OpenCode plugin
+- **Release-Branch VS Code Behavior Preserved**: Reconciliation work kept the dedicated Overview sidebar entry, excluded `overview.md` from generic context duplication, and re-exposed the `hive_status` language-model tool manifest entry after the PR #57 rewrite landed on the release branch
+- **Custom Commit/Merge Messages (#63 / `ac7e78d`) Preserved**: The integrated release branch keeps optional `message` support for `hive_worktree_commit` and `hive_merge` across core, plugin, and VS Code surfaces
+- **Release Verification Stability**: Stabilized the `writeAtomic()` regression coverage so full release verification no longer depends on environment-specific readonly-directory behavior
+
+### Fixed
+- **Worker Execution Context Purity**: Reserved `context/overview.md` is no longer injected into worker prompt/spec payloads, preserving `plan.md` as the execution contract
+- **Review Approval Feedback**: Approval flows now return document-aware unresolved-comment counts instead of overlooking overview comments or failing with less actionable messaging
+- **Status manifest test stabilization (`6a2d870`)**: The shipped `v1.3.2` tag included the `packages/vscode-hive/src/tools/status.test.ts` stabilization fix even though the original release notes were drafted one commit earlier
+
 ## [1.3.1] - 2026-03-17
 
 ### Added

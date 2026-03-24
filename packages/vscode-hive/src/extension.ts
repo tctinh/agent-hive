@@ -12,9 +12,47 @@ import {
   getExecTools,
   getMergeTools,
   getContextTools,
-  getStatusTools
+  getStatusTools,
+  getAgentsMdTools,
+  getSkillTools
 } from './tools'
 import { initNest } from './commands/initNest'
+import { regenerateAgents } from './commands/regenerateAgents'
+
+type ReviewDocument = 'plan' | 'overview'
+
+function getReviewTarget(workspaceRoot: string, filePath: string): { featureName: string; document: ReviewDocument } | null {
+  const normalizedWorkspace = workspaceRoot.replace(/\\/g, '/').replace(/\/+$/, '')
+  const normalizedPath = filePath.replace(/\\/g, '/')
+  const compareWorkspace = process.platform === 'win32' ? normalizedWorkspace.toLowerCase() : normalizedWorkspace
+  const comparePath = process.platform === 'win32' ? normalizedPath.toLowerCase() : normalizedPath
+
+  if (!comparePath.startsWith(`${compareWorkspace}/`)) {
+    return null
+  }
+
+  const planMatch = normalizedPath.match(/\.hive\/features\/([^/]+)\/plan\.md$/)
+  if (planMatch) {
+    return { featureName: planMatch[1], document: 'plan' }
+  }
+
+  const overviewMatch = normalizedPath.match(/\.hive\/features\/([^/]+)\/context\/overview\.md$/)
+  if (overviewMatch) {
+    return { featureName: overviewMatch[1], document: 'overview' }
+  }
+
+  return null
+}
+
+function getReviewCommentsPath(workspaceRoot: string, featureName: string, document: ReviewDocument): string {
+  if (document === 'plan') {
+    const canonicalPath = path.join(workspaceRoot, '.hive', 'features', featureName, 'comments', 'plan.json')
+    const legacyPath = path.join(workspaceRoot, '.hive', 'features', featureName, 'comments.json')
+    return fs.existsSync(canonicalPath) ? canonicalPath : fs.existsSync(legacyPath) ? legacyPath : canonicalPath
+  }
+
+  return path.join(workspaceRoot, '.hive', 'features', featureName, 'comments', 'overview.json')
+}
 
 function findHiveRoot(startPath: string): string | null {
   let current = startPath
@@ -70,7 +108,9 @@ class HiveExtension {
       ...getExecTools(workspaceRoot),
       ...getMergeTools(workspaceRoot),
       ...getContextTools(workspaceRoot),
-      ...getStatusTools(workspaceRoot)
+      ...getStatusTools(workspaceRoot),
+      ...getAgentsMdTools(workspaceRoot),
+      ...getSkillTools(workspaceRoot)
     ])
 
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => {
@@ -131,6 +171,12 @@ class HiveExtension {
         this.sidebarProvider?.refresh()
       }),
 
+      vscode.commands.registerCommand('hive.regenerateAgents', async () => {
+        if (this.workspaceRoot) {
+          await regenerateAgents(this.workspaceRoot)
+        }
+      }),
+
       vscode.commands.registerCommand('hive.newFeature', async () => {
         const name = await vscode.window.showInputBox({
           prompt: 'Feature name',
@@ -176,11 +222,17 @@ class HiveExtension {
 
       vscode.commands.registerCommand('hive.approvePlan', async (item: { featureName?: string }) => {
         if (item?.featureName && this.workspaceRoot) {
+          const featureService = new FeatureService(this.workspaceRoot)
           const planService = new PlanService(this.workspaceRoot)
-          const comments = planService.getComments(item.featureName)
+          const reviewCounts = featureService.getInfo(item.featureName)?.reviewCounts ?? { plan: 0, overview: 0 }
+          const unresolvedTotal = reviewCounts.plan + reviewCounts.overview
           
-          if (comments.length > 0) {
-            vscode.window.showWarningMessage(`Hive: Cannot approve - ${comments.length} unresolved comment(s). Address them first.`)
+          if (unresolvedTotal > 0) {
+            const documents = [
+              reviewCounts.plan > 0 ? `plan (${reviewCounts.plan})` : null,
+              reviewCounts.overview > 0 ? `overview (${reviewCounts.overview})` : null,
+            ].filter(Boolean).join(', ')
+            vscode.window.showWarningMessage(`Hive: Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`)
             return
           }
           
@@ -255,15 +307,13 @@ class HiveExtension {
         }
 
         const filePath = editor.document.uri.fsPath
-        const normalized = filePath.replace(/\\/g, "/");
-        const featureMatch = normalized.match(/\.hive\/features\/([^/]+)\/plan\.md$/)
-        if (!featureMatch) {
-          vscode.window.showErrorMessage('Not a plan.md file')
+        const target = getReviewTarget(this.workspaceRoot, filePath)
+        if (!target) {
+          vscode.window.showErrorMessage('Not a reviewable plan.md or context/overview.md file')
           return
         }
 
-        const featureName = featureMatch[1]
-        const commentsPath = path.join(this.workspaceRoot, '.hive', 'features', featureName, 'comments.json')
+        const commentsPath = getReviewCommentsPath(this.workspaceRoot, target.featureName, target.document)
 
         let comments: Array<{ body: string; line?: number }> = []
 
@@ -275,9 +325,10 @@ class HiveExtension {
         }
 
         const hasComments = comments.length > 0
+        const documentLabel = target.document === 'overview' ? 'Overview' : 'Plan'
         const inputPrompt = hasComments 
-          ? `${comments.length} comment(s) found. Add feedback or leave empty to submit comments only`
-          : 'Enter your review feedback (or leave empty to approve)'
+          ? `${documentLabel}: ${comments.length} comment(s) found. Add feedback or leave empty to submit comments only`
+          : `Enter your ${documentLabel.toLowerCase()} review feedback (or leave empty to approve)`
         
         const userInput = await vscode.window.showInputBox({
           prompt: inputPrompt,
@@ -291,12 +342,12 @@ class HiveExtension {
         if (hasComments) {
           const allComments = comments.map(c => `Line ${c.line}: ${c.body}`).join('\n')
           feedback = userInput === '' 
-            ? `Review comments:\n${allComments}`
-            : `Review comments:\n${allComments}\n\nAdditional feedback: ${userInput}`
+            ? `${documentLabel} review comments:\n${allComments}`
+            : `${documentLabel} review comments:\n${allComments}\n\nAdditional feedback: ${userInput}`
         } else {
           feedback = userInput === ''
-            ? 'Plan approved'
-            : `Review feedback: ${userInput}`
+            ? `${documentLabel} approved`
+            : `${documentLabel} review feedback: ${userInput}`
         }
 
         // Show the feedback and guide user to Copilot Chat

@@ -66,15 +66,39 @@ When user wants to build something:
    ### 2. Add token refresh mechanism
    Implement refresh token rotation.
 
-   ### 3. Update API routes
-   Convert routes to use AuthService.
-   ` })
+    ### 3. Update API routes
+    Convert routes to use AuthService.
+    ` })
+    ```
+
+   Then refresh the reserved human-facing overview with the existing context tool:
+   ```
+   hiveContextWrite({
+     name: "overview",
+     content: `# User Authentication
+
+## At a Glance
+Add JWT auth so humans can review the scope without reading task mechanics.
+
+## Workstreams
+- Auth service extraction
+- Refresh token rotation
+- API route migration
+
+## Revision History
+- 2026-03-20: Initial planning summary`
+   })
    ```
 
-5. **User reviews plan** - Check for comments:
-   ```
-   hivePlanRead()
-   ```
+5. **User reviews overview first, then plan** - Check for comments:
+    ```
+    hivePlanRead()
+    ```
+
+   Review flow:
+   - `context/overview.md` is the primary human-facing summary/history file
+   - `plan.md` remains the execution contract that `hiveTasksSync` parses
+   - Comments can exist on either document and should be resolved before approval
 
 6. **Iterate until approved** - Revise based on feedback
 
@@ -117,7 +141,7 @@ Use `runSubagent` to delegate tasks to sub-agents. Each runs in isolation with a
 runSubagent({
   prompt: `Execute Hive task "02-add-token-refresh":
   1. hiveExecStart({ task: "02-add-token-refresh" })
-  2. Read context files from .hive/features/<name>/contexts/
+  2. Read context files from .hive/features/<name>/context/
   3. Implement token refresh using read/edit/execute
   4. hiveExecComplete({ task: "02-add-token-refresh", summary: "..." })
   5. Do NOT call hiveMerge
@@ -146,7 +170,7 @@ hiveMerge({ task: "03-update-api-routes" })
 ### Sub-Agent Rules
 
 Each sub-agent MUST:
-1. Read context files from `.hive/features/<name>/contexts/`
+1. Read context files from `.hive/features/<name>/context/`
 2. Do implementation using `read`, `edit`, `execute`
 3. `hiveExecComplete` with summary
 4. **NOT call hiveMerge** - orchestrator decides
@@ -187,11 +211,13 @@ hiveContextWrite({
 })
 ```
 
-**Why context files?** Hive context persists as actual files in `.hive/features/<name>/contexts/`. This provides:
+**Why context files?** Hive context persists as actual files in `.hive/features/<name>/context/`. This provides:
 - Reliable persistence across sessions
 - Readable by sub-agents
 - Git-trackable audit trail
 - No drift over time
+
+`context/overview.md` is a reserved context filename: it is maintained with `hiveContextWrite({ name: "overview", content })`, shown first to humans, and kept out of worker execution context so it does not replace `plan.md` or `spec.md` as execution truth.
 
 ## Plan Format
 
@@ -212,6 +238,12 @@ Description.
 Description.
 ```
 
+Use the plan together with a reserved overview document:
+
+- `context/overview.md` — primary human-facing summary/history for review
+- `plan.md` — authoritative execution plan and task source for `hiveTasksSync`
+- Do not invent a separate overview write tool; use `hiveContextWrite({ name: "overview", content })`
+
 ## Prompt Budgeting & Observability
 
 Hive automatically bounds worker prompt sizes to prevent context overflow:
@@ -220,7 +252,7 @@ Hive automatically bounds worker prompt sizes to prevent context overflow:
 
 - **Task history**: Last 10 completed tasks included (older tasks referenced by path)
 - **Task summaries**: Truncated to 2000 chars each with `...[truncated]` marker
-- **Context files**: Individual files capped at 20KB, total at 60KB
+- **Context files**: Individual files capped at 20KB, total at 60KB; reserved `context/overview.md` stays human-facing and is excluded from worker execution payloads
 - **Full access**: Workers can always read full content from `.hive/` file paths
 
 ### Observability
@@ -244,6 +276,6 @@ Large prompts are written to `.hive/features/<feature>/tasks/<task>/worker-promp
 2. **Always save context** - Sub-agents work blind without it
 3. **Complete ≠ Merge** - `hiveExecComplete` commits, `hiveMerge` integrates
 4. **Worktrees persist** - Stay until merged or aborted
-5. **Check for comments** - `hivePlanRead` before proceeding
+5. **Check for comments** - `hivePlanRead` before proceeding, and review `context/overview.md` before treating the plan as ready
 6. **Wait for approval** - Don't execute until plan is approved
 7. **Use right tools** - Hive for orchestration, Copilot for file ops

@@ -13,40 +13,50 @@ interface CommentsFile {
   threads: StoredThread[]
 }
 
+type ReviewDocument = 'plan' | 'overview'
+
+interface ReviewTarget {
+  featureName: string
+  document: ReviewDocument
+}
+
 export class PlanCommentController {
   private controller: vscode.CommentController
   private threads = new Map<string, vscode.CommentThread>()
-  private commentsWatcher: vscode.FileSystemWatcher | undefined
+  private commentsWatchers: vscode.FileSystemWatcher[] = []
   private normalizedWorkspaceRoot: string
 
   constructor(private workspaceRoot: string) {
     this.normalizedWorkspaceRoot = this.normalizePath(workspaceRoot)
     this.controller = vscode.comments.createCommentController(
       'hive-plan-review',
-      'Plan Review'
+      'Hive Review'
     )
 
     this.controller.commentingRangeProvider = {
       provideCommentingRanges: (document: vscode.TextDocument) => {
-        if (path.basename(document.fileName) !== 'plan.md') return []
+        if (!this.getReviewTarget(document.fileName)) return []
         return [new vscode.Range(0, 0, document.lineCount - 1, 0)]
       }
     }
 
-    const pattern = new vscode.RelativePattern(
-      workspaceRoot,
-      '.hive/features/*/comments.json'
-    )
-    this.commentsWatcher = vscode.workspace.createFileSystemWatcher(pattern)
-    this.commentsWatcher.onDidChange(uri => this.onCommentsFileChanged(uri))
-    this.commentsWatcher.onDidDelete(uri => this.onCommentsFileChanged(uri))
+    const patterns = [
+      new vscode.RelativePattern(workspaceRoot, '.hive/features/*/comments.json'),
+      new vscode.RelativePattern(workspaceRoot, '.hive/features/*/comments/*.json')
+    ]
+    const rootWatcher = vscode.workspace.createFileSystemWatcher(patterns[0])
+    const nestedWatcher = vscode.workspace.createFileSystemWatcher(patterns[1])
+    rootWatcher.onDidChange(uri => this.onCommentsFileChanged(uri))
+    rootWatcher.onDidDelete(uri => this.onCommentsFileChanged(uri))
+    nestedWatcher.onDidChange(uri => this.onCommentsFileChanged(uri))
+    nestedWatcher.onDidDelete(uri => this.onCommentsFileChanged(uri))
+    this.commentsWatchers = [rootWatcher, nestedWatcher]
   }
 
   private onCommentsFileChanged(commentsUri: vscode.Uri): void {
-    const featureMatch = this.getFeatureMatch(commentsUri.fsPath)
-    if (!featureMatch) return
-    const planPath = path.join(this.workspaceRoot, '.hive', 'features', featureMatch, 'plan.md')
-    this.loadComments(vscode.Uri.file(planPath))
+    const target = this.getCommentsTarget(commentsUri.fsPath)
+    if (!target) return
+    this.loadComments(vscode.Uri.file(this.getDocumentPath(target.featureName, target.document)))
   }
 
   registerCommands(context: vscode.ExtensionContext): void {
@@ -82,34 +92,58 @@ export class PlanCommentController {
       }),
 
       vscode.workspace.onDidOpenTextDocument(doc => {
-        if (path.basename(doc.fileName) === 'plan.md') {
+        if (this.getReviewTarget(doc.fileName)) {
           this.loadComments(doc.uri)
         }
       }),
 
       vscode.workspace.onDidSaveTextDocument(doc => {
-        if (path.basename(doc.fileName) === 'plan.md') {
+        if (this.getReviewTarget(doc.fileName)) {
           this.saveComments(doc.uri)
         }
       })
     )
 
     vscode.workspace.textDocuments.forEach(doc => {
-      if (path.basename(doc.fileName) === 'plan.md') {
+      if (this.getReviewTarget(doc.fileName)) {
         this.loadComments(doc.uri)
       }
     })
   }
 
-  private getFeatureMatch(filePath: string): string | null {
+  private getReviewTarget(filePath: string): ReviewTarget | null {
     const normalized = this.normalizePath(filePath)
     const normalizedWorkspace = this.normalizedWorkspaceRoot.replace(/\/+$/, '')
     const compareNormalized = process.platform === 'win32' ? normalized.toLowerCase() : normalized
     const compareWorkspace = process.platform === 'win32' ? normalizedWorkspace.toLowerCase() : normalizedWorkspace
     if (!compareNormalized.startsWith(`${compareWorkspace}/`)) return null
-    const match = filePath.replace(/\\/g, '/')
-      .match(/\.hive\/features\/([^/]+)\/(?:plan\.md|comments\.json)$/)
-    return match ? match[1] : null
+
+    const planMatch = normalized.match(/\.hive\/features\/([^/]+)\/plan\.md$/)
+    if (planMatch) {
+      return { featureName: planMatch[1], document: 'plan' }
+    }
+
+    const overviewMatch = normalized.match(/\.hive\/features\/([^/]+)\/context\/overview\.md$/)
+    if (overviewMatch) {
+      return { featureName: overviewMatch[1], document: 'overview' }
+    }
+
+    return null
+  }
+
+  private getCommentsTarget(filePath: string): ReviewTarget | null {
+    const normalized = this.normalizePath(filePath)
+    const reviewMatch = normalized.match(/\.hive\/features\/([^/]+)\/comments\/(plan|overview)\.json$/)
+    if (reviewMatch) {
+      return { featureName: reviewMatch[1], document: reviewMatch[2] as ReviewDocument }
+    }
+
+    const legacyMatch = normalized.match(/\.hive\/features\/([^/]+)\/comments\.json$/)
+    if (legacyMatch) {
+      return { featureName: legacyMatch[1], document: 'plan' }
+    }
+
+    return null
   }
 
   private normalizePath(filePath: string): string {
@@ -158,24 +192,52 @@ export class PlanCommentController {
   }
 
   private getCommentsPath(uri: vscode.Uri): string | null {
-    const featureMatch = this.getFeatureMatch(uri.fsPath)
-    if (!featureMatch) return null
-    return path.join(this.workspaceRoot, '.hive', 'features', featureMatch, 'comments.json')
+    const target = this.getReviewTarget(uri.fsPath)
+    if (!target) return null
+    return path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments', `${target.document}.json`)
+  }
+
+  private getReadableCommentsPath(uri: vscode.Uri): string | null {
+    const target = this.getReviewTarget(uri.fsPath)
+    if (!target) return null
+
+    if (target.document === 'plan') {
+      const canonicalPath = path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments', 'plan.json')
+      if (fs.existsSync(canonicalPath)) {
+        return canonicalPath
+      }
+
+      const legacyPath = path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments.json')
+      if (fs.existsSync(legacyPath)) {
+        return legacyPath
+      }
+
+      return canonicalPath
+    }
+
+    return path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments', `${target.document}.json`)
+  }
+
+  private getDocumentPath(featureName: string, document: ReviewDocument): string {
+    return document === 'overview'
+      ? path.join(this.workspaceRoot, '.hive', 'features', featureName, 'context', 'overview.md')
+      : path.join(this.workspaceRoot, '.hive', 'features', featureName, 'plan.md')
   }
 
   private loadComments(uri: vscode.Uri): void {
-    const commentsPath = this.getCommentsPath(uri)
+    const commentsPath = this.getReadableCommentsPath(uri)
+
+    this.threads.forEach((thread, id) => {
+      if (this.isSamePath(thread.uri.fsPath, uri.fsPath)) {
+        thread.dispose()
+        this.threads.delete(id)
+      }
+    })
+
     if (!commentsPath || !fs.existsSync(commentsPath)) return
 
     try {
       const data: CommentsFile = JSON.parse(fs.readFileSync(commentsPath, 'utf-8'))
-      
-      this.threads.forEach((thread, id) => {
-        if (this.isSamePath(thread.uri.fsPath, uri.fsPath)) {
-          thread.dispose()
-          this.threads.delete(id)
-        }
-      })
 
       for (const stored of data.threads) {
         const comments: vscode.Comment[] = [
@@ -239,7 +301,7 @@ export class PlanCommentController {
   }
 
   dispose(): void {
-    this.commentsWatcher?.dispose()
+    this.commentsWatchers.forEach(watcher => watcher.dispose())
     this.controller.dispose()
   }
 }

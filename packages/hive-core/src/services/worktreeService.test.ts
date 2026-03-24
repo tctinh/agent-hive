@@ -87,6 +87,29 @@ async function readHeadBody(targetPath: string): Promise<string> {
 }
 
 describe("WorktreeService merge and commit messages", () => {
+  it("uses logical feature names for indexed worktree storage and branch naming", async () => {
+    const { repoPath } = await createTempRepo();
+    const service = new WorktreeService({
+      baseDir: repoPath,
+      hiveDir: path.join(repoPath, ".hive"),
+    });
+
+    await fs.mkdir(path.join(repoPath, ".hive", "features", "03_test-feature", "tasks", "01-test-task"), {
+      recursive: true,
+    });
+    await fs.writeFile(
+      path.join(repoPath, ".hive", "features", "03_test-feature", "tasks", "01-test-task", "status.json"),
+      JSON.stringify({ status: "pending", origin: "plan" }),
+      "utf-8",
+    );
+
+    const worktree = await service.create("test-feature", "01-test-task");
+
+    expect(worktree.path).toBe(path.join(repoPath, ".hive", ".worktrees", "test-feature", "01-test-task"));
+    expect(worktree.branch).toBe("hive/test-feature/01-test-task");
+    expect(await service.get("test-feature", "01-test-task")).not.toBeNull();
+  });
+
   it("uses a custom commit message verbatim, including body text", async () => {
     const fixture = await createFixture();
     await fs.writeFile(path.join(fixture.worktreePath, "custom-commit.txt"), "custom\n", "utf-8");

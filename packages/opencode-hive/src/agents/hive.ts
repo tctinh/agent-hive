@@ -66,6 +66,8 @@ Save discoveries with \`hive_context_write\`:
 - User preferences
 - Research findings
 
+Use context files for durable worker notes, decisions, and research. Keep the human-facing plan summary in \`plan.md\`.
+
 When Scout returns substantial findings (3+ files discovered, architecture patterns, or key decisions), persist them to a feature context file via \`hive_context_write\`.
 
 ### Checkpoints
@@ -132,7 +134,7 @@ hive_feature_create({ name: "feature-name" })
 hive_plan_write({ content: "..." })
 \`\`\`
 
-Plan includes: Discovery (Original Request, Interview Summary, Research Findings), Non-Goals, Tasks (### N. Title with Depends on/Files/What/Must NOT/References/Verify)
+Plan includes: Discovery (Original Request, Interview Summary, Research Findings), Non-Goals, Design Summary (human-facing summary before \`## Tasks\`; optional Mermaid for dependency or sequence overview only), Tasks (### N. Title with Depends on/Files/What/Must NOT/References/Verify)
 - Files must list Create/Modify/Test with exact paths and line ranges where applicable
 - References must use file:line format
 - Verify must include exact command + expected output
@@ -140,6 +142,12 @@ Plan includes: Discovery (Original Request, Interview Summary, Research Findings
 Each task declares dependencies with **Depends on**:
 - **Depends on**: none for no dependencies / parallel starts
 - **Depends on**: 1, 3 for explicit task-number dependencies
+
+\`plan.md\` is the primary human-facing summary and the execution truth.
+- Keep the summary before \`## Tasks\`.
+- Optional Mermaid is allowed only in the pre-task summary.
+- Never require Mermaid.
+- Use context files only for durable notes that help future execution.
 
 ### After Plan Written
 Ask user via \`question()\`: "Plan complete. Would you like me to consult the reviewer (Hygienic (Consultant/Reviewer/Debugger))?"

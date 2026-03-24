@@ -1,7 +1,8 @@
-import { PlanService, ContextService } from 'hive-core';
+import { FeatureService, PlanService, ContextService } from 'hive-core';
 import type { ToolRegistration } from './base';
 
 export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
+  const featureService = new FeatureService(workspaceRoot);
   const planService = new PlanService(workspaceRoot);
   const contextService = new ContextService(workspaceRoot);
 
@@ -9,7 +10,7 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
     {
       name: 'hive_plan_write',
       displayName: 'Write Hive Plan',
-      modelDescription: 'Write or update the plan.md for a feature. The plan defines tasks to execute. Use markdown with ### numbered headers for tasks. Clears existing comments when plan is rewritten.',
+      modelDescription: 'Write or update the plan.md for a feature. plan.md is the human-facing review surface and execution truth. Include a concise summary before ## Tasks, and optionally include a Mermaid dependency or sequence overview in that pre-task summary only. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -32,23 +33,23 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
         try {
           const contexts = contextService.list(feature);
           if (contexts.length === 0) {
-            contextWarning = '\n\n⚠️ WARNING: No context files created yet! Workers need context to execute well. Use hive_context_write to document:\n- Research findings and patterns\n- User preferences and decisions\n- Architecture constraints\n- References to existing code';
+            contextWarning += '\n\n⚠️ WARNING: No context files created yet. If workers will need durable notes, use hive_context_write to document research findings, user decisions, architecture constraints, or references to existing code.';
           }
         } catch {
-          contextWarning = '\n\n⚠️ WARNING: Could not check context files. Consider using hive_context_write to document findings for workers.';
+          contextWarning = '\n\n⚠️ WARNING: Could not check context files. If needed, use hive_context_write to document durable findings for workers.';
         }
         
         return JSON.stringify({
           success: true,
           path: planPath,
-          message: `Plan written. User can review and add comments. When ready, use hive_plan_approve.${contextWarning}`,
+          message: `Plan written. User can review plan.md as the human-facing surface and execution truth. When ready, use hive_plan_approve.${contextWarning}`,
         });
       },
     },
     {
       name: 'hive_plan_read',
       displayName: 'Read Hive Plan',
-      modelDescription: 'Read the plan.md and any user comments for a feature. Use to check plan content, status, and user feedback before making changes.',
+      modelDescription: 'Read the plan.md and related review comments for a feature. Use to check the in-plan human-facing summary, task structure, status, and user feedback before making changes.',
       readOnly: true,
       inputSchema: {
         type: 'object',
@@ -77,7 +78,7 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
     {
       name: 'hive_plan_approve',
       displayName: 'Approve Hive Plan',
-      modelDescription: 'Approve a plan for execution. Use after user has reviewed the plan and resolved any comments. Changes feature status to approved.',
+      modelDescription: 'Approve a plan for execution. Use after the user has reviewed plan.md, including the human-facing summary before ## Tasks, and resolved any comments. Changes feature status to approved.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -90,16 +91,38 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
       },
       invoke: async (input) => {
         const { feature } = input as { feature: string };
+        let contexts: Array<{ name: string }> = [];
         
         let contextWarning = '';
         try {
-          const contexts = contextService.list(feature);
+          contexts = contextService.list(feature);
           if (contexts.length === 0) {
-            contextWarning = '\n\n⚠️ Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.';
+            contextWarning += '\n\n⚠️ Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.';
           }
         } catch { /* continue without warning */ }
         
-        planService.approve(feature);
+        try {
+          planService.approve(feature);
+        } catch (error) {
+          if (error instanceof Error && /unresolved review comments/i.test(error.message)) {
+            const hasOverview = contexts.some(context => context.name === 'overview');
+            const reviewCounts = featureService.getInfo(feature)?.reviewCounts ?? { plan: 0, overview: 0 };
+            const planComments = reviewCounts.plan;
+            const overviewComments = hasOverview ? reviewCounts.overview : 0;
+            const unresolvedTotal = planComments + overviewComments;
+            const documents = [
+              planComments > 0 ? `plan (${planComments})` : null,
+              overviewComments > 0 ? `overview (${overviewComments})` : null,
+            ].filter(Boolean).join(', ');
+
+            return JSON.stringify({
+              success: false,
+              message: `Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`,
+            });
+          }
+
+          throw error;
+        }
         return JSON.stringify({
           success: true,
           message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan.${contextWarning}`,

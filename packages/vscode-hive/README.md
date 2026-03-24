@@ -69,7 +69,7 @@ Launch tasks directly in OpenCode from the sidebar.
 1. Hive activates when `.hive/` folder exists in your workspace
 2. Click the Hive icon in the Activity Bar
 3. View features, tasks, and execution progress
-4. Open plan.md to add review comments
+4. Open `context/overview.md` first, then `plan.md` if needed, to add review comments
 5. Click "Done Review" when ready to continue
 
 ## Commands

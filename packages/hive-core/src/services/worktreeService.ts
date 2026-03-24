@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import simpleGit, { SimpleGit } from "simple-git";
+import { resolveFeatureDirectoryName } from "../utils/paths.js";
 
 export interface WorktreeInfo {
   path: string;
@@ -64,7 +65,8 @@ export class WorktreeService {
   }
 
   private async getStepStatusPath(feature: string, step: string): Promise<string> {
-    const featurePath = path.join(this.config.hiveDir, "features", feature);
+    const featureDir = resolveFeatureDirectoryName(this.config.baseDir, feature);
+    const featurePath = path.join(this.config.hiveDir, "features", featureDir);
     
     // Check v2 structure first (tasks/)
     const tasksPath = path.join(featurePath, "tasks", step, "status.json");

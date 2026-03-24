@@ -50,7 +50,10 @@ async function buildAutoLoadedSkillsContent(
   projectRoot: string,
   autoLoadSkillsOverride?: string[],
 ): Promise<string> {
-  const autoLoadSkills = autoLoadSkillsOverride ?? (configService.getAgentConfig(agentName).autoLoadSkills ?? []);
+  const autoLoadSkills = autoLoadSkillsOverride
+    ?? (((configService as unknown as {
+      getAgentConfig: (name: string) => { autoLoadSkills?: string[] };
+    }).getAgentConfig(agentName).autoLoadSkills) ?? []);
 
   if (autoLoadSkills.length === 0) {
     return '';
@@ -84,6 +87,51 @@ async function buildAutoLoadedSkillsContent(
   }
 
   return '\n\n' + skillTemplates.join('\n\n');
+}
+
+type CompatibleCustomAgentConfig = {
+  baseAgent: 'forager-worker' | 'hygienic-reviewer';
+  description: string;
+  autoLoadSkills?: string[];
+};
+
+function getCustomAgentConfigsCompat(configService: ConfigService): Record<string, CompatibleCustomAgentConfig> {
+  const serviceWithMethod = configService as ConfigService & {
+    getCustomAgentConfigs?: () => Record<string, CompatibleCustomAgentConfig>;
+    get?: () => { customAgents?: Record<string, unknown> };
+  };
+
+  if (typeof serviceWithMethod.getCustomAgentConfigs === 'function') {
+    return serviceWithMethod.getCustomAgentConfigs();
+  }
+
+  const rawConfig = serviceWithMethod.get?.() as { customAgents?: Record<string, unknown> } | undefined;
+  const rawCustomAgents = rawConfig?.customAgents;
+  if (!rawCustomAgents || typeof rawCustomAgents !== 'object') {
+    return {};
+  }
+
+  const compatibleEntries = Object.entries(rawCustomAgents).flatMap(([name, config]) => {
+    if (!config || typeof config !== 'object') {
+      return [];
+    }
+
+    const record = config as Record<string, unknown>;
+    const baseAgent = record.baseAgent;
+    if (baseAgent !== 'forager-worker' && baseAgent !== 'hygienic-reviewer') {
+      return [];
+    }
+
+    return [[name, {
+      baseAgent,
+      description: typeof record.description === 'string' ? record.description : 'Custom subagent',
+      autoLoadSkills: Array.isArray(record.autoLoadSkills)
+        ? record.autoLoadSkills.filter((skill): skill is string => typeof skill === 'string')
+        : [],
+    } satisfies CompatibleCustomAgentConfig]];
+  });
+
+  return Object.fromEntries(compatibleEntries);
 }
 
 function createHiveSkillTool(filteredSkills: SkillDefinition[]): ToolDefinition {
@@ -141,8 +189,8 @@ import {
   buildEffectiveDependencies,
   computeRunnableAndBlocked,
   detectContext,
-  listFeatures,
   normalizePath,
+  resolveFeatureDirectoryName,
   type WorktreeInfo,
 } from "hive-core";
 import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
@@ -200,10 +248,7 @@ const plugin: Plugin = async (ctx) => {
     const context = detectContext(directory);
     if (context.feature) return context.feature;
 
-    const features = listFeatures(directory);
-    if (features.length === 1) return features[0];
-
-    return null;
+    return featureService.getActive()?.name ?? null;
   };
 
   const captureSession = (feature: string, toolContext: unknown) => {
@@ -226,7 +271,8 @@ const plugin: Plugin = async (ctx) => {
    */
   const checkBlocked = (feature: string): string | null => {
     const fs = require('fs');
-    const blockedPath = path.join(directory, '.hive', 'features', feature, 'BLOCKED');
+    const featureDir = resolveFeatureDirectoryName(directory, feature);
+    const blockedPath = path.join(directory, '.hive', 'features', featureDir, 'BLOCKED');
     if (fs.existsSync(blockedPath)) {
       const reason = fs.readFileSync(blockedPath, 'utf-8').trim();
       return `⛔ BLOCKED by Beekeeper
@@ -234,7 +280,7 @@ const plugin: Plugin = async (ctx) => {
 ${reason || '(No reason provided)'}
 
 The human has blocked this feature. Wait for them to unblock it.
-To unblock: Remove .hive/features/${feature}/BLOCKED`;
+To unblock: Remove .hive/features/${featureDir}/BLOCKED`;
     }
     return null;
   };
@@ -324,7 +370,15 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
     const planResult = planService.read(feature);
     const allTasks = taskService.list(feature);
 
-    const rawContextFiles = contextService.list(feature).map(f => ({
+    const executionContextFiles = typeof (contextService as ContextService & {
+      listExecutionContext?: (featureName: string) => Array<{ name: string; content: string }>;
+    }).listExecutionContext === 'function'
+      ? (contextService as ContextService & {
+          listExecutionContext: (featureName: string) => Array<{ name: string; content: string }>;
+        }).listExecutionContext(feature)
+      : contextService.list(feature).filter(f => f.name !== 'overview');
+
+    const rawContextFiles = executionContextFiles.map(f => ({
       name: f.name,
       content: f.content,
     }));
@@ -393,7 +447,7 @@ To unblock: Remove .hive/features/${feature}/BLOCKED`;
       } : undefined,
     });
 
-    const customAgentConfigs = configService.getCustomAgentConfigs();
+    const customAgentConfigs = getCustomAgentConfigsCompat(configService);
     const defaultAgent = 'forager-worker';
     const eligibleAgents = [
       {
@@ -549,7 +603,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         task,
         hints: [
           'Wait for the human to unblock the feature before retrying.',
-          `If approved, remove .hive/features/${feature}/BLOCKED and retry hive_worktree_start.`,
+          `If approved, remove .hive/features/${resolveFeatureDirectoryName(directory, feature)}/BLOCKED and retry hive_worktree_start.`,
         ],
       });
     }
@@ -655,7 +709,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         task,
         hints: [
           'Wait for the human to unblock the feature before retrying.',
-          `If approved, remove .hive/features/${feature}/BLOCKED and retry hive_worktree_create.`,
+          `If approved, remove .hive/features/${resolveFeatureDirectoryName(directory, feature)}/BLOCKED and retry hive_worktree_create.`,
         ],
       });
     }
@@ -762,12 +816,22 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       if (activeFeature) {
         const info = featureService.getInfo(activeFeature);
         if (info) {
+          const featureInfo = info as typeof info & {
+            hasOverview?: boolean;
+            reviewCounts?: { plan: number; overview: number };
+          };
           let statusHint = `\n### Current Hive Status\n`;
           statusHint += `**Active Feature**: ${info.name} (${info.status})\n`;
           statusHint += `**Progress**: ${info.tasks.filter(t => t.status === 'done').length}/${info.tasks.length} tasks\n`;
 
+          if (featureInfo.hasOverview) {
+            statusHint += `**Overview**: available at .hive/features/${resolveFeatureDirectoryName(directory, info.name)}/context/overview.md (primary human-facing doc)\n`;
+          } else if (info.hasPlan) {
+            statusHint += `**Overview**: missing - write it with hive_context_write({ name: "overview", content })\n`;
+          }
+
           if (info.commentCount > 0) {
-            statusHint += `**Comments**: ${info.commentCount} unresolved - address with hive_plan_read\n`;
+            statusHint += `**Comments**: ${info.commentCount} unresolved (plan: ${featureInfo.reviewCounts?.plan ?? 0}, overview: ${featureInfo.reviewCounts?.overview ?? 0})\n`;
           }
 
           output.system.push(statusHint);
@@ -888,7 +952,7 @@ NEXT: Ask your first clarifying question about this feature.`;
       }),
 
       hive_plan_write: tool({
-        description: 'Write plan.md (clears existing comments)',
+        description: 'Write plan.md (clears plan review comments)',
         args: {
           content: tool.schema.string().describe('Plan markdown content'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
@@ -930,12 +994,12 @@ Expand your Discovery section and try again.`;
 
           captureSession(feature, toolContext);
           const planPath = planService.write(feature, content);
-          return `Plan written to ${planPath}. Comments cleared for fresh review.`;
+          return `Plan written to ${planPath}. Comments cleared for fresh review. Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History. Review context/overview.md first; plan.md remains execution truth.`;
         },
       }),
 
       hive_plan_read: tool({
-        description: 'Read plan.md and user comments',
+        description: 'Read plan.md and related review comments',
         args: {
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
@@ -958,12 +1022,19 @@ Expand your Discovery section and try again.`;
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
           captureSession(feature, toolContext);
-          const comments = planService.getComments(feature);
-          if (comments.length > 0) {
-            return `Error: Cannot approve - ${comments.length} unresolved comment(s). Address them first.`;
+          const info = featureService.getInfo(feature);
+          const planComments = info?.reviewCounts.plan ?? 0;
+          const overviewComments = info?.reviewCounts.overview ?? 0;
+          const unresolvedTotal = planComments + overviewComments;
+          if (unresolvedTotal > 0) {
+            const documents = [
+              planComments > 0 ? `plan (${planComments})` : null,
+              overviewComments > 0 ? `overview (${overviewComments})` : null,
+            ].filter(Boolean).join(', ');
+            return `Error: Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`;
           }
           planService.approve(feature);
-          return "Plan approved. Run hive_tasks_sync to generate tasks.";
+          return 'Plan approved. Run hive_tasks_sync to generate tasks. Refresh the overview if approval changed the plan narrative, workstreams, or milestones; context/overview.md is the primary human-facing surface and plan.md remains execution truth.';
         },
       }),
 
@@ -1340,7 +1411,7 @@ Expand your Discovery section and try again.`;
               error: blocked,
               hints: [
                 'Read the blocker details and resolve them before retrying hive_status.',
-                `Remove .hive/features/${feature}/BLOCKED once the blocker is resolved.`,
+                `Remove .hive/features/${resolveFeatureDirectoryName(directory, feature)}/BLOCKED once the blocker is resolved.`,
               ],
             });
           }
@@ -1348,6 +1419,27 @@ Expand your Discovery section and try again.`;
           const plan = planService.read(feature);
           const tasks = taskService.list(feature);
           const contextFiles = contextService.list(feature);
+          const overview = contextFiles.find(file => file.name === 'overview') ?? null;
+          const readThreads = (filePath: string): Array<unknown> | null => {
+            if (!fs.existsSync(filePath)) {
+              return null;
+            }
+
+            try {
+              const data = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as { threads?: Array<unknown> };
+              return data.threads ?? [];
+            } catch {
+              return [];
+            }
+          };
+          const featurePath = path.join(directory, '.hive', 'features', resolveFeatureDirectoryName(directory, feature));
+          const reviewDir = path.join(featurePath, 'comments');
+          const planThreads = readThreads(path.join(reviewDir, 'plan.json')) ?? readThreads(path.join(featurePath, 'comments.json'));
+          const overviewThreads = readThreads(path.join(reviewDir, 'overview.json'));
+          const reviewCounts = {
+            plan: planThreads?.length ?? 0,
+            overview: overviewThreads?.length ?? 0,
+          };
 
           const tasksSummary = await Promise.all(tasks.map(async t => {
             const rawStatus = taskService.getRawStatus(feature, t.folder);
@@ -1391,12 +1483,18 @@ Expand your Discovery section and try again.`;
           }));
           const { runnable, blocked: blockedBy } = computeRunnableAndBlocked(normalizedTasks);
 
-          const getNextAction = (planStatus: string | null, tasks: Array<{ status: string; folder: string }>, runnableTasks: string[]): string => {
-            if (!planStatus || planStatus === 'draft') {
-              return 'Write or revise plan with hive_plan_write, then get approval';
-            }
+          const getNextAction = (
+            planStatus: string | null,
+            tasks: Array<{ status: string; folder: string }>,
+            runnableTasks: string[],
+            hasPlan: boolean,
+            hasOverview: boolean,
+          ): string => {
             if (planStatus === 'review') {
               return 'Wait for plan approval or revise based on comments';
+            }
+            if (!hasPlan || planStatus === 'draft') {
+              return 'Write or revise plan with hive_plan_write. Keep plan.md as the human-facing review artifact; pre-task Mermaid overview diagrams are optional.';
             }
             if (tasks.length === 0) {
               return 'Generate tasks from plan with hive_tasks_sync';
@@ -1434,6 +1532,18 @@ Expand your Discovery section and try again.`;
               status: planStatus,
               approved: planStatus === 'approved' || planStatus === 'locked',
             },
+            overview: {
+              exists: !!overview,
+              path: `.hive/features/${feature}/context/overview.md`,
+              updatedAt: overview?.updatedAt ?? null,
+            },
+            review: {
+              unresolvedTotal: reviewCounts.plan + reviewCounts.overview,
+              byDocument: {
+                overview: reviewCounts.overview,
+                plan: reviewCounts.plan,
+              },
+            },
             tasks: {
               total: tasks.length,
               pending: pendingTasks.length,
@@ -1447,7 +1557,7 @@ Expand your Discovery section and try again.`;
               fileCount: contextFiles.length,
               files: contextSummary,
             },
-            nextAction: getNextAction(planStatus, tasksSummary, runnable),
+            nextAction: getNextAction(planStatus, tasksSummary, runnable, !!plan, !!overview),
           });
         },
       }),
@@ -1526,7 +1636,7 @@ Expand your Discovery section and try again.`;
       const hiveConfigData = configService.get();
       const agentMode = hiveConfigData.agentMode ?? 'unified';
 
-      const customAgentConfigs = configService.getCustomAgentConfigs();
+      const customAgentConfigs = getCustomAgentConfigsCompat(configService);
       const customSubagentAppendix = Object.keys(customAgentConfigs).length === 0
         ? ''
         : `\n\n## Configured Custom Subagents\n${Object.entries(customAgentConfigs)
