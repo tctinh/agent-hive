@@ -6853,6 +6853,22 @@ var PlanItem = class extends vscode3.TreeItem {
     };
   }
 };
+var OverviewItem = class extends vscode3.TreeItem {
+  constructor(featureName, overviewPath, commentCount) {
+    super("Overview", vscode3.TreeItemCollapsibleState.None);
+    this.featureName = featureName;
+    this.overviewPath = overviewPath;
+    this.commentCount = commentCount;
+    this.description = commentCount > 0 ? `${commentCount} comment(s)` : "";
+    this.contextValue = "overview-file";
+    this.iconPath = new vscode3.ThemeIcon("book");
+    this.command = {
+      command: "vscode.open",
+      title: "Open Overview",
+      arguments: [vscode3.Uri.file(overviewPath)]
+    };
+  }
+};
 var ContextFolderItem = class extends vscode3.TreeItem {
   constructor(featureName, contextPath, fileCount) {
     super("Context", fileCount > 0 ? vscode3.TreeItemCollapsibleState.Collapsed : vscode3.TreeItemCollapsibleState.None);
@@ -7028,7 +7044,12 @@ var HiveSidebarProvider = class {
       items.push(new PlanItem(featureName, planPath, feature.status, commentCount));
     }
     const contextPath = path6.join(featurePath, "context");
-    const contextFiles = fs6.existsSync(contextPath) ? fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".")) : [];
+    const contextFiles = fs6.existsSync(contextPath) ? fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".") && f !== "overview.md") : [];
+    const overviewPath = path6.join(contextPath, "overview.md");
+    if (fs6.existsSync(overviewPath)) {
+      const commentCount = this.getCommentCount(featureName, "overview");
+      items.push(new OverviewItem(featureName, overviewPath, commentCount));
+    }
     items.push(new ContextFolderItem(featureName, contextPath, contextFiles.length));
     const tasks = this.getTaskList(featureName);
     items.push(new TasksGroupItem(featureName, tasks));
@@ -7036,7 +7057,7 @@ var HiveSidebarProvider = class {
   }
   getContextFiles(featureName, contextPath) {
     if (!fs6.existsSync(contextPath)) return [];
-    return fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".")).map((f) => new ContextFileItem(f, path6.join(contextPath, f)));
+    return fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".") && f !== "overview.md").map((f) => new ContextFileItem(f, path6.join(contextPath, f)));
   }
   getTasks(featureName, tasks) {
     const featurePath = getFeaturePath(this.workspaceRoot, featureName);

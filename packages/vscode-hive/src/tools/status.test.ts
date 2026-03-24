@@ -115,7 +115,7 @@ describe('getStatusTools', () => {
 
   it('registers hive_status for VS Code language model tools', () => {
     const packageJson = JSON.parse(
-      fs.readFileSync(path.join(process.cwd(), 'packages', 'vscode-hive', 'package.json'), 'utf-8')
+      fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf-8')
     ) as {
       contributes?: {
         languageModelTools?: Array<{ name?: string; toolReferenceName?: string }>;
