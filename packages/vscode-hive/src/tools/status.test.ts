@@ -112,6 +112,22 @@ describe('getStatusTools', () => {
 
     expect(status.nextAction).toBe('Generate tasks from plan with hive_tasks_sync');
   });
+
+  it('registers hive_status for VS Code language model tools', () => {
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), 'packages', 'vscode-hive', 'package.json'), 'utf-8')
+    ) as {
+      contributes?: {
+        languageModelTools?: Array<{ name?: string; toolReferenceName?: string }>;
+      };
+    };
+
+    const toolNames = packageJson.contributes?.languageModelTools?.map(tool => tool.name) ?? [];
+    const statusTool = packageJson.contributes?.languageModelTools?.find(tool => tool.name === 'hive_status');
+
+    expect(toolNames).toContain('hive_status');
+    expect(statusTool?.toolReferenceName).toBe('hiveStatus');
+  });
 });
 
 async function invokeStatus(workspaceRoot: string, input: { feature: string }): Promise<any> {

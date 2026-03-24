@@ -329,9 +329,16 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
     }
 
     const contextPath = path.join(featurePath, 'context')
-    const contextFiles = fs.existsSync(contextPath) 
-      ? fs.readdirSync(contextPath).filter(f => !f.startsWith('.'))
+    const contextFiles = fs.existsSync(contextPath)
+      ? fs.readdirSync(contextPath).filter(f => !f.startsWith('.') && f !== 'overview.md')
       : []
+
+    const overviewPath = path.join(contextPath, 'overview.md')
+    if (fs.existsSync(overviewPath)) {
+      const commentCount = this.getCommentCount(featureName, 'overview')
+      items.push(new OverviewItem(featureName, overviewPath, commentCount))
+    }
+
     items.push(new ContextFolderItem(featureName, contextPath, contextFiles.length))
 
     const tasks = this.getTaskList(featureName)
@@ -344,7 +351,7 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
     if (!fs.existsSync(contextPath)) return []
 
     return fs.readdirSync(contextPath)
-      .filter(f => !f.startsWith('.'))
+      .filter(f => !f.startsWith('.') && f !== 'overview.md')
       .map(f => new ContextFileItem(f, path.join(contextPath, f)))
   }
 

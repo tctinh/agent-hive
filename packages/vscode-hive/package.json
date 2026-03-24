@@ -516,6 +516,22 @@
         }
       },
       {
+        "name": "hive_status",
+        "displayName": "Get Hive Status",
+        "modelDescription": "Get comprehensive status of a feature including plan, tasks, and context. Returns JSON with all relevant state for resuming work.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "hiveStatus",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "feature": {
+              "type": "string",
+              "description": "Feature name (optional, uses active feature if omitted)"
+            }
+          }
+        }
+      },
+      {
         "name": "hive_merge",
         "displayName": "Merge Task Branch",
         "modelDescription": "Merge a completed task branch into current branch. Supports merge, squash, or rebase strategies. Use after hive_exec_complete to integrate changes.",
