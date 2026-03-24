@@ -189,7 +189,7 @@ import {
   buildEffectiveDependencies,
   computeRunnableAndBlocked,
   detectContext,
-  listFeatures,
+  resolveActiveFeatureName,
   normalizePath,
   resolveFeatureDirectoryName,
   type WorktreeInfo,
@@ -249,10 +249,7 @@ const plugin: Plugin = async (ctx) => {
     const context = detectContext(directory);
     if (context.feature) return context.feature;
 
-    const features = listFeatures(directory);
-    if (features.length === 1) return features[0];
-
-    return null;
+    return resolveActiveFeatureName(directory);
   };
 
   const captureSession = (feature: string, toolContext: unknown) => {

@@ -327,6 +327,57 @@ Do it
     expect(status.tasks?.list?.[0]?.folder).toBe("01-first-task");
   });
 
+  it("writes logical active-feature names and status fallback prefers the shared pointer", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_active_feature_pointer");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "zeta-feature" },
+      toolContext
+    );
+
+    expect(
+      fs.readFileSync(path.join(testRoot, ".hive", "active-feature"), "utf-8")
+    ).toBe("zeta-feature");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "alpha-feature" },
+      toolContext
+    );
+
+    expect(
+      fs.readFileSync(path.join(testRoot, ".hive", "active-feature"), "utf-8")
+    ).toBe("alpha-feature");
+
+    const statusRaw = await hooks.tool!.hive_status.execute({}, toolContext);
+    const status = JSON.parse(statusRaw as string) as {
+      feature?: { name?: string };
+    };
+
+    expect(status.feature?.name).toBe("alpha-feature");
+
+    await hooks.tool!.hive_feature_complete.execute(
+      { name: "alpha-feature" },
+      toolContext
+    );
+
+    const fallbackStatusRaw = await hooks.tool!.hive_status.execute({}, toolContext);
+    const fallbackStatus = JSON.parse(fallbackStatusRaw as string) as {
+      feature?: { name?: string };
+    };
+
+    expect(fallbackStatus.feature?.name).toBe("zeta-feature");
+  });
+
   it("returns task tool call using @file prompt", async () => {
 
     const ctx: PluginInput = {

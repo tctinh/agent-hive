@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
+import { FeatureService, getFeaturePath } from 'hive-core'
 import type { FeatureJson, TaskStatus } from 'hive-core'
 
 type SidebarItem = ActionItem | StatusGroupItem | FeatureItem | OverviewItem | PlanItem | ContextFolderItem | ContextFileItem | TasksGroupItem | TaskItem | TaskFileItem
@@ -209,8 +210,11 @@ class TaskFileItem extends vscode.TreeItem {
 export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<SidebarItem | undefined>()
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event
+  private readonly featureService: FeatureService
 
-  constructor(private workspaceRoot: string) {}
+  constructor(private workspaceRoot: string) {
+    this.featureService = new FeatureService(workspaceRoot)
+  }
 
   refresh(): void {
     this._onDidChangeTreeData.fire(undefined)
@@ -290,21 +294,13 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
   }
 
   private getAllFeatures(): FeatureItem[] {
-    const featuresPath = path.join(this.workspaceRoot, '.hive', 'features')
-    if (!fs.existsSync(featuresPath)) return []
-
-    const activeFeature = this.getActiveFeature()
+    const activeFeature = this.featureService.getActive()?.name
     const features: FeatureItem[] = []
 
-    const dirs = fs.readdirSync(featuresPath, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name)
+    for (const name of this.featureService.list()) {
+      const feature = this.featureService.get(name)
+      if (!feature) continue
 
-    for (const name of dirs) {
-      const featureJsonPath = path.join(featuresPath, name, 'feature.json')
-      if (!fs.existsSync(featureJsonPath)) continue
-
-      const feature: FeatureJson = JSON.parse(fs.readFileSync(featureJsonPath, 'utf-8'))
       const taskStats = this.getTaskStats(name)
       const isActive = name === activeFeature
 
@@ -322,7 +318,7 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
   }
 
   private getFeatureChildren(featureName: string): SidebarItem[] {
-    const featurePath = path.join(this.workspaceRoot, '.hive', 'features', featureName)
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName)
     const items: SidebarItem[] = []
 
     const featureJsonPath = path.join(featurePath, 'feature.json')
@@ -361,7 +357,7 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
   }
 
   private getTasks(featureName: string, tasks: Array<{ folder: string; status: TaskStatus }>): TaskItem[] {
-    const featurePath = path.join(this.workspaceRoot, '.hive', 'features', featureName)
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName)
     
     return tasks.map(t => {
       const taskDir = path.join(featurePath, 'tasks', t.folder)
@@ -388,7 +384,7 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
   }
 
   private getTaskList(featureName: string): Array<{ folder: string; status: TaskStatus }> {
-    const tasksPath = path.join(this.workspaceRoot, '.hive', 'features', featureName, 'tasks')
+    const tasksPath = path.join(getFeaturePath(this.workspaceRoot, featureName), 'tasks')
     if (!fs.existsSync(tasksPath)) return []
 
     const folders = fs.readdirSync(tasksPath, { withFileTypes: true })
@@ -413,14 +409,8 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
     }
   }
 
-  private getActiveFeature(): string | null {
-    const activePath = path.join(this.workspaceRoot, '.hive', 'active-feature')
-    if (!fs.existsSync(activePath)) return null
-    return fs.readFileSync(activePath, 'utf-8').trim()
-  }
-
   private getCommentCount(featureName: string, document: 'plan' | 'overview'): number {
-    const featurePath = path.join(this.workspaceRoot, '.hive', 'features', featureName)
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName)
     const commentsPath = document === 'plan'
       ? this.firstExistingPath([
           path.join(featurePath, 'comments', 'plan.json'),

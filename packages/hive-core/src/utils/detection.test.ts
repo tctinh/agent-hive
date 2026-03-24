@@ -34,7 +34,7 @@ describe('detection', () => {
     writeFeature(projectRoot, 'legacy-feature', 'legacy-feature');
     writeFeature(projectRoot, '02_indexed-feature', 'indexed-feature');
 
-    expect(listFeatures(projectRoot)).toEqual(['legacy-feature', 'indexed-feature']);
+    expect(listFeatures(projectRoot)).toEqual(['indexed-feature', 'legacy-feature']);
     expect(getFeatureData(projectRoot, 'indexed-feature')).toMatchObject({ name: 'indexed-feature' });
   });
 

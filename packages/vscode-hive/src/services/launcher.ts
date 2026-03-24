@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
+import { getFeaturePath } from 'hive-core'
 
 /**
  * Launcher for Hive features - works with GitHub Copilot Chat
@@ -18,8 +19,13 @@ export class Launcher {
       return
     }
 
-    const overviewPath = path.join(this.workspaceRoot, '.hive', 'features', feature, 'context', 'overview.md')
-    const planPath = path.join(this.workspaceRoot, '.hive', 'features', feature, 'plan.md')
+    const activeFeaturePath = path.join(this.workspaceRoot, '.hive', 'active-feature')
+    fs.mkdirSync(path.dirname(activeFeaturePath), { recursive: true })
+    fs.writeFileSync(activeFeaturePath, feature, 'utf-8')
+
+    const featurePath = getFeaturePath(this.workspaceRoot, feature)
+    const overviewPath = `${featurePath}/context/overview.md`
+    const planPath = `${featurePath}/plan.md`
     const targetPath = fs.existsSync(overviewPath) ? overviewPath : planPath
     try {
       const uri = vscode.Uri.file(targetPath)
