@@ -9,19 +9,23 @@ The `Release` workflow runs **publishing only on tags** matching `v*`. Manual ru
 
 ## 1) Prep the release locally
 
-Pick a version (e.g. `0.8.3`) and run:
+For the current patch line, work from `release/human-overview-context-v1`, pick a version (e.g. `1.3.4`), and run:
 
 ```bash
-npm run release:prepare -- 0.8.3
+git checkout release/human-overview-context-v1
+git pull
+bun run release:prepare -- 1.3.4
 ```
 
 This will:
 
 - Bump versions in `package.json` + workspace packages
-- Generate `docs/releases/v0.8.3.md` (draft release notes)
+- Generate `docs/releases/v1.3.4.md` (draft release notes)
 - Create/update `CHANGELOG.md`
 
 Review/edit the generated notes and changelog before continuing.
+
+Manual `workflow_dispatch` runs of `release.yml` are branch-safe rehearsal runs: they build and test the selected ref, but they do not publish packages.
 
 ## 2) Validate
 
@@ -29,11 +33,11 @@ Run the normal build/test loop:
 
 ```bash
 bun install
-npm run build --workspaces
-npm -ws --if-present run test
+bun run build
+bun run test
 ```
 
-## 3) Merge to `main`
+## 3) Merge to the release branch
 
 Open a PR with:
 
@@ -41,15 +45,18 @@ Open a PR with:
 - `CHANGELOG.md` updates
 - `docs/releases/vX.Y.Z.md` release notes
 
+Target `release/human-overview-context-v1` for the active `1.3.x` line. Do not switch this patch workflow back to `main`.
+
 ## 4) Tag and release
 
-After merging to `main`, create and push a tag:
+After merging to `release/human-overview-context-v1`, create and push a tag:
 
 ```bash
-git checkout main
+git checkout release/human-overview-context-v1
 git pull
-git tag -a v0.8.3 -m "Release 0.8.3"
-git push origin v0.8.3
+gh workflow run release.yml --ref release/human-overview-context-v1
+git tag -a v1.3.4 -m "Release 1.3.4"
+git push origin v1.3.4
 ```
 
-That tag triggers `.github/workflows/release.yml` to build, publish, and create a GitHub Release.
+The manual workflow run rehearses the exact release branch without publishing. The pushed tag then triggers `.github/workflows/release.yml` to build, publish, and create a GitHub Release.
