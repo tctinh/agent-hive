@@ -502,9 +502,41 @@ Test compaction resume flow.
     const compactionOutput = { context: [] as string[], prompt: undefined as string | undefined };
     await hooks["experimental.session.compacting"]?.({ sessionID: "sess_compaction" }, compactionOutput);
 
+    expect(compactionOutput.prompt).toBeDefined();
+    expect(compactionOutput.prompt).toContain("Compaction recovery");
+    expect(compactionOutput.prompt).not.toMatch(/hive_status/);
     const joined = compactionOutput.context.join("\n");
     expect(joined).not.toMatch(/hive_status/);
-    expect(joined).toMatch(/continue/i);
-    expect(joined).toMatch(/worker-prompt\.md|task spec|spec file/i);
+  });
+
+  it("compaction hook sets both prompt and context for known forager session", async () => {
+    const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
+    const { SessionService } = await import("hive-core");
+    const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
+
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: { id: "test", worktree: testRoot, time: { created: Date.now() } },
+      client: OPENCODE_CLIENT,
+      $: createStubShellForLoop(),
+    };
+    const hooks = await plugin(ctx);
+
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal("sess_forager_e2e", {
+      agent: "forager-worker",
+      sessionKind: "task-worker",
+      workerPromptPath: ".hive/features/test-feature/tasks/01-task/worker-prompt.md",
+    } as any);
+
+    const compactionOutput = { context: [] as string[], prompt: undefined as string | undefined };
+    await hooks["experimental.session.compacting"]?.({ sessionID: "sess_forager_e2e" }, compactionOutput);
+
+    expect(compactionOutput.prompt).toBeDefined();
+    expect(compactionOutput.prompt).toContain("Compaction recovery");
+    expect(compactionOutput.prompt).toContain("Role: Forager");
+    expect(compactionOutput.context.join("\n")).toContain("worker-prompt.md");
   });
 });

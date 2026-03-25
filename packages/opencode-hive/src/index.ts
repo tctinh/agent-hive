@@ -202,6 +202,8 @@ import { formatRelativeTime } from "./utils/format";
 import { createVariantHook } from "./hooks/variant-hook.js";
 import { HIVE_SYSTEM_PROMPT, shouldExecuteHook } from "./hooks/system-hook.js";
 import { buildCompactionPrompt } from "./utils/compaction-prompt.js";
+import { buildCompactionReanchor } from "./utils/compaction-anchor.js";
+import type { CompactionSessionContext } from "./utils/compaction-anchor.js";
 
 /**
  * Core plugin implementation.
@@ -857,7 +859,24 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       _input: { sessionID: string },
       output: { context: string[]; prompt?: string },
     ) => {
-      output.context.push(buildCompactionPrompt());
+      const session = sessionService.getGlobal(_input.sessionID);
+      if (session) {
+        const ctx: CompactionSessionContext = {
+          agent: session.agent,
+          baseAgent: session.baseAgent,
+          sessionKind: session.sessionKind,
+          featureName: session.featureName,
+          taskFolder: session.taskFolder,
+          workerPromptPath: session.workerPromptPath,
+        };
+        const reanchor = buildCompactionReanchor(ctx);
+        output.prompt = reanchor.prompt;
+        output.context.push(...reanchor.context);
+      } else {
+        const reanchor = buildCompactionReanchor({});
+        output.prompt = reanchor.prompt;
+        output.context.push(...reanchor.context);
+      }
     },
 
     // Apply per-agent variant to messages (covers built-in and accepted custom task() agents)

@@ -57,6 +57,8 @@ export function buildCompactionReanchor(ctx: CompactionSessionContext): Compacti
     if (ctx.workerPromptPath) {
       lines.push('Re-read worker-prompt.md now to recall your assignment.');
       context.push(ctx.workerPromptPath);
+    } else {
+      lines.push('Re-read worker-prompt.md in your task worktree root to recall your assignment.');
     }
   }
 
