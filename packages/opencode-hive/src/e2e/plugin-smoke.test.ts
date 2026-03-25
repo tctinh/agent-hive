@@ -1944,4 +1944,148 @@ Do it
 
     expect(execStart.taskPromptMode).toBe("opencode-at-file");
   });
+
+  it("hive_plan_read binds featureName to global session", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_plan_bind");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "plan-bind-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_write.execute(
+      {
+        content: createSingleTaskPlan(
+          "Plan Bind Feature",
+          "Yes, this regression test validates that hive_plan_read binds featureName to the global session via SessionService.bindFeature. This is essential for compaction recovery."
+        ),
+        feature: "plan-bind-feature",
+      },
+      toolContext
+    );
+
+    const workerContext = createToolContext("sess_worker_plan_bind");
+    await hooks.tool!.hive_plan_read.execute(
+      { feature: "plan-bind-feature" },
+      workerContext
+    );
+
+    const sessionsPath = path.join(testRoot, ".hive", "sessions.json");
+    expect(fs.existsSync(sessionsPath)).toBe(true);
+    const sessions = JSON.parse(fs.readFileSync(sessionsPath, "utf-8"));
+    const workerSession = sessions.sessions.find(
+      (s: { sessionId: string }) => s.sessionId === "sess_worker_plan_bind"
+    );
+    expect(workerSession).toBeDefined();
+    expect(workerSession.featureName).toBe("plan-bind-feature");
+  });
+
+  it("hive_context_write binds featureName to global session", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_ctx_bind");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "ctx-bind-feature" },
+      toolContext
+    );
+
+    const workerContext = createToolContext("sess_worker_ctx_bind");
+    await hooks.tool!.hive_context_write.execute(
+      { name: "notes", content: "test notes", feature: "ctx-bind-feature" },
+      workerContext
+    );
+
+    const sessionsPath = path.join(testRoot, ".hive", "sessions.json");
+    expect(fs.existsSync(sessionsPath)).toBe(true);
+    const sessions = JSON.parse(fs.readFileSync(sessionsPath, "utf-8"));
+    const workerSession = sessions.sessions.find(
+      (s: { sessionId: string }) => s.sessionId === "sess_worker_ctx_bind"
+    );
+    expect(workerSession).toBeDefined();
+    expect(workerSession.featureName).toBe("ctx-bind-feature");
+  });
+
+  it("hive_worktree_commit binds featureName, taskFolder, and workerPromptPath to global session", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_commit_bind");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "commit-bind-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_write.execute(
+      {
+        content: createSingleTaskPlan(
+          "Commit Bind Feature",
+          "Yes, this regression test validates that hive_worktree_commit binds featureName, taskFolder, and workerPromptPath to the global session for compaction recovery."
+        ),
+        feature: "commit-bind-feature",
+      },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_approve.execute(
+      { feature: "commit-bind-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_tasks_sync.execute(
+      { feature: "commit-bind-feature" },
+      toolContext
+    );
+
+    const startRaw = await hooks.tool!.hive_worktree_start.execute(
+      { feature: "commit-bind-feature", task: FIRST_TASK },
+      toolContext
+    );
+    const startResult = JSON.parse(startRaw as string);
+    expect(startResult.success).toBe(true);
+
+    const workerContext = createToolContext("sess_worker_commit_bind");
+    await hooks.tool!.hive_worktree_commit.execute(
+      {
+        task: FIRST_TASK,
+        summary: "Test commit binding. Tests pass.",
+        status: "completed",
+        feature: "commit-bind-feature",
+      },
+      workerContext
+    );
+
+    const sessionsPath = path.join(testRoot, ".hive", "sessions.json");
+    expect(fs.existsSync(sessionsPath)).toBe(true);
+    const sessions = JSON.parse(fs.readFileSync(sessionsPath, "utf-8"));
+    const workerSession = sessions.sessions.find(
+      (s: { sessionId: string }) => s.sessionId === "sess_worker_commit_bind"
+    );
+    expect(workerSession).toBeDefined();
+    expect(workerSession.featureName).toBe("commit-bind-feature");
+    expect(workerSession.taskFolder).toBe(FIRST_TASK);
+    expect(workerSession.workerPromptPath).toContain("worker-prompt.md");
+  });
 });

@@ -186,6 +186,7 @@ import {
   ConfigService,
   AgentsMdService,
   DockerSandboxService,
+  SessionService,
   buildEffectiveDependencies,
   computeRunnableAndBlocked,
   detectContext,
@@ -221,6 +222,7 @@ const plugin: Plugin = async (ctx) => {
   const contextService = new ContextService(directory);
   const agentsMdService = new AgentsMdService(directory, contextService);
   const configService = new ConfigService(); // User config at ~/.config/opencode/agent_hive.json
+  const sessionService = new SessionService(directory);
   const disabledMcps = configService.getDisabledMcps();
   const disabledSkills = configService.getDisabledSkills();
   const builtinMcps = createBuiltinMcps(disabledMcps);
@@ -233,6 +235,8 @@ const plugin: Plugin = async (ctx) => {
     baseDir: directory,
     hiveDir: path.join(directory, '.hive'),
   });
+
+  const customAgentConfigsForClassification = getCustomAgentConfigsCompat(configService);
 
   /**
    * Check if OMO-Slim delegation is enabled via user config.
@@ -259,6 +263,16 @@ const plugin: Plugin = async (ctx) => {
         featureService.setSession(feature, ctx.sessionID);
       }
     }
+  };
+
+  const bindFeatureSession = (
+    feature: string,
+    toolContext: unknown,
+    patch?: Partial<{ taskFolder: string; workerPromptPath: string }>,
+  ) => {
+    const ctx = toolContext as ToolContext;
+    if (!ctx?.sessionID) return;
+    sessionService.bindFeature(ctx.sessionID, feature, patch as any);
   };
 
   /**
@@ -850,7 +864,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
     // Type assertion needed because TypeScript's contravariance rules are too strict
     // for the hook's output parameter type. The hook only accesses output.message.variant
     // which exists on UserMessage.
-    "chat.message": createVariantHook(configService) as any,
+    "chat.message": createVariantHook(configService, sessionService, customAgentConfigsForClassification) as any,
 
     "tool.execute.before": async (input, output) => {
       // Cadence gate: check if this hook should execute this turn
@@ -1007,6 +1021,7 @@ Expand your Discovery section and try again.`;
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
           captureSession(feature, toolContext);
+          bindFeatureSession(feature, toolContext);
           const result = planService.read(feature);
           if (!result) return "Error: No plan.md found";
           return JSON.stringify(result, null, 2);
@@ -1131,7 +1146,7 @@ Expand your Discovery section and try again.`;
           }).optional().describe('Blocker info when status is blocked'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
-        async execute({ task, summary, message, status = 'completed', blocker, feature: explicitFeature }) {
+        async execute({ task, summary, message, status = 'completed', blocker, feature: explicitFeature }, toolContext) {
           const respond = (payload: Record<string, unknown>) => JSON.stringify(payload, null, 2);
           const feature = resolveFeature(explicitFeature);
           if (!feature) {
@@ -1174,6 +1189,10 @@ Expand your Discovery section and try again.`;
               nextAction: 'Only in_progress or blocked tasks can be committed. Start/resume the task first.',
             });
           }
+
+          const featureDir = resolveFeatureDirectoryName(directory, feature);
+          const workerPromptPath = path.posix.join('.hive', 'features', featureDir, 'tasks', task, 'worker-prompt.md');
+          bindFeatureSession(feature, toolContext, { taskFolder: task, workerPromptPath });
 
           // ADVISORY: Track verification status (workers do best-effort)
           let verificationNote: string | undefined;
@@ -1363,10 +1382,11 @@ Expand your Discovery section and try again.`;
           content: tool.schema.string().describe('Markdown content to write'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
         },
-        async execute({ name, content, feature: explicitFeature }) {
+        async execute({ name, content, feature: explicitFeature }, toolContext) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
+          bindFeatureSession(feature, toolContext);
           const filePath = contextService.write(feature, name, content);
           return `Context file written: ${filePath}`;
         },
