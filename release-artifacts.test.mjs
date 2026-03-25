@@ -106,4 +106,18 @@ describe('release 1.3.4 correction artifacts', () => {
     assert.match(newNotes, /prompt|planner|orchestrator guidance/i);
     assert.match(newNotes, /worker execution context purity/i);
   });
+
+  it('keeps the release guide aligned with real verification commands', () => {
+    const releasingGuide = readText('docs/RELEASING.md');
+
+    assert.doesNotMatch(releasingGuide, /\bbun run test\b/);
+    assert.match(releasingGuide, /bun run release:check|bun run --filter hive-core test/);
+  });
+
+  it('does not add a new extension activation banner for the 1.3.4 correction patch', () => {
+    const extensionSource = readText('packages/vscode-hive/src/extension.ts');
+
+    assert.doesNotMatch(extensionSource, /extension activated/i);
+    assert.doesNotMatch(extensionSource, /const extensionVersion = '1\.3\.4'/);
+  });
 });

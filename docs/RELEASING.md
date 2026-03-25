@@ -34,7 +34,16 @@ Run the normal build/test loop:
 ```bash
 bun install
 bun run build
-bun run test
+bun run --filter hive-core test
+bun run --filter opencode-hive test
+bun run --filter vscode-hive test
+bun test release-artifacts.test.mjs
+```
+
+Or use the combined helper:
+
+```bash
+bun run release:check
 ```
 
 ## 3) Merge to the release branch
@@ -55,7 +64,7 @@ After merging to `release/human-overview-context-v1`, create and push a tag:
 git checkout release/human-overview-context-v1
 git pull
 gh workflow run release.yml --ref release/human-overview-context-v1
-git tag -a v1.3.4 -m "Release 1.3.4"
+git tag -a v1.3.4 -m "Release v1.3.4"
 git push origin v1.3.4
 ```
 
