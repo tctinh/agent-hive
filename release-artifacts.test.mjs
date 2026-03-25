@@ -61,11 +61,16 @@ describe('release 1.3.4 correction artifacts', () => {
     assert.match(bunLock, /"version": "1\.3\.4"/);
   });
 
-  it('rebuilds the tracked vscode release bundle with 1.3.4 metadata', () => {
+  it('rebuilds the tracked vscode release bundle as the packaged extension entrypoint', () => {
     const distPath = path.join(workspaceRoot, 'packages/vscode-hive/dist/extension.js');
+    const distBundle = readText('packages/vscode-hive/dist/extension.js');
+    const extensionManifest = readJson('packages/vscode-hive/package.json');
 
     assert.equal(fs.existsSync(distPath), true, 'packages/vscode-hive/dist/extension.js should exist');
-    assert.match(readText('packages/vscode-hive/dist/extension.js'), /1\.3\.4/);
+    assert.equal(extensionManifest.main, './dist/extension.js');
+    assert.match(distBundle, /function activate\(/);
+    assert.match(distBundle, /function deactivate\(/);
+    assert.match(distBundle, /# sourceMappingURL=extension\.js\.map/);
   });
 
   it('keeps release-history docs aligned with the 1.3.4 correction', () => {
