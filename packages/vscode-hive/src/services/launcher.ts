@@ -1,5 +1,7 @@
 import * as vscode from 'vscode'
+import * as fs from 'fs'
 import * as path from 'path'
+import { getFeaturePath } from 'hive-core'
 
 /**
  * Launcher for Hive features - works with GitHub Copilot Chat
@@ -9,7 +11,7 @@ export class Launcher {
   constructor(private workspaceRoot: string) {}
 
   /**
-   * Open a feature's plan in VS Code and show instructions
+   * Open a feature's overview in VS Code and show instructions
    */
   async openFeature(feature: string): Promise<void> {
     if (!feature || !this.workspaceRoot) {
@@ -17,16 +19,23 @@ export class Launcher {
       return
     }
 
-    const planPath = path.join(this.workspaceRoot, '.hive', 'features', feature, 'plan.md')
+    const activeFeaturePath = path.join(this.workspaceRoot, '.hive', 'active-feature')
+    fs.mkdirSync(path.dirname(activeFeaturePath), { recursive: true })
+    fs.writeFileSync(activeFeaturePath, feature, 'utf-8')
+
+    const featurePath = getFeaturePath(this.workspaceRoot, feature)
+    const overviewPath = `${featurePath}/context/overview.md`
+    const planPath = `${featurePath}/plan.md`
+    const targetPath = fs.existsSync(overviewPath) ? overviewPath : planPath
     try {
-      const uri = vscode.Uri.file(planPath)
+      const uri = vscode.Uri.file(targetPath)
       await vscode.workspace.openTextDocument(uri)
       await vscode.window.showTextDocument(uri)
       vscode.window.showInformationMessage(
-        `Hive: Opened ${feature} plan. Use @Hive in Copilot Chat to continue.`
+        `Hive: Opened ${feature} ${fs.existsSync(overviewPath) ? 'overview' : 'plan'}. Use @Hive in Copilot Chat to continue.`
       )
     } catch (error: any) {
-      vscode.window.showWarningMessage(`Hive: No plan found for feature "${feature}" - ${error}`)
+      vscode.window.showWarningMessage(`Hive: No overview or plan found for feature "${feature}" - ${error}`)
     }
   }
 

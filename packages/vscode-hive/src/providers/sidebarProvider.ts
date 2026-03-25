@@ -1,9 +1,11 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
+import { getFeaturePath, listFeatureDirectories } from 'hive-core'
 import type { FeatureJson, TaskStatus } from 'hive-core'
 
-type SidebarItem = ActionItem | StatusGroupItem | FeatureItem | PlanItem | ContextFolderItem | ContextFileItem | TasksGroupItem | TaskItem | TaskFileItem
+type SidebarItem = ActionItem | StatusGroupItem | FeatureItem | OverviewItem | PlanItem | ContextFolderItem | ContextFileItem | TasksGroupItem | TaskItem | TaskFileItem
+  | CopilotArtifactsGroupItem | ArtifactCategoryItem | ArtifactFileItem
 
 // Quick action button
 class ActionItem extends vscode.TreeItem {
@@ -65,9 +67,7 @@ class FeatureItem extends vscode.TreeItem {
     super(name, vscode.TreeItemCollapsibleState.Collapsed)
     
     const statusLabel = feature.status.charAt(0).toUpperCase() + feature.status.slice(1)
-    this.description = isActive 
-      ? `${statusLabel} · ${taskStats.done}/${taskStats.total}` 
-      : `${taskStats.done}/${taskStats.total}`
+    this.description = `${statusLabel} · ${taskStats.done}/${taskStats.total}`
     
     this.contextValue = `feature-${feature.status}`
     this.iconPath = new vscode.ThemeIcon(STATUS_ICONS[feature.status] || 'package')
@@ -94,6 +94,25 @@ class PlanItem extends vscode.TreeItem {
       command: 'vscode.open',
       title: 'Open Plan',
       arguments: [vscode.Uri.file(planPath)]
+    }
+  }
+}
+
+class OverviewItem extends vscode.TreeItem {
+  constructor(
+    public readonly featureName: string,
+    public readonly overviewPath: string,
+    public readonly commentCount: number
+  ) {
+    super('Overview', vscode.TreeItemCollapsibleState.None)
+
+    this.description = commentCount > 0 ? `${commentCount} comment(s)` : ''
+    this.contextValue = 'overview-file'
+    this.iconPath = new vscode.ThemeIcon('book')
+    this.command = {
+      command: 'vscode.open',
+      title: 'Open Overview',
+      arguments: [vscode.Uri.file(overviewPath)]
     }
   }
 }
@@ -187,6 +206,42 @@ class TaskFileItem extends vscode.TreeItem {
   }
 }
 
+export class CopilotArtifactsGroupItem extends vscode.TreeItem {
+  constructor(public readonly workspaceRoot: string) {
+    super('Copilot Artifacts', vscode.TreeItemCollapsibleState.Collapsed)
+    this.contextValue = 'copilot-artifacts'
+    this.iconPath = new vscode.ThemeIcon('github')
+  }
+}
+
+export class ArtifactFileItem extends vscode.TreeItem {
+  constructor(
+    label: string,
+    public readonly filePath: string,
+    iconName: string
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.None)
+    this.iconPath = new vscode.ThemeIcon(iconName)
+    this.command = {
+      command: 'vscode.open',
+      title: 'Open',
+      arguments: [vscode.Uri.file(filePath)]
+    }
+  }
+}
+
+export class ArtifactCategoryItem extends vscode.TreeItem {
+  constructor(
+    label: string,
+    public readonly files: ArtifactFileItem[],
+    iconName: string
+  ) {
+    super(label, files.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None)
+    this.description = `${files.length}`
+    this.iconPath = new vscode.ThemeIcon(iconName)
+  }
+}
+
 export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<SidebarItem | undefined>()
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event
@@ -206,6 +261,10 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
       const items: SidebarItem[] = [
         new ActionItem('Init Skills', 'hive.initNest', 'symbol-misc')
       ]
+      const githubDir = path.join(this.workspaceRoot, '.github')
+      if (fs.existsSync(githubDir)) {
+        items.push(new CopilotArtifactsGroupItem(this.workspaceRoot))
+      }
       const statusGroups = await this.getStatusGroups()
       return [...items, ...statusGroups]
     }
@@ -220,6 +279,14 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
 
     if (element instanceof FeatureItem) {
       return this.getFeatureChildren(element.name)
+    }
+
+    if (element instanceof CopilotArtifactsGroupItem) {
+      return this.getCopilotArtifactCategories(element.workspaceRoot)
+    }
+
+    if (element instanceof ArtifactCategoryItem) {
+      return element.files
     }
 
     if (element instanceof ContextFolderItem) {
@@ -271,39 +338,34 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
   }
 
   private getAllFeatures(): FeatureItem[] {
-    const featuresPath = path.join(this.workspaceRoot, '.hive', 'features')
-    if (!fs.existsSync(featuresPath)) return []
-
     const activeFeature = this.getActiveFeature()
     const features: FeatureItem[] = []
 
-    const dirs = fs.readdirSync(featuresPath, { withFileTypes: true })
-      .filter(d => d.isDirectory())
-      .map(d => d.name)
+    const dirs = listFeatureDirectories(this.workspaceRoot)
 
-    for (const name of dirs) {
-      const featureJsonPath = path.join(featuresPath, name, 'feature.json')
+    for (const dir of dirs) {
+      const featureJsonPath = path.join(getFeaturePath(this.workspaceRoot, dir.logicalName), 'feature.json')
       if (!fs.existsSync(featureJsonPath)) continue
 
       const feature: FeatureJson = JSON.parse(fs.readFileSync(featureJsonPath, 'utf-8'))
-      const taskStats = this.getTaskStats(name)
-      const isActive = name === activeFeature
+      const taskStats = this.getTaskStats(dir.logicalName)
+      const isActive = dir.logicalName === activeFeature
 
-      features.push(new FeatureItem(name, feature, taskStats, isActive))
+      features.push(new FeatureItem(dir.logicalName, feature, taskStats, isActive))
     }
 
-    // Sort by active first, then by creation date
+    // Sort by active first, then by deterministic logical name
     features.sort((a, b) => {
-      if (a.isActive) return -1
-      if (b.isActive) return 1
-      return 0
+      if (a.isActive && !b.isActive) return -1
+      if (!a.isActive && b.isActive) return 1
+      return a.name.localeCompare(b.name)
     })
 
     return features
   }
 
   private getFeatureChildren(featureName: string): SidebarItem[] {
-    const featurePath = path.join(this.workspaceRoot, '.hive', 'features', featureName)
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName)
     const items: SidebarItem[] = []
 
     const featureJsonPath = path.join(featurePath, 'feature.json')
@@ -311,14 +373,21 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
 
     const planPath = path.join(featurePath, 'plan.md')
     if (fs.existsSync(planPath)) {
-      const commentCount = this.getCommentCount(featureName)
+      const commentCount = this.getCommentCount(featureName, 'plan')
       items.push(new PlanItem(featureName, planPath, feature.status, commentCount))
     }
 
     const contextPath = path.join(featurePath, 'context')
-    const contextFiles = fs.existsSync(contextPath) 
-      ? fs.readdirSync(contextPath).filter(f => !f.startsWith('.'))
+    const contextFiles = fs.existsSync(contextPath)
+      ? fs.readdirSync(contextPath).filter(f => !f.startsWith('.') && f !== 'overview.md')
       : []
+
+    const overviewPath = path.join(contextPath, 'overview.md')
+    if (fs.existsSync(overviewPath)) {
+      const commentCount = this.getCommentCount(featureName, 'overview')
+      items.push(new OverviewItem(featureName, overviewPath, commentCount))
+    }
+
     items.push(new ContextFolderItem(featureName, contextPath, contextFiles.length))
 
     const tasks = this.getTaskList(featureName)
@@ -327,16 +396,77 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
     return items
   }
 
+  private getCopilotArtifactCategories(workspaceRoot: string): SidebarItem[] {
+    const githubRoot = path.join(workspaceRoot, '.github')
+    const agentsDir = path.join(githubRoot, 'agents')
+    const skillsDir = path.join(githubRoot, 'skills')
+    const hooksDir = path.join(githubRoot, 'hooks')
+    const instructionsDir = path.join(githubRoot, 'instructions')
+    const pluginPath = path.join(workspaceRoot, 'plugin.json')
+
+    const categories: SidebarItem[] = [
+      new ArtifactCategoryItem(
+        'Agents',
+        this.getArtifactFiles(agentsDir, file => file.endsWith('.agent.md'), 'person'),
+        'person'
+      ),
+      new ArtifactCategoryItem(
+        'Skills',
+        this.getArtifactFiles(skillsDir, file => file === 'SKILL.md', 'book', true),
+        'book'
+      ),
+      new ArtifactCategoryItem(
+        'Hooks',
+        this.getArtifactFiles(hooksDir, file => file.endsWith('.json'), 'zap'),
+        'zap'
+      ),
+      new ArtifactCategoryItem(
+        'Instructions',
+        this.getArtifactFiles(instructionsDir, file => file.endsWith('.instructions.md'), 'note'),
+        'note'
+      )
+    ]
+
+    if (fs.existsSync(pluginPath)) {
+      categories.push(new ArtifactFileItem('Plugin Manifest', pluginPath, 'package'))
+    }
+
+    return categories
+  }
+
+  private getArtifactFiles(
+    basePath: string,
+    matches: (filename: string) => boolean,
+    iconName: string,
+    nestedSkillDirs: boolean = false
+  ): ArtifactFileItem[] {
+    if (!fs.existsSync(basePath)) return []
+
+    if (nestedSkillDirs) {
+      return fs.readdirSync(basePath, { withFileTypes: true })
+        .filter(entry => entry.isDirectory())
+        .map(entry => path.join(basePath, entry.name, 'SKILL.md'))
+        .filter(filePath => fs.existsSync(filePath))
+        .map(filePath => new ArtifactFileItem(path.basename(path.dirname(filePath)), filePath, iconName))
+        .sort((a, b) => String(a.label).localeCompare(String(b.label)))
+    }
+
+    return fs.readdirSync(basePath, { withFileTypes: true })
+      .filter(entry => entry.isFile() && matches(entry.name))
+      .map(entry => new ArtifactFileItem(entry.name, path.join(basePath, entry.name), iconName))
+      .sort((a, b) => String(a.label).localeCompare(String(b.label)))
+  }
+
   private getContextFiles(featureName: string, contextPath: string): ContextFileItem[] {
     if (!fs.existsSync(contextPath)) return []
 
     return fs.readdirSync(contextPath)
-      .filter(f => !f.startsWith('.'))
+      .filter(f => !f.startsWith('.') && f !== 'overview.md')
       .map(f => new ContextFileItem(f, path.join(contextPath, f)))
   }
 
   private getTasks(featureName: string, tasks: Array<{ folder: string; status: TaskStatus }>): TaskItem[] {
-    const featurePath = path.join(this.workspaceRoot, '.hive', 'features', featureName)
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName)
     
     return tasks.map(t => {
       const taskDir = path.join(featurePath, 'tasks', t.folder)
@@ -363,7 +493,7 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
   }
 
   private getTaskList(featureName: string): Array<{ folder: string; status: TaskStatus }> {
-    const tasksPath = path.join(this.workspaceRoot, '.hive', 'features', featureName, 'tasks')
+    const tasksPath = path.join(getFeaturePath(this.workspaceRoot, featureName), 'tasks')
     if (!fs.existsSync(tasksPath)) return []
 
     const folders = fs.readdirSync(tasksPath, { withFileTypes: true })
@@ -390,19 +520,55 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
 
   private getActiveFeature(): string | null {
     const activePath = path.join(this.workspaceRoot, '.hive', 'active-feature')
-    if (!fs.existsSync(activePath)) return null
-    return fs.readFileSync(activePath, 'utf-8').trim()
+    const configuredActive = fs.existsSync(activePath)
+      ? fs.readFileSync(activePath, 'utf-8').trim()
+      : null
+
+    if (configuredActive) {
+      const feature = this.readFeature(configuredActive)
+      if (feature && feature.status !== 'completed') {
+        return configuredActive
+      }
+    }
+
+    const available = listFeatureDirectories(this.workspaceRoot)
+      .map(entry => entry.logicalName)
+      .filter(name => {
+        const feature = this.readFeature(name)
+        return feature !== null && feature.status !== 'completed'
+      })
+      .sort((a, b) => a.localeCompare(b))
+
+    return available[0] ?? null
   }
 
-  private getCommentCount(featureName: string): number {
-    const commentsPath = path.join(this.workspaceRoot, '.hive', 'features', featureName, 'comments.json')
-    if (!fs.existsSync(commentsPath)) return 0
-    
+  private readFeature(featureName: string): FeatureJson | null {
+    const featureJsonPath = path.join(getFeaturePath(this.workspaceRoot, featureName), 'feature.json')
+    if (!fs.existsSync(featureJsonPath)) return null
+
+    return JSON.parse(fs.readFileSync(featureJsonPath, 'utf-8'))
+  }
+
+  private getCommentCount(featureName: string, document: 'plan' | 'overview'): number {
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName)
+    const commentsPath = document === 'plan'
+      ? this.firstExistingPath([
+          path.join(featurePath, 'comments', 'plan.json'),
+          path.join(featurePath, 'comments.json')
+        ])
+      : path.join(featurePath, 'comments', 'overview.json')
+
+    if (!commentsPath || !fs.existsSync(commentsPath)) return 0
+
     try {
       const data = JSON.parse(fs.readFileSync(commentsPath, 'utf-8'))
       return data.threads?.length || 0
     } catch {
       return 0
     }
+  }
+
+  private firstExistingPath(paths: string[]): string | null {
+    return paths.find(candidate => fs.existsSync(candidate)) ?? null
   }
 }

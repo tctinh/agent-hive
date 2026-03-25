@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import simpleGit, { SimpleGit } from "simple-git";
+import { resolveFeatureDirectoryName } from "../utils/paths.js";
 
 export interface WorktreeInfo {
   path: string;
@@ -64,7 +65,8 @@ export class WorktreeService {
   }
 
   private async getStepStatusPath(feature: string, step: string): Promise<string> {
-    const featurePath = path.join(this.config.hiveDir, "features", feature);
+    const featureDir = resolveFeatureDirectoryName(this.config.baseDir, feature);
+    const featurePath = path.join(this.config.hiveDir, "features", featureDir);
     
     // Check v2 structure first (tasks/)
     const tasksPath = path.join(featurePath, "tasks", step, "status.json");
@@ -495,9 +497,22 @@ export class WorktreeService {
     }
   }
 
-  async merge(feature: string, step: string, strategy: 'merge' | 'squash' | 'rebase' = 'merge'): Promise<MergeResult> {
+  async merge(
+    feature: string,
+    step: string,
+    strategy: "merge" | "squash" | "rebase" = "merge",
+    message?: string,
+  ): Promise<MergeResult> {
     const branchName = this.getBranchName(feature, step);
     const git = this.getGit();
+
+    if (strategy === "rebase" && message) {
+      return {
+        success: false,
+        merged: false,
+        error: "Custom merge message is not supported for rebase strategy",
+      };
+    }
 
     try {
       const branches = await git.branch();
@@ -513,16 +528,17 @@ export class WorktreeService {
         .filter(l => l.trim() && l.includes("|"))
         .map(l => l.split("|")[0].trim());
 
-      if (strategy === 'squash') {
+      if (strategy === "squash") {
         await git.raw(["merge", "--squash", branchName]);
-        const result = await git.commit(`hive: merge ${step} (squashed)`);
+        const squashMessage = message || `hive: merge ${step} (squashed)`;
+        const result = await git.commit(squashMessage);
         return {
           success: true,
           merged: true,
           sha: result.commit,
           filesChanged,
         };
-      } else if (strategy === 'rebase') {
+      } else if (strategy === "rebase") {
         const commits = await git.log([`${currentBranch}..${branchName}`]);
         const commitsToApply = [...commits.all].reverse();
         for (const commit of commitsToApply) {
@@ -536,7 +552,8 @@ export class WorktreeService {
           filesChanged,
         };
       } else {
-        const result = await git.merge([branchName, "--no-ff", "-m", `hive: merge ${step}`]);
+        const mergeMessage = message || `hive: merge ${step}`;
+        const result = await git.merge([branchName, "--no-ff", "-m", mergeMessage]);
         const head = (await git.revparse(["HEAD"])).trim();
         return {
           success: true,

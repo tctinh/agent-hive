@@ -4,6 +4,8 @@ import { getContextPath, ensureDir, fileExists, readText, writeText } from '../u
 import type { ContextFile } from '../types.js';
 export type { ContextFile };
 
+export const RESERVED_OVERVIEW_CONTEXT = 'overview';
+
 export class ContextService {
   constructor(private projectRoot: string) {}
 
@@ -47,6 +49,14 @@ export class ContextService {
         updatedAt: stat.mtime.toISOString(),
       };
     });
+  }
+
+  getOverview(featureName: string): ContextFile | null {
+    return this.list(featureName).find(file => file.name === RESERVED_OVERVIEW_CONTEXT) ?? null;
+  }
+
+  listExecutionContext(featureName: string): ContextFile[] {
+    return this.list(featureName).filter(file => file.name !== RESERVED_OVERVIEW_CONTEXT);
   }
 
   delete(featureName: string, fileName: string): boolean {

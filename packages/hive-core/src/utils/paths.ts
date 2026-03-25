@@ -1,16 +1,20 @@
 import * as path from 'path';
 import * as fs from 'fs';
+import type { FeatureDirectoryInfo, FeatureJson, ReviewDocument } from '../types.js';
 
 const HIVE_DIR = '.hive';
 const FEATURES_DIR = 'features';
 const TASKS_DIR = 'tasks';
 const CONTEXT_DIR = 'context';
+const REVIEW_COMMENTS_DIR = 'comments';
 const PLAN_FILE = 'plan.md';
 const COMMENTS_FILE = 'comments.json';
+const OVERVIEW_FILE = 'overview.md';
 const FEATURE_FILE = 'feature.json';
 const STATUS_FILE = 'status.json';
 const REPORT_FILE = 'report.md';
 const APPROVED_FILE = 'APPROVED';
+const ACTIVE_FEATURE_FILE = 'active-feature';
 
 export function normalizePath(filePath: string): string {
   return filePath.replace(/\\/g, '/');
@@ -24,8 +28,74 @@ export function getFeaturesPath(projectRoot: string): string {
   return path.join(getHivePath(projectRoot), FEATURES_DIR);
 }
 
+export function getActiveFeaturePath(projectRoot: string): string {
+  return path.join(getHivePath(projectRoot), ACTIVE_FEATURE_FILE);
+}
+
+function parseIndexedFeatureDirectoryName(directoryName: string): { index: number; logicalName: string } | null {
+  const match = directoryName.match(/^(\d+)[_-](.+)$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    index: Number.parseInt(match[1], 10),
+    logicalName: match[2],
+  };
+}
+
+export function listFeatureDirectories(projectRoot: string): FeatureDirectoryInfo[] {
+  const featuresPath = getFeaturesPath(projectRoot);
+  if (!fs.existsSync(featuresPath)) {
+    return [];
+  }
+
+  return fs.readdirSync(featuresPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      const directoryName = entry.name;
+      const parsed = parseIndexedFeatureDirectoryName(directoryName);
+      const featureJsonPath = path.join(featuresPath, directoryName, FEATURE_FILE);
+      const featureJson = readJson<FeatureJson>(featureJsonPath);
+
+      return {
+        directoryName,
+        logicalName: featureJson?.name || parsed?.logicalName || directoryName,
+        index: parsed?.index ?? null,
+      };
+    })
+    .sort((left, right) => {
+      if (left.index !== null && right.index !== null) {
+        return left.index - right.index;
+      }
+      if (left.index !== null) {
+        return 1;
+      }
+      if (right.index !== null) {
+        return -1;
+      }
+      return left.logicalName.localeCompare(right.logicalName);
+    });
+}
+
+export function resolveFeatureDirectoryName(projectRoot: string, featureName: string): string {
+  const directPath = path.join(getFeaturesPath(projectRoot), featureName);
+  if (fs.existsSync(directPath)) {
+    return featureName;
+  }
+
+  const match = listFeatureDirectories(projectRoot).find((entry) => entry.logicalName === featureName);
+  return match?.directoryName || featureName;
+}
+
+export function getNextIndexedFeatureDirectoryName(projectRoot: string, featureName: string): string {
+  const indexedEntries = listFeatureDirectories(projectRoot).filter((entry) => entry.index !== null);
+  const nextIndex = indexedEntries.reduce((max, entry) => Math.max(max, entry.index ?? 0), 0) + 1;
+  return `${String(nextIndex).padStart(2, '0')}_${featureName}`;
+}
+
 export function getFeaturePath(projectRoot: string, featureName: string): string {
-  return path.join(getFeaturesPath(projectRoot), featureName);
+  return path.join(getFeaturesPath(projectRoot), resolveFeatureDirectoryName(projectRoot, featureName));
 }
 
 export function getPlanPath(projectRoot: string, featureName: string): string {
@@ -36,12 +106,20 @@ export function getCommentsPath(projectRoot: string, featureName: string): strin
   return path.join(getFeaturePath(projectRoot, featureName), COMMENTS_FILE);
 }
 
+export function getReviewCommentsPath(projectRoot: string, featureName: string, document: ReviewDocument): string {
+  return path.join(getFeaturePath(projectRoot, featureName), REVIEW_COMMENTS_DIR, `${document}.json`);
+}
+
 export function getFeatureJsonPath(projectRoot: string, featureName: string): string {
   return path.join(getFeaturePath(projectRoot, featureName), FEATURE_FILE);
 }
 
 export function getContextPath(projectRoot: string, featureName: string): string {
   return path.join(getFeaturePath(projectRoot, featureName), CONTEXT_DIR);
+}
+
+export function getOverviewPath(projectRoot: string, featureName: string): string {
+  return path.join(getContextPath(projectRoot, featureName), OVERVIEW_FILE);
 }
 
 export function getTasksPath(projectRoot: string, featureName: string): string {

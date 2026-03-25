@@ -271,11 +271,16 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 3. User adds comments in VSCode → `hive_plan_read` to see them
 4. Revise plan → User approves
 5. `hive_tasks_sync()` - Generate tasks from plan
-6. `hive_worktree_start(task)` → work in worktree → `hive_worktree_commit(task, summary)`
-7. `hive_merge(task)` - Merge task branch into main (when ready)
+6. `hive_worktree_start(task)` → work in worktree → `hive_worktree_commit(task, summary[, message])`
+7. `hive_merge(task[, strategy, message])` - Merge task branch into main (when ready)
 
 **Important:** `hive_worktree_commit` commits changes to task branch but does NOT merge.
 Use `hive_merge` to explicitly integrate changes. Worktrees persist until manually removed.
+
+`summary` remains task/report context; optional `message` controls git commit/merge text.
+Multi-line `message` is supported where a new commit is created.
+Omit `message` (or pass `''`) to keep default message behavior.
+Do not provide `message` when using `hive_merge(..., strategy: 'rebase')`.
 
 ### Delegated Execution
 

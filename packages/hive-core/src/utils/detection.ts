@@ -1,7 +1,12 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { getHivePath, getFeaturesPath, getFeaturePath, readJson, normalizePath } from './paths.js';
-import { FeatureJson } from '../types.js';
+import { getFeaturesPath, getFeaturePath, getActiveFeaturePath, listFeatureDirectories, readJson, normalizePath } from './paths.js';
+import type { FeatureJson } from '../types.js';
+
+function toLogicalFeatureName(featureName: string): string {
+  const match = featureName.match(/^\d+[_-](.+)$/);
+  return match ? match[1] : featureName;
+}
 
 export interface DetectionResult {
   projectRoot: string;
@@ -24,7 +29,7 @@ export function detectContext(cwd: string): DetectionResult {
   const worktreeMatch = normalizedCwd.match(/(.+)\/\.hive\/\.worktrees\/([^/]+)\/([^/]+)/);
   if (worktreeMatch) {
     result.mainProjectRoot = worktreeMatch[1];
-    result.feature = worktreeMatch[2];
+    result.feature = toLogicalFeatureName(worktreeMatch[2]);
     result.task = worktreeMatch[3];
     result.isWorktree = true;
     result.projectRoot = worktreeMatch[1];
@@ -46,7 +51,7 @@ export function detectContext(cwd: string): DetectionResult {
           const cwdWorktreeMatch = normalizedCwd.match(/\.hive\/\.worktrees\/([^/]+)\/([^/]+)/);
           if (cwdWorktreeMatch) {
             result.mainProjectRoot = mainRepo;
-            result.feature = cwdWorktreeMatch[1];
+            result.feature = toLogicalFeatureName(cwdWorktreeMatch[1]);
             result.task = cwdWorktreeMatch[2];
             result.isWorktree = true;
             result.projectRoot = mainRepo;
@@ -64,9 +69,37 @@ export function listFeatures(projectRoot: string): string[] {
   const featuresPath = getFeaturesPath(projectRoot);
   if (!fs.existsSync(featuresPath)) return [];
 
-  return fs.readdirSync(featuresPath, { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .map(d => d.name);
+  return listFeatureDirectories(projectRoot)
+    .map((feature) => feature.logicalName)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+export function getActiveFeatureName(projectRoot: string): string | null {
+  const activeFeaturePath = getActiveFeaturePath(projectRoot);
+  if (!fs.existsSync(activeFeaturePath)) {
+    return null;
+  }
+
+  const activeFeatureName = fs.readFileSync(activeFeaturePath, 'utf-8').trim();
+  if (!activeFeatureName) {
+    return null;
+  }
+
+  const feature = getFeatureData(projectRoot, activeFeatureName);
+  if (!feature || feature.status === 'completed') {
+    return null;
+  }
+
+  return activeFeatureName;
+}
+
+export function resolveActiveFeatureName(projectRoot: string): string | null {
+  const activeFeatureName = getActiveFeatureName(projectRoot);
+  if (activeFeatureName) {
+    return activeFeatureName;
+  }
+
+  return listFeatures(projectRoot).find((featureName) => getFeatureData(projectRoot, featureName)?.status !== 'completed') ?? null;
 }
 
 export function getFeatureData(projectRoot: string, featureName: string): FeatureJson | null {

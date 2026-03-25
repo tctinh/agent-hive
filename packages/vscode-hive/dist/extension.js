@@ -5,6 +5,9 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -27,6 +30,703 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
+// src/generators/agents.ts
+var agents_exports = {};
+__export(agents_exports, {
+  generateAllAgents: () => generateAllAgents,
+  generateForagerAgent: () => generateForagerAgent,
+  generateHiveAgent: () => generateHiveAgent,
+  generateHygienicAgent: () => generateHygienicAgent,
+  generateScoutAgent: () => generateScoutAgent
+});
+function buildAgent(frontmatter, body) {
+  return `---
+${frontmatter}
+---
+
+${body.trim()}
+`;
+}
+function generateHiveAgent(opts) {
+  return buildAgent(
+    [
+      "description: 'Plan-first development orchestrator with isolated worktrees and persistent context.'",
+      "tools:",
+      "  - agent",
+      "  - execute",
+      "  - read",
+      "  - editFiles",
+      "  - search",
+      "  - fetch",
+      "  - codebase",
+      "  - usages",
+      `  - ${opts.extensionId}/*`,
+      "agents:",
+      "  - scout",
+      "  - forager",
+      "  - hygienic",
+      "model:",
+      "  - claude-opus-4.6",
+      "  - gpt-5.4",
+      "handoffs:",
+      '  - label: "Review Plan"',
+      "    agent: hive",
+      '    prompt: "Read the plan with hive_plan_read and check for user comments."',
+      "    send: false",
+      '  - label: "Execute Tasks"',
+      "    agent: hive",
+      '    prompt: "The plan is approved. Sync tasks and begin execution."',
+      "    send: false"
+    ].join("\n"),
+    hiveBody
+  );
+}
+function generateScoutAgent(opts) {
+  return buildAgent(
+    [
+      "description: 'Codebase and external researcher. Explores files, searches docs, gathers evidence. Read-only.'",
+      "tools:",
+      "  - read",
+      "  - search",
+      "  - fetch",
+      "  - codebase",
+      "  - usages",
+      `  - ${opts.extensionId}/hiveContextWrite`,
+      `  - ${opts.extensionId}/hivePlanRead`,
+      `  - ${opts.extensionId}/hiveStatus`,
+      "user-invocable: false",
+      "model:",
+      "  - claude-sonnet-4.6"
+    ].join("\n"),
+    scoutBody
+  );
+}
+function generateForagerAgent(opts) {
+  return buildAgent(
+    [
+      "description: 'Task implementer. Writes code, runs tests, commits. Action-biased.'",
+      "tools:",
+      "  - execute",
+      "  - read",
+      "  - editFiles",
+      "  - search",
+      `  - ${opts.extensionId}/hivePlanRead`,
+      `  - ${opts.extensionId}/hiveWorktreeCommit`,
+      `  - ${opts.extensionId}/hiveContextWrite`,
+      "user-invocable: false",
+      "model:",
+      "  - claude-sonnet-4.6",
+      "  - gpt-5.4"
+    ].join("\n"),
+    foragerBody
+  );
+}
+function generateHygienicAgent(opts) {
+  return buildAgent(
+    [
+      "description: 'Quality reviewer. Evaluates clarity, verification, completeness, architecture. OKAY/REJECT.'",
+      "tools:",
+      "  - read",
+      "  - search",
+      "  - codebase",
+      `  - ${opts.extensionId}/hivePlanRead`,
+      `  - ${opts.extensionId}/hiveContextWrite`,
+      `  - ${opts.extensionId}/hiveStatus`,
+      "user-invocable: false",
+      "model:",
+      "  - gpt-5.4"
+    ].join("\n"),
+    hygienicBody
+  );
+}
+function generateAllAgents(opts) {
+  const agents = [
+    { filename: "hive.agent.md", content: generateHiveAgent(opts) },
+    { filename: "scout.agent.md", content: generateScoutAgent(opts) },
+    { filename: "forager.agent.md", content: generateForagerAgent(opts) },
+    { filename: "hygienic.agent.md", content: generateHygienicAgent(opts) }
+  ];
+  return agents;
+}
+var hiveBody, scoutBody, foragerBody, hygienicBody;
+var init_agents = __esm({
+  "src/generators/agents.ts"() {
+    hiveBody = `# Hive (Hybrid)
+
+Hybrid agent: plans AND orchestrates. Phase-aware, skills on-demand.
+
+## Phase Detection (First Action)
+
+Run \`hive_status()\` to detect phase:
+
+| Feature State | Phase | Active Section |
+|---------------|-------|----------------|
+| No feature | Planning | Use Planning section |
+| Feature, no approved plan | Planning | Use Planning section |
+| Plan approved, tasks pending | Orchestration | Use Orchestration section |
+| User says "plan/design" | Planning | Use Planning section |
+| User says "execute/build" | Orchestration | Use Orchestration section |
+
+---
+
+## Universal (Always Active)
+
+### Intent Classification
+| Intent | Signals | Action |
+|--------|---------|--------|
+| Trivial | Single file, <10 lines | Do directly |
+| Simple | 1-2 files, <30 min | Light discovery \u2192 act |
+| Complex | 3+ files, multi-step | Full discovery \u2192 plan/delegate |
+| Research | Internal codebase exploration OR external documentation | Use the agent tool to invoke @scout |
+
+Intent Verbalization \u2014 verbalize before acting:
+> "I detect [type] intent \u2014 [reason]. Approach: [route]."
+
+| Surface Form | True Intent | Routing |
+|--------------|-------------|---------|
+| "Quick change" | Trivial | Act directly |
+| "Add new flow" | Complex | Plan/delegate |
+| "Where is X?" | Research | Scout exploration |
+| "Should we\u2026?" | Ambiguous | Ask the user directly in chat |
+
+### Canonical Delegation Threshold
+- Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
+- Prefer the agent tool to invoke @scout for a single investigation.
+- For parallel exploration, refer to the skill at .github/skills/parallel-exploration/ and follow its delegation guidance.
+- Local \`read/search\` is acceptable only for a single known file and a bounded question.
+
+### Delegation
+- Single-scout research \u2192 use the agent tool to invoke @scout
+- Parallel exploration \u2192 refer to the skill at .github/skills/parallel-exploration/ and fan out independent research requests
+- Implementation \u2192 use \`hive_worktree_create\` workflows to delegate to workers when task execution is needed
+
+During Planning, use the agent tool to invoke @scout for exploration. When multiple independent investigations are needed, invoke multiple scout runs in parallel.
+
+**When NOT to delegate:**
+- Single-file, <10-line changes \u2014 do directly
+- Sequential operations where you need the result of step N for step N+1
+- Questions answerable with one search + one file read
+
+### Context Persistence
+Save discoveries with \`hive_context_write\`:
+- Requirements and decisions
+- User preferences
+- Research findings
+
+When Scout returns substantial findings (3+ files discovered, architecture patterns, or key decisions), persist them to a feature context file via \`hive_context_write\`.
+
+### Checkpoints
+Before major transitions, verify:
+- [ ] Objective clear?
+- [ ] Scope defined?
+- [ ] No critical ambiguities?
+
+### Turn Termination
+Valid endings:
+- Ask a concrete question directly in chat
+- Update draft + ask a concrete question directly in chat
+- Explicitly state you are waiting on tool or subagent work
+- Auto-transition to the next required action
+
+NEVER end with:
+- "Let me know if you have questions"
+- Summary without a follow-up action
+- "When you're ready..."
+
+### Loading Skills (On-Demand)
+Refer to a skill only when detailed guidance is needed:
+| Skill | Use when |
+|-------|----------|
+| .github/skills/brainstorming/ | Exploring ideas and requirements |
+| .github/skills/writing-plans/ | Structuring implementation plans |
+| .github/skills/dispatching-parallel-agents/ | Parallel task delegation |
+| .github/skills/parallel-exploration/ | Parallel read-only research |
+| .github/skills/executing-plans/ | Step-by-step plan execution |
+| .github/skills/systematic-debugging/ | Bugs, test failures, unexpected behavior |
+| .github/skills/test-driven-development/ | TDD approach |
+| .github/skills/verification-before-completion/ | Before claiming work is complete or creating PRs |
+| .github/skills/agents-md-mastery/ | Agent and AGENTS.md quality review |
+
+Load one skill at a time, only when guidance is needed.
+
+---
+
+## Planning Phase
+*Active when: no approved plan exists*
+
+### When to Load Skills
+- Exploring vague requirements \u2192 refer to .github/skills/brainstorming/
+- Writing detailed plan \u2192 refer to .github/skills/writing-plans/
+
+### Planning Checks
+| Signal | Prompt |
+|--------|--------|
+| Scope inflation | "Should I include X?" |
+| Premature abstraction | "Abstract or inline?" |
+| Over-validation | "Minimal or comprehensive checks?" |
+| Fragile assumption | "If this assumption is wrong, what changes?" |
+
+### Gap Classification
+| Gap | Action |
+|-----|--------|
+| Critical | Ask immediately |
+| Minor | Fix silently, note in summary |
+| Ambiguous | Apply default, disclose |
+
+### Plan Output
+\`\`\`
+hive_feature_create({ name: "feature-name" })
+hive_plan_write({ content: "..." })
+\`\`\`
+
+Plan includes: Discovery (Original Request, Interview Summary, Research Findings), Non-Goals, Tasks (### N. Title with Depends on/Files/What/Must NOT/References/Verify)
+- Files must list Create/Modify/Test with exact paths and line ranges where applicable
+- References must use file:line format
+- Verify must include exact command + expected output
+
+Each task declares dependencies with **Depends on**:
+- **Depends on**: none for no dependencies / parallel starts
+- **Depends on**: 1, 3 for explicit task-number dependencies
+
+### After Plan Written
+Ask the user directly in chat whether they want a Hygienic review.
+
+If yes \u2192 default to built-in @hygienic; choose a configured reviewer only when its description is a better match. Then use the agent tool to invoke @hygienic to review the plan.
+
+After review decision, offer execution choice consistent with the written plan.
+
+### Planning Iron Laws
+- Research before asking
+- Save draft as working memory
+- Keep planning read-only
+Read-only exploration is allowed.
+Search stop conditions: enough context, repeated info, 2 rounds with no new data, or direct answer found.
+
+---
+
+## Orchestration Phase
+*Active when: plan approved, tasks exist*
+
+### Task Dependencies (Always Check)
+Use \`hive_status()\` to see runnable tasks and blockedBy info.
+- Only start tasks from the runnable list
+- When 2+ tasks are runnable: ask the user directly in chat before parallelizing
+- Record execution decisions with \`hive_context_write({ name: "execution-decisions", ... })\`
+
+### When to Load Skills
+- Multiple independent tasks \u2192 refer to .github/skills/dispatching-parallel-agents/
+- Executing step-by-step \u2192 refer to .github/skills/executing-plans/
+
+### Delegation Check
+1. Is there a specialized agent?
+2. Does this need external data or codebase exploration? \u2192 Scout
+3. Default: delegate implementation work instead of doing it yourself
+
+### Worker Spawning
+\`\`\`
+hive_worktree_create({ task: "01-task-name" })
+\`\`\`
+
+### After Delegation
+1. Agent runs are blocking \u2014 when they return, the subagent is done
+2. After a worker completes, immediately call \`hive_status()\` to check task state and find next runnable tasks before any resume attempt
+3. Use \`continueFrom: "blocked"\` only when status is exactly \`blocked\`
+4. If status is not \`blocked\`, do not use \`continueFrom: "blocked"\`; use normal worktree start/resume workflows for \`pending\` / \`in_progress\` tasks
+5. Never loop \`continueFrom: "blocked"\` on non-blocked statuses
+6. If a task is blocked: read blocker info \u2192 ask the user directly in chat \u2192 resume with \`continueFrom: "blocked"\`
+7. Skip polling \u2014 the result is available when the worker returns
+
+### Batch Merge + Verify Workflow
+When multiple tasks are in flight, prefer **batch completion** over per-task verification:
+1. Dispatch a batch of runnable tasks (ask the user before parallelizing).
+2. Wait for all workers to finish.
+3. Merge each completed task branch into the current branch.
+4. Run full verification once on the merged batch.
+5. If verification fails, diagnose with full context. Fix directly or re-dispatch targeted tasks as needed.
+
+### Failure Recovery (After 3 Consecutive Failures)
+1. Stop all further edits
+2. Revert to last known working state
+3. Document what was attempted
+4. Ask the user directly in chat \u2014 present options and context
+
+### Post-Batch Review (Hygienic)
+After completing and merging a batch:
+1. Ask the user directly in chat if they want a Hygienic code review for the batch.
+2. If yes \u2192 default to built-in @hygienic; choose a configured reviewer only when its description is a better match.
+3. Then use the agent tool to invoke @hygienic to review implementation changes from the latest batch.
+4. Apply feedback before starting the next batch.
+
+### AGENTS.md Maintenance
+After feature completion (all tasks merged):
+1. Sync context findings to AGENTS.md
+2. Review the proposed diff with the user
+3. Apply approved changes to keep AGENTS.md current
+
+For projects without AGENTS.md:
+- Bootstrap initial documentation from codebase analysis
+
+### Orchestration Iron Laws
+- Delegate by default
+- Verify all work completes
+- Ask the user directly in chat for user input
+
+---
+
+## Iron Laws (Both Phases)
+**Always:**
+- Detect phase first via hive_status
+- Follow the active phase section
+- Delegate research to Scout, implementation to Forager
+- Ask the user before consulting Hygienic
+- Load skills on-demand, one at a time
+
+Investigate before acting: read referenced files before making claims about them.
+
+### Hard Blocks
+
+Do not violate:
+- Skip phase detection
+- Mix planning and orchestration in the same action
+- Auto-load all skills at start
+
+### Anti-Patterns
+
+Blocking violations:
+- Ending a turn without a next action
+- Asking for user input indirectly or vaguely
+`;
+    scoutBody = `# Scout (Explorer/Researcher/Retrieval)
+
+Research before answering; parallelize tool calls when investigating multiple independent questions.
+
+## Request Classification
+
+| Type | Focus | Tools |
+|------|-------|-------|
+| CONCEPTUAL | Understanding, "what is" | fetch |
+| IMPLEMENTATION | "How to" with code | codebase, usages, fetch |
+| CODEBASE | Local patterns, "where is" | read, search, codebase, usages |
+| COMPREHENSIVE | Multi-source synthesis | Combine local and fetched evidence in parallel |
+
+## Research Protocol
+
+### Phase 1: Intent Analysis (First)
+
+\`\`\`
+<analysis>
+Literal Request: [exact user words]
+Actual Need: [what they really want]
+Success Looks Like: [concrete outcome]
+</analysis>
+\`\`\`
+
+### Phase 2: Parallel Execution
+
+When investigating multiple independent questions, run related tools in parallel:
+\`\`\`
+read(path/to/file)
+search(pattern)
+fetch(url)
+\`\`\`
+
+### Phase 3: Structured Results
+
+\`\`\`
+<results>
+<files>
+- path/to/file.ts:42 \u2014 [why relevant]
+</files>
+<answer>
+[Direct answer with evidence]
+</answer>
+<next_steps>
+[If applicable]
+</next_steps>
+</results>
+\`\`\`
+
+## Search Stop Conditions (After Research Protocol)
+
+Stop when any is true:
+- enough context to answer
+- repeated information across sources
+- two rounds with no new data
+- a direct answer is found
+
+## Evidence Check (Before Answering)
+
+- Every claim has a source (file:line, URL, snippet)
+- Avoid speculation; say "can't answer with available evidence" when needed
+
+## Investigate Before Answering
+
+- Read files before making claims about them
+
+## Tool Strategy
+
+| Need | Tool |
+|------|------|
+| Type or symbol relationships | usages |
+| Structural code discovery | codebase |
+| Text patterns | search |
+| File reading | read |
+| External docs or web pages | fetch |
+
+## External System Data
+
+When asked to retrieve raw data from external systems:
+- Prefer targeted queries
+- Summarize findings; avoid raw dumps
+- Redact secrets and personal data
+- Note access limitations or missing context
+
+## Evidence Format
+
+- Local: \`path/to/file.ts:line\`
+- Docs: URL with section anchor if available
+
+## Persistence
+
+When operating within a feature context:
+- If findings are substantial (3+ files, architecture patterns, or key decisions), save them with \`hive_context_write\`
+
+## Operating Rules
+
+- Read-only behavior (no file changes)
+- Classify request first, then research
+- Use absolute paths for file references
+- Cite evidence for every claim
+- Use the current year when reasoning about time-sensitive information
+`;
+    foragerBody = `# Forager (Worker/Coder)
+
+You are an autonomous senior engineer. Once given direction, gather context, implement, and verify without waiting for prompts.
+
+Execute directly. Work in isolation. Do not delegate implementation.
+
+## Intent Extraction
+
+| Spec says | True intent | Action |
+|---|---|---|
+| "Implement X" | Build + verify | Code \u2192 verify |
+| "Fix Y" | Root cause + minimal fix | Diagnose \u2192 fix \u2192 verify |
+| "Refactor Z" | Preserve behavior | Restructure \u2192 verify no regressions |
+| "Add tests" | Coverage | Write tests \u2192 verify |
+
+## Action Bias
+
+- Act directly: implement first, explain in the completion summary. Complete all steps before reporting.
+- REQUIRED: keep going until done, make decisions, course-correct on failure
+
+Your tool access is scoped to your role. Use only the tools available to you.
+
+## Allowed Research
+
+Use quick local exploration when needed:
+- \`read\` \u2014 inspect referenced files
+- \`search\` \u2014 find nearby patterns
+- \`execute\` \u2014 run verification commands available in the environment
+
+## Resolve Before Blocking
+
+Default to exploration, questions are LAST resort.
+Context inference: Before asking "what does X do?", READ X first.
+
+Apply in order before reporting as blocked:
+1. Read the referenced files and surrounding code
+2. Search for similar patterns in the codebase
+3. Try a reasonable approach
+4. Verify the result
+5. Last resort: report blocked
+
+Investigate before acting. Do not speculate about code you have not read.
+
+## Plan = READ ONLY
+
+Do not modify the plan file.
+- Read to understand the task
+- Only the orchestrator manages plan updates
+
+## Persistent Notes
+
+For substantial discoveries (architecture patterns, key decisions, gotchas that affect multiple tasks), use:
+\`hive_context_write({ name: "learnings", content: "..." })\`.
+
+## Working Rules
+
+- DRY/Search First: look for existing helpers before adding new code
+- Convention Following: check neighboring files and package.json, then follow existing patterns
+- Efficient Edits: read enough context before editing, batch logical edits
+- Tight Error Handling: avoid broad catches or silent defaults; propagate errors explicitly
+- Avoid Over-engineering: only implement what was asked for
+- Reversibility Preference: favor local, reversible actions; confirm before hard-to-reverse steps
+- Promise Discipline: do not commit to future work; if not done this turn, label it "Next steps"
+- No Comments: do not add comments unless the spec requests them
+- Concise Output: minimize output and avoid extra explanations unless asked
+
+## Execution Loop (max 3 iterations)
+
+EXPLORE \u2192 PLAN \u2192 EXECUTE \u2192 VERIFY \u2192 LOOP
+
+- EXPLORE: read references, gather context, search for patterns
+- PLAN: decide the minimum change, files to touch, and verification commands
+- EXECUTE: edit using conventions, reuse helpers, batch changes
+- VERIFY: run best-effort checks
+- LOOP: if verification fails, diagnose and retry within the limit
+
+## Progress Updates
+
+Provide brief status at meaningful milestones.
+
+## Completion Checklist
+
+- All acceptance criteria met?
+- Best-effort verification done and recorded?
+- Re-read the spec \u2014 missed anything?
+- Said "I'll do X" \u2014 did you?
+- Plan closure: mark each intention as Done, Blocked, or Cancelled
+- Record exact commands and results
+
+## Failure Recovery
+
+If 3 different approaches fail: stop edits, revert local changes, document attempts, report blocked.
+If you have tried 3 approaches and still cannot finish safely, report as blocked.
+
+## Reporting
+
+**Success:**
+\`\`\`
+hive_worktree_commit({
+  task: "current-task",
+  summary: "Implemented X. Tests pass.",
+  status: "completed"
+})
+\`\`\`
+
+Then inspect the tool response fields:
+- If \`ok=true\` and \`terminal=true\`: stop and hand off to orchestrator
+- If \`ok=false\` or \`terminal=false\`: DO NOT STOP. Follow \`nextAction\`, remediate, and retry \`hive_worktree_commit\`
+
+**Blocked (need user decision):**
+\`\`\`
+hive_worktree_commit({
+  task: "current-task",
+  summary: "Progress on X. Blocked on Y.",
+  status: "blocked",
+  blocker: {
+    reason: "Need clarification on...",
+    options: ["Option A", "Option B"],
+    recommendation: "I suggest A because...",
+    context: "Additional info..."
+  }
+})
+\`\`\`
+`;
+    hygienicBody = `# Hygienic (Consultant/Reviewer/Debugger)
+
+Named after Momus - finds fault in everything. Reviews DOCUMENTATION, not DESIGN.
+
+## Core Mandate
+
+Review plan WITHIN the stated approach. Question DOCUMENTATION gaps, NOT design decisions.
+
+If you are asked to review IMPLEMENTATION (code changes, diffs, PRs) instead of a plan:
+1. Refer to the skill at .github/skills/code-reviewer/
+2. Apply it and return its output format
+3. Still do NOT edit code (review only)
+
+Self-check before every critique:
+> "Am I questioning APPROACH or DOCUMENTATION?"
+> APPROACH \u2192 Stay silent
+> DOCUMENTATION \u2192 Raise it
+
+## Four Core Criteria
+
+### 1. Clarity of Work Content
+- Are reference sources specified with file:lines?
+- Can the implementer find what they need?
+
+### 2. Verification & Acceptance Criteria
+- Are criteria measurable and concrete?
+- Are they agent-executable without human judgment?
+- Do they specify exact commands + expected signals (exit code, output text, counts)?
+- Red flags: "should work", "looks good", "properly handles", "verify manually"
+- If manual checks are required, the plan must explain why automation is impossible
+
+### 3. Context Completeness (90% Confidence)
+- Could a capable worker execute with 90% confidence?
+- What's missing that would drop below 90%?
+
+### 4. Big Picture & Workflow
+- Is the WHY clear (not just WHAT and HOW)?
+- Does the flow make sense?
+
+## Red Flags Table
+
+| Pattern | Problem |
+|---------|---------|
+| Vague verbs | "Handle appropriately", "Process correctly" |
+| Missing paths | Task mentions file but no path |
+| Subjective criteria | "Should be clean", "Well-structured" |
+| Assumed context | "As discussed", "Obviously" |
+| Magic numbers | Timeouts, limits without rationale |
+
+## Active Implementation Simulation
+
+Before verdict, mentally execute 2-3 tasks:
+1. Pick a representative task
+2. Simulate: "I'm starting this task now..."
+3. Where do I get stuck? What's missing?
+4. Document gaps found
+
+## Output Format
+
+\`\`\`
+[OKAY / REJECT]
+
+**Justification**: [one-line explanation]
+
+**Assessment**:
+- Clarity: [Good/Needs Work]
+- Verifiability: [Good/Needs Work]
+- Completeness: [Good/Needs Work]
+- Big Picture: [Good/Needs Work]
+
+[If REJECT - Top 3-5 Critical Improvements]:
+1. [Specific gap with location]
+2. [Specific gap with location]
+3. [Specific gap with location]
+\`\`\`
+
+## When to OKAY vs REJECT
+
+| Situation | Verdict |
+|-----------|---------|
+| Minor gaps, easily inferred | OKAY with notes |
+| Design seems suboptimal | OKAY (not your call) |
+| Missing file paths for key tasks | REJECT |
+| Vague acceptance criteria | REJECT |
+| Unclear dependencies | REJECT |
+| Assumed context not documented | REJECT |
+
+## Iron Laws
+
+**Never:**
+- Reject based on design decisions
+- Suggest alternative architectures
+- Block on style preferences
+- Review implementation unless explicitly asked (default is plans only)
+
+**Always:**
+- Self-check: approach vs documentation
+- Simulate 2-3 tasks before verdict
+- Cite specific locations for gaps
+- Focus on worker success, not perfection
+`;
+  }
+});
+
 // src/extension.ts
 var extension_exports = {};
 __export(extension_exports, {
@@ -34,25 +734,28 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode7 = __toESM(require("vscode"));
-var fs10 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
+var vscode6 = __toESM(require("vscode"));
+var fs15 = __toESM(require("fs"));
+var path15 = __toESM(require("path"));
 
 // ../hive-core/dist/index.js
 var import_node_module = require("node:module");
 var path = __toESM(require("path"), 1);
 var fs = __toESM(require("fs"), 1);
 var fs3 = __toESM(require("fs"), 1);
+var path3 = __toESM(require("path"), 1);
 var fs4 = __toESM(require("fs"), 1);
 var fs5 = __toESM(require("fs"), 1);
 var fs7 = __toESM(require("fs/promises"), 1);
-var path3 = __toESM(require("path"), 1);
+var path4 = __toESM(require("path"), 1);
 var import_node_buffer = require("node:buffer");
 var import_child_process = require("child_process");
 var import_node_path = require("node:path");
 var import_node_events = require("node:events");
 var fs8 = __toESM(require("fs"), 1);
-var path4 = __toESM(require("path"), 1);
+var path5 = __toESM(require("path"), 1);
+var fs11 = __toESM(require("fs"), 1);
+var path8 = __toESM(require("path"), 1);
 var __create2 = Object.create;
 var __getProtoOf2 = Object.getPrototypeOf;
 var __defProp2 = Object.defineProperty;
@@ -819,10 +1522,10 @@ var require_src2 = __commonJS((exports2) => {
   var fs_1 = __require("fs");
   var debug_1 = __importDefault(require_src());
   var log = debug_1.default("@kwsites/file-exists");
-  function check(path32, isFile, isDirectory) {
-    log(`checking %s`, path32);
+  function check(path42, isFile, isDirectory) {
+    log(`checking %s`, path42);
     try {
-      const stat2 = fs_1.statSync(path32);
+      const stat2 = fs_1.statSync(path42);
       if (stat2.isFile() && isFile) {
         log(`[OK] path represents a file`);
         return true;
@@ -842,8 +1545,8 @@ var require_src2 = __commonJS((exports2) => {
       throw e;
     }
   }
-  function exists(path32, type = exports2.READABLE) {
-    return check(path32, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
+  function exists(path42, type = exports2.READABLE) {
+    return check(path42, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
   }
   exports2.exists = exists;
   exports2.FILE = 1;
@@ -994,20 +1697,77 @@ var HIVE_DIR = ".hive";
 var FEATURES_DIR = "features";
 var TASKS_DIR = "tasks";
 var CONTEXT_DIR = "context";
+var REVIEW_COMMENTS_DIR = "comments";
 var PLAN_FILE = "plan.md";
 var COMMENTS_FILE = "comments.json";
+var OVERVIEW_FILE = "overview.md";
 var FEATURE_FILE = "feature.json";
 var STATUS_FILE = "status.json";
 var REPORT_FILE = "report.md";
 var APPROVED_FILE = "APPROVED";
+var ACTIVE_FEATURE_FILE = "active-feature";
 function getHivePath(projectRoot) {
   return path.join(projectRoot, HIVE_DIR);
 }
 function getFeaturesPath(projectRoot) {
   return path.join(getHivePath(projectRoot), FEATURES_DIR);
 }
+function getActiveFeaturePath(projectRoot) {
+  return path.join(getHivePath(projectRoot), ACTIVE_FEATURE_FILE);
+}
+function parseIndexedFeatureDirectoryName(directoryName) {
+  const match = directoryName.match(/^(\d+)[_-](.+)$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    index: Number.parseInt(match[1], 10),
+    logicalName: match[2]
+  };
+}
+function listFeatureDirectories(projectRoot) {
+  const featuresPath = getFeaturesPath(projectRoot);
+  if (!fs.existsSync(featuresPath)) {
+    return [];
+  }
+  return fs.readdirSync(featuresPath, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => {
+    const directoryName = entry.name;
+    const parsed = parseIndexedFeatureDirectoryName(directoryName);
+    const featureJsonPath = path.join(featuresPath, directoryName, FEATURE_FILE);
+    const featureJson = readJson(featureJsonPath);
+    return {
+      directoryName,
+      logicalName: featureJson?.name || parsed?.logicalName || directoryName,
+      index: parsed?.index ?? null
+    };
+  }).sort((left, right) => {
+    if (left.index !== null && right.index !== null) {
+      return left.index - right.index;
+    }
+    if (left.index !== null) {
+      return 1;
+    }
+    if (right.index !== null) {
+      return -1;
+    }
+    return left.logicalName.localeCompare(right.logicalName);
+  });
+}
+function resolveFeatureDirectoryName(projectRoot, featureName) {
+  const directPath = path.join(getFeaturesPath(projectRoot), featureName);
+  if (fs.existsSync(directPath)) {
+    return featureName;
+  }
+  const match = listFeatureDirectories(projectRoot).find((entry) => entry.logicalName === featureName);
+  return match?.directoryName || featureName;
+}
+function getNextIndexedFeatureDirectoryName(projectRoot, featureName) {
+  const indexedEntries = listFeatureDirectories(projectRoot).filter((entry) => entry.index !== null);
+  const nextIndex = indexedEntries.reduce((max, entry) => Math.max(max, entry.index ?? 0), 0) + 1;
+  return `${String(nextIndex).padStart(2, "0")}_${featureName}`;
+}
 function getFeaturePath(projectRoot, featureName) {
-  return path.join(getFeaturesPath(projectRoot), featureName);
+  return path.join(getFeaturesPath(projectRoot), resolveFeatureDirectoryName(projectRoot, featureName));
 }
 function getPlanPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), PLAN_FILE);
@@ -1015,11 +1775,17 @@ function getPlanPath(projectRoot, featureName) {
 function getCommentsPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), COMMENTS_FILE);
 }
+function getReviewCommentsPath(projectRoot, featureName, document2) {
+  return path.join(getFeaturePath(projectRoot, featureName), REVIEW_COMMENTS_DIR, `${document2}.json`);
+}
 function getFeatureJsonPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), FEATURE_FILE);
 }
 function getContextPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), CONTEXT_DIR);
+}
+function getOverviewPath(projectRoot, featureName) {
+  return path.join(getContextPath(projectRoot, featureName), OVERVIEW_FILE);
 }
 function getTasksPath(projectRoot, featureName) {
   return path.join(getFeaturePath(projectRoot, featureName), TASKS_DIR);
@@ -1189,16 +1955,70 @@ function writeText(filePath, content) {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, content);
 }
-var FeatureService = class {
+var ReviewService = class {
   projectRoot;
   constructor(projectRoot) {
     this.projectRoot = projectRoot;
   }
+  getThreads(featureName, document2) {
+    const data = this.readComments(featureName, document2);
+    return data?.threads ?? [];
+  }
+  saveThreads(featureName, document2, threads) {
+    writeJson(this.getCanonicalPath(featureName, document2), { threads });
+  }
+  clear(featureName, document2) {
+    this.saveThreads(featureName, document2, []);
+    if (document2 === "plan" && fileExists(getCommentsPath(this.projectRoot, featureName))) {
+      writeJson(getCommentsPath(this.projectRoot, featureName), { threads: [] });
+    }
+  }
+  countByDocument(featureName) {
+    return {
+      plan: this.getThreads(featureName, "plan").length,
+      overview: this.getThreads(featureName, "overview").length
+    };
+  }
+  hasUnresolvedThreads(featureName, document2) {
+    if (document2) {
+      return this.getThreads(featureName, document2).length > 0;
+    }
+    const counts = this.countByDocument(featureName);
+    return counts.plan > 0 || counts.overview > 0;
+  }
+  readComments(featureName, document2) {
+    const canonicalPath = this.getCanonicalPath(featureName, document2);
+    const canonical = readJson(canonicalPath);
+    if (canonical) {
+      return canonical;
+    }
+    if (document2 === "plan") {
+      return readJson(getCommentsPath(this.projectRoot, featureName));
+    }
+    return null;
+  }
+  getCanonicalPath(featureName, document2) {
+    return getReviewCommentsPath(this.projectRoot, featureName, document2);
+  }
+};
+var FeatureService = class {
+  projectRoot;
+  reviewService;
+  constructor(projectRoot) {
+    this.projectRoot = projectRoot;
+  }
+  getReviewService() {
+    if (!this.reviewService) {
+      this.reviewService = new ReviewService(this.projectRoot);
+    }
+    return this.reviewService;
+  }
   create(name, ticket) {
-    const featurePath = getFeaturePath(this.projectRoot, name);
-    if (fileExists(featurePath)) {
+    const existingFeature = listFeatureDirectories(this.projectRoot).find((feature2) => feature2.logicalName === name);
+    if (existingFeature) {
       throw new Error(`Feature '${name}' already exists`);
     }
+    const featurePath = path3.join(getFeaturesPath(this.projectRoot), getNextIndexedFeatureDirectoryName(this.projectRoot, name));
     ensureDir(featurePath);
     ensureDir(getContextPath(this.projectRoot, name));
     ensureDir(getTasksPath(this.projectRoot, name));
@@ -1209,18 +2029,24 @@ var FeatureService = class {
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     writeJson(getFeatureJsonPath(this.projectRoot, name), feature);
+    ensureDir(path3.dirname(getActiveFeaturePath(this.projectRoot)));
+    fs3.writeFileSync(getActiveFeaturePath(this.projectRoot), name, "utf-8");
     return feature;
   }
   get(name) {
     return readJson(getFeatureJsonPath(this.projectRoot, name));
   }
   list() {
-    const featuresPath = getFeaturesPath(this.projectRoot);
-    if (!fileExists(featuresPath))
-      return [];
-    return fs3.readdirSync(featuresPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    return listFeatureDirectories(this.projectRoot).map((feature) => feature.logicalName).sort((left, right) => left.localeCompare(right));
   }
   getActive() {
+    const activeName = this.readActiveFeatureName();
+    if (activeName) {
+      const activeFeature = this.get(activeName);
+      if (activeFeature && activeFeature.status !== "completed") {
+        return activeFeature;
+      }
+    }
     const features = this.list();
     for (const name of features) {
       const feature = this.get(name);
@@ -1229,6 +2055,14 @@ var FeatureService = class {
       }
     }
     return null;
+  }
+  setActive(name) {
+    const feature = this.get(name);
+    if (!feature) {
+      throw new Error(`Feature '${name}' not found`);
+    }
+    ensureDir(path3.dirname(getActiveFeaturePath(this.projectRoot)));
+    fs3.writeFileSync(getActiveFeaturePath(this.projectRoot), name, "utf-8");
   }
   updateStatus(name, status) {
     const feature = this.get(name);
@@ -1250,14 +2084,17 @@ var FeatureService = class {
       return null;
     const tasks = this.getTasks(name);
     const hasPlan = fileExists(getPlanPath(this.projectRoot, name));
-    const comments2 = readJson(getCommentsPath(this.projectRoot, name));
-    const commentCount = comments2?.threads?.length || 0;
+    const hasOverview = fileExists(getOverviewPath(this.projectRoot, name));
+    const reviewCounts = this.getReviewService().countByDocument(name);
+    const commentCount = reviewCounts.plan + reviewCounts.overview;
     return {
       name: feature.name,
       status: feature.status,
       tasks,
       hasPlan,
-      commentCount
+      hasOverview,
+      commentCount,
+      reviewCounts
     };
   }
   getTasks(featureName) {
@@ -1299,11 +2136,26 @@ var FeatureService = class {
     const feature = this.get(name);
     return feature?.sessionId;
   }
+  readActiveFeatureName() {
+    const activeFeaturePath = getActiveFeaturePath(this.projectRoot);
+    if (!fileExists(activeFeaturePath)) {
+      return null;
+    }
+    const activeFeature = fs3.readFileSync(activeFeaturePath, "utf-8").trim();
+    return activeFeature || null;
+  }
 };
 var PlanService = class {
   projectRoot;
+  reviewService;
   constructor(projectRoot) {
     this.projectRoot = projectRoot;
+  }
+  getReviewService() {
+    if (!this.reviewService) {
+      this.reviewService = new ReviewService(this.projectRoot);
+    }
+    return this.reviewService;
   }
   write(featureName, content) {
     const planPath = getPlanPath(this.projectRoot, featureName);
@@ -1328,6 +2180,9 @@ var PlanService = class {
   approve(featureName) {
     if (!fileExists(getPlanPath(this.projectRoot, featureName))) {
       throw new Error(`No plan.md found for feature '${featureName}'`);
+    }
+    if (this.getReviewService().hasUnresolvedThreads(featureName)) {
+      throw new Error(`Cannot approve feature '${featureName}' with unresolved review comments`);
     }
     const approvedPath = getApprovedPath(this.projectRoot, featureName);
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
@@ -1358,25 +2213,21 @@ var PlanService = class {
     }
   }
   getComments(featureName) {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    const data = readJson(commentsPath);
-    return data?.threads || [];
+    return this.getReviewService().getThreads(featureName, "plan");
   }
   addComment(featureName, comment) {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    const data = readJson(commentsPath) || { threads: [] };
     const newComment = {
       ...comment,
-      id: `comment-${Date.now()}`,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      id: `comment-${Date.now()}`
     };
-    data.threads.push(newComment);
-    writeJson(commentsPath, data);
+    this.getReviewService().saveThreads(featureName, "plan", [
+      ...this.getComments(featureName),
+      newComment
+    ]);
     return newComment;
   }
   clearComments(featureName) {
-    const commentsPath = getCommentsPath(this.projectRoot, featureName);
-    writeJson(commentsPath, { threads: [] });
+    this.getReviewService().clear(featureName, "plan");
   }
 };
 var TASK_STATUS_SCHEMA_VERSION = 1;
@@ -1592,20 +2443,20 @@ ${f.content}`).join(`
       return [task.order - 1];
     };
     const visited = /* @__PURE__ */ new Map();
-    const path32 = [];
+    const path42 = [];
     const dfs = (taskOrder) => {
       const state = visited.get(taskOrder);
       if (state === 2) {
         return;
       }
       if (state === 1) {
-        const cycleStart = path32.indexOf(taskOrder);
-        const cyclePath = [...path32.slice(cycleStart), taskOrder];
+        const cycleStart = path42.indexOf(taskOrder);
+        const cyclePath = [...path42.slice(cycleStart), taskOrder];
         const cycleDesc = cyclePath.join(" -> ");
         throw new Error(`Invalid dependency graph in plan.md: Cycle detected in task dependencies: ${cycleDesc}. Tasks cannot have circular dependencies. Please fix the "Depends on:" lines in plan.md.`);
       }
       visited.set(taskOrder, 1);
-      path32.push(taskOrder);
+      path42.push(taskOrder);
       const task = taskByOrder.get(taskOrder);
       if (task) {
         const deps = getDependencies(task);
@@ -1613,7 +2464,7 @@ ${f.content}`).join(`
           dfs(depOrder);
         }
       }
-      path32.pop();
+      path42.pop();
       visited.set(taskOrder, 2);
     };
     for (const task of tasks) {
@@ -1935,7 +2786,7 @@ var __defProp22 = Object.defineProperty;
 var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames22 = Object.getOwnPropertyNames;
 var __hasOwnProp22 = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
+var __esm2 = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames22(fn)[0]])(fn = 0)), res;
 };
 var __commonJS2 = (cb, mod) => function __require2() {
@@ -1959,20 +2810,20 @@ function pathspec(...paths) {
   cache.set(key, paths);
   return key;
 }
-function isPathSpec(path32) {
-  return path32 instanceof String && cache.has(path32);
+function isPathSpec(path42) {
+  return path42 instanceof String && cache.has(path42);
 }
 function toPaths(pathSpec) {
   return cache.get(pathSpec) || [];
 }
 var cache;
-var init_pathspec = __esm({
+var init_pathspec = __esm2({
   "src/lib/args/pathspec.ts"() {
     cache = /* @__PURE__ */ new WeakMap();
   }
 });
 var GitError;
-var init_git_error = __esm({
+var init_git_error = __esm2({
   "src/lib/errors/git-error.ts"() {
     GitError = class extends Error {
       constructor(task, message) {
@@ -1984,7 +2835,7 @@ var init_git_error = __esm({
   }
 });
 var GitResponseError;
-var init_git_response_error = __esm({
+var init_git_response_error = __esm2({
   "src/lib/errors/git-response-error.ts"() {
     init_git_error();
     GitResponseError = class extends GitError {
@@ -1996,7 +2847,7 @@ var init_git_response_error = __esm({
   }
 });
 var TaskConfigurationError;
-var init_task_configuration_error = __esm({
+var init_task_configuration_error = __esm2({
   "src/lib/errors/task-configuration-error.ts"() {
     init_git_error();
     TaskConfigurationError = class extends GitError {
@@ -2046,8 +2897,8 @@ function toLinesWithContent(input = "", trimmed2 = true, separator = `
 function forEachLineWithContent(input, callback) {
   return toLinesWithContent(input, true).map((line) => callback(line));
 }
-function folderExists(path32) {
-  return import_file_exists.exists(path32, import_file_exists.FOLDER);
+function folderExists(path42) {
+  return import_file_exists.exists(path42, import_file_exists.FOLDER);
 }
 function append(target, item) {
   if (Array.isArray(target)) {
@@ -2127,7 +2978,7 @@ function orVoid(input) {
 var NULL;
 var NOOP;
 var objectToString;
-var init_util = __esm({
+var init_util = __esm2({
   "src/lib/utils/util.ts"() {
     init_argument_filters();
     NULL = "\0";
@@ -2157,7 +3008,7 @@ var filterNumber;
 var filterString;
 var filterStringOrStringArray;
 var filterHasLength;
-var init_argument_filters = __esm({
+var init_argument_filters = __esm2({
   "src/lib/utils/argument-filters.ts"() {
     init_pathspec();
     init_util();
@@ -2182,7 +3033,7 @@ var init_argument_filters = __esm({
   }
 });
 var ExitCodes;
-var init_exit_codes = __esm({
+var init_exit_codes = __esm2({
   "src/lib/utils/exit-codes.ts"() {
     ExitCodes = /* @__PURE__ */ ((ExitCodes2) => {
       ExitCodes2[ExitCodes2["SUCCESS"] = 0] = "SUCCESS";
@@ -2194,7 +3045,7 @@ var init_exit_codes = __esm({
   }
 });
 var GitOutputStreams;
-var init_git_output_streams = __esm({
+var init_git_output_streams = __esm2({
   "src/lib/utils/git-output-streams.ts"() {
     GitOutputStreams = class _GitOutputStreams {
       constructor(stdOut, stdErr) {
@@ -2212,7 +3063,7 @@ function useMatchesDefault() {
 }
 var LineParser;
 var RemoteLineParser;
-var init_line_parser = __esm({
+var init_line_parser = __esm2({
   "src/lib/utils/line-parser.ts"() {
     LineParser = class {
       constructor(regExp, useMatches) {
@@ -2267,7 +3118,7 @@ function createInstanceConfig(...options) {
   return config;
 }
 var defaultOptions;
-var init_simple_git_options = __esm({
+var init_simple_git_options = __esm2({
   "src/lib/utils/simple-git-options.ts"() {
     defaultOptions = {
       binary: "git",
@@ -2324,7 +3175,7 @@ function trailingFunctionArgument(args, includeNoop = true) {
   const callback = asFunction(last(args));
   return includeNoop || isUserFunction(callback) ? callback : void 0;
 }
-var init_task_options = __esm({
+var init_task_options = __esm2({
   "src/lib/utils/task-options.ts"() {
     init_argument_filters();
     init_util();
@@ -2348,7 +3199,7 @@ function parseStringResponse(result, parsers12, texts, trim = true) {
   });
   return result;
 }
-var init_task_parser = __esm({
+var init_task_parser = __esm2({
   "src/lib/utils/task-parser.ts"() {
     init_util();
   }
@@ -2399,7 +3250,7 @@ __export2(utils_exports, {
   trailingFunctionArgument: () => trailingFunctionArgument,
   trailingOptionsArgument: () => trailingOptionsArgument
 });
-var init_utils = __esm({
+var init_utils = __esm2({
   "src/lib/utils/index.ts"() {
     init_argument_filters();
     init_exit_codes();
@@ -2439,8 +3290,8 @@ function checkIsRepoRootTask() {
     commands: commands4,
     format: "utf-8",
     onError,
-    parser(path32) {
-      return /^\.(git)?$/.test(path32.trim());
+    parser(path42) {
+      return /^\.(git)?$/.test(path42.trim());
     }
   };
 }
@@ -2459,7 +3310,7 @@ function isNotRepoMessage(error) {
 var CheckRepoActions;
 var onError;
 var parser;
-var init_check_is_repo = __esm({
+var init_check_is_repo = __esm2({
   "src/lib/tasks/check-is-repo.ts"() {
     init_utils();
     CheckRepoActions = /* @__PURE__ */ ((CheckRepoActions2) => {
@@ -2493,7 +3344,7 @@ var CleanResponse;
 var removalRegexp;
 var dryRunRemovalRegexp;
 var isFolderRegexp;
-var init_CleanSummary = __esm({
+var init_CleanSummary = __esm2({
   "src/lib/responses/CleanSummary.ts"() {
     init_utils();
     CleanResponse = class {
@@ -2560,7 +3411,7 @@ function isEmptyTask(task) {
   return task.format === "empty" || !task.commands.length;
 }
 var EMPTY_COMMANDS;
-var init_task = __esm({
+var init_task = __esm2({
   "src/lib/tasks/task.ts"() {
     init_task_configuration_error();
     EMPTY_COMMANDS = [];
@@ -2638,7 +3489,7 @@ var CONFIG_ERROR_MODE_REQUIRED;
 var CONFIG_ERROR_UNKNOWN_OPTION;
 var CleanOptions;
 var CleanOptionValues;
-var init_clean = __esm({
+var init_clean = __esm2({
   "src/lib/tasks/clean.ts"() {
     init_CleanSummary();
     init_utils();
@@ -2711,7 +3562,7 @@ function* configParser(text, requestedKey = null) {
   }
 }
 var ConfigList;
-var init_ConfigList = __esm({
+var init_ConfigList = __esm2({
   "src/lib/responses/ConfigList.ts"() {
     init_utils();
     ConfigList = class {
@@ -2809,7 +3660,7 @@ function config_default() {
   };
 }
 var GitConfigScope;
-var init_config = __esm({
+var init_config = __esm2({
   "src/lib/tasks/config.ts"() {
     init_ConfigList();
     init_utils();
@@ -2827,7 +3678,7 @@ function isDiffNameStatus(input) {
 }
 var DiffNameStatus;
 var diffNameStatus;
-var init_diff_name_status = __esm({
+var init_diff_name_status = __esm2({
   "src/lib/tasks/diff-name-status.ts"() {
     DiffNameStatus = /* @__PURE__ */ ((DiffNameStatus2) => {
       DiffNameStatus2["ADDED"] = "A";
@@ -2851,11 +3702,11 @@ function parseGrep(grep) {
   const paths = /* @__PURE__ */ new Set();
   const results = {};
   forEachLineWithContent(grep, (input) => {
-    const [path32, line, preview] = input.split(NULL);
-    paths.add(path32);
-    (results[path32] = results[path32] || []).push({
+    const [path42, line, preview] = input.split(NULL);
+    paths.add(path42);
+    (results[path42] = results[path42] || []).push({
       line: asNumber(line),
-      path: path32,
+      path: path42,
       preview
     });
   });
@@ -2892,7 +3743,7 @@ var disallowedOptions;
 var Query;
 var _a;
 var GrepQuery;
-var init_grep = __esm({
+var init_grep = __esm2({
   "src/lib/tasks/grep.ts"() {
     init_utils();
     init_task();
@@ -2948,7 +3799,7 @@ function isValidResetMode(mode) {
 }
 var ResetMode;
 var validResetModes;
-var init_reset = __esm({
+var init_reset = __esm2({
   "src/lib/tasks/reset.ts"() {
     init_utils();
     init_task();
@@ -3011,7 +3862,7 @@ function createLogger(label, verbose, initialStep, infoDebugger = createLog()) {
     });
   }
 }
-var init_git_logger = __esm({
+var init_git_logger = __esm2({
   "src/lib/git-logger.ts"() {
     init_utils();
     import_debug.default.formatters.L = (value) => String(filterHasLength(value) ? value.length : "-");
@@ -3024,7 +3875,7 @@ var init_git_logger = __esm({
   }
 });
 var TasksPendingQueue;
-var init_tasks_pending_queue = __esm({
+var init_tasks_pending_queue = __esm2({
   "src/lib/runners/tasks-pending-queue.ts"() {
     init_git_error();
     init_git_logger();
@@ -3108,7 +3959,7 @@ function onDataReceived(target, name, logger, output) {
   };
 }
 var GitExecutorChain;
-var init_git_executor_chain = __esm({
+var init_git_executor_chain = __esm2({
   "src/lib/runners/git-executor-chain.ts"() {
     init_git_error();
     init_task();
@@ -3273,7 +4124,7 @@ __export2(git_executor_exports, {
   GitExecutor: () => GitExecutor
 });
 var GitExecutor;
-var init_git_executor = __esm({
+var init_git_executor = __esm2({
   "src/lib/runners/git-executor.ts"() {
     init_git_executor_chain();
     GitExecutor = class {
@@ -3324,7 +4175,7 @@ function addDeprecationNoticeToError(err) {
     return all;
   }
 }
-var init_task_callback = __esm({
+var init_task_callback = __esm2({
   "src/lib/task-callback.ts"() {
     init_git_response_error();
     init_utils();
@@ -3338,7 +4189,7 @@ function changeWorkingDirectoryTask(directory, root) {
     return (root || instance).cwd = directory;
   });
 }
-var init_change_working_directory = __esm({
+var init_change_working_directory = __esm2({
   "src/lib/tasks/change-working-directory.ts"() {
     init_utils();
     init_task();
@@ -3364,7 +4215,7 @@ function checkout_default() {
     }
   };
 }
-var init_checkout = __esm({
+var init_checkout = __esm2({
   "src/lib/tasks/checkout.ts"() {
     init_utils();
     init_task();
@@ -3396,7 +4247,7 @@ function count_objects_default() {
   };
 }
 var parser2;
-var init_count_objects = __esm({
+var init_count_objects = __esm2({
   "src/lib/tasks/count-objects.ts"() {
     init_utils();
     parser2 = new LineParser(/([a-z-]+): (\d+)$/, (result, [key, value]) => {
@@ -3422,7 +4273,7 @@ function parseCommitResult(stdOut) {
   return parseStringResponse(result, parsers, stdOut);
 }
 var parsers;
-var init_parse_commit = __esm({
+var init_parse_commit = __esm2({
   "src/lib/parsers/parse-commit.ts"() {
     init_utils();
     parsers = [
@@ -3489,7 +4340,7 @@ function commit_default() {
     return !filterStringOrStringArray(message) && configurationErrorTask(`git.commit: requires the commit message to be supplied as a string/string[]`);
   }
 }
-var init_commit = __esm({
+var init_commit = __esm2({
   "src/lib/tasks/commit.ts"() {
     init_parse_commit();
     init_utils();
@@ -3503,7 +4354,7 @@ function first_commit_default() {
     }
   };
 }
-var init_first_commit = __esm({
+var init_first_commit = __esm2({
   "src/lib/tasks/first-commit.ts"() {
     init_utils();
     init_task();
@@ -3516,19 +4367,19 @@ function hashObjectTask(filePath, write) {
   }
   return straightThroughStringTask(commands4, true);
 }
-var init_hash_object = __esm({
+var init_hash_object = __esm2({
   "src/lib/tasks/hash-object.ts"() {
     init_task();
   }
 });
-function parseInit(bare, path32, text) {
+function parseInit(bare, path42, text) {
   const response = String(text).trim();
   let result;
   if (result = initResponseRegex.exec(response)) {
-    return new InitSummary(bare, path32, false, result[1]);
+    return new InitSummary(bare, path42, false, result[1]);
   }
   if (result = reInitResponseRegex.exec(response)) {
-    return new InitSummary(bare, path32, true, result[1]);
+    return new InitSummary(bare, path42, true, result[1]);
   }
   let gitDir = "";
   const tokens = response.split(" ");
@@ -3539,17 +4390,17 @@ function parseInit(bare, path32, text) {
       break;
     }
   }
-  return new InitSummary(bare, path32, /^re/i.test(response), gitDir);
+  return new InitSummary(bare, path42, /^re/i.test(response), gitDir);
 }
 var InitSummary;
 var initResponseRegex;
 var reInitResponseRegex;
-var init_InitSummary = __esm({
+var init_InitSummary = __esm2({
   "src/lib/responses/InitSummary.ts"() {
     InitSummary = class {
-      constructor(bare, path32, existing, gitDir) {
+      constructor(bare, path42, existing, gitDir) {
         this.bare = bare;
-        this.path = path32;
+        this.path = path42;
         this.existing = existing;
         this.gitDir = gitDir;
       }
@@ -3561,7 +4412,7 @@ var init_InitSummary = __esm({
 function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
-function initTask(bare = false, path32, customArgs) {
+function initTask(bare = false, path42, customArgs) {
   const commands4 = ["init", ...customArgs];
   if (bare && !hasBareCommand(commands4)) {
     commands4.splice(1, 0, bareCommand);
@@ -3570,12 +4421,12 @@ function initTask(bare = false, path32, customArgs) {
     commands: commands4,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands4.includes("--bare"), path32, text);
+      return parseInit(commands4.includes("--bare"), path42, text);
     }
   };
 }
 var bareCommand;
-var init_init = __esm({
+var init_init = __esm2({
   "src/lib/tasks/init.ts"() {
     init_InitSummary();
     bareCommand = "--bare";
@@ -3594,13 +4445,13 @@ function isLogFormat(customArg) {
   return logFormatRegex.test(customArg);
 }
 var logFormatRegex;
-var init_log_format = __esm({
+var init_log_format = __esm2({
   "src/lib/args/log-format.ts"() {
     logFormatRegex = /^--(stat|numstat|name-only|name-status)(=|$)/;
   }
 });
 var DiffSummary;
-var init_DiffSummary = __esm({
+var init_DiffSummary = __esm2({
   "src/lib/responses/DiffSummary.ts"() {
     DiffSummary = class {
       constructor() {
@@ -3621,7 +4472,7 @@ var numStatParser;
 var nameOnlyParser;
 var nameStatusParser;
 var diffSummaryParsers;
-var init_parse_diff_summary = __esm({
+var init_parse_diff_summary = __esm2({
   "src/lib/parsers/parse-diff-summary.ts"() {
     init_log_format();
     init_DiffSummary();
@@ -3742,7 +4593,7 @@ var START_BOUNDARY;
 var COMMIT_BOUNDARY;
 var SPLITTER;
 var defaultFieldNames;
-var init_parse_list_log_summary = __esm({
+var init_parse_list_log_summary = __esm2({
   "src/lib/parsers/parse-list-log-summary.ts"() {
     init_utils();
     init_parse_diff_summary();
@@ -3781,7 +4632,7 @@ function validateLogFormatConfig(customArgs) {
     return configurationErrorTask(`Summary flag ${flags} parsing is not compatible with null termination option '-z'`);
   }
 }
-var init_diff = __esm({
+var init_diff = __esm2({
   "src/lib/tasks/diff.ts"() {
     init_log_format();
     init_parse_diff_summary();
@@ -3865,7 +4716,7 @@ function log_default() {
   }
 }
 var excludeOptions;
-var init_log = __esm({
+var init_log = __esm2({
   "src/lib/tasks/log.ts"() {
     init_log_format();
     init_pathspec();
@@ -3893,7 +4744,7 @@ var init_log = __esm({
 });
 var MergeSummaryConflict;
 var MergeSummaryDetail;
-var init_MergeSummary = __esm({
+var init_MergeSummary = __esm2({
   "src/lib/responses/MergeSummary.ts"() {
     MergeSummaryConflict = class {
       constructor(reason, file = null, meta) {
@@ -3928,7 +4779,7 @@ var init_MergeSummary = __esm({
 });
 var PullSummary;
 var PullFailedSummary;
-var init_PullSummary = __esm({
+var init_PullSummary = __esm2({
   "src/lib/responses/PullSummary.ts"() {
     PullSummary = class {
       constructor() {
@@ -3985,7 +4836,7 @@ function asObjectCount(source) {
   };
 }
 var remoteMessagesObjectParsers;
-var init_parse_remote_objects = __esm({
+var init_parse_remote_objects = __esm2({
   "src/lib/parsers/parse-remote-objects.ts"() {
     init_utils();
     remoteMessagesObjectParsers = [
@@ -4013,7 +4864,7 @@ function parseRemoteMessages(_stdOut, stdErr) {
 }
 var parsers2;
 var RemoteMessageSummary;
-var init_parse_remote_messages = __esm({
+var init_parse_remote_messages = __esm2({
   "src/lib/parsers/parse-remote-messages.ts"() {
     init_utils();
     init_parse_remote_objects();
@@ -4052,7 +4903,7 @@ var parsers3;
 var errorParsers;
 var parsePullDetail;
 var parsePullResult;
-var init_parse_pull = __esm({
+var init_parse_pull = __esm2({
   "src/lib/parsers/parse-pull.ts"() {
     init_PullSummary();
     init_utils();
@@ -4105,7 +4956,7 @@ var init_parse_pull = __esm({
 var parsers4;
 var parseMergeResult;
 var parseMergeDetail;
-var init_parse_merge = __esm({
+var init_parse_merge = __esm2({
   "src/lib/parsers/parse-merge.ts"() {
     init_MergeSummary();
     init_utils();
@@ -4151,7 +5002,7 @@ function mergeTask(customArgs) {
     }
   };
 }
-var init_merge = __esm({
+var init_merge = __esm2({
   "src/lib/tasks/merge.ts"() {
     init_git_response_error();
     init_parse_merge();
@@ -4175,7 +5026,7 @@ function pushResultPushedItem(local, remote, status) {
 var parsers5;
 var parsePushResult;
 var parsePushDetail;
-var init_parse_push = __esm({
+var init_parse_push = __esm2({
   "src/lib/parsers/parse-push.ts"() {
     init_utils();
     init_parse_remote_messages();
@@ -4252,7 +5103,7 @@ function pushTask(ref = {}, customArgs) {
     parser: parsePushResult
   };
 }
-var init_push = __esm({
+var init_push = __esm2({
   "src/lib/tasks/push.ts"() {
     init_parse_push();
     init_utils();
@@ -4273,7 +5124,7 @@ function show_default() {
     }
   };
 }
-var init_show = __esm({
+var init_show = __esm2({
   "src/lib/tasks/show.ts"() {
     init_utils();
     init_task();
@@ -4281,16 +5132,16 @@ var init_show = __esm({
 });
 var fromPathRegex;
 var FileStatusSummary;
-var init_FileStatusSummary = __esm({
+var init_FileStatusSummary = __esm2({
   "src/lib/responses/FileStatusSummary.ts"() {
     fromPathRegex = /^(.+)\0(.+)$/;
     FileStatusSummary = class {
-      constructor(path32, index, working_dir) {
-        this.path = path32;
+      constructor(path42, index, working_dir) {
+        this.path = path42;
         this.index = index;
         this.working_dir = working_dir;
         if (index === "R" || working_dir === "R") {
-          const detail = fromPathRegex.exec(path32) || [null, path32, path32];
+          const detail = fromPathRegex.exec(path42) || [null, path42, path42];
           this.from = detail[2] || "";
           this.path = detail[1] || "";
         }
@@ -4321,21 +5172,21 @@ function splitLine(result, lineStr) {
     default:
       return;
   }
-  function data(index, workingDir, path32) {
+  function data(index, workingDir, path42) {
     const raw = `${index}${workingDir}`;
     const handler = parsers6.get(raw);
     if (handler) {
-      handler(result, path32);
+      handler(result, path42);
     }
     if (raw !== "##" && raw !== "!!") {
-      result.files.push(new FileStatusSummary(path32, index, workingDir));
+      result.files.push(new FileStatusSummary(path42, index, workingDir));
     }
   }
 }
 var StatusSummary;
 var parsers6;
 var parseStatusSummary;
-var init_StatusSummary = __esm({
+var init_StatusSummary = __esm2({
   "src/lib/responses/StatusSummary.ts"() {
     init_utils();
     init_FileStatusSummary();
@@ -4443,7 +5294,7 @@ function statusTask(customArgs) {
   };
 }
 var ignoredOptions;
-var init_status = __esm({
+var init_status = __esm2({
   "src/lib/tasks/status.ts"() {
     init_StatusSummary();
     ignoredOptions = ["--null", "-z"];
@@ -4492,7 +5343,7 @@ function versionParser(stdOut) {
 }
 var NOT_INSTALLED;
 var parsers7;
-var init_version = __esm({
+var init_version = __esm2({
   "src/lib/tasks/version.ts"() {
     init_utils();
     NOT_INSTALLED = "installed=false";
@@ -4511,7 +5362,7 @@ __export2(simple_git_api_exports, {
   SimpleGitApi: () => SimpleGitApi
 });
 var SimpleGitApi;
-var init_simple_git_api = __esm({
+var init_simple_git_api = __esm2({
   "src/lib/simple-git-api.ts"() {
     init_task_callback();
     init_change_working_directory();
@@ -4560,8 +5411,8 @@ var init_simple_git_api = __esm({
         }
         return this._runTask(configurationErrorTask("Git.cwd: workingDirectory must be supplied as a string"), next);
       }
-      hashObject(path32, write) {
-        return this._runTask(hashObjectTask(path32, write === true), trailingFunctionArgument(arguments));
+      hashObject(path42, write) {
+        return this._runTask(hashObjectTask(path42, write === true), trailingFunctionArgument(arguments));
       }
       init(bare) {
         return this._runTask(initTask(bare === true, this._executor.cwd, getTrailingOptions(arguments)), trailingFunctionArgument(arguments));
@@ -4602,7 +5453,7 @@ __export2(scheduler_exports, {
 });
 var createScheduledTask;
 var Scheduler;
-var init_scheduler = __esm({
+var init_scheduler = __esm2({
   "src/lib/runners/scheduler.ts"() {
     init_utils();
     init_git_logger();
@@ -4655,7 +5506,7 @@ __export2(apply_patch_exports, {
 function applyPatchTask(patches, customArgs) {
   return straightThroughStringTask(["apply", ...customArgs, ...patches]);
 }
-var init_apply_patch = __esm({
+var init_apply_patch = __esm2({
   "src/lib/tasks/apply-patch.ts"() {
     init_task();
   }
@@ -4675,7 +5526,7 @@ function branchDeletionFailure(branch) {
   };
 }
 var BranchDeletionBatch;
-var init_BranchDeleteSummary = __esm({
+var init_BranchDeleteSummary = __esm2({
   "src/lib/responses/BranchDeleteSummary.ts"() {
     BranchDeletionBatch = class {
       constructor() {
@@ -4696,7 +5547,7 @@ var deleteSuccessRegex;
 var deleteErrorRegex;
 var parsers8;
 var parseBranchDeletions;
-var init_parse_branch_delete = __esm({
+var init_parse_branch_delete = __esm2({
   "src/lib/parsers/parse-branch-delete.ts"() {
     init_BranchDeleteSummary();
     init_utils();
@@ -4721,7 +5572,7 @@ var init_parse_branch_delete = __esm({
   }
 });
 var BranchSummaryResult;
-var init_BranchSummary = __esm({
+var init_BranchSummary = __esm2({
   "src/lib/responses/BranchSummary.ts"() {
     BranchSummaryResult = class {
       constructor() {
@@ -4755,7 +5606,7 @@ function parseBranchSummary(stdOut, currentOnly = false) {
 }
 var parsers9;
 var currentBranchParser;
-var init_parse_branch = __esm({
+var init_parse_branch = __esm2({
   "src/lib/parsers/parse-branch.ts"() {
     init_BranchSummary();
     init_utils();
@@ -4845,7 +5696,7 @@ function deleteBranchTask(branch, forceDelete = false) {
   };
   return task;
 }
-var init_branch = __esm({
+var init_branch = __esm2({
   "src/lib/tasks/branch.ts"() {
     init_git_response_error();
     init_parse_branch_delete();
@@ -4854,11 +5705,11 @@ var init_branch = __esm({
   }
 });
 function toPath(input) {
-  const path32 = input.trim().replace(/^["']|["']$/g, "");
-  return path32 && (0, import_node_path.normalize)(path32);
+  const path42 = input.trim().replace(/^["']|["']$/g, "");
+  return path42 && (0, import_node_path.normalize)(path42);
 }
 var parseCheckIgnore;
-var init_CheckIgnore = __esm({
+var init_CheckIgnore = __esm2({
   "src/lib/responses/CheckIgnore.ts"() {
     parseCheckIgnore = (text) => {
       return text.split(/\n/g).map(toPath).filter(Boolean);
@@ -4876,7 +5727,7 @@ function checkIgnoreTask(paths) {
     parser: parseCheckIgnore
   };
 }
-var init_check_ignore = __esm({
+var init_check_ignore = __esm2({
   "src/lib/tasks/check-ignore.ts"() {
     init_CheckIgnore();
   }
@@ -4903,7 +5754,7 @@ function cloneMirrorTask(repo, directory, customArgs) {
   append(customArgs, "--mirror");
   return cloneTask(repo, directory, customArgs);
 }
-var init_clone = __esm({
+var init_clone = __esm2({
   "src/lib/tasks/clone.ts"() {
     init_task();
     init_utils();
@@ -4921,7 +5772,7 @@ function parseFetchResult(stdOut, stdErr) {
   return parseStringResponse(result, parsers10, [stdOut, stdErr]);
 }
 var parsers10;
-var init_parse_fetch = __esm({
+var init_parse_fetch = __esm2({
   "src/lib/parsers/parse-fetch.ts"() {
     init_utils();
     parsers10 = [
@@ -4978,7 +5829,7 @@ function fetchTask(remote, branch, customArgs) {
     parser: parseFetchResult
   };
 }
-var init_fetch = __esm({
+var init_fetch = __esm2({
   "src/lib/tasks/fetch.ts"() {
     init_parse_fetch();
     init_task();
@@ -4988,7 +5839,7 @@ function parseMoveResult(stdOut) {
   return parseStringResponse({ moves: [] }, parsers11, stdOut);
 }
 var parsers11;
-var init_parse_move = __esm({
+var init_parse_move = __esm2({
   "src/lib/parsers/parse-move.ts"() {
     init_utils();
     parsers11 = [
@@ -5009,7 +5860,7 @@ function moveTask(from, to) {
     parser: parseMoveResult
   };
 }
-var init_move = __esm({
+var init_move = __esm2({
   "src/lib/tasks/move.ts"() {
     init_parse_move();
     init_utils();
@@ -5039,7 +5890,7 @@ function pullTask(remote, branch, customArgs) {
     }
   };
 }
-var init_pull = __esm({
+var init_pull = __esm2({
   "src/lib/tasks/pull.ts"() {
     init_git_response_error();
     init_parse_pull();
@@ -5069,7 +5920,7 @@ function parseGetRemotesVerbose(text) {
 function forEach(text, handler) {
   forEachLineWithContent(text, (line) => handler(line.split(/\s+/)));
 }
-var init_GetRemoteSummary = __esm({
+var init_GetRemoteSummary = __esm2({
   "src/lib/responses/GetRemoteSummary.ts"() {
     init_utils();
   }
@@ -5113,7 +5964,7 @@ function remoteTask(customArgs) {
 function removeRemoteTask(remoteName) {
   return straightThroughStringTask(["remote", "remove", remoteName]);
 }
-var init_remote = __esm({
+var init_remote = __esm2({
   "src/lib/tasks/remote.ts"() {
     init_GetRemoteSummary();
     init_task();
@@ -5133,7 +5984,7 @@ function stashListTask(opt = {}, customArgs) {
     parser: parser4
   };
 }
-var init_stash_list = __esm({
+var init_stash_list = __esm2({
   "src/lib/tasks/stash-list.ts"() {
     init_log_format();
     init_parse_list_log_summary();
@@ -5148,8 +5999,8 @@ __export2(sub_module_exports, {
   subModuleTask: () => subModuleTask,
   updateSubModuleTask: () => updateSubModuleTask
 });
-function addSubModuleTask(repo, path32) {
-  return subModuleTask(["add", repo, path32]);
+function addSubModuleTask(repo, path42) {
+  return subModuleTask(["add", repo, path42]);
 }
 function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
@@ -5164,7 +6015,7 @@ function subModuleTask(customArgs) {
 function updateSubModuleTask(customArgs) {
   return subModuleTask(["update", ...customArgs]);
 }
-var init_sub_module = __esm({
+var init_sub_module = __esm2({
   "src/lib/tasks/sub-module.ts"() {
     init_task();
   }
@@ -5191,7 +6042,7 @@ function toNumber(input) {
 }
 var TagList;
 var parseTagList;
-var init_TagList = __esm({
+var init_TagList = __esm2({
   "src/lib/responses/TagList.ts"() {
     TagList = class {
       constructor(all, latest) {
@@ -5257,7 +6108,7 @@ function addAnnotatedTagTask(name, tagMessage) {
     }
   };
 }
-var init_tag = __esm({
+var init_tag = __esm2({
   "src/lib/tasks/tag.ts"() {
     init_TagList();
   }
@@ -5417,8 +6268,8 @@ var require_git = __commonJS2({
       }
       return this._runTask(straightThroughStringTask2(command, this._trimmed), next);
     };
-    Git2.prototype.submoduleAdd = function(repo, path32, then) {
-      return this._runTask(addSubModuleTask2(repo, path32), trailingFunctionArgument2(arguments));
+    Git2.prototype.submoduleAdd = function(repo, path42, then) {
+      return this._runTask(addSubModuleTask2(repo, path42), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.submoduleUpdate = function(args, then) {
       return this._runTask(updateSubModuleTask2(getTrailingOptions2(arguments, true)), trailingFunctionArgument2(arguments));
@@ -5937,20 +6788,21 @@ var WorktreeService = class {
     return esm_default(cwd || this.config.baseDir);
   }
   getWorktreesDir() {
-    return path3.join(this.config.hiveDir, ".worktrees");
+    return path4.join(this.config.hiveDir, ".worktrees");
   }
   getWorktreePath(feature, step) {
-    return path3.join(this.getWorktreesDir(), feature, step);
+    return path4.join(this.getWorktreesDir(), feature, step);
   }
   async getStepStatusPath(feature, step) {
-    const featurePath = path3.join(this.config.hiveDir, "features", feature);
-    const tasksPath = path3.join(featurePath, "tasks", step, "status.json");
+    const featureDir = resolveFeatureDirectoryName(this.config.baseDir, feature);
+    const featurePath = path4.join(this.config.hiveDir, "features", featureDir);
+    const tasksPath = path4.join(featurePath, "tasks", step, "status.json");
     try {
       await fs7.access(tasksPath);
       return tasksPath;
     } catch {
     }
-    return path3.join(featurePath, "execution", step, "status.json");
+    return path4.join(featurePath, "execution", step, "status.json");
   }
   getBranchName(feature, step) {
     return `hive/${feature}/${step}`;
@@ -5959,7 +6811,7 @@ var WorktreeService = class {
     const worktreePath = this.getWorktreePath(feature, step);
     const branchName = this.getBranchName(feature, step);
     const git = this.getGit();
-    await fs7.mkdir(path3.dirname(worktreePath), { recursive: true });
+    await fs7.mkdir(path4.dirname(worktreePath), { recursive: true });
     const base = baseBranch || (await git.revparse(["HEAD"])).trim();
     const existing = await this.get(feature, step);
     if (existing) {
@@ -6055,7 +6907,7 @@ var WorktreeService = class {
   }
   async exportPatch(feature, step, baseBranch) {
     const worktreePath = this.getWorktreePath(feature, step);
-    const patchPath = path3.join(worktreePath, "..", `${step}.patch`);
+    const patchPath = path4.join(worktreePath, "..", `${step}.patch`);
     const base = baseBranch || "HEAD~1";
     const worktreeGit = this.getGit(worktreePath);
     const diff = await worktreeGit.diff([`${base}...HEAD`]);
@@ -6067,7 +6919,7 @@ var WorktreeService = class {
     if (!hasDiff) {
       return { success: true, filesAffected: [] };
     }
-    const patchPath = path3.join(this.config.hiveDir, ".worktrees", feature, `${step}.patch`);
+    const patchPath = path4.join(this.config.hiveDir, ".worktrees", feature, `${step}.patch`);
     try {
       await fs7.writeFile(patchPath, diffContent);
       const git = this.getGit();
@@ -6091,7 +6943,7 @@ var WorktreeService = class {
     if (!hasDiff) {
       return { success: true, filesAffected: [] };
     }
-    const patchPath = path3.join(this.config.hiveDir, ".worktrees", feature, `${step}.patch`);
+    const patchPath = path4.join(this.config.hiveDir, ".worktrees", feature, `${step}.patch`);
     try {
       await fs7.writeFile(patchPath, diffContent);
       const git = this.getGit();
@@ -6164,7 +7016,7 @@ var WorktreeService = class {
     try {
       const features = feature ? [feature] : await fs7.readdir(worktreesDir);
       for (const feat of features) {
-        const featurePath = path3.join(worktreesDir, feat);
+        const featurePath = path4.join(worktreesDir, feat);
         const stat2 = await fs7.stat(featurePath).catch(() => null);
         if (!stat2?.isDirectory())
           continue;
@@ -6190,13 +7042,13 @@ var WorktreeService = class {
     const worktreesDir = this.getWorktreesDir();
     const features = feature ? [feature] : await fs7.readdir(worktreesDir).catch(() => []);
     for (const feat of features) {
-      const featurePath = path3.join(worktreesDir, feat);
+      const featurePath = path4.join(worktreesDir, feat);
       const stat2 = await fs7.stat(featurePath).catch(() => null);
       if (!stat2?.isDirectory())
         continue;
       const steps = await fs7.readdir(featurePath).catch(() => []);
       for (const step of steps) {
-        const worktreePath = path3.join(featurePath, step);
+        const worktreePath = path4.join(featurePath, step);
         const stepStat = await fs7.stat(worktreePath).catch(() => null);
         if (!stepStat?.isDirectory())
           continue;
@@ -6216,7 +7068,7 @@ var WorktreeService = class {
     if (!hasDiff) {
       return [];
     }
-    const patchPath = path3.join(this.config.hiveDir, ".worktrees", feature, `${step}-check.patch`);
+    const patchPath = path4.join(this.config.hiveDir, ".worktrees", feature, `${step}-check.patch`);
     try {
       await fs7.writeFile(patchPath, diffContent);
       const git = this.getGit();
@@ -6292,9 +7144,16 @@ var WorktreeService = class {
       };
     }
   }
-  async merge(feature, step, strategy = "merge") {
+  async merge(feature, step, strategy = "merge", message) {
     const branchName = this.getBranchName(feature, step);
     const git = this.getGit();
+    if (strategy === "rebase" && message) {
+      return {
+        success: false,
+        merged: false,
+        error: "Custom merge message is not supported for rebase strategy"
+      };
+    }
     try {
       const branches = await git.branch();
       if (!branches.all.includes(branchName)) {
@@ -6306,7 +7165,8 @@ var WorktreeService = class {
 `).filter((l) => l.trim() && l.includes("|")).map((l) => l.split("|")[0].trim());
       if (strategy === "squash") {
         await git.raw(["merge", "--squash", branchName]);
-        const result = await git.commit(`hive: merge ${step} (squashed)`);
+        const squashMessage = message || `hive: merge ${step} (squashed)`;
+        const result = await git.commit(squashMessage);
         return {
           success: true,
           merged: true,
@@ -6327,7 +7187,8 @@ var WorktreeService = class {
           filesChanged
         };
       } else {
-        const result = await git.merge([branchName, "--no-ff", "-m", `hive: merge ${step}`]);
+        const mergeMessage = message || `hive: merge ${step}`;
+        const result = await git.merge([branchName, "--no-ff", "-m", mergeMessage]);
         const head = (await git.revparse(["HEAD"])).trim();
         return {
           success: true,
@@ -6384,6 +7245,7 @@ var WorktreeService = class {
     return conflicts2;
   }
 };
+var RESERVED_OVERVIEW_CONTEXT = "overview";
 var ContextService = class {
   projectRoot;
   constructor(projectRoot) {
@@ -6392,7 +7254,7 @@ var ContextService = class {
   write(featureName, fileName, content) {
     const contextPath = getContextPath(this.projectRoot, featureName);
     ensureDir(contextPath);
-    const filePath = path4.join(contextPath, this.normalizeFileName(fileName));
+    const filePath = path5.join(contextPath, this.normalizeFileName(fileName));
     writeText(filePath, content);
     const totalChars = this.list(featureName).reduce((sum, c) => sum + c.content.length, 0);
     if (totalChars > 2e4) {
@@ -6404,7 +7266,7 @@ var ContextService = class {
   }
   read(featureName, fileName) {
     const contextPath = getContextPath(this.projectRoot, featureName);
-    const filePath = path4.join(contextPath, this.normalizeFileName(fileName));
+    const filePath = path5.join(contextPath, this.normalizeFileName(fileName));
     return readText(filePath);
   }
   list(featureName) {
@@ -6413,7 +7275,7 @@ var ContextService = class {
       return [];
     const files = fs8.readdirSync(contextPath, { withFileTypes: true }).filter((f) => f.isFile() && f.name.endsWith(".md")).map((f) => f.name);
     return files.map((name) => {
-      const filePath = path4.join(contextPath, name);
+      const filePath = path5.join(contextPath, name);
       const stat2 = fs8.statSync(filePath);
       const content = readText(filePath) || "";
       return {
@@ -6423,9 +7285,15 @@ var ContextService = class {
       };
     });
   }
+  getOverview(featureName) {
+    return this.list(featureName).find((file) => file.name === RESERVED_OVERVIEW_CONTEXT) ?? null;
+  }
+  listExecutionContext(featureName) {
+    return this.list(featureName).filter((file) => file.name !== RESERVED_OVERVIEW_CONTEXT);
+  }
   delete(featureName, fileName) {
     const contextPath = getContextPath(this.projectRoot, featureName);
-    const filePath = path4.join(contextPath, this.normalizeFileName(fileName));
+    const filePath = path5.join(contextPath, this.normalizeFileName(fileName));
     if (fileExists(filePath)) {
       fs8.unlinkSync(filePath);
       return true;
@@ -6450,14 +7318,14 @@ ${f.content}`);
     if (contexts.length === 0)
       return { archived: [], archivePath: "" };
     const contextPath = getContextPath(this.projectRoot, featureName);
-    const archiveDir = path4.join(contextPath, "..", "archive");
+    const archiveDir = path5.join(contextPath, "..", "archive");
     ensureDir(archiveDir);
     const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
     const archived = [];
     for (const ctx of contexts) {
       const archiveName = `${timestamp}_${ctx.name}.md`;
-      const src = path4.join(contextPath, `${ctx.name}.md`);
-      const dest = path4.join(archiveDir, archiveName);
+      const src = path5.join(contextPath, `${ctx.name}.md`);
+      const dest = path5.join(archiveDir, archiveName);
       fs8.copyFileSync(src, dest);
       fs8.unlinkSync(src);
       archived.push(ctx.name);
@@ -6479,6 +7347,210 @@ ${f.content}`);
   normalizeFileName(name) {
     const normalized = name.replace(/\.md$/, "");
     return `${normalized}.md`;
+  }
+};
+var AgentsMdService = class {
+  rootDir;
+  contextService;
+  constructor(rootDir, contextService) {
+    this.rootDir = rootDir;
+    this.contextService = contextService;
+  }
+  async init() {
+    const agentsMdPath = path8.join(this.rootDir, "AGENTS.md");
+    const existed = fileExists(agentsMdPath);
+    if (existed) {
+      const existing = readText(agentsMdPath);
+      return { content: existing || "", existed: true };
+    }
+    const content = await this.scanAndGenerate();
+    return { content, existed: false };
+  }
+  async sync(featureName) {
+    const contexts = this.contextService.list(featureName);
+    const agentsMdPath = path8.join(this.rootDir, "AGENTS.md");
+    const current = await fs11.promises.readFile(agentsMdPath, "utf-8").catch(() => "");
+    const findings = this.extractFindings(contexts);
+    const proposals = this.generateProposals(findings, current);
+    return { proposals, diff: this.formatDiff(current, proposals) };
+  }
+  apply(content) {
+    const agentsMdPath = path8.join(this.rootDir, "AGENTS.md");
+    const isNew = !fileExists(agentsMdPath);
+    writeText(agentsMdPath, content);
+    return { path: agentsMdPath, chars: content.length, isNew };
+  }
+  extractFindings(contexts) {
+    const findings = [];
+    const patterns = [
+      /we\s+use\s+[^.\n]+/gi,
+      /prefer\s+[^.\n]+\s+over\s+[^.\n]+/gi,
+      /don't\s+use\s+[^.\n]+/gi,
+      /do\s+not\s+use\s+[^.\n]+/gi,
+      /(?:build|test|dev)\s+command:\s*[^.\n]+/gi,
+      /[a-zA-Z]+\s+lives?\s+in\s+\/[^\s.\n]+/gi
+    ];
+    for (const context of contexts) {
+      const lines = context.content.split(`
+`);
+      for (const line of lines) {
+        const trimmed2 = line.trim();
+        if (!trimmed2 || trimmed2.startsWith("#"))
+          continue;
+        for (const pattern of patterns) {
+          const matches = trimmed2.match(pattern);
+          if (matches) {
+            for (const match of matches) {
+              const finding = match.trim();
+              if (finding && !findings.includes(finding)) {
+                findings.push(finding);
+              }
+            }
+          }
+        }
+      }
+    }
+    return findings;
+  }
+  generateProposals(findings, current) {
+    const proposals = [];
+    const currentLower = current.toLowerCase();
+    for (const finding of findings) {
+      const findingLower = finding.toLowerCase();
+      if (!currentLower.includes(findingLower)) {
+        proposals.push(finding);
+      }
+    }
+    return proposals;
+  }
+  formatDiff(current, proposals) {
+    if (proposals.length === 0)
+      return "";
+    const lines = proposals.map((p) => `+ ${p}`);
+    return lines.join(`
+`);
+  }
+  async scanAndGenerate() {
+    const detections = await this.detectProjectInfo();
+    return this.generateTemplate(detections);
+  }
+  async detectProjectInfo() {
+    const packageJsonPath = path8.join(this.rootDir, "package.json");
+    let packageJson = null;
+    if (fileExists(packageJsonPath)) {
+      try {
+        const content = readText(packageJsonPath);
+        packageJson = content ? JSON.parse(content) : null;
+      } catch {
+      }
+    }
+    const info = {
+      packageManager: this.detectPackageManager(),
+      language: this.detectLanguage(),
+      testFramework: this.detectTestFramework(packageJson),
+      buildCommand: packageJson?.scripts?.build || null,
+      testCommand: packageJson?.scripts?.test || null,
+      devCommand: packageJson?.scripts?.dev || null,
+      isMonorepo: this.detectMonorepo(packageJson)
+    };
+    return info;
+  }
+  detectPackageManager() {
+    if (fileExists(path8.join(this.rootDir, "bun.lockb")))
+      return "bun";
+    if (fileExists(path8.join(this.rootDir, "pnpm-lock.yaml")))
+      return "pnpm";
+    if (fileExists(path8.join(this.rootDir, "yarn.lock")))
+      return "yarn";
+    if (fileExists(path8.join(this.rootDir, "package-lock.json")))
+      return "npm";
+    return "npm";
+  }
+  detectLanguage() {
+    if (fileExists(path8.join(this.rootDir, "tsconfig.json")))
+      return "TypeScript";
+    if (fileExists(path8.join(this.rootDir, "package.json")))
+      return "JavaScript";
+    if (fileExists(path8.join(this.rootDir, "requirements.txt")))
+      return "Python";
+    if (fileExists(path8.join(this.rootDir, "go.mod")))
+      return "Go";
+    if (fileExists(path8.join(this.rootDir, "Cargo.toml")))
+      return "Rust";
+    return "Unknown";
+  }
+  detectTestFramework(packageJson) {
+    if (!packageJson)
+      return null;
+    const deps = {
+      ...packageJson.dependencies,
+      ...packageJson.devDependencies
+    };
+    if (deps?.vitest)
+      return "vitest";
+    if (deps?.jest)
+      return "jest";
+    if (this.detectPackageManager() === "bun")
+      return "bun test";
+    if (deps?.pytest)
+      return "pytest";
+    return null;
+  }
+  detectMonorepo(packageJson) {
+    if (!packageJson)
+      return false;
+    return !!packageJson.workspaces;
+  }
+  generateTemplate(info) {
+    const sections = [];
+    sections.push(`# Agent Guidelines
+`);
+    sections.push(`## Overview
+`);
+    sections.push(`This project uses AI-assisted development. Follow these guidelines.
+`);
+    sections.push(`## Build & Test Commands
+`);
+    sections.push("```bash");
+    if (info.isMonorepo) {
+      sections.push("# This is a monorepo using bun workspaces");
+    }
+    if (info.buildCommand) {
+      sections.push(`# Build`);
+      sections.push(`${info.packageManager} run build`);
+      sections.push("");
+    }
+    if (info.testCommand) {
+      sections.push(`# Run tests`);
+      sections.push(`${info.packageManager} ${info.testCommand === "bun test" ? "test" : "run test"}`);
+      sections.push("");
+    }
+    if (info.devCommand) {
+      sections.push(`# Development mode`);
+      sections.push(`${info.packageManager} run dev`);
+    }
+    sections.push("```\n");
+    sections.push(`## Technology Stack
+`);
+    sections.push(`- **Language**: ${info.language}`);
+    sections.push(`- **Package Manager**: ${info.packageManager}`);
+    if (info.testFramework) {
+      sections.push(`- **Test Framework**: ${info.testFramework}`);
+    }
+    if (info.isMonorepo) {
+      sections.push(`- **Structure**: Monorepo with workspaces`);
+    }
+    sections.push("");
+    sections.push(`## Code Style
+`);
+    sections.push(`Follow existing patterns in the codebase.
+`);
+    sections.push(`## Architecture Principles
+`);
+    sections.push(`Document key architectural decisions here.
+`);
+    return sections.join(`
+`);
   }
 };
 function computeRunnableAndBlocked(tasks) {
@@ -6541,47 +7613,64 @@ function buildEffectiveDependencies(tasks) {
 // src/services/watcher.ts
 var vscode = __toESM(require("vscode"));
 var HiveWatcher = class {
-  watcher;
+  hiveWatcher;
+  githubWatcher;
+  pluginWatcher;
   constructor(workspaceRoot, onChange) {
-    const pattern = new vscode.RelativePattern(
-      workspaceRoot,
-      ".hive/**/*"
+    this.hiveWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(workspaceRoot, ".hive/**/*")
     );
-    this.watcher = vscode.workspace.createFileSystemWatcher(pattern);
-    this.watcher.onDidCreate(onChange);
-    this.watcher.onDidChange(onChange);
-    this.watcher.onDidDelete(onChange);
+    this.githubWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(workspaceRoot, ".github/**/*")
+    );
+    this.pluginWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(workspaceRoot, "plugin.json")
+    );
+    for (const watcher of [this.hiveWatcher, this.githubWatcher, this.pluginWatcher]) {
+      watcher.onDidCreate(onChange);
+      watcher.onDidChange(onChange);
+      watcher.onDidDelete(onChange);
+    }
   }
   dispose() {
-    this.watcher.dispose();
+    this.hiveWatcher.dispose();
+    this.githubWatcher.dispose();
+    this.pluginWatcher.dispose();
   }
 };
 
 // src/services/launcher.ts
 var vscode2 = __toESM(require("vscode"));
+var fs2 = __toESM(require("fs"));
 var path2 = __toESM(require("path"));
 var Launcher = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
   }
   /**
-   * Open a feature's plan in VS Code and show instructions
+   * Open a feature's overview in VS Code and show instructions
    */
   async openFeature(feature) {
     if (!feature || !this.workspaceRoot) {
       vscode2.window.showWarningMessage("Hive: Invalid feature name or workspace root");
       return;
     }
-    const planPath = path2.join(this.workspaceRoot, ".hive", "features", feature, "plan.md");
+    const activeFeaturePath = path2.join(this.workspaceRoot, ".hive", "active-feature");
+    fs2.mkdirSync(path2.dirname(activeFeaturePath), { recursive: true });
+    fs2.writeFileSync(activeFeaturePath, feature, "utf-8");
+    const featurePath = getFeaturePath(this.workspaceRoot, feature);
+    const overviewPath = `${featurePath}/context/overview.md`;
+    const planPath = `${featurePath}/plan.md`;
+    const targetPath = fs2.existsSync(overviewPath) ? overviewPath : planPath;
     try {
-      const uri = vscode2.Uri.file(planPath);
+      const uri = vscode2.Uri.file(targetPath);
       await vscode2.workspace.openTextDocument(uri);
       await vscode2.window.showTextDocument(uri);
       vscode2.window.showInformationMessage(
-        `Hive: Opened ${feature} plan. Use @Hive in Copilot Chat to continue.`
+        `Hive: Opened ${feature} ${fs2.existsSync(overviewPath) ? "overview" : "plan"}. Use @Hive in Copilot Chat to continue.`
       );
     } catch (error) {
-      vscode2.window.showWarningMessage(`Hive: No plan found for feature "${feature}" - ${error}`);
+      vscode2.window.showWarningMessage(`Hive: No overview or plan found for feature "${feature}" - ${error}`);
     }
   }
   /**
@@ -6620,8 +7709,8 @@ var Launcher = class {
 
 // src/providers/sidebarProvider.ts
 var vscode3 = __toESM(require("vscode"));
-var fs2 = __toESM(require("fs"));
-var path5 = __toESM(require("path"));
+var fs6 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
 var ActionItem = class extends vscode3.TreeItem {
   constructor(label, commandId, iconName) {
     super(label, vscode3.TreeItemCollapsibleState.None);
@@ -6669,7 +7758,7 @@ var FeatureItem = class extends vscode3.TreeItem {
     this.taskStats = taskStats;
     this.isActive = isActive;
     const statusLabel = feature.status.charAt(0).toUpperCase() + feature.status.slice(1);
-    this.description = isActive ? `${statusLabel} \xB7 ${taskStats.done}/${taskStats.total}` : `${taskStats.done}/${taskStats.total}`;
+    this.description = `${statusLabel} \xB7 ${taskStats.done}/${taskStats.total}`;
     this.contextValue = `feature-${feature.status}`;
     this.iconPath = new vscode3.ThemeIcon(STATUS_ICONS[feature.status] || "package");
     if (isActive) {
@@ -6691,6 +7780,22 @@ var PlanItem = class extends vscode3.TreeItem {
       command: "vscode.open",
       title: "Open Plan",
       arguments: [vscode3.Uri.file(planPath)]
+    };
+  }
+};
+var OverviewItem = class extends vscode3.TreeItem {
+  constructor(featureName, overviewPath, commentCount) {
+    super("Overview", vscode3.TreeItemCollapsibleState.None);
+    this.featureName = featureName;
+    this.overviewPath = overviewPath;
+    this.commentCount = commentCount;
+    this.description = commentCount > 0 ? `${commentCount} comment(s)` : "";
+    this.contextValue = "overview-file";
+    this.iconPath = new vscode3.ThemeIcon("book");
+    this.command = {
+      command: "vscode.open",
+      title: "Open Overview",
+      arguments: [vscode3.Uri.file(overviewPath)]
     };
   }
 };
@@ -6773,6 +7878,34 @@ var TaskFileItem = class extends vscode3.TreeItem {
     };
   }
 };
+var CopilotArtifactsGroupItem = class extends vscode3.TreeItem {
+  constructor(workspaceRoot) {
+    super("Copilot Artifacts", vscode3.TreeItemCollapsibleState.Collapsed);
+    this.workspaceRoot = workspaceRoot;
+    this.contextValue = "copilot-artifacts";
+    this.iconPath = new vscode3.ThemeIcon("github");
+  }
+};
+var ArtifactFileItem = class extends vscode3.TreeItem {
+  constructor(label, filePath, iconName) {
+    super(label, vscode3.TreeItemCollapsibleState.None);
+    this.filePath = filePath;
+    this.iconPath = new vscode3.ThemeIcon(iconName);
+    this.command = {
+      command: "vscode.open",
+      title: "Open",
+      arguments: [vscode3.Uri.file(filePath)]
+    };
+  }
+};
+var ArtifactCategoryItem = class extends vscode3.TreeItem {
+  constructor(label, files, iconName) {
+    super(label, files.length > 0 ? vscode3.TreeItemCollapsibleState.Collapsed : vscode3.TreeItemCollapsibleState.None);
+    this.files = files;
+    this.description = `${files.length}`;
+    this.iconPath = new vscode3.ThemeIcon(iconName);
+  }
+};
 var HiveSidebarProvider = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
@@ -6790,6 +7923,10 @@ var HiveSidebarProvider = class {
       const items = [
         new ActionItem("Init Skills", "hive.initNest", "symbol-misc")
       ];
+      const githubDir = path6.join(this.workspaceRoot, ".github");
+      if (fs6.existsSync(githubDir)) {
+        items.push(new CopilotArtifactsGroupItem(this.workspaceRoot));
+      }
       const statusGroups = await this.getStatusGroups();
       return [...items, ...statusGroups];
     }
@@ -6801,6 +7938,12 @@ var HiveSidebarProvider = class {
     }
     if (element instanceof FeatureItem) {
       return this.getFeatureChildren(element.name);
+    }
+    if (element instanceof CopilotArtifactsGroupItem) {
+      return this.getCopilotArtifactCategories(element.workspaceRoot);
+    }
+    if (element instanceof ArtifactCategoryItem) {
+      return element.files;
     }
     if (element instanceof ContextFolderItem) {
       return this.getContextFiles(element.featureName, element.contextPath);
@@ -6840,55 +7983,99 @@ var HiveSidebarProvider = class {
     return groups;
   }
   getAllFeatures() {
-    const featuresPath = path5.join(this.workspaceRoot, ".hive", "features");
-    if (!fs2.existsSync(featuresPath)) return [];
     const activeFeature = this.getActiveFeature();
     const features = [];
-    const dirs = fs2.readdirSync(featuresPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
-    for (const name of dirs) {
-      const featureJsonPath = path5.join(featuresPath, name, "feature.json");
-      if (!fs2.existsSync(featureJsonPath)) continue;
-      const feature = JSON.parse(fs2.readFileSync(featureJsonPath, "utf-8"));
-      const taskStats = this.getTaskStats(name);
-      const isActive = name === activeFeature;
-      features.push(new FeatureItem(name, feature, taskStats, isActive));
+    const dirs = listFeatureDirectories(this.workspaceRoot);
+    for (const dir of dirs) {
+      const featureJsonPath = path6.join(getFeaturePath(this.workspaceRoot, dir.logicalName), "feature.json");
+      if (!fs6.existsSync(featureJsonPath)) continue;
+      const feature = JSON.parse(fs6.readFileSync(featureJsonPath, "utf-8"));
+      const taskStats = this.getTaskStats(dir.logicalName);
+      const isActive = dir.logicalName === activeFeature;
+      features.push(new FeatureItem(dir.logicalName, feature, taskStats, isActive));
     }
     features.sort((a, b) => {
-      if (a.isActive) return -1;
-      if (b.isActive) return 1;
-      return 0;
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      return a.name.localeCompare(b.name);
     });
     return features;
   }
   getFeatureChildren(featureName) {
-    const featurePath = path5.join(this.workspaceRoot, ".hive", "features", featureName);
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName);
     const items = [];
-    const featureJsonPath = path5.join(featurePath, "feature.json");
-    const feature = JSON.parse(fs2.readFileSync(featureJsonPath, "utf-8"));
-    const planPath = path5.join(featurePath, "plan.md");
-    if (fs2.existsSync(planPath)) {
-      const commentCount = this.getCommentCount(featureName);
+    const featureJsonPath = path6.join(featurePath, "feature.json");
+    const feature = JSON.parse(fs6.readFileSync(featureJsonPath, "utf-8"));
+    const planPath = path6.join(featurePath, "plan.md");
+    if (fs6.existsSync(planPath)) {
+      const commentCount = this.getCommentCount(featureName, "plan");
       items.push(new PlanItem(featureName, planPath, feature.status, commentCount));
     }
-    const contextPath = path5.join(featurePath, "context");
-    const contextFiles = fs2.existsSync(contextPath) ? fs2.readdirSync(contextPath).filter((f) => !f.startsWith(".")) : [];
+    const contextPath = path6.join(featurePath, "context");
+    const contextFiles = fs6.existsSync(contextPath) ? fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".") && f !== "overview.md") : [];
+    const overviewPath = path6.join(contextPath, "overview.md");
+    if (fs6.existsSync(overviewPath)) {
+      const commentCount = this.getCommentCount(featureName, "overview");
+      items.push(new OverviewItem(featureName, overviewPath, commentCount));
+    }
     items.push(new ContextFolderItem(featureName, contextPath, contextFiles.length));
     const tasks = this.getTaskList(featureName);
     items.push(new TasksGroupItem(featureName, tasks));
     return items;
   }
+  getCopilotArtifactCategories(workspaceRoot) {
+    const githubRoot = path6.join(workspaceRoot, ".github");
+    const agentsDir = path6.join(githubRoot, "agents");
+    const skillsDir = path6.join(githubRoot, "skills");
+    const hooksDir = path6.join(githubRoot, "hooks");
+    const instructionsDir = path6.join(githubRoot, "instructions");
+    const pluginPath = path6.join(workspaceRoot, "plugin.json");
+    const categories = [
+      new ArtifactCategoryItem(
+        "Agents",
+        this.getArtifactFiles(agentsDir, (file) => file.endsWith(".agent.md"), "person"),
+        "person"
+      ),
+      new ArtifactCategoryItem(
+        "Skills",
+        this.getArtifactFiles(skillsDir, (file) => file === "SKILL.md", "book", true),
+        "book"
+      ),
+      new ArtifactCategoryItem(
+        "Hooks",
+        this.getArtifactFiles(hooksDir, (file) => file.endsWith(".json"), "zap"),
+        "zap"
+      ),
+      new ArtifactCategoryItem(
+        "Instructions",
+        this.getArtifactFiles(instructionsDir, (file) => file.endsWith(".instructions.md"), "note"),
+        "note"
+      )
+    ];
+    if (fs6.existsSync(pluginPath)) {
+      categories.push(new ArtifactFileItem("Plugin Manifest", pluginPath, "package"));
+    }
+    return categories;
+  }
+  getArtifactFiles(basePath, matches, iconName, nestedSkillDirs = false) {
+    if (!fs6.existsSync(basePath)) return [];
+    if (nestedSkillDirs) {
+      return fs6.readdirSync(basePath, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => path6.join(basePath, entry.name, "SKILL.md")).filter((filePath) => fs6.existsSync(filePath)).map((filePath) => new ArtifactFileItem(path6.basename(path6.dirname(filePath)), filePath, iconName)).sort((a, b) => String(a.label).localeCompare(String(b.label)));
+    }
+    return fs6.readdirSync(basePath, { withFileTypes: true }).filter((entry) => entry.isFile() && matches(entry.name)).map((entry) => new ArtifactFileItem(entry.name, path6.join(basePath, entry.name), iconName)).sort((a, b) => String(a.label).localeCompare(String(b.label)));
+  }
   getContextFiles(featureName, contextPath) {
-    if (!fs2.existsSync(contextPath)) return [];
-    return fs2.readdirSync(contextPath).filter((f) => !f.startsWith(".")).map((f) => new ContextFileItem(f, path5.join(contextPath, f)));
+    if (!fs6.existsSync(contextPath)) return [];
+    return fs6.readdirSync(contextPath).filter((f) => !f.startsWith(".") && f !== "overview.md").map((f) => new ContextFileItem(f, path6.join(contextPath, f)));
   }
   getTasks(featureName, tasks) {
-    const featurePath = path5.join(this.workspaceRoot, ".hive", "features", featureName);
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName);
     return tasks.map((t) => {
-      const taskDir = path5.join(featurePath, "tasks", t.folder);
-      const specPath = path5.join(taskDir, "spec.md");
-      const reportPath = path5.join(taskDir, "report.md");
-      const hasSpec = fs2.existsSync(specPath);
-      const hasReport = fs2.existsSync(reportPath);
+      const taskDir = path6.join(featurePath, "tasks", t.folder);
+      const specPath = path6.join(taskDir, "spec.md");
+      const reportPath = path6.join(taskDir, "report.md");
+      const hasSpec = fs6.existsSync(specPath);
+      const hasReport = fs6.existsSync(reportPath);
       return new TaskItem(featureName, t.folder, t.status, hasSpec ? specPath : null, hasReport ? reportPath : null);
     });
   }
@@ -6903,12 +8090,12 @@ var HiveSidebarProvider = class {
     return items;
   }
   getTaskList(featureName) {
-    const tasksPath = path5.join(this.workspaceRoot, ".hive", "features", featureName, "tasks");
-    if (!fs2.existsSync(tasksPath)) return [];
-    const folders = fs2.readdirSync(tasksPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
+    const tasksPath = path6.join(getFeaturePath(this.workspaceRoot, featureName), "tasks");
+    if (!fs6.existsSync(tasksPath)) return [];
+    const folders = fs6.readdirSync(tasksPath, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
     return folders.map((folder) => {
-      const statusPath = path5.join(tasksPath, folder, "status.json");
-      const status = fs2.existsSync(statusPath) ? JSON.parse(fs2.readFileSync(statusPath, "utf-8")) : { status: "pending", origin: "plan" };
+      const statusPath = path6.join(tasksPath, folder, "status.json");
+      const status = fs6.existsSync(statusPath) ? JSON.parse(fs6.readFileSync(statusPath, "utf-8")) : { status: "pending", origin: "plan" };
       return { folder, status };
     });
   }
@@ -6920,57 +8107,82 @@ var HiveSidebarProvider = class {
     };
   }
   getActiveFeature() {
-    const activePath = path5.join(this.workspaceRoot, ".hive", "active-feature");
-    if (!fs2.existsSync(activePath)) return null;
-    return fs2.readFileSync(activePath, "utf-8").trim();
+    const activePath = path6.join(this.workspaceRoot, ".hive", "active-feature");
+    const configuredActive = fs6.existsSync(activePath) ? fs6.readFileSync(activePath, "utf-8").trim() : null;
+    if (configuredActive) {
+      const feature = this.readFeature(configuredActive);
+      if (feature && feature.status !== "completed") {
+        return configuredActive;
+      }
+    }
+    const available = listFeatureDirectories(this.workspaceRoot).map((entry) => entry.logicalName).filter((name) => {
+      const feature = this.readFeature(name);
+      return feature !== null && feature.status !== "completed";
+    }).sort((a, b) => a.localeCompare(b));
+    return available[0] ?? null;
   }
-  getCommentCount(featureName) {
-    const commentsPath = path5.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
-    if (!fs2.existsSync(commentsPath)) return 0;
+  readFeature(featureName) {
+    const featureJsonPath = path6.join(getFeaturePath(this.workspaceRoot, featureName), "feature.json");
+    if (!fs6.existsSync(featureJsonPath)) return null;
+    return JSON.parse(fs6.readFileSync(featureJsonPath, "utf-8"));
+  }
+  getCommentCount(featureName, document2) {
+    const featurePath = getFeaturePath(this.workspaceRoot, featureName);
+    const commentsPath = document2 === "plan" ? this.firstExistingPath([
+      path6.join(featurePath, "comments", "plan.json"),
+      path6.join(featurePath, "comments.json")
+    ]) : path6.join(featurePath, "comments", "overview.json");
+    if (!commentsPath || !fs6.existsSync(commentsPath)) return 0;
     try {
-      const data = JSON.parse(fs2.readFileSync(commentsPath, "utf-8"));
+      const data = JSON.parse(fs6.readFileSync(commentsPath, "utf-8"));
       return data.threads?.length || 0;
     } catch {
       return 0;
     }
   }
+  firstExistingPath(paths) {
+    return paths.find((candidate) => fs6.existsSync(candidate)) ?? null;
+  }
 };
 
 // src/providers/planCommentController.ts
 var vscode4 = __toESM(require("vscode"));
-var fs6 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var fs9 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
 var PlanCommentController = class {
   constructor(workspaceRoot) {
     this.workspaceRoot = workspaceRoot;
     this.normalizedWorkspaceRoot = this.normalizePath(workspaceRoot);
     this.controller = vscode4.comments.createCommentController(
       "hive-plan-review",
-      "Plan Review"
+      "Hive Review"
     );
     this.controller.commentingRangeProvider = {
       provideCommentingRanges: (document2) => {
-        if (path6.basename(document2.fileName) !== "plan.md") return [];
+        if (!this.getReviewTarget(document2.fileName)) return [];
         return [new vscode4.Range(0, 0, document2.lineCount - 1, 0)];
       }
     };
-    const pattern = new vscode4.RelativePattern(
-      workspaceRoot,
-      ".hive/features/*/comments.json"
-    );
-    this.commentsWatcher = vscode4.workspace.createFileSystemWatcher(pattern);
-    this.commentsWatcher.onDidChange((uri) => this.onCommentsFileChanged(uri));
-    this.commentsWatcher.onDidDelete((uri) => this.onCommentsFileChanged(uri));
+    const patterns = [
+      new vscode4.RelativePattern(workspaceRoot, ".hive/features/*/comments.json"),
+      new vscode4.RelativePattern(workspaceRoot, ".hive/features/*/comments/*.json")
+    ];
+    const rootWatcher = vscode4.workspace.createFileSystemWatcher(patterns[0]);
+    const nestedWatcher = vscode4.workspace.createFileSystemWatcher(patterns[1]);
+    rootWatcher.onDidChange((uri) => this.onCommentsFileChanged(uri));
+    rootWatcher.onDidDelete((uri) => this.onCommentsFileChanged(uri));
+    nestedWatcher.onDidChange((uri) => this.onCommentsFileChanged(uri));
+    nestedWatcher.onDidDelete((uri) => this.onCommentsFileChanged(uri));
+    this.commentsWatchers = [rootWatcher, nestedWatcher];
   }
   controller;
   threads = /* @__PURE__ */ new Map();
-  commentsWatcher;
+  commentsWatchers = [];
   normalizedWorkspaceRoot;
   onCommentsFileChanged(commentsUri) {
-    const featureMatch = this.getFeatureMatch(commentsUri.fsPath);
-    if (!featureMatch) return;
-    const planPath = path6.join(this.workspaceRoot, ".hive", "features", featureMatch, "plan.md");
-    this.loadComments(vscode4.Uri.file(planPath));
+    const target = this.getCommentsTarget(commentsUri.fsPath);
+    if (!target) return;
+    this.loadComments(vscode4.Uri.file(this.getDocumentPath(target.featureName, target.document)));
   }
   registerCommands(context) {
     context.subscriptions.push(
@@ -7000,30 +8212,49 @@ var PlanCommentController = class {
         }
       }),
       vscode4.workspace.onDidOpenTextDocument((doc) => {
-        if (path6.basename(doc.fileName) === "plan.md") {
+        if (this.getReviewTarget(doc.fileName)) {
           this.loadComments(doc.uri);
         }
       }),
       vscode4.workspace.onDidSaveTextDocument((doc) => {
-        if (path6.basename(doc.fileName) === "plan.md") {
+        if (this.getReviewTarget(doc.fileName)) {
           this.saveComments(doc.uri);
         }
       })
     );
     vscode4.workspace.textDocuments.forEach((doc) => {
-      if (path6.basename(doc.fileName) === "plan.md") {
+      if (this.getReviewTarget(doc.fileName)) {
         this.loadComments(doc.uri);
       }
     });
   }
-  getFeatureMatch(filePath) {
+  getReviewTarget(filePath) {
     const normalized = this.normalizePath(filePath);
     const normalizedWorkspace = this.normalizedWorkspaceRoot.replace(/\/+$/, "");
     const compareNormalized = process.platform === "win32" ? normalized.toLowerCase() : normalized;
     const compareWorkspace = process.platform === "win32" ? normalizedWorkspace.toLowerCase() : normalizedWorkspace;
     if (!compareNormalized.startsWith(`${compareWorkspace}/`)) return null;
-    const match = filePath.replace(/\\/g, "/").match(/\.hive\/features\/([^/]+)\/(?:plan\.md|comments\.json)$/);
-    return match ? match[1] : null;
+    const planMatch = normalized.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
+    if (planMatch) {
+      return { featureName: planMatch[1], document: "plan" };
+    }
+    const overviewMatch = normalized.match(/\.hive\/features\/([^/]+)\/context\/overview\.md$/);
+    if (overviewMatch) {
+      return { featureName: overviewMatch[1], document: "overview" };
+    }
+    return null;
+  }
+  getCommentsTarget(filePath) {
+    const normalized = this.normalizePath(filePath);
+    const reviewMatch = normalized.match(/\.hive\/features\/([^/]+)\/comments\/(plan|overview)\.json$/);
+    if (reviewMatch) {
+      return { featureName: reviewMatch[1], document: reviewMatch[2] };
+    }
+    const legacyMatch = normalized.match(/\.hive\/features\/([^/]+)\/comments\.json$/);
+    if (legacyMatch) {
+      return { featureName: legacyMatch[1], document: "plan" };
+    }
+    return null;
   }
   normalizePath(filePath) {
     return filePath.replace(/\\/g, "/");
@@ -7064,21 +8295,40 @@ var PlanCommentController = class {
     this.saveComments(reply.thread.uri);
   }
   getCommentsPath(uri) {
-    const featureMatch = this.getFeatureMatch(uri.fsPath);
-    if (!featureMatch) return null;
-    return path6.join(this.workspaceRoot, ".hive", "features", featureMatch, "comments.json");
+    const target = this.getReviewTarget(uri.fsPath);
+    if (!target) return null;
+    return path7.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", `${target.document}.json`);
+  }
+  getReadableCommentsPath(uri) {
+    const target = this.getReviewTarget(uri.fsPath);
+    if (!target) return null;
+    if (target.document === "plan") {
+      const canonicalPath = path7.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", "plan.json");
+      if (fs9.existsSync(canonicalPath)) {
+        return canonicalPath;
+      }
+      const legacyPath = path7.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments.json");
+      if (fs9.existsSync(legacyPath)) {
+        return legacyPath;
+      }
+      return canonicalPath;
+    }
+    return path7.join(this.workspaceRoot, ".hive", "features", target.featureName, "comments", `${target.document}.json`);
+  }
+  getDocumentPath(featureName, document2) {
+    return document2 === "overview" ? path7.join(this.workspaceRoot, ".hive", "features", featureName, "context", "overview.md") : path7.join(this.workspaceRoot, ".hive", "features", featureName, "plan.md");
   }
   loadComments(uri) {
-    const commentsPath = this.getCommentsPath(uri);
-    if (!commentsPath || !fs6.existsSync(commentsPath)) return;
+    const commentsPath = this.getReadableCommentsPath(uri);
+    this.threads.forEach((thread, id) => {
+      if (this.isSamePath(thread.uri.fsPath, uri.fsPath)) {
+        thread.dispose();
+        this.threads.delete(id);
+      }
+    });
+    if (!commentsPath || !fs9.existsSync(commentsPath)) return;
     try {
-      const data = JSON.parse(fs6.readFileSync(commentsPath, "utf-8"));
-      this.threads.forEach((thread, id) => {
-        if (this.isSamePath(thread.uri.fsPath, uri.fsPath)) {
-          thread.dispose();
-          this.threads.delete(id);
-        }
-      });
+      const data = JSON.parse(fs9.readFileSync(commentsPath, "utf-8"));
       for (const stored of data.threads) {
         const comments2 = [
           {
@@ -7124,14 +8374,14 @@ var PlanCommentController = class {
     });
     const data = { threads };
     try {
-      fs6.mkdirSync(path6.dirname(commentsPath), { recursive: true });
-      fs6.writeFileSync(commentsPath, JSON.stringify(data, null, 2));
+      fs9.mkdirSync(path7.dirname(commentsPath), { recursive: true });
+      fs9.writeFileSync(commentsPath, JSON.stringify(data, null, 2));
     } catch (error) {
       console.error("Failed to save comments:", error);
     }
   }
   dispose() {
-    this.commentsWatcher?.dispose();
+    this.commentsWatchers.forEach((watcher) => watcher.dispose());
     this.controller.dispose();
   }
 };
@@ -7243,13 +8493,14 @@ function getFeatureTools(workspaceRoot) {
 
 // src/tools/plan.ts
 function getPlanTools(workspaceRoot) {
+  const featureService = new FeatureService(workspaceRoot);
   const planService = new PlanService(workspaceRoot);
   const contextService = new ContextService(workspaceRoot);
   return [
     {
       name: "hive_plan_write",
       displayName: "Write Hive Plan",
-      modelDescription: "Write or update the plan.md for a feature. The plan defines tasks to execute. Use markdown with ### numbered headers for tasks. Clears existing comments when plan is rewritten.",
+      modelDescription: "Write or update the plan.md for a feature. plan.md is the human-facing review surface and execution truth. Include a concise summary before ## Tasks, and optionally include a Mermaid dependency or sequence overview in that pre-task summary only. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.",
       inputSchema: {
         type: "object",
         properties: {
@@ -7271,22 +8522,22 @@ function getPlanTools(workspaceRoot) {
         try {
           const contexts = contextService.list(feature);
           if (contexts.length === 0) {
-            contextWarning = "\n\n\u26A0\uFE0F WARNING: No context files created yet! Workers need context to execute well. Use hive_context_write to document:\n- Research findings and patterns\n- User preferences and decisions\n- Architecture constraints\n- References to existing code";
+            contextWarning += "\n\n\u26A0\uFE0F WARNING: No context files created yet. If workers will need durable notes, use hive_context_write to document research findings, user decisions, architecture constraints, or references to existing code.";
           }
         } catch {
-          contextWarning = "\n\n\u26A0\uFE0F WARNING: Could not check context files. Consider using hive_context_write to document findings for workers.";
+          contextWarning = "\n\n\u26A0\uFE0F WARNING: Could not check context files. If needed, use hive_context_write to document durable findings for workers.";
         }
         return JSON.stringify({
           success: true,
           path: planPath,
-          message: `Plan written. User can review and add comments. When ready, use hive_plan_approve.${contextWarning}`
+          message: `Plan written. User can review plan.md as the human-facing surface and execution truth. When ready, use hive_plan_approve.${contextWarning}`
         });
       }
     },
     {
       name: "hive_plan_read",
       displayName: "Read Hive Plan",
-      modelDescription: "Read the plan.md and any user comments for a feature. Use to check plan content, status, and user feedback before making changes.",
+      modelDescription: "Read the plan.md and related review comments for a feature. Use to check the in-plan human-facing summary, task structure, status, and user feedback before making changes.",
       readOnly: true,
       inputSchema: {
         type: "object",
@@ -7315,7 +8566,7 @@ function getPlanTools(workspaceRoot) {
     {
       name: "hive_plan_approve",
       displayName: "Approve Hive Plan",
-      modelDescription: "Approve a plan for execution. Use after user has reviewed the plan and resolved any comments. Changes feature status to approved.",
+      modelDescription: "Approve a plan for execution. Use after the user has reviewed plan.md, including the human-facing summary before ## Tasks, and resolved any comments. Changes feature status to approved.",
       inputSchema: {
         type: "object",
         properties: {
@@ -7328,15 +8579,35 @@ function getPlanTools(workspaceRoot) {
       },
       invoke: async (input) => {
         const { feature } = input;
+        let contexts = [];
         let contextWarning = "";
         try {
-          const contexts = contextService.list(feature);
+          contexts = contextService.list(feature);
           if (contexts.length === 0) {
-            contextWarning = "\n\n\u26A0\uFE0F Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.";
+            contextWarning += "\n\n\u26A0\uFE0F Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.";
           }
         } catch {
         }
-        planService.approve(feature);
+        try {
+          planService.approve(feature);
+        } catch (error) {
+          if (error instanceof Error && /unresolved review comments/i.test(error.message)) {
+            const hasOverview = contexts.some((context) => context.name === "overview");
+            const reviewCounts = featureService.getInfo(feature)?.reviewCounts ?? { plan: 0, overview: 0 };
+            const planComments = reviewCounts.plan;
+            const overviewComments = hasOverview ? reviewCounts.overview : 0;
+            const unresolvedTotal = planComments + overviewComments;
+            const documents = [
+              planComments > 0 ? `plan (${planComments})` : null,
+              overviewComments > 0 ? `overview (${overviewComments})` : null
+            ].filter(Boolean).join(", ");
+            return JSON.stringify({
+              success: false,
+              message: `Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`
+            });
+          }
+          throw error;
+        }
         return JSON.stringify({
           success: true,
           message: `Plan approved. Use hive_tasks_sync to generate tasks from the plan.${contextWarning}`
@@ -7452,7 +8723,7 @@ Reminder: run hive_worktree_start to work in its worktree, and ensure any subage
 }
 
 // src/tools/exec.ts
-var path7 = __toESM(require("path"));
+var path9 = __toESM(require("path"));
 function checkDependencies(taskService, feature, taskFolder) {
   const taskStatus = taskService.getRawStatus(feature, taskFolder);
   if (!taskStatus) {
@@ -7493,7 +8764,7 @@ function checkDependencies(taskService, feature, taskFolder) {
 function getExecTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
-    hiveDir: path7.join(workspaceRoot, ".hive")
+    hiveDir: path9.join(workspaceRoot, ".hive")
   });
   const taskService = new TaskService(workspaceRoot);
   const startWorktree = async ({ feature, task }) => {
@@ -7707,13 +8978,15 @@ function getExecTools(workspaceRoot) {
         properties: {
           feature: { type: "string", description: "Feature name" },
           task: { type: "string", description: "Task folder name" },
-          summary: { type: "string", description: "Summary of what was done" }
+          summary: { type: "string", description: "Summary of what was done" },
+          message: { type: "string", description: "Optional git commit message; subject/body allowed. Empty uses default." }
         },
         required: ["feature", "task", "summary"]
       },
       invoke: async (input) => {
-        const { feature, task, summary } = input;
-        const result = await worktreeService.commitChanges(feature, task, summary);
+        const { feature, task, summary, message } = input;
+        const commitMessage = message || summary;
+        const result = await worktreeService.commitChanges(feature, task, commitMessage);
         if (result.committed) {
           taskService.update(feature, task, { status: "done", summary });
           const reportContent = `# Task Completion Report
@@ -7767,11 +9040,11 @@ ${summary}
 }
 
 // src/tools/merge.ts
-var path8 = __toESM(require("path"));
+var path10 = __toESM(require("path"));
 function getMergeTools(workspaceRoot) {
   const worktreeService = new WorktreeService({
     baseDir: workspaceRoot,
-    hiveDir: path8.join(workspaceRoot, ".hive")
+    hiveDir: path10.join(workspaceRoot, ".hive")
   });
   return [
     {
@@ -7787,13 +9060,14 @@ function getMergeTools(workspaceRoot) {
             type: "string",
             enum: ["merge", "squash", "rebase"],
             description: "Merge strategy (default: merge)"
-          }
+          },
+          message: { type: "string", description: "Optional merge commit message for merge/squash only. Empty uses default." }
         },
         required: ["feature", "task"]
       },
       invoke: async (input) => {
-        const { feature, task, strategy = "merge" } = input;
-        const result = await worktreeService.merge(feature, task, strategy);
+        const { feature, task, strategy = "merge", message } = input;
+        const result = await worktreeService.merge(feature, task, strategy, message);
         return JSON.stringify({
           success: result.success,
           strategy,
@@ -7811,26 +9085,32 @@ function getContextTools(workspaceRoot) {
     {
       name: "hive_context_write",
       displayName: "Write Context File",
-      modelDescription: "Write a context file to store research findings, decisions, or reference material. Context persists and helps workers understand background.",
+      modelDescription: 'Write a context file to store research findings, decisions, or reference material. Use name: "overview" for the canonical human-facing summary/history file at context/overview.md; refresh it after major planning or execution milestones while plan.md remains execution truth.',
       inputSchema: {
         type: "object",
         properties: {
           feature: { type: "string", description: "Feature name" },
-          name: { type: "string", description: "Context file name (without .md)" },
+          name: { type: "string", description: 'Context file name (without .md). Use "overview" for the primary human-facing summary/history file.' },
           content: { type: "string", description: "Context content in markdown" }
         },
         required: ["feature", "name", "content"]
       },
       invoke: async (input) => {
         const { feature, name, content } = input;
-        const path11 = contextService.write(feature, name, content);
-        return JSON.stringify({ success: true, path: path11 });
+        const path16 = contextService.write(feature, name, content);
+        return JSON.stringify({
+          success: true,
+          path: path16,
+          message: name === "overview" ? "Overview written as the primary human-facing summary/history file. Keep sections ## At a Glance, ## Workstreams, and ## Revision History current." : "Context file written."
+        });
       }
     }
   ];
 }
 
 // src/tools/status.ts
+var fs10 = __toESM(require("fs"));
+var path11 = __toESM(require("path"));
 function getStatusTools(workspaceRoot) {
   const featureService = new FeatureService(workspaceRoot);
   const taskService = new TaskService(workspaceRoot);
@@ -7861,6 +9141,8 @@ function getStatusTools(workspaceRoot) {
     const plan = planService.read(feature);
     const tasks = taskService.list(feature);
     const contextFiles = contextService.list(feature);
+    const overview = contextFiles.find((file) => file.name === "overview") ?? null;
+    const reviewCounts = readReviewCounts(workspaceRoot, feature);
     const tasksSummary = tasks.map((t) => {
       const rawStatus = taskService.getRawStatus(feature, t.folder);
       return {
@@ -7904,6 +9186,18 @@ function getStatusTools(workspaceRoot) {
         status: planStatus,
         approved: planStatus === "approved" || planStatus === "locked"
       },
+      overview: {
+        exists: !!overview,
+        path: [".hive", "features", feature, "context", "overview.md"].join("/"),
+        updatedAt: overview?.updatedAt ?? null
+      },
+      review: {
+        unresolvedTotal: reviewCounts.plan + reviewCounts.overview,
+        byDocument: {
+          overview: reviewCounts.overview,
+          plan: reviewCounts.plan
+        }
+      },
       tasks: {
         total: tasks.length,
         pending: pendingTasks.length,
@@ -7917,7 +9211,7 @@ function getStatusTools(workspaceRoot) {
         fileCount: contextFiles.length,
         files: contextSummary
       },
-      nextAction: getNextAction(planStatus, tasksSummary, runnable)
+      nextAction: getNextAction(planStatus, tasksSummary, runnable, !!plan, !!overview)
     });
   };
   const baseStatusTool = {
@@ -7946,12 +9240,12 @@ function getStatusTools(workspaceRoot) {
     }
   ];
 }
-function getNextAction(planStatus, tasks, runnable) {
-  if (!planStatus || planStatus === "draft") {
-    return "Write or revise plan with hive_plan_write, then get approval";
-  }
+function getNextAction(planStatus, tasks, runnable, hasPlan, hasOverview) {
   if (planStatus === "review") {
     return "Wait for plan approval or revise based on comments";
+  }
+  if (!hasPlan || planStatus === "draft") {
+    return "Write or revise plan with hive_plan_write. Keep plan.md as the human-facing review artifact; pre-task Mermaid overview diagrams are optional.";
   }
   if (tasks.length === 0) {
     return "Generate tasks from plan with hive_tasks_sync";
@@ -7972,274 +9266,2921 @@ function getNextAction(planStatus, tasks, runnable) {
   }
   return "All tasks complete. Review and merge or complete feature.";
 }
+function readReviewCounts(workspaceRoot, feature) {
+  const featurePath = getFeaturePath(workspaceRoot, feature);
+  const reviewDir = path11.join(featurePath, "comments");
+  const planThreads = readThreads(path11.join(reviewDir, "plan.json")) ?? readThreads(path11.join(featurePath, "comments.json"));
+  const overviewThreads = readThreads(path11.join(reviewDir, "overview.json"));
+  return {
+    plan: planThreads?.length ?? 0,
+    overview: overviewThreads?.length ?? 0
+  };
+}
+function readThreads(filePath) {
+  if (!fs10.existsSync(filePath)) {
+    return null;
+  }
+  try {
+    const data = JSON.parse(fs10.readFileSync(filePath, "utf-8"));
+    return data.threads ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// src/tools/agentsMd.ts
+function getAgentsMdTools(workspaceRoot) {
+  return [
+    {
+      name: "hive_agents_md",
+      displayName: "Manage AGENTS.md",
+      modelDescription: "Initialize, sync, or apply changes to AGENTS.md. init: scan codebase and generate. sync: propose updates from feature contexts. apply: write approved content.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["init", "sync", "apply"],
+            description: "Action to perform"
+          },
+          feature: {
+            type: "string",
+            description: "Feature name (required for sync)"
+          },
+          content: {
+            type: "string",
+            description: "Content to apply (required for apply)"
+          }
+        },
+        required: ["action"]
+      },
+      invoke: async (input) => {
+        const contextService = new ContextService(workspaceRoot);
+        const service = new AgentsMdService(workspaceRoot, contextService);
+        const { action, feature, content } = input;
+        if (action === "init") {
+          return JSON.stringify(await service.init());
+        }
+        if (action === "sync") {
+          if (!feature) {
+            return JSON.stringify({ error: "Feature name required for sync" });
+          }
+          return JSON.stringify(await service.sync(feature));
+        }
+        if (action === "apply") {
+          if (!content) {
+            return JSON.stringify({ error: "Content required for apply" });
+          }
+          return JSON.stringify(service.apply(content));
+        }
+        return JSON.stringify({ error: `Unknown action: ${action}` });
+      }
+    }
+  ];
+}
+
+// src/tools/skill.ts
+var fs12 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
+function getSkillTools(workspaceRoot) {
+  return [
+    {
+      name: "hive_skill",
+      displayName: "Load Hive Skill",
+      modelDescription: "Load a skill by name. Returns the SKILL.md content with instructions for the specified workflow skill.",
+      readOnly: true,
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Skill name (e.g. writing-plans, brainstorming)"
+          }
+        },
+        required: ["name"]
+      },
+      invoke: async (input) => {
+        const { name } = input;
+        const searchPaths = [
+          path12.join(workspaceRoot, ".github", "skills", name, "SKILL.md"),
+          path12.join(workspaceRoot, ".claude", "skills", name, "SKILL.md"),
+          path12.join(workspaceRoot, ".opencode", "skill", name, "SKILL.md")
+        ];
+        for (const skillPath of searchPaths) {
+          if (fs12.existsSync(skillPath)) {
+            return fs12.readFileSync(skillPath, "utf-8");
+          }
+        }
+        return JSON.stringify({
+          error: `Skill not found: ${name}`,
+          searchedPaths: searchPaths
+        });
+      }
+    }
+  ];
+}
 
 // src/commands/initNest.ts
-var vscode6 = __toESM(require("vscode"));
-var fs9 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
-var HIVE_SKILL_TEMPLATE = `---
-name: hive
-description: Plan-first AI development with isolated git worktrees and human review. Use for any feature development.
+var fs13 = __toESM(require("fs"));
+var path13 = __toESM(require("path"));
+init_agents();
+
+// src/generators/hooks.ts
+function buildScript(body) {
+  return `#!/usr/bin/env bash
+set -e
+
+${body.trim()}
+`;
+}
+function buildHookOutput(configFilename, config, scripts) {
+  return {
+    configFilename,
+    config,
+    scripts
+  };
+}
+function generatePlanEnforcementHook() {
+  const script = buildScript(`shopt -s nullglob
+
+input_json="$(</dev/stdin)"
+tool_name="$(jq -r '(.toolName // .tool?.name // .tool_name // .name // .tool // empty) | strings' <<<"$input_json")"
+
+if [[ "$tool_name" != 'editFiles' && "$tool_name" != 'execute' ]]; then
+  exit 0
+fi
+
+has_approved_plan=false
+
+for feature_json in .hive/features/*/feature.json; do
+  status="$(jq -r '.status // empty' "$feature_json")"
+  if [[ "$status" == 'approved' || "$status" == 'executing' ]]; then
+    has_approved_plan=true
+    break
+  fi
+done
+
+if [[ "$has_approved_plan" == 'true' ]]; then
+  exit 0
+fi
+
+jq -n '{ permissionDecision: "deny", message: "No approved Hive plan found. Create and approve a plan first." }'
+`);
+  return buildHookOutput(
+    "hive-plan-enforcement.json",
+    {
+      version: 1,
+      hooks: {
+        preToolUse: [
+          {
+            type: "command",
+            command: { bash: ".github/hooks/scripts/check-plan.sh" },
+            timeoutSec: 5
+          }
+        ]
+      }
+    },
+    [
+      {
+        filename: "check-plan.sh",
+        content: script
+      }
+    ]
+  );
+}
+function generateContextInjectionHook() {
+  const script = buildScript(`shopt -s nullglob
+
+active_feature=''
+
+logical_name_for_feature() {
+  local feature_json="$1"
+  local directory_name logical_name
+
+  logical_name="$(jq -r '.name // empty' "$feature_json")"
+  if [[ -n "$logical_name" ]]; then
+    printf '%s' "$logical_name"
+    return
+  fi
+
+  directory_name="\${feature_json%/feature.json}"
+  directory_name="\${directory_name##*/}"
+  if [[ "$directory_name" =~ ^[0-9]+[_-](.+)$ ]]; then
+    printf '%s' "\${BASH_REMATCH[1]}"
+    return
+  fi
+
+  printf '%s' "$directory_name"
+}
+
+if [[ -f .hive/active-feature ]]; then
+  active_feature="$(tr -d '\r
+' < .hive/active-feature)"
+fi
+
+if [[ -n "$active_feature" ]]; then
+  resolved_active_feature=''
+
+  for feature_json in .hive/features/*/feature.json; do
+    status="$(jq -r '.status // empty' "$feature_json")"
+    logical_name="$(logical_name_for_feature "$feature_json")"
+
+    if [[ "$status" != 'completed' && "$logical_name" == "$active_feature" ]]; then
+      resolved_active_feature="\${feature_json%/feature.json}"
+      resolved_active_feature="\${resolved_active_feature##*/}"
+      break
+    fi
+  done
+
+  active_feature="$resolved_active_feature"
+fi
+
+if [[ -z "$active_feature" ]]; then
+  for feature_json in .hive/features/*/feature.json; do
+    status="$(jq -r '.status // empty' "$feature_json")"
+
+    if [[ "$status" != 'completed' ]]; then
+      active_feature="\${feature_json%/feature.json}"
+      active_feature="\${active_feature##*/}"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$active_feature" ]]; then
+  jq -n '{}'
+  exit 0
+fi
+
+context_dir=".hive/features/$active_feature/context"
+
+if [[ ! -d "$context_dir" ]]; then
+  context_dir=".hive/features/$active_feature/contexts"
+fi
+
+if [[ ! -d "$context_dir" ]]; then
+  jq -n '{}'
+  exit 0
+fi
+
+combined_context=''
+
+for context_file in "$context_dir"/*; do
+  if [[ ! -f "$context_file" ]]; then
+    continue
+  fi
+
+  file_name="\${context_file##*/}"
+  file_content="$(<"$context_file")"
+
+  if [[ -n "$file_content" ]]; then
+    if [[ -n "$combined_context" ]]; then
+      combined_context+=$'
+
+'
+    fi
+
+    combined_context+="## $file_name"
+    combined_context+=$'
+
+'
+    combined_context+="$file_content"
+  fi
+done
+
+if [[ -z "$combined_context" ]]; then
+  jq -n '{}'
+  exit 0
+fi
+
+jq -n --arg additionalContext "$combined_context" '{ additionalContext: $additionalContext }'
+`);
+  return buildHookOutput(
+    "hive-context-injection.json",
+    {
+      version: 1,
+      hooks: {
+        sessionStart: [
+          {
+            type: "command",
+            command: { bash: ".github/hooks/scripts/inject-context.sh" },
+            timeoutSec: 10
+          }
+        ]
+      }
+    },
+    [
+      {
+        filename: "inject-context.sh",
+        content: script
+      }
+    ]
+  );
+}
+function generateAllHooks() {
+  return [generatePlanEnforcementHook(), generateContextInjectionHook()];
+}
+
+// src/generators/instructions.ts
+function buildInstructionBody(description, applyTo, content) {
+  return `---
+description: "${description}"
+applyTo: "${applyTo}"
 ---
 
-# Hive Workflow
+${content.trim()}
+`;
+}
+function createInstructionFile(filename, description, applyTo, content) {
+  return {
+    filename,
+    description,
+    applyTo,
+    body: buildInstructionBody(description, applyTo, content)
+  };
+}
+function generateHiveWorkflowInstructions() {
+  return createInstructionFile(
+    "hive-workflow.instructions.md",
+    "Hive plan-first development workflow",
+    "**",
+    "This project uses Hive plan-first development. Before making changes, check for an active feature with hive_status. Follow: Plan \u2192 Review \u2192 Approve \u2192 Execute \u2192 Merge. Save research to context files with hive_context_write. Never execute code without an approved plan."
+  );
+}
+function generateCodingStandardsTemplate() {
+  return createInstructionFile(
+    "coding-standards.instructions.md",
+    "Project coding standards template",
+    "**/*.ts",
+    `## Imports
 
-You are working in a Hive-enabled repository. Follow this plan-first workflow.
+<!-- TODO: customize -->
+- Prefer explicit imports and keep local import style consistent.
 
-## Lifecycle
+## Naming
 
-\`\`\`
-Feature -> Plan -> Review -> Approve -> Execute -> Merge -> Complete
-\`\`\`
+<!-- TODO: customize -->
+- Document naming conventions for files, types, functions, and constants.
 
----
+## Error Handling
 
-## Phase 1: Planning
+<!-- TODO: customize -->
+- Define how errors should be surfaced, wrapped, or logged.
 
-### Start Feature
+## Testing
 
-\`\`\`
-hive_feature_create({ name: "feature-name" })
-\`\`\`
+<!-- TODO: customize -->
+- Describe required test coverage, frameworks, and verification expectations.`
+  );
+}
+function generateAllInstructions() {
+  return [generateHiveWorkflowInstructions(), generateCodingStandardsTemplate()];
+}
 
-### Research First
+// src/generators/plugin.ts
+var pluginManifestTemplate = {
+  name: "agent-hive",
+  description: "Plan-first AI development with isolated worktrees and human review",
+  author: { name: "tctinh" },
+  repository: "https://github.com/tctinh/agent-hive",
+  license: "MIT",
+  keywords: ["planning", "orchestration", "multi-agent", "worktree", "hive"],
+  agents: [".github/agents"],
+  skills: [".github/skills/*"],
+  hooks: [".github/hooks/*"],
+  instructions: [".github/instructions"]
+};
+function generatePluginManifest(options = {}) {
+  return {
+    ...pluginManifestTemplate,
+    version: options.version ?? "1.0.0",
+    author: { ...pluginManifestTemplate.author },
+    keywords: [...pluginManifestTemplate.keywords],
+    agents: [...pluginManifestTemplate.agents],
+    skills: [...pluginManifestTemplate.skills],
+    hooks: [...pluginManifestTemplate.hooks],
+    instructions: [...pluginManifestTemplate.instructions]
+  };
+}
 
-Before writing anything:
-1. Search for relevant files (grep, explore)
-2. Read existing implementations
-3. Identify patterns and conventions
+// src/generators/skills.ts
+var MAX_SKILL_NAME_LENGTH = 64;
+var MIN_SKILL_DESCRIPTION_LENGTH = 10;
+var MAX_SKILL_DESCRIPTION_LENGTH = 1024;
+var MAX_SKILL_CONTENT_LENGTH = 3e4;
+function ensureSkillName(name) {
+  const trimmed2 = name.trim();
+  if (trimmed2.length === 0 || trimmed2.length > MAX_SKILL_NAME_LENGTH) {
+    throw new Error(`Skill name must be between 1 and ${MAX_SKILL_NAME_LENGTH} characters.`);
+  }
+  return trimmed2;
+}
+function ensureSkillDescription(description) {
+  const trimmed2 = description.trim();
+  if (trimmed2.length < MIN_SKILL_DESCRIPTION_LENGTH || trimmed2.length > MAX_SKILL_DESCRIPTION_LENGTH) {
+    throw new Error(
+      `Skill description must be between ${MIN_SKILL_DESCRIPTION_LENGTH} and ${MAX_SKILL_DESCRIPTION_LENGTH} characters.`
+    );
+  }
+  return trimmed2;
+}
+function stripFrontmatter(content) {
+  const normalized = content.trim();
+  if (!normalized.startsWith("---\n")) {
+    return normalized;
+  }
+  const endIndex = normalized.indexOf("\n---\n", 4);
+  if (endIndex === -1) {
+    return normalized;
+  }
+  return normalized.slice(endIndex + 5).trim();
+}
+function buildFrontmatter(name, description) {
+  return `---
+name: ${name}
+description: ${description}
+---`;
+}
+function assertSkillContentLength(content) {
+  if (content.length > MAX_SKILL_CONTENT_LENGTH) {
+    throw new Error(`Skill content must be at most ${MAX_SKILL_CONTENT_LENGTH} characters.`);
+  }
+  return content;
+}
+function generateSkillFile(skill) {
+  const name = ensureSkillName(skill.name);
+  const description = ensureSkillDescription(skill.description);
+  const body = stripFrontmatter(skill.content);
+  const content = `${buildFrontmatter(name, description)}
 
-Save all findings:
-\`\`\`
-hive_context_write({
-  name: "research",
-  content: \`# Research Findings
-
-## Existing Patterns
-- Theme system uses CSS variables in src/theme/
-- Components follow atomic design
-
-## Files to Modify
-- src/theme/colors.ts
-- src/components/ThemeProvider.tsx
-\`
-})
-\`\`\`
-
-### Write the Plan
-
-Format for task parsing:
-
-\`\`\`markdown
-# Feature Name
+${body}
+`;
+  return assertSkillContentLength(content);
+}
+var builtinSkillSources = [
+  {
+    name: "writing-plans",
+    description: "Use when you have a spec or requirements for a multi-step task, before touching code",
+    body: `# Writing Plans
 
 ## Overview
-One paragraph explaining what and why.
+
+Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+
+Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
+
+**Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
+
+**Context:** Planning is read-only. Use \`hive_feature_create\` + \`hive_plan_write\` and avoid worktrees during planning.
+
+**Save plans to:** \`hive_plan_write\` (writes to \`.hive/features/<feature>/plan.md\`)
+
+## Bite-Sized Task Granularity
+
+**Each step is one action (2-5 minutes):**
+- "Write the failing test" - step
+- "Run it to make sure it fails" - step
+- "Implement the minimal code to make the test pass" - step
+- "Run the tests and make sure they pass" - step
+- "Commit" - step
+
+## Plan Structure
+
+**Every plan MUST follow this structure:**
+
+\`\`\`\`markdown
+# [Feature Name]
+
+## Discovery
+
+### Original Request
+- "{User's exact words}"
+
+### Interview Summary
+- {Point}: {Decision}
+
+### Research Findings
+- \`{file:lines}\`: {Finding}
+
+---
+
+## Non-Goals (What we're NOT building)
+- {Explicit exclusion}
+
+---
 
 ## Tasks
 
 ### 1. Task Name
-Description of what this task accomplishes.
-- Specific files to modify
-- Expected outcome
 
-### 2. Another Task
-Description...
+Use the Task Structure template below for every task.
+\`\`\`\`
 
-### 3. Final Task
-Description...
+
+## Task Structure
+
+The **Depends on** annotation declares task execution order:
+- **Depends on**: none \u2014 No dependencies; can run immediately or in parallel
+- **Depends on**: 1 \u2014 Depends on task 1
+- **Depends on**: 1, 3 \u2014 Depends on tasks 1 and 3
+
+Always include **Depends on** for each task. Use \`none\` to enable parallel starts.
+
+\`\`\`\`markdown
+### N. Task Name
+
+**Depends on**: none
+
+**Files:**
+- Create: \`exact/path/to/file.py\`
+- Modify: \`exact/path/to/existing.py:123-145\`
+- Test: \`tests/exact/path/to/test.py\`
+
+**What to do**:
+- Step 1: Write the failing test
+  \`\`\`python
+  def test_specific_behavior():
+      result = function(input)
+      assert result == expected
+  \`\`\`
+- Step 2: Run test to verify it fails
+  - Run: \`pytest tests/path/test.py::test_name -v\`
+  - Expected: FAIL with "function not defined"
+- Step 3: Write minimal implementation
+  \`\`\`python
+  def function(input):
+      return expected
+  \`\`\`
+- Step 4: Run test to verify it passes
+  - Run: \`pytest tests/path/test.py::test_name -v\`
+  - Expected: PASS
+- Step 5: Commit
+  \`\`\`bash
+  git add tests/path/test.py src/path/file.py
+  git commit -m "feat: add specific feature"
+  \`\`\`
+
+**Must NOT do**:
+- {Task guardrail}
+
+**References**:
+- \`{file:lines}\` \u2014 {Why this reference matters}
+
+**Verify**:
+- [ ] Run: \`{command}\` \u2192 {expected}
+- [ ] {Additional acceptance criteria}
+
+All verification MUST be agent-executable (no human intervention):
+\u2705 \`bun test\` \u2192 all pass
+\u2705 \`curl -X POST /api/x\` \u2192 201
+\u274C "User manually tests..."
+\u274C "Visually confirm..."
+\`\`\`\`
+
+## Remember
+- Exact file paths always
+- Complete code in plan (not "add validation")
+- Exact commands with expected output
+- Reference relevant skills with @ syntax
+- DRY, YAGNI, TDD, frequent commits
+- All acceptance criteria must be agent-executable (zero human intervention)
+
+## Execution Handoff
+
+After saving the plan, ask whether to consult Hygienic (Consultant/Reviewer/Debugger) before offering execution choice.
+
+Plan complete and saved to \`.hive/features/<feature>/plan.md\`.
+
+Two execution options:
+1. Agent-Driven (this session) - I dispatch fresh subagent per task, review between tasks, fast iteration
+2. Parallel Session (separate) - Open new session with executing-plans, batch execution with checkpoints
+
+Which approach?
+
+**If Agent-Driven chosen:**
+- Stay in this session
+- Fresh subagent per task + code review
+
+**If Parallel Session chosen:**
+- Guide them to open new session in worktree
+- **REQUIRED SUB-SKILL:** New session uses Refer to the skill at .github/skills/executing-plans/SKILL.md
+`
+  },
+  {
+    name: "executing-plans",
+    description: "Use when you have a written implementation plan to execute in a separate session with review checkpoints",
+    body: `# Executing Plans
+
+## Overview
+
+Load plan, review critically, execute tasks in batches, report for review between batches.
+
+**Core principle:** Batch execution with checkpoints for architect review.
+
+**Announce at start:** "I'm using the executing-plans skill to implement this plan."
+
+## The Process
+
+### Step 1: Load and Review Plan
+1. Read plan file
+2. Review critically - identify any questions or concerns about the plan
+3. If concerns: Raise them with your human partner before starting
+4. If no concerns: Create a short checklist in your working notes and proceed
+
+### Step 2: Identify Runnable Tasks
+
+Use \`hive_status()\` to get the **runnable** list \u2014 tasks with all dependencies satisfied.
+
+Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, \`cancelled\`).
+
+**When 2+ tasks are runnable:**
+- Ask the user directly in chat: "Multiple tasks are runnable: [list]. Run in parallel, sequential, or a specific subset?"
+- Record the decision with \`hive_context_write({ name: "execution-decisions", content: "..." })\` for future reference
+
+**When 1 task is runnable:** Proceed directly.
+
+### Step 3: Execute Batch
+
+For each task in the batch:
+1. Mark as in_progress via \`hive_worktree_start()\`
+2. Follow each step exactly (plan has bite-sized steps)
+3. Run verifications as specified
+4. Mark as completed
+
+### Step 4: Report
+When batch complete:
+- Show what was implemented
+- Show verification output
+- Say: "Ready for feedback."
+
+### Step 4.5: Post-Batch Hygienic Review
+
+After the batch report, ask the user directly in chat if they want a Hygienic code review for the batch.
+If yes, invoke the @hygienic agent via the agent tool to review implementation changes from the latest batch, then apply feedback before starting the next batch.
+
+### Step 5: Continue
+Based on feedback:
+- Apply changes if needed
+- Execute next batch
+- Repeat until complete
+
+### Step 6: Complete Development
+
+After all tasks complete and verified:
+- Announce: "I'm using the verification-before-completion skill to complete this work."
+- **REQUIRED SUB-SKILL:** Refer to the skill at .github/skills/verification-before-completion/SKILL.md
+- Follow that skill to verify tests, present options, execute choice
+
+## When to Stop and Ask for Help
+
+**STOP executing immediately when:**
+- Hit a blocker mid-batch (missing dependency, test fails, instruction unclear)
+- Plan has critical gaps preventing starting
+- You don't understand an instruction
+- Verification fails repeatedly
+
+**Ask for clarification rather than guessing.**
+
+## When to Revisit Earlier Steps
+
+**Return to Review (Step 1) when:**
+- Partner updates the plan based on your feedback
+- Fundamental approach needs rethinking
+
+**Don't force through blockers** - stop and ask.
+
+## Remember
+- Review plan critically first
+- Follow plan steps exactly
+- Don't skip verifications
+- Reference skills when plan says to
+- Between batches: just report and wait
+- Stop when blocked, don't guess
+`
+  },
+  {
+    name: "brainstorming",
+    description: "Use before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.",
+    body: `# Brainstorming Ideas Into Designs
+
+## Overview
+
+Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
+
+Start by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design in small sections (200-300 words), checking after each section whether it looks right so far.
+
+## The Process
+
+**Understanding the idea:**
+- Check out the current project state first (files, docs, recent commits)
+- Ask questions one at a time to refine the idea
+- Prefer multiple choice questions when possible, but open-ended is fine too
+- Only one question per message - if a topic needs more exploration, break it into multiple questions
+- Focus on understanding: purpose, constraints, success criteria
+
+**Exploring approaches:**
+- Propose 2-3 different approaches with trade-offs
+- Present options conversationally with your recommendation and reasoning
+- Lead with your recommended option and explain why
+
+**Presenting the design:**
+- Once you believe you understand what you're building, present the design
+- Break it into sections of 200-300 words
+- Ask after each section whether it looks right so far
+- Cover: architecture, components, data flow, error handling, testing
+- Be ready to go back and clarify if something doesn't make sense
+
+## After the Design
+
+**Documentation:**
+- Write the validated design to \`docs/plans/YYYY-MM-DD-<topic>-design.md\`
+- Commit the design document to git
+
+**Implementation (if continuing):**
+- Ask: "Ready to set up for implementation?"
+- Refer to the skill at .github/skills/writing-plans/SKILL.md to create a detailed implementation plan
+
+## Key Principles
+
+- **One question at a time** - Don't overwhelm with multiple questions
+- **Multiple choice preferred** - Easier to answer than open-ended when possible
+- **YAGNI ruthlessly** - Remove unnecessary features from all designs
+- **Explore alternatives** - Always propose 2-3 approaches before settling
+- **Incremental validation** - Present design in sections, validate each
+- **Be flexible** - Go back and clarify when something doesn't make sense
+- **Challenge assumptions** - Surface fragile assumptions, ask what changes if they fail, offer lean fallback options
+`
+  },
+  {
+    name: "parallel-exploration",
+    description: "Use when you need parallel, read-only exploration with the agent tool (Scout fan-out)",
+    body: `# Parallel Exploration (Scout Fan-Out)
+
+## Overview
+
+When you need to answer "where/how does X work?" across multiple domains (codebase, tests, docs, OSS), investigating sequentially wastes time. Each investigation is independent and can happen in parallel.
+
+**Core principle:** Decompose into independent sub-questions, invoke one scout agent per sub-question, and synthesize the results together.
+
+**Safe in Planning mode:** This is read-only exploration. It is OK to use during exploratory research even when there is no feature, no plan, and no approved tasks.
+
+**This skill is for read-only research.** For parallel implementation work, refer to the skill at .github/skills/dispatching-parallel-agents/SKILL.md and use \`hive_worktree_start\`.
+
+## When to Use
+
+**Default to this skill when:**
+**Use when:**
+- Investigation spans multiple domains (code + tests + docs)
+- User asks **2+ questions across different domains** (e.g., code + tests, code + docs/OSS, code + config/runtime)
+- Questions are independent (answer to A doesn't affect B)
+- User asks **3+ independent questions** (often as a numbered list or separate bullets)
+- No edits needed (read-only exploration)
+- User asks for an exploration that likely spans multiple files/packages
+- The work is read-only and the questions can be investigated independently
+
+**Only skip this skill when:**
+- Investigation requires shared state or context between questions
+- It's a single focused question that is genuinely answerable with **one quick grep + one file read**
+- Questions are dependent (answer A materially changes what to ask for B)
+- Work involves file edits (use Hive tasks / Forager instead)
+
+**Important:** Do not treat "this is exploratory" as a reason to avoid delegation. This skill is specifically for exploratory research when fan-out makes it faster and cleaner.
+
+## The Pattern
+
+### 1. Decompose Into Independent Questions
+
+Split your investigation into 2-4 independent sub-questions. Good decomposition:
+
+| Domain | Question Example |
+|--------|------------------|
+| Codebase | "Where is X implemented? What files define it?" |
+| Tests | "How is X tested? What test patterns exist?" |
+| Docs/OSS | "How do other projects implement X? What's the recommended pattern?" |
+| Config | "How is X configured? What environment variables affect it?" |
+
+**Bad decomposition (dependent questions):**
+- "What is X?" then "How is X used?" (second depends on first)
+- "Find the bug" then "Fix the bug" (not read-only)
+
+### 2. Invoke Scout Agents in Parallel
+
+Start all independent scout requests before waiting on any result.
+
+\`\`\`text
+Invoke the @scout agent via the agent tool for question 1.
+Invoke the @scout agent via the agent tool for question 2.
+Invoke the @scout agent via the agent tool for question 3.
 \`\`\`
 
-Write with:
+**Key points:**
+- Invoke the @scout agent via the agent tool for read-only exploration
+- Give each invocation a clear, focused scope
+- Make prompts specific about what evidence to return
+
+### 3. Continue Working (Optional)
+
+While tasks run, you can:
+- Work on other aspects of the problem
+- Prepare synthesis structure
+- Start drafting based on what you already know
+
+Each scout result returns to the parent chat when it completes.
+
+### 4. Collect Results
+
+When each task completes, its result is returned directly. Collect the outputs from each task and proceed to synthesis.
+
+### 5. Synthesize Findings
+
+Combine results from all tasks:
+- Cross-reference findings (file X mentioned by tasks A and B)
+- Identify gaps (task C found nothing, need different approach)
+- Build coherent answer from parallel evidence
+
+### 6. Cleanup (If Needed)
+
+No manual cancellation is required for these agent invocations.
+
+## Prompt Templates
+
+### Codebase Slice
+
 \`\`\`
-hive_plan_write({ content: \`...\` })
-\`\`\`
+Investigate [TOPIC] in the codebase:
+- Where is [X] defined/implemented?
+- What files contain [X]?
+- How does [X] interact with [Y]?
 
-**STOP** and tell user: "Plan written. Please review."
-
----
-
-## Phase 2: Review (Human)
-
-- User reviews plan.md in VS Code sidebar
-- User can add comments
-- Use \`hive_plan_read()\` to see user comments
-- Revise plan based on feedback
-- User clicks "Approve" or runs \`hive_plan_approve()\`
-
----
-
-## Phase 3: Execution
-
-### Generate Tasks
-
-\`\`\`
-hive_tasks_sync()
-\`\`\`
-
-Parses \`### N. Task Name\` headers into task folders.
-
-### Execute Each Task
-
-For each task in order:
-
-#### 1. Start (creates worktree)
-\`\`\`
-hive_worktree_start({ task: "01-task-name" })
-\`\`\`
-
-#### 2. Implement
-Work in the isolated worktree path. Read \`spec.md\` for context.
-
-#### 3. Complete (commits to branch)
-\`\`\`
-hive_worktree_commit({ task: "01-task-name", summary: "What was done" })
-\`\`\`
-
-#### 4. Merge (integrates to main)
-\`\`\`
-hive_merge({ task: "01-task-name", strategy: "squash" })
+Return:
+- File paths with line numbers
+- Brief code snippets as evidence
+- Key patterns observed
 \`\`\`
 
----
+### Tests Slice
 
-## Phase 4: Completion
-
-After all tasks merged:
 \`\`\`
-hive_feature_complete({ name: "feature-name" })
-\`\`\`
+Investigate how [TOPIC] is tested:
+- What test files cover [X]?
+- What testing patterns are used?
+- What edge cases are tested?
 
----
-
-## Tool Quick Reference
-
-| Phase | Tool | Purpose |
-|-------|------|---------|
-| Plan | \`hive_feature_create\` | Start new feature |
-| Plan | \`hive_context_write\` | Save research findings |
-| Plan | \`hive_plan_write\` | Write the plan |
-| Plan | \`hive_plan_read\` | Check for user comments |
-| Plan | \`hive_plan_approve\` | Approve plan |
-| Execute | \`hive_tasks_sync\` | Generate tasks from plan |
-| Execute | \`hive_worktree_start\` | Start task (creates worktree) |
-| Execute | \`hive_worktree_commit\` | Finish task (commits changes) |
-| Execute | \`hive_merge\` | Integrate task to main |
-| Complete | \`hive_feature_complete\` | Mark feature done |
-
----
-
-## Task Design Guidelines
-
-### Good Tasks
-
-| Characteristic | Example |
-|---------------|---------|
-| **Atomic** | "Add ThemeContext provider" not "Add theming" |
-| **Testable** | "Toggle switches between light/dark" |
-| **Independent** | Can be completed without other tasks (where possible) |
-| **Ordered** | Dependencies come first |
-
-### Task Sizing
-
-- **Too small**: "Add import statement" - combine with related work
-- **Too large**: "Implement entire feature" - break into logical units
-- **Just right**: "Create theme context with light/dark values"
-
----
-
-## Rules
-
-1. **Never skip planning** - Always write plan first
-2. **Context is critical** - Save all research with \`hive_context_write\`
-3. **Wait for approval** - Don't execute until user approves
-4. **One task at a time** - Complete and merge before starting next
-5. **Squash merges** - Keep history clean with single commit per task
-
----
-
-## Error Recovery
-
-### Task Failed
-\`\`\`
-hive_worktree_discard(task="<task>")  # Discards changes
-hive_worktree_start(task="<task>")  # Fresh start
+Return:
+- Test file paths
+- Example test patterns
+- Coverage gaps if obvious
 \`\`\`
 
-### Merge Conflicts
-1. Resolve conflicts in the worktree
-2. Commit the resolution
-3. Run \`hive_merge\` again
-`;
-var COPILOT_AGENT_TEMPLATE = `---
-description: 'Plan-first feature development with isolated worktrees and persistent context.'
-tools: ['runSubagent', 'tctinh.vscode-hive/hiveFeatureCreate', 'tctinh.vscode-hive/hiveFeatureComplete', 'tctinh.vscode-hive/hivePlanWrite', 'tctinh.vscode-hive/hivePlanRead', 'tctinh.vscode-hive/hivePlanApprove', 'tctinh.vscode-hive/hiveTasksSync', 'tctinh.vscode-hive/hiveTaskCreate', 'tctinh.vscode-hive/hiveTaskUpdate', 'tctinh.vscode-hive/hiveWorktreeStart', 'tctinh.vscode-hive/hiveWorktreeCreate', 'tctinh.vscode-hive/hiveWorktreeCommit', 'tctinh.vscode-hive/hiveWorktreeDiscard', 'tctinh.vscode-hive/hiveMerge', 'tctinh.vscode-hive/hiveContextWrite', 'tctinh.vscode-hive/hiveStatus']
----
+### Docs/OSS Slice
 
-# Hive Agent
+\`\`\`
+Research [TOPIC] in external sources:
+- How do other projects implement [X]?
+- What does the official documentation say?
+- What are common patterns/anti-patterns?
 
-You are a plan-first development orchestrator. Follow this workflow: Plan -> Review -> Approve -> Execute -> Merge.
+Return:
+- Links to relevant docs/repos
+- Key recommendations
+- Patterns that apply to our codebase
+\`\`\`
 
-## Core Workflow
+## Real Example
 
-### Phase 1: Planning
-1. \\\`featureCreate({ name: "feature-name" })\\\` - Create feature
-2. Research codebase, save with \\\`contextWrite\\\`
-3. \\\`planWrite({ content: "# Feature\\\\n\\\\n## Tasks\\\\n\\\\n### 1. First task..." })\\\`
-4. **STOP** - Tell user: "Plan ready. Please review and approve."
+**Investigation:** "How does the API routing system work?"
 
-### Phase 2: User Review
-User reviews in VS Code, adds comments, approves when ready.
+**Decomposition:**
+1. Implementation: Where are API routes defined?
+2. Routing: How does route registration work?
+3. Notifications: How are errors surfaced to the caller?
 
-### Phase 3: Execution
-1. \\\`tasksSync()\\\` - Generate tasks from plan
-2. For each task:
-   - \\\`worktreeStart({ task: "task-name" })\\\`
-   - Implement
-   - \\\`worktreeCommit({ task: "task-name", summary: "..." })\\\`
-   - \\\`merge({ task: "task-name", strategy: "squash" })\\\`
+**Fan-out:**
+\`\`\`text
+Invoke the @scout agent via the agent tool to find API route implementation.
+Invoke the @scout agent via the agent tool to analyze concurrency.
+Invoke the @scout agent via the agent tool to find the notification mechanism.
+\`\`\`
 
-### Phase 4: Completion
-\\\`featureComplete({ name: "feature-name" })\\\`
+**Results:**
+- Task 1: Found \`background-tools.ts\` (tool definition), \`index.ts\` (registration)
+- Task 2: Found \`manager.ts\` with concurrency=3 default, queue-based scheduling
+- Task 3: Found \`session.prompt()\` call in manager for parent notification
 
-## Rules
-1. Never skip planning
-2. Save context with \`contextWrite\`
-3. Wait for approval before execution
-4. One task at a time
-5. Squash merges for clean history
-6. Copilot does not support \`question()\`; ask only when critical and batch all questions into a single ask
+**Synthesis:** Complete picture of background task lifecycle in ~1/3 the time of sequential investigation.
 
-## Delegation with runSubagent
-Use \`#tool:runSubagent\` for parallel work. Do not switch models; delegate only with runSubagent.
-`;
-function createSkill(basePath) {
-  const skillPath = path9.join(basePath, "hive");
-  fs9.mkdirSync(skillPath, { recursive: true });
-  fs9.writeFileSync(path9.join(skillPath, "SKILL.md"), HIVE_SKILL_TEMPLATE);
+## Common Mistakes
+
+**Spawning sequentially (defeats the purpose):**
+\`\`\`text
+Bad: invoke one scout agent, wait, then decide whether to invoke the next.
+\`\`\`
+
+\`\`\`text
+Good: issue all independent scout invocations in the same response.
+\`\`\`
+
+**Too many tasks (diminishing returns):**
+- 2-4 tasks: Good parallelization
+- 5+ tasks: Overhead exceeds benefit, harder to synthesize
+
+**Dependent questions:**
+- Don't spawn task B if it needs task A's answer
+- Either make them independent or run sequentially
+
+**Using for edits:**
+- Scout is read-only; use Forager for implementation
+- This skill is for exploration, not execution
+
+## Key Benefits
+
+1. **Speed** - 3 investigations in time of 1
+2. **Focus** - Each Scout has narrow scope
+3. **Independence** - No interference between tasks
+4. **Flexibility** - Cancel unneeded tasks, add new ones
+
+## Verification
+
+After using this pattern, verify:
+- [ ] All tasks spawned before collecting any results (true fan-out)
+- [ ] Verified agent-tool fan-out pattern used for parallel exploration
+- [ ] Synthesized findings into coherent answer
+`
+  },
+  {
+    name: "dispatching-parallel-agents",
+    description: "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies",
+    body: `# Dispatching Parallel Agents
+
+## Overview
+
+When you have multiple unrelated failures (different test files, different subsystems, different bugs), investigating them sequentially wastes time. Each investigation is independent and can happen in parallel.
+
+**Core principle:** Dispatch one agent per independent problem domain. Let them work concurrently.
+
+## Prerequisite: Check Runnable Tasks
+
+Before dispatching, use \`hive_status()\` to get the **runnable** list \u2014 tasks whose dependencies are all satisfied.
+
+**Only dispatch tasks that are runnable.** Never start tasks with unmet dependencies.
+
+Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, \`cancelled\`).
+
+**Ask the operator first:**
+- Ask the operator directly in chat: "These tasks are runnable and independent: [list]. Execute in parallel?"
+- Record the decision with \`hive_context_write({ name: "execution-decisions", content: "..." })\`
+- Proceed only after operator approval
+
+## When to Use
+
+\`\`\`dot
+digraph when_to_use {
+    "Multiple failures?" [shape=diamond];
+    "Are they independent?" [shape=diamond];
+    "Single agent investigates all" [shape=box];
+    "One agent per problem domain" [shape=box];
+    "Can they work in parallel?" [shape=diamond];
+    "Sequential agents" [shape=box];
+    "Parallel dispatch" [shape=box];
+
+    "Multiple failures?" -> "Are they independent?" [label="yes"];
+    "Are they independent?" -> "Single agent investigates all" [label="no - related"];
+    "Are they independent?" -> "Can they work in parallel?" [label="yes"];
+    "Can they work in parallel?" -> "Parallel dispatch" [label="yes"];
+    "Can they work in parallel?" -> "Sequential agents" [label="no - shared state"];
 }
-async function initNest(projectRoot) {
-  const hivePath = path9.join(projectRoot, ".hive");
-  fs9.mkdirSync(path9.join(hivePath, "features"), { recursive: true });
-  fs9.mkdirSync(path9.join(hivePath, "skills"), { recursive: true });
-  const opencodePath = path9.join(projectRoot, ".opencode", "skill");
-  createSkill(opencodePath);
-  const claudePath = path9.join(projectRoot, ".claude", "skills");
-  createSkill(claudePath);
-  const agentPath = path9.join(projectRoot, ".github", "agents");
-  fs9.mkdirSync(agentPath, { recursive: true });
-  fs9.writeFileSync(path9.join(agentPath, "Hive.agent.md"), COPILOT_AGENT_TEMPLATE);
-  vscode6.window.showInformationMessage("\u{1F41D} Hive Nest initialized! Skills created for OpenCode, Claude, and GitHub Copilot.");
+\`\`\`
+
+**Use when:**
+- 3+ test files failing with different root causes
+- Multiple subsystems broken independently
+- Each problem can be understood without context from others
+- No shared state between investigations
+
+**Don't use when:**
+- Failures are related (fix one might fix others)
+- Need to understand full system state
+- Agents would interfere with each other
+
+## The Pattern
+
+### 1. Identify Independent Domains
+
+Group failures by what's broken:
+- File A tests: Tool approval flow
+- File B tests: Batch completion behavior
+- File C tests: Abort functionality
+
+Each domain is independent - fixing tool approval doesn't affect abort tests.
+
+### 2. Create Focused Agent Tasks
+
+Each agent gets:
+- **Specific scope:** One test file or subsystem
+- **Clear goal:** Make these tests pass
+- **Constraints:** Don't change other code
+- **Expected output:** Summary of what you found and fixed
+
+### 3. Dispatch in Parallel
+
+\`\`\`typescript
+// Using Hive tools for parallel execution
+hive_worktree_start({ task: "01-fix-abort-tests" })
+hive_worktree_start({ task: "02-fix-batch-tests" })
+hive_worktree_start({ task: "03-fix-race-condition-tests" })
+// All three run concurrently in isolated worktrees
+\`\`\`
+
+Parallelize by issuing multiple agent-tool invocations in the same response.
+
+\`\`\`text
+Invoke the appropriate agent for failure A.
+Invoke the appropriate agent for failure B.
+\`\`\`
+
+### 4. Review and Integrate
+
+When agents return:
+- Read each summary
+- Verify fixes don't conflict
+- Run full test suite
+- Integrate all changes with \`hive_merge\`
+
+## Agent Prompt Structure
+
+Good agent prompts are:
+1. **Focused** - One clear problem domain
+2. **Self-contained** - All context needed to understand the problem
+3. **Specific about output** - What should the agent return?
+
+\`\`\`markdown
+Fix the 3 failing tests in src/agents/agent-tool-abort.test.ts:
+
+1. "should abort tool with partial output capture" - expects 'interrupted at' in message
+2. "should handle mixed completed and aborted tools" - fast tool aborted instead of completed
+3. "should properly track pendingToolCount" - expects 3 results but gets 0
+
+These are timing/race condition issues. Your task:
+
+1. Read the test file and understand what each test verifies
+2. Identify root cause - timing issues or actual bugs?
+3. Fix by:
+   - Replacing arbitrary timeouts with event-based waiting
+   - Fixing bugs in abort implementation if found
+   - Adjusting test expectations if testing changed behavior
+
+Do NOT just increase timeouts - find the real issue.
+
+Return: Summary of what you found and what you fixed.
+\`\`\`
+
+## Common Mistakes
+
+**\u274C Too broad:** "Fix all the tests" - agent gets lost
+**\u2705 Specific:** "Fix agent-tool-abort.test.ts" - focused scope
+
+**\u274C No context:** "Fix the race condition" - agent doesn't know where
+**\u2705 Context:** Paste the error messages and test names
+
+**\u274C No constraints:** Agent might refactor everything
+**\u2705 Constraints:** "Do NOT change production code" or "Fix tests only"
+
+**\u274C Vague output:** "Fix it" - you don't know what changed
+**\u2705 Specific:** "Return summary of root cause and changes"
+
+## When NOT to Use
+
+**Related failures:** Fixing one might fix others - investigate together first
+**Need full context:** Understanding requires seeing entire system
+**Exploratory debugging:** You don't know what's broken yet
+**Shared state:** Agents would interfere (editing same files, using same resources)
+
+## Real Example from Session
+
+**Scenario:** 6 test failures across 3 files after major refactoring
+
+**Failures:**
+- agent-tool-abort.test.ts: 3 failures (timing issues)
+- batch-completion-behavior.test.ts: 2 failures (tools not executing)
+- tool-approval-race-conditions.test.ts: 1 failure (execution count = 0)
+
+**Decision:** Independent domains - abort logic separate from batch completion separate from race conditions
+
+**Dispatch:**
+\`\`\`
+Agent 1 \u2192 Fix agent-tool-abort.test.ts
+Agent 2 \u2192 Fix batch-completion-behavior.test.ts
+Agent 3 \u2192 Fix tool-approval-race-conditions.test.ts
+\`\`\`
+
+**Results:**
+- Agent 1: Replaced timeouts with event-based waiting
+- Agent 2: Fixed event structure bug (threadId in wrong place)
+- Agent 3: Added wait for async tool execution to complete
+
+**Integration:** All fixes independent, no conflicts, full suite green
+
+**Time saved:** 3 problems solved in parallel vs sequentially
+
+## Key Benefits
+
+1. **Parallelization** - Multiple investigations happen simultaneously
+2. **Focus** - Each agent has narrow scope, less context to track
+3. **Independence** - Agents don't interfere with each other
+4. **Speed** - 3 problems solved in time of 1
+
+## Verification
+
+After agents return:
+1. **Review each summary** - Understand what changed
+2. **Check for conflicts** - Did agents edit same code?
+3. **Run full suite** - Verify all fixes work together
+4. **Spot check** - Agents can make systematic errors
+
+## Real-World Impact
+
+From debugging session (2025-10-03):
+- 6 failures across 3 files
+- 3 agents dispatched in parallel
+- All investigations completed concurrently
+- All fixes integrated successfully
+- Zero conflicts between agent changes
+`
+  },
+  {
+    name: "systematic-debugging",
+    description: "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes",
+    body: `# Systematic Debugging
+
+## Overview
+
+Random fixes waste time and create new bugs. Quick patches mask underlying issues.
+
+**Core principle:** ALWAYS find root cause before attempting fixes. Symptom fixes are failure.
+
+**Violating the letter of this process is violating the spirit of debugging.**
+
+## The Iron Law
+
+\`\`\`
+NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
+\`\`\`
+
+If you haven't completed Phase 1, you cannot propose fixes.
+
+## When to Use
+
+Use for ANY technical issue:
+- Test failures
+- Bugs in production
+- Unexpected behavior
+- Performance problems
+- Build failures
+- Integration issues
+
+**Use this ESPECIALLY when:**
+- Under time pressure (emergencies make guessing tempting)
+- "Just one quick fix" seems obvious
+- You've already tried multiple fixes
+- Previous fix didn't work
+- You don't fully understand the issue
+
+**Don't skip when:**
+- Issue seems simple (simple bugs have root causes too)
+- You're in a hurry (rushing guarantees rework)
+- Manager wants it fixed NOW (systematic is faster than thrashing)
+
+## The Four Phases
+
+You MUST complete each phase before proceeding to the next.
+
+### Phase 1: Root Cause Investigation
+
+**BEFORE attempting ANY fix:**
+
+1. **Read Error Messages Carefully**
+   - Don't skip past errors or warnings
+   - They often contain the exact solution
+   - Read stack traces completely
+   - Note line numbers, file paths, error codes
+
+2. **Reproduce Consistently**
+   - Can you trigger it reliably?
+   - What are the exact steps?
+   - Does it happen every time?
+   - If not reproducible \u2192 gather more data, don't guess
+
+3. **Check Recent Changes**
+   - What changed that could cause this?
+   - Git diff, recent commits
+   - New dependencies, config changes
+   - Environmental differences
+
+4. **Gather Evidence in Multi-Component Systems**
+
+   **WHEN system has multiple components (CI \u2192 build \u2192 signing, API \u2192 service \u2192 database):**
+
+   **BEFORE proposing fixes, add diagnostic instrumentation:**
+   \`\`\`
+   For EACH component boundary:
+     - Log what data enters component
+     - Log what data exits component
+     - Verify environment/config propagation
+     - Check state at each layer
+
+   Run once to gather evidence showing WHERE it breaks
+   THEN analyze evidence to identify failing component
+   THEN investigate that specific component
+   \`\`\`
+
+   **Example (multi-layer system):**
+   \`\`\`bash
+   # Layer 1: Workflow
+   echo "=== Secrets available in workflow: ==="
+   echo "IDENTITY: \${IDENTITY:+SET}\${IDENTITY:-UNSET}"
+
+   # Layer 2: Build script
+   echo "=== Env vars in build script: ==="
+   env | grep IDENTITY || echo "IDENTITY not in environment"
+
+   # Layer 3: Signing script
+   echo "=== Keychain state: ==="
+   security list-keychains
+   security find-identity -v
+
+   # Layer 4: Actual signing
+   codesign --sign "$IDENTITY" --verbose=4 "$APP"
+   \`\`\`
+
+   **This reveals:** Which layer fails (secrets \u2192 workflow \u2713, workflow \u2192 build \u2717)
+
+5. **Trace Data Flow**
+
+   **WHEN error is deep in call stack:**
+
+   See \`root-cause-tracing.md\` in this directory for the complete backward tracing technique.
+
+   **Quick version:**
+   - Where does bad value originate?
+   - What called this with bad value?
+   - Keep tracing up until you find the source
+   - Fix at source, not at symptom
+
+### Phase 2: Pattern Analysis
+
+**Find the pattern before fixing:**
+
+1. **Find Working Examples**
+   - Locate similar working code in same codebase
+   - What works that's similar to what's broken?
+
+2. **Compare Against References**
+   - If implementing pattern, read reference implementation COMPLETELY
+   - Don't skim - read every line
+   - Understand the pattern fully before applying
+
+3. **Identify Differences**
+   - What's different between working and broken?
+   - List every difference, however small
+   - Don't assume "that can't matter"
+
+4. **Understand Dependencies**
+   - What other components does this need?
+   - What settings, config, environment?
+   - What assumptions does it make?
+
+### Phase 3: Hypothesis and Testing
+
+**Scientific method:**
+
+1. **Form Single Hypothesis**
+   - State clearly: "I think X is the root cause because Y"
+   - Write it down
+   - Be specific, not vague
+
+2. **Test Minimally**
+   - Make the SMALLEST possible change to test hypothesis
+   - One variable at a time
+   - Don't fix multiple things at once
+
+3. **Verify Before Continuing**
+   - Did it work? Yes \u2192 Phase 4
+   - Didn't work? Form NEW hypothesis
+   - DON'T add more fixes on top
+
+4. **When You Don't Know**
+   - Say "I don't understand X"
+   - Don't pretend to know
+   - Ask for help
+   - Research more
+
+### Phase 4: Implementation
+
+**Fix the root cause, not the symptom:**
+
+1. **Create Failing Test Case**
+   - Simplest possible reproduction
+   - Automated test if possible
+   - One-off test script if no framework
+   - MUST have before fixing
+   - Refer to the skill at .github/skills/test-driven-development/SKILL.md for writing proper failing tests
+
+2. **Implement Single Fix**
+   - Address the root cause identified
+   - ONE change at a time
+   - No "while I'm here" improvements
+   - No bundled refactoring
+
+3. **Verify Fix**
+   - Test passes now?
+   - No other tests broken?
+   - Issue actually resolved?
+
+4. **If Fix Doesn't Work**
+   - STOP
+   - Count: How many fixes have you tried?
+   - If < 3: Return to Phase 1, re-analyze with new information
+   - **If \u2265 3: STOP and question the architecture (step 5 below)**
+   - DON'T attempt Fix #4 without architectural discussion
+
+5. **If 3+ Fixes Failed: Question Architecture**
+
+   **Pattern indicating architectural problem:**
+   - Each fix reveals new shared state/coupling/problem in different place
+   - Fixes require "massive refactoring" to implement
+   - Each fix creates new symptoms elsewhere
+
+   **STOP and question fundamentals:**
+   - Is this pattern fundamentally sound?
+   - Are we "sticking with it through sheer inertia"?
+   - Should we refactor architecture vs. continue fixing symptoms?
+
+   **Discuss with your human partner before attempting more fixes**
+
+   This is NOT a failed hypothesis - this is a wrong architecture.
+
+## Red Flags - STOP and Follow Process
+
+If you catch yourself thinking:
+- "Quick fix for now, investigate later"
+- "Just try changing X and see if it works"
+- "Add multiple changes, run tests"
+- "Skip the test, I'll manually verify"
+- "It's probably X, let me fix that"
+- "I don't fully understand but this might work"
+- "Pattern says X but I'll adapt it differently"
+- "Here are the main problems: [lists fixes without investigation]"
+- Proposing solutions before tracing data flow
+- **"One more fix attempt" (when already tried 2+)**
+- **Each fix reveals new problem in different place**
+
+**ALL of these mean: STOP. Return to Phase 1.**
+
+**If 3+ fixes failed:** Question the architecture (see Phase 4.5)
+
+## your human partner's Signals You're Doing It Wrong
+
+**Watch for these redirections:**
+- "Is that not happening?" - You assumed without verifying
+- "Will it show us...?" - You should have added evidence gathering
+- "Stop guessing" - You're proposing fixes without understanding
+- "Ultrathink this" - Question fundamentals, not just symptoms
+- "We're stuck?" (frustrated) - Your approach isn't working
+
+**When you see these:** STOP. Return to Phase 1.
+
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Issue is simple, don't need process" | Simple issues have root causes too. Process is fast for simple bugs. |
+| "Emergency, no time for process" | Systematic debugging is FASTER than guess-and-check thrashing. |
+| "Just try this first, then investigate" | First fix sets the pattern. Do it right from the start. |
+| "I'll write test after confirming fix works" | Untested fixes don't stick. Test first proves it. |
+| "Multiple fixes at once saves time" | Can't isolate what worked. Causes new bugs. |
+| "Reference too long, I'll adapt the pattern" | Partial understanding guarantees bugs. Read it completely. |
+| "I see the problem, let me fix it" | Seeing symptoms \u2260 understanding root cause. |
+| "One more fix attempt" (after 2+ failures) | 3+ failures = architectural problem. Question pattern, don't fix again. |
+
+## Quick Reference
+
+| Phase | Key Activities | Success Criteria |
+|-------|---------------|------------------|
+| **1. Root Cause** | Read errors, reproduce, check changes, gather evidence | Understand WHAT and WHY |
+| **2. Pattern** | Find working examples, compare | Identify differences |
+| **3. Hypothesis** | Form theory, test minimally | Confirmed or new hypothesis |
+| **4. Implementation** | Create test, fix, verify | Bug resolved, tests pass |
+
+## When Process Reveals "No Root Cause"
+
+If systematic investigation reveals issue is truly environmental, timing-dependent, or external:
+
+1. You've completed the process
+2. Document what you investigated
+3. Implement appropriate handling (retry, timeout, error message)
+4. Add monitoring/logging for future investigation
+
+**But:** 95% of "no root cause" cases are incomplete investigation.
+
+## Supporting Techniques
+
+These techniques are part of systematic debugging and available in this directory:
+
+- **\`root-cause-tracing.md\`** - Trace bugs backward through call stack to find original trigger
+- **\`defense-in-depth.md\`** - Add validation at multiple layers after finding root cause
+- **\`condition-based-waiting.md\`** - Replace arbitrary timeouts with condition polling
+
+**Related skills:**
+- **Refer to the skill at .github/skills/test-driven-development/SKILL.md** - For creating a failing test case (Phase 4, Step 1)
+- **Refer to the skill at .github/skills/verification-before-completion/SKILL.md** - Verify the fix worked before claiming success
+
+## Real-World Impact
+
+From debugging sessions:
+- Systematic approach: 15-30 minutes to fix
+- Random fixes approach: 2-3 hours of thrashing
+- First-time fix rate: 95% vs 40%
+- New bugs introduced: Near zero vs common
+`
+  },
+  {
+    name: "test-driven-development",
+    description: "Use when implementing any feature or bugfix, before writing implementation code",
+    body: `# Test-Driven Development (TDD)
+
+## Overview
+
+Write the test first. Watch it fail. Write minimal code to pass.
+
+**Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
+
+**Violating the letter of the rules is violating the spirit of the rules.**
+
+## When to Use
+
+**Always:**
+- New features
+- Bug fixes
+- Refactoring
+- Behavior changes
+
+**Exceptions (ask your human partner):**
+- Throwaway prototypes
+- Generated code
+- Configuration files
+
+Thinking "skip TDD just this once"? Stop. That's rationalization.
+
+## The Iron Law
+
+\`\`\`
+NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
+\`\`\`
+
+Write code before the test? Delete it. Start over.
+
+**No exceptions:**
+- Don't keep it as "reference"
+- Don't "adapt" it while writing tests
+- Don't look at it
+- Delete means delete
+
+Implement fresh from tests. Period.
+
+## Red-Green-Refactor
+
+\`\`\`dot
+digraph tdd_cycle {
+    rankdir=LR;
+    red [label="RED\\nWrite failing test", shape=box, style=filled, fillcolor="#ffcccc"];
+    verify_red [label="Verify fails\\ncorrectly", shape=diamond];
+    green [label="GREEN\\nMinimal code", shape=box, style=filled, fillcolor="#ccffcc"];
+    verify_green [label="Verify passes\\nAll green", shape=diamond];
+    refactor [label="REFACTOR\\nClean up", shape=box, style=filled, fillcolor="#ccccff"];
+    next [label="Next", shape=ellipse];
+
+    red -> verify_red;
+    verify_red -> green [label="yes"];
+    verify_red -> red [label="wrong\\nfailure"];
+    green -> verify_green;
+    verify_green -> refactor [label="yes"];
+    verify_green -> green [label="no"];
+    refactor -> verify_green [label="stay\\ngreen"];
+    verify_green -> next;
+    next -> red;
+}
+\`\`\`
+
+### RED - Write Failing Test
+
+Write one minimal test showing what should happen.
+
+<Good>
+\`\`\`typescript
+test('retries failed operations 3 times', async () => {
+  let attempts = 0;
+  const operation = () => {
+    attempts++;
+    if (attempts < 3) throw new Error('fail');
+    return 'success';
+  };
+
+  const result = await retryOperation(operation);
+
+  expect(result).toBe('success');
+  expect(attempts).toBe(3);
+});
+\`\`\`
+Clear name, tests real behavior, one thing
+</Good>
+
+<Bad>
+\`\`\`typescript
+test('retry works', async () => {
+  const mock = jest.fn()
+    .mockRejectedValueOnce(new Error())
+    .mockRejectedValueOnce(new Error())
+    .mockResolvedValueOnce('success');
+  await retryOperation(mock);
+  expect(mock).toHaveBeenCalledTimes(3);
+});
+\`\`\`
+Vague name, tests mock not code
+</Bad>
+
+**Requirements:**
+- One behavior
+- Clear name
+- Real code (no mocks unless unavoidable)
+
+### Verify RED - Watch It Fail
+
+**MANDATORY. Never skip.**
+
+\`\`\`bash
+npm test path/to/test.test.ts
+\`\`\`
+
+Confirm:
+- Test fails (not errors)
+- Failure message is expected
+- Fails because feature missing (not typos)
+
+**Test passes?** You're testing existing behavior. Fix test.
+
+**Test errors?** Fix error, re-run until it fails correctly.
+
+### GREEN - Minimal Code
+
+Write simplest code to pass the test.
+
+<Good>
+\`\`\`typescript
+async function retryOperation<T>(fn: () => Promise<T>): Promise<T> {
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === 2) throw e;
+    }
+  }
+  throw new Error('unreachable');
+}
+\`\`\`
+Just enough to pass
+</Good>
+
+<Bad>
+\`\`\`typescript
+async function retryOperation<T>(
+  fn: () => Promise<T>,
+  options?: {
+    maxRetries?: number;
+    backoff?: 'linear' | 'exponential';
+    onRetry?: (attempt: number) => void;
+  }
+): Promise<T> {
+  // YAGNI
+}
+\`\`\`
+Over-engineered
+</Bad>
+
+Don't add features, refactor other code, or "improve" beyond the test.
+
+### Verify GREEN - Watch It Pass
+
+**MANDATORY.**
+
+\`\`\`bash
+npm test path/to/test.test.ts
+\`\`\`
+
+Confirm:
+- Test passes
+- Other tests still pass
+- Output pristine (no errors, warnings)
+
+**Test fails?** Fix code, not test.
+
+**Other tests fail?** Fix now.
+
+### REFACTOR - Clean Up
+
+After green only:
+- Remove duplication
+- Improve names
+- Extract helpers
+
+Keep tests green. Don't add behavior.
+
+### Repeat
+
+Next failing test for next feature.
+
+## Good Tests
+
+| Quality | Good | Bad |
+|---------|------|-----|
+| **Minimal** | One thing. "and" in name? Split it. | \`test('validates email and domain and whitespace')\` |
+| **Clear** | Name describes behavior | \`test('test1')\` |
+| **Shows intent** | Demonstrates desired API | Obscures what code should do |
+
+## Why Order Matters
+
+**"I'll write tests after to verify it works"**
+
+Tests written after code pass immediately. Passing immediately proves nothing:
+- Might test wrong thing
+- Might test implementation, not behavior
+- Might miss edge cases you forgot
+- You never saw it catch the bug
+
+Test-first forces you to see the test fail, proving it actually tests something.
+
+**"I already manually tested all the edge cases"**
+
+Manual testing is ad-hoc. You think you tested everything but:
+- No record of what you tested
+- Can't re-run when code changes
+- Easy to forget cases under pressure
+- "It worked when I tried it" \u2260 comprehensive
+
+Automated tests are systematic. They run the same way every time.
+
+**"Deleting X hours of work is wasteful"**
+
+Sunk cost fallacy. The time is already gone. Your choice now:
+- Delete and rewrite with TDD (X more hours, high confidence)
+- Keep it and add tests after (30 min, low confidence, likely bugs)
+
+The "waste" is keeping code you can't trust. Working code without real tests is technical debt.
+
+**"TDD is dogmatic, being pragmatic means adapting"**
+
+TDD IS pragmatic:
+- Finds bugs before commit (faster than debugging after)
+- Prevents regressions (tests catch breaks immediately)
+- Documents behavior (tests show how to use code)
+- Enables refactoring (change freely, tests catch breaks)
+
+"Pragmatic" shortcuts = debugging in production = slower.
+
+**"Tests after achieve the same goals - it's spirit not ritual"**
+
+No. Tests-after answer "What does this do?" Tests-first answer "What should this do?"
+
+Tests-after are biased by your implementation. You test what you built, not what's required. You verify remembered edge cases, not discovered ones.
+
+Tests-first force edge case discovery before implementing. Tests-after verify you remembered everything (you didn't).
+
+30 minutes of tests after \u2260 TDD. You get coverage, lose proof tests work.
+
+## Common Rationalizations
+
+| Excuse | Reality |
+|--------|---------|
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
+| "I'll test after" | Tests passing immediately prove nothing. |
+| "Tests after achieve same goals" | Tests-after = "what does this do?" Tests-first = "what should this do?" |
+| "Already manually tested" | Ad-hoc \u2260 systematic. No record, can't re-run. |
+| "Deleting X hours is wasteful" | Sunk cost fallacy. Keeping unverified code is technical debt. |
+| "Keep as reference, write tests first" | You'll adapt it. That's testing after. Delete means delete. |
+| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
+| "Test hard = design unclear" | Listen to test. Hard to test = hard to use. |
+| "TDD will slow me down" | TDD faster than debugging. Pragmatic = test-first. |
+| "Manual test faster" | Manual doesn't prove edge cases. You'll re-test every change. |
+| "Existing code has no tests" | You're improving it. Add tests for existing code. |
+
+## Red Flags - STOP and Start Over
+
+- Code before test
+- Test after implementation
+- Test passes immediately
+- Can't explain why test failed
+- Tests added "later"
+- Rationalizing "just this once"
+- "I already manually tested it"
+- "Tests after achieve the same purpose"
+- "It's about spirit not ritual"
+- "Keep as reference" or "adapt existing code"
+- "Already spent X hours, deleting is wasteful"
+- "TDD is dogmatic, I'm being pragmatic"
+- "This is different because..."
+
+**All of these mean: Delete code. Start over with TDD.**
+
+## Example: Bug Fix
+
+**Bug:** Empty email accepted
+
+**RED**
+\`\`\`typescript
+test('rejects empty email', async () => {
+  const result = await submitForm({ email: '' });
+  expect(result.error).toBe('Email required');
+});
+\`\`\`
+
+**Verify RED**
+\`\`\`bash
+$ npm test
+FAIL: expected 'Email required', got undefined
+\`\`\`
+
+**GREEN**
+\`\`\`typescript
+function submitForm(data: FormData) {
+  if (!data.email?.trim()) {
+    return { error: 'Email required' };
+  }
+  // ...
+}
+\`\`\`
+
+**Verify GREEN**
+\`\`\`bash
+$ npm test
+PASS
+\`\`\`
+
+**REFACTOR**
+Extract validation for multiple fields if needed.
+
+## Verification Checklist
+
+Before marking work complete:
+
+- [ ] Every new function/method has a test
+- [ ] Watched each test fail before implementing
+- [ ] Each test failed for expected reason (feature missing, not typo)
+- [ ] Wrote minimal code to pass each test
+- [ ] All tests pass
+- [ ] Output pristine (no errors, warnings)
+- [ ] Tests use real code (mocks only if unavoidable)
+- [ ] Edge cases and errors covered
+
+Can't check all boxes? You skipped TDD. Start over.
+
+## When Stuck
+
+| Problem | Solution |
+|---------|----------|
+| Don't know how to test | Write wished-for API. Write assertion first. Ask your human partner. |
+| Test too complicated | Design too complicated. Simplify interface. |
+| Must mock everything | Code too coupled. Use dependency injection. |
+| Test setup huge | Extract helpers. Still complex? Simplify design. |
+
+## Debugging Integration
+
+Bug found? Write failing test reproducing it. Follow TDD cycle. Test proves fix and prevents regression.
+
+Never fix bugs without a test.
+
+## Testing Anti-Patterns
+
+When adding mocks or test utilities, avoid common pitfalls:
+- Testing mock behavior instead of real behavior
+- Adding test-only methods to production classes
+- Mocking without understanding dependencies
+
+## Final Rule
+
+\`\`\`
+Production code \u2192 test exists and failed first
+Otherwise \u2192 not TDD
+\`\`\`
+
+No exceptions without your human partner's permission.
+`
+  },
+  {
+    name: "code-reviewer",
+    description: "Use when reviewing implementation changes against an approved plan or task (especially before merging or between Hive tasks) to catch missing requirements, YAGNI, dead code, and risky patterns",
+    body: `# Code Reviewer
+
+## Overview
+
+This skill teaches a reviewer to evaluate implementation changes for:
+- Adherence to the approved plan/task (did we build what we said?)
+- Correctness (does it work, including edge cases?)
+- Simplicity (YAGNI, dead code, over-abstraction)
+- Risk (security, performance, maintainability)
+
+**Core principle:** The best change is the smallest correct change that satisfies the plan.
+
+## Iron Laws
+
+- Review against the task/plan first. Code quality comes second.
+- Bias toward deletion and simplification. Every extra line is a liability.
+- Prefer changes that leverage existing patterns and dependencies.
+- Be specific: cite file paths and (when available) line numbers.
+- Do not invent requirements. If the plan/task is ambiguous, mark it and request clarification.
+
+## What Inputs You Need
+
+Minimum:
+- The task intent (1-3 sentences)
+- The plan/task requirements (or a link/path to plan section)
+- The code changes (diff or list of changed files)
+
+If available (recommended):
+- Acceptance criteria / verification steps from the plan
+- Test output or proof the change was verified
+- Any relevant context files (design decisions, constraints)
+
+## Review Process (In Order)
+
+### 1) Identify Scope
+
+1. List all files changed.
+2. For each file, state why it changed (what requirement it serves).
+3. Flag any changes that do not map to the task/plan.
+
+**Rule:** If you cannot map a change to a requirement, treat it as suspicious until justified.
+
+### 2) Plan/Task Adherence (Non-Negotiable)
+
+Create a simple checklist:
+- What the task says must happen
+- Evidence in code/tests that it happens
+
+Flag as issues:
+- Missing requirements (implemented behavior does not match intent)
+- Partial implementation with no follow-up task (TODO-driven shipping)
+- Behavior changes that are not in the plan/task
+
+### 3) Correctness Layer
+
+Review for:
+- Edge cases and error paths
+- Incorrect assumptions about inputs/types
+- Inconsistent behavior across platforms/environments
+- Broken invariants (e.g., state can become invalid)
+
+Prefer "fail fast, fail loud": invalid states should become clear errors, not silent fallbacks.
+
+### 4) Simplicity / YAGNI Layer
+
+Be ruthless and concrete:
+- Remove dead branches, unused flags/options, unreachable code
+- Remove speculative TODOs and "reserved for future" scaffolding
+- Remove comments that restate the code or narrate obvious steps
+- Inline one-off abstractions (helpers/classes/interfaces used once)
+- Replace cleverness with obvious code
+- Reduce nesting with guard clauses / early returns
+
+Prefer clarity over brevity:
+- Avoid nested ternary operators; use \`if/else\` or \`switch\` when branches matter
+- Avoid dense one-liners that hide intent or make debugging harder
+
+### 4b) De-Slop Pass (AI Artifacts / Style Drift)
+
+Scan the diff (not just the final code) for AI-generated slop introduced in this branch:
+- Extra comments that a human would not add, or that do not match the file's tone
+- Defensive checks or try/catch blocks that are abnormal for that area of the codebase
+  - Especially swallowed errors ("ignore and continue") and silent fallbacks
+  - Especially redundant validation in trusted internal codepaths
+- TypeScript escape hatches used to dodge type errors (\`as any\`, \`as unknown as X\`) without necessity
+- Style drift: naming, error handling patterns, logging style, and structure inconsistent with nearby code
+
+Default stance:
+- Prefer deletion over justification.
+- If validation is needed, do it at boundaries; keep internals trusting parsed inputs.
+- If a cast is truly unavoidable, localize it and keep the justification to a single short note.
+
+When recommending simplifications, do not accidentally change behavior. If the current behavior is unclear, request clarification or ask for a test that pins it down.
+
+**Default stance:** Do not add extensibility points without an explicit current requirement.
+
+### 5) Risk Layer (Security / Performance / Maintainability)
+
+Only report what you are confident about.
+
+Security checks (examples):
+- No secrets in code/logs
+- No injection vectors (shell/SQL/HTML) introduced
+- Authz/authn checks preserved
+- Sensitive data not leaked
+
+Performance checks (examples):
+- Avoid unnecessary repeated work (N+1 queries, repeated parsing, repeated filesystem hits)
+- Avoid obvious hot-path allocations or large sync operations
+
+Maintainability checks:
+- Clear naming and intent
+- Consistent error handling
+- API boundaries not blurred
+- Consistent with local file patterns (imports, export style, function style)
+
+### 6) Make One Primary Recommendation
+
+Provide one clear path to reach approval.
+Mention alternatives only when they have materially different trade-offs.
+
+### 7) Signal the Investment
+
+Tag the required follow-up effort using:
+- Quick (<1h)
+- Short (1-4h)
+- Medium (1-2d)
+- Large (3d+)
+
+## Confidence Filter
+
+Only report findings you believe are >=80% likely to be correct.
+If you are unsure, explicitly label it as "Uncertain" and explain what evidence would confirm it.
+
+## Output Format (Use This Exactly)
+
+---
+
+**Files Reviewed:** [list]
+
+**Plan/Task Reference:** [task name + link/path to plan section if known]
+
+**Overall Assessment:** [APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION]
+
+**Bottom Line:** 2-3 sentences describing whether it matches the task/plan and what must change.
+
+### Critical Issues
+- None | [file:line] - [issue] (why it blocks approval) + (recommended fix)
+
+### Major Issues
+- None | [file:line] - [issue] + (recommended fix)
+
+### Minor Issues
+- None | [file:line] - [issue] + (suggested fix)
+
+### YAGNI / Dead Code
+- None | [file:line] - [what to remove/simplify] + (why it is unnecessary)
+
+### Positive Observations
+- [at least one concrete good thing]
+
+### Action Plan
+1. [highest priority change]
+2. [next]
+3. [next]
+
+### Effort Estimate
+[Quick | Short | Medium | Large]
+
+---
+
+## Common Review Smells (Fast Scan)
+
+Task/plan adherence:
+- Adds features not mentioned in the plan/task
+- Leaves TODOs as the mechanism for correctness
+- Introduces new configuration modes/flags "for future"
+
+YAGNI / dead code:
+- Options/config that are parsed but not used
+- Branches that do the same thing on both sides
+- Comments like "reserved for future" or "we might need this"
+
+AI slop / inconsistency:
+- Commentary that restates code, narrates obvious steps, or adds process noise
+- try/catch that swallows errors or returns defaults without a requirement
+- \`as any\` used to silence type errors instead of fixing types
+- New helpers/abstractions with a single call site
+
+Correctness:
+- Silent fallbacks to defaults on error when the task expects a hard failure
+- Unhandled error paths, missing cleanup, missing returns
+
+Maintainability:
+- Abstractions used once
+- Unclear naming, "utility" grab-bags
+
+## When to Escalate
+
+Use NEEDS_DISCUSSION (instead of REQUEST_CHANGES) when:
+- The plan/task is ambiguous and multiple implementations could be correct
+- The change implies a product/architecture decision not documented
+- Fixing issues requires changing scope, dependencies, or public API
+`
+  },
+  {
+    name: "verification-before-completion",
+    description: "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always",
+    body: `# Verification Before Completion
+
+## Overview
+
+Claiming work is complete without verification is dishonesty, not efficiency.
+
+**Core principle:** Evidence before claims, always.
+
+**Violating the letter of this rule is violating the spirit of this rule.**
+
+## The Iron Law
+
+\`\`\`
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+\`\`\`
+
+If you haven't run the verification command in this message, you cannot claim it passes.
+
+## The Gate Function
+
+\`\`\`
+BEFORE claiming any status or expressing satisfaction:
+
+1. IDENTIFY: What command proves this claim?
+2. RUN: Execute the FULL command (fresh, complete)
+3. READ: Full output, check exit code, count failures
+4. VERIFY: Does output confirm the claim?
+   - If NO: State actual status with evidence
+   - If YES: State claim WITH evidence
+5. ONLY THEN: Make the claim
+
+Skip any step = lying, not verifying
+\`\`\`
+
+## Common Failures
+
+| Claim | Requires | Not Sufficient |
+|-------|----------|----------------|
+| Tests pass | Test command output: 0 failures | Previous run, "should pass" |
+| Linter clean | Linter output: 0 errors | Partial check, extrapolation |
+| Build succeeds | Build command: exit 0 | Linter passing, logs look good |
+| Bug fixed | Test original symptom: passes | Code changed, assumed fixed |
+| Regression test works | Red-green cycle verified | Test passes once |
+| Agent completed | VCS diff shows changes | Agent reports "success" |
+| Requirements met | Line-by-line checklist | Tests passing |
+
+## Red Flags - STOP
+
+- Using "should", "probably", "seems to"
+- Expressing satisfaction before verification ("Great!", "Perfect!", "Done!", etc.)
+- About to commit/push/PR without verification
+- Trusting agent success reports
+- Relying on partial verification
+- Thinking "just this once"
+- Tired and wanting work over
+- **ANY wording implying success without having run verification**
+
+## Rationalization Prevention
+
+| Excuse | Reality |
+|--------|---------|
+| "Should work now" | RUN the verification |
+| "I'm confident" | Confidence \u2260 evidence |
+| "Just this once" | No exceptions |
+| "Linter passed" | Linter \u2260 compiler |
+| "Agent said success" | Verify independently |
+| "I'm tired" | Exhaustion \u2260 excuse |
+| "Partial check is enough" | Partial proves nothing |
+| "Different words so rule doesn't apply" | Spirit over letter |
+
+## Key Patterns
+
+**Tests:**
+\`\`\`
+\u2705 [Run test command] [See: 34/34 pass] "All tests pass"
+\u274C "Should pass now" / "Looks correct"
+\`\`\`
+
+**Regression tests (TDD Red-Green):**
+\`\`\`
+\u2705 Write \u2192 Run (pass) \u2192 Revert fix \u2192 Run (MUST FAIL) \u2192 Restore \u2192 Run (pass)
+\u274C "I've written a regression test" (without red-green verification)
+\`\`\`
+
+**Build:**
+\`\`\`
+\u2705 [Run build] [See: exit 0] "Build passes"
+\u274C "Linter passed" (linter doesn't check compilation)
+\`\`\`
+
+**Requirements:**
+\`\`\`
+\u2705 Re-read plan \u2192 Create checklist \u2192 Verify each \u2192 Report gaps or completion
+\u274C "Tests pass, phase complete"
+\`\`\`
+
+**Agent delegation:**
+\`\`\`
+\u2705 Agent reports success \u2192 Check VCS diff \u2192 Verify changes \u2192 Report actual state
+\u274C Trust agent report
+\`\`\`
+
+## Why This Matters
+
+From 24 failure memories:
+- your human partner said "I don't believe you" - trust broken
+- Undefined functions shipped - would crash
+- Missing requirements shipped - incomplete features
+- Time wasted on false completion \u2192 redirect \u2192 rework
+- Violates: "Honesty is a core value. If you lie, you'll be replaced."
+
+## When To Apply
+
+**ALWAYS before:**
+- ANY variation of success/completion claims
+- ANY expression of satisfaction
+- ANY positive statement about work state
+- Committing, PR creation, task completion
+- Moving to next task
+- Delegating to agents
+
+**Rule applies to:**
+- Exact phrases
+- Paraphrases and synonyms
+- Implications of success
+- ANY communication suggesting completion/correctness
+
+## The Bottom Line
+
+**No shortcuts for verification.**
+
+Run the command. Read the output. THEN claim the result.
+
+This is non-negotiable.
+`
+  },
+  {
+    name: "docker-mastery",
+    description: "Use when working with Docker containers \u2014 debugging container failures, writing Dockerfiles, docker-compose for integration tests, image optimization, or deploying containerized applications",
+    body: `# Docker Mastery
+
+## Overview
+
+Docker is a **platform for building, shipping, and running applications**, not just isolation.
+
+Agents should think in containers: reproducible environments, declarative dependencies, isolated execution.
+
+**Core principle:** Containers are not virtual machines. They share the kernel but isolate processes, filesystems, and networks.
+
+**Violating the letter of these guidelines is violating the spirit of containerization.**
+
+## The Iron Law
+
+\`\`\`
+UNDERSTAND THE CONTAINER BEFORE DEBUGGING INSIDE IT
+\`\`\`
+
+Before exec'ing into a container or adding debug commands:
+1. Check the image (what's installed?)
+2. Check mounts (what host files are visible?)
+3. Check environment variables (what config is passed?)
+4. Check the Dockerfile (how was it built?)
+
+Random debugging inside containers wastes time. Context first, then debug.
+
+## When to Use
+
+Use this skill when working with:
+- **Container build failures** - Dockerfile errors, missing dependencies
+- **Test environment setup** - Reproducible test environments across machines
+- **Integration test orchestration** - Multi-service setups (DB + API + tests)
+- **Dockerfile authoring** - Writing efficient, maintainable Dockerfiles
+- **Image size optimization** - Reducing image size, layer caching
+- **Deployment** - Containerized application deployment
+- **Sandbox debugging** - Issues with Hive's Docker sandbox mode
+
+**Use this ESPECIALLY when:**
+- Tests pass locally but fail in CI (environment mismatch)
+- "Works on my machine" problems
+- Need to test against specific dependency versions
+- Multiple services must coordinate (database + API)
+- Building for production deployment
+
+## Core Concepts
+
+### Images vs Containers
+
+- **Image**: Read-only template (built from Dockerfile)
+- **Container**: Running instance of an image (ephemeral by default)
+
+\`\`\`bash
+# Build once
+docker build -t myapp:latest .
+
+# Run many times
+docker run --rm myapp:latest
+docker run --rm -e DEBUG=true myapp:latest
+\`\`\`
+
+**Key insight:** Changes inside containers are lost unless committed or volumes are used.
+
+### Volumes & Mounts
+
+Mount host directories into containers for persistence and code sharing:
+
+\`\`\`bash
+# Mount current directory to /app in container
+docker run -v $(pwd):/app myapp:latest
+
+# Hive worktrees are mounted automatically
+# Your code edits (via Read/Write/editFiles tools) affect the host
+# Container sees the same files at runtime
+\`\`\`
+
+**How Hive uses this:** Worktree is mounted into container, so file tools work on host, bash commands run in container.
+
+### Multi-Stage Builds
+
+Minimize image size by using multiple FROM statements:
+
+\`\`\`dockerfile
+# Build stage (large, has compilers)
+FROM node:22 AS builder
+WORKDIR /app
+COPY package.json bun.lockb ./
+RUN bun install
+COPY . .
+RUN bun run build
+
+# Runtime stage (small, production only)
+FROM node:22-slim
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+CMD ["node", "dist/index.js"]
+\`\`\`
+
+**Result:** Builder tools (TypeScript, bundlers) not included in final image.
+
+### Docker Compose for Multi-Service Setups
+
+Define multiple services in \`docker-compose.yml\`:
+
+\`\`\`yaml
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5432:5432"
+  
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://db:5432/testdb
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+\`\`\`
+
+Run with: \`docker-compose up -d\`
+Teardown with: \`docker-compose down\`
+
+### Network Modes
+
+- **bridge** (default): Isolated network, containers can talk to each other by name
+- **host**: Container uses host's network directly (no isolation)
+- **none**: No network access
+
+**When to use host mode:** Debugging network issues, accessing host services directly.
+
+## Common Patterns
+
+### Debug a Failing Container
+
+**Problem:** Container exits immediately, logs unclear.
+
+**Pattern:**
+1. Run interactively with shell:
+   \`\`\`bash
+   docker run -it --entrypoint sh myapp:latest
+   \`\`\`
+2. Inspect filesystem, check if dependencies exist:
+   \`\`\`bash
+   ls /app
+   which node
+   cat /etc/os-release
+   \`\`\`
+3. Run command manually to see full error:
+   \`\`\`bash
+   node dist/index.js
+   \`\`\`
+
+### Integration Tests with Docker Compose
+
+**Pattern:**
+1. Define services in \`docker-compose.test.yml\`
+2. Add wait logic (wait for DB to be ready)
+3. Run tests
+4. Teardown
+
+\`\`\`yaml
+# docker-compose.test.yml
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: test
+  test:
+    build: .
+    command: bun run test:integration
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgres://postgres:test@db:5432/testdb
+\`\`\`
+
+\`\`\`bash
+docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+docker-compose -f docker-compose.test.yml down
+\`\`\`
+
+### Optimize Dockerfile
+
+**Anti-pattern:**
+\`\`\`dockerfile
+FROM node:22
+WORKDIR /app
+COPY . .              # Copies everything (including node_modules, .git)
+RUN bun install       # Invalidates cache on any file change
+CMD ["bun", "run", "start"]
+\`\`\`
+
+**Optimized:**
+\`\`\`dockerfile
+FROM node:22-slim     # Use slim variant
+WORKDIR /app
+
+# Copy dependency files first (cache layer)
+COPY package.json bun.lockb ./
+RUN bun install --production
+
+# Copy source code (changes frequently)
+COPY src ./src
+COPY tsconfig.json ./
+
+CMD ["bun", "run", "start"]
+\`\`\`
+
+**Add \`.dockerignore\`:**
+\`\`\`
+node_modules
+.git
+.env
+*.log
+dist
+.DS_Store
+\`\`\`
+
+### Handle Missing Dependencies
+
+**Problem:** Command fails with "not found" in container.
+
+**Pattern:**
+1. Check if dependency is in image:
+   \`\`\`bash
+   docker run -it myapp:latest which git
+   \`\`\`
+2. If missing, add to Dockerfile:
+   \`\`\`dockerfile
+   RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+   \`\`\`
+3. Or use a richer base image (e.g., \`node:22\` instead of \`node:22-slim\`).
+
+## Sandbox Integration
+
+### How Hive Wraps Commands
+
+When sandbox mode is active (\`sandbox: 'docker'\` in config):
+1. Hive hook intercepts bash commands before execution
+2. Wraps with \`docker run --rm -v <worktree>:/workspace -w /workspace <image> sh -c "<command>"\`
+3. Command runs in container, but file edits (read/editFiles) still affect the host
+
+**Workers are unaware** \u2014 they issue normal bash commands, Hive handles containerization.
+
+### When Host Access is Needed
+
+Some operations MUST run on host:
+- **Git operations** (commit, push, branch) \u2014 repo state is on host
+- **Host-level tools** (Docker itself, system config)
+- **Cross-worktree operations** (accessing main repo from worktree)
+
+**Pattern:** Use \`HOST:\` prefix to escape sandbox:
+\`\`\`bash
+HOST: git status
+HOST: docker ps
+\`\`\`
+
+**If you need host access frequently:** Report as blocked and ask user if sandbox should be disabled for this task.
+
+### Persistent vs Ephemeral Containers
+
+**Current (v1.2.0):** Each command runs \`docker run --rm\` (ephemeral). State does NOT persist.
+
+Example: \`npm install lodash\` in one command \u2192 not available in next command.
+
+**Workaround:** Install dependencies in Dockerfile, not at runtime.
+
+**Future:** \`docker exec\` will reuse containers, persisting state across commands.
+
+### Auto-Detected Images
+
+Hive detects runtime from project files:
+- \`package.json\` \u2192 \`node:22-slim\`
+- \`requirements.txt\` / \`pyproject.toml\` \u2192 \`python:3.12-slim\`
+- \`go.mod\` \u2192 \`golang:1.22-slim\`
+- \`Cargo.toml\` \u2192 \`rust:1.77-slim\`
+- \`Dockerfile\` \u2192 Builds from project Dockerfile
+- Fallback \u2192 \`ubuntu:24.04\`
+
+**Override:** Set \`dockerImage\` in config (\`~/.config/opencode/agent_hive.json\`).
+
+## Red Flags - STOP
+
+If you catch yourself:
+- Installing packages on host instead of in Dockerfile
+- Running \`docker build\` without \`.dockerignore\` (cache invalidation)
+- Using \`latest\` tag in production (non-reproducible)
+- Ignoring container exit codes (hides failures)
+- Assuming state persists between \`docker run --rm\` commands
+- Using absolute host paths in Dockerfile (not portable)
+- Copying secrets into image layers (leaks credentials)
+
+**ALL of these mean: STOP. Review pattern.**
+
+## Anti-Patterns
+
+| Excuse | Reality |
+|--------|---------|
+| "I'll just run it on host" | Container mismatch bugs are worse to debug later. Build happens in container anyway. |
+| "Works in my container, don't need CI" | CI uses different cache state. Always test in CI-like environment. |
+| "I'll optimize the Dockerfile later" | Later never comes. Large images slow down deployments now. |
+| "latest tag is fine for dev" | Dev should match prod. Pin versions or face surprises. |
+| "Don't need .dockerignore, COPY is fast" | Invalidates cache on every file change. Wastes minutes per build. |
+| "Install at runtime, not in image" | Ephemeral containers lose state. Slows down every command. |
+| "Skip depends_on, services start fast" | Race conditions in integration tests. Use wait-for-it or health checks. |
+
+## Verification Before Completion
+
+Before marking Docker work complete:
+
+- [ ] Container runs successfully: \`docker run --rm <image> <command>\` exits 0
+- [ ] Tests pass inside container (not just on host)
+- [ ] No host pollution (dependencies installed in container, not host)
+- [ ] \`.dockerignore\` exists if using \`COPY . .\`
+- [ ] Image tags are pinned (not \`latest\`) for production
+- [ ] Multi-stage build used if applicable (separate build/runtime)
+- [ ] Integration tests teardown properly (\`docker-compose down\`)
+
+**If any fail:** Don't claim success. Fix or report blocker.
+
+## Quick Reference
+
+| Task | Command Pattern |
+|------|----------------|
+| **Debug container** | \`docker run -it --entrypoint sh <image>\` |
+| **Run with mounts** | \`docker run -v $(pwd):/app <image>\` |
+| **Multi-service tests** | \`docker-compose up --abort-on-container-exit\` |
+| **Check image contents** | \`docker run --rm <image> ls /app\` |
+| **Optimize build** | Add \`.dockerignore\`, use multi-stage, pin versions |
+| **Escape Hive sandbox** | Prefix with \`HOST:\` (e.g., \`HOST: git status\`) |
+
+## Related Skills
+
+- **Refer to the skill at .github/skills/systematic-debugging/SKILL.md** - When container behavior is unexpected
+- **Refer to the skill at .github/skills/test-driven-development/SKILL.md** - Write tests that run in containers
+- **Refer to the skill at .github/skills/verification-before-completion/SKILL.md** - Verify tests pass in container before claiming done
+`
+  },
+  {
+    name: "agents-md-mastery",
+    description: "Use when bootstrapping, updating, or reviewing AGENTS.md \u2014 teaches what makes effective agent memory, how to structure sections, signal vs noise filtering, and when to prune stale entries",
+    body: `# AGENTS.md Mastery
+
+## Overview
+
+**AGENTS.md is pseudo-memory loaded at session start.** Every line shapes agent behavior for the entire session. Quality beats quantity. Write for agents, not humans.
+
+Unlike code comments or READMEs, AGENTS.md entries persist across all agent sessions. A bad entry misleads agents hundreds of times. A missing entry causes the same mistake repeatedly.
+
+**Core principle:** Optimize for agent comprehension and behavioral change, not human readability.
+
+## The Iron Law
+
+\`\`\`
+EVERY ENTRY MUST CHANGE AGENT BEHAVIOR
+\`\`\`
+
+If an entry doesn't:
+- Prevent a specific mistake
+- Enable a capability the agent would otherwise miss
+- Override a default assumption that breaks in this codebase
+
+...then it doesn't belong in AGENTS.md.
+
+**Test:** Would a fresh agent session make a mistake without this entry? If no \u2192 noise.
+
+## When to Use
+
+| Trigger | Action |
+|---------|--------|
+| New project bootstrap | Write initial AGENTS.md with build/test/style basics |
+| Feature completion | Sync new learnings via \`hive_agents_md\` |
+| Periodic review | Audit for stale/redundant entries (quarterly) |
+| Quality issues | Agent repeating mistakes? Check if AGENTS.md has the fix |
+
+## What Makes Good Agent Memory
+
+### Signal Entries (Keep)
+
+\u2705 **Project-specific conventions:**
+- "We use Zustand, not Redux \u2014 never add Redux"
+- "Auth lives in \`/lib/auth\` \u2014 never create auth elsewhere"
+- "Run \`bun test\` not \`npm test\` (we don't use npm)"
+
+\u2705 **Non-obvious patterns:**
+- "Use \`.js\` extension for local imports (ESM requirement)"
+- "Worktrees don't share \`node_modules\` \u2014 run \`bun install\` in each"
+- "SandboxConfig is in \`dockerSandboxService.ts\`, NOT \`types.ts\`"
+
+\u2705 **Gotchas that break builds:**
+- "Never use \`ensureDirSync\` \u2014 doesn't exist. Use \`ensureDir\` (sync despite name)"
+- "Import from \`../utils/paths.js\` not \`./paths\` (ESM strict)"
+
+### Noise Entries (Remove)
+
+\u274C **Agent already knows:**
+- "This project uses TypeScript" (agent detects from files)
+- "We follow semantic versioning" (universal convention)
+- "Use descriptive variable names" (generic advice)
+
+\u274C **Irrelevant metadata:**
+- "Created on January 2024"
+- "Originally written by X"
+- "License: MIT" (in LICENSE file already)
+
+\u274C **Describes what code does:**
+- "FeatureService manages features" (agent can read code)
+- "The system uses git worktrees" (observable from commands)
+
+### Rule of Thumb
+
+**Signal:** Changes how agent acts  
+**Noise:** Documents what agent observes
+
+## Section Structure for Fast Comprehension
+
+Agents read AGENTS.md top-to-bottom once at session start. Put high-value info first:
+
+\`\`\`markdown
+# Project Name
+
+## Build & Test Commands
+# \u2190 Agents need this IMMEDIATELY
+bun run build
+bun run test
+bun run release:check
+
+## Code Style
+# \u2190 Prevents syntax/import errors
+- Semicolons: Yes
+- Quotes: Single
+- Imports: Use \`.js\` extension
+
+## Architecture
+# \u2190 Key directories, where things live
+packages/
+\u251C\u2500\u2500 hive-core/      # Shared logic
+\u251C\u2500\u2500 opencode-hive/  # Plugin
+\u2514\u2500\u2500 vscode-hive/    # Extension
+
+## Important Patterns
+# \u2190 How to do common tasks correctly
+Use \`readText\` from paths.ts, not fs.readFileSync
+
+## Gotchas & Anti-Patterns
+# \u2190 Things that break or mislead
+NEVER use \`ensureDirSync\` \u2014 doesn't exist
+\`\`\`
+
+**Keep total under 500 lines.** Beyond that, agents lose focus and miss critical entries.
+
+## The Sync Workflow
+
+After completing a feature, sync learnings to AGENTS.md:
+
+1. **Trigger sync:**
+   \`\`\`typescript
+   hive_agents_md({ action: 'sync', feature: 'feature-name' })
+   \`\`\`
+
+2. **Review each proposal:**
+   - Read the proposed change
+   - Ask: "Does this change agent behavior?"
+   - Check: Is this already obvious from code/files?
+
+3. **Accept signal, reject noise:**
+   - \u274C "TypeScript is used" \u2192 Agent detects this
+   - \u2705 "Use \`.js\` extension for imports" \u2192 Prevents build failures
+
+4. **Apply approved changes:**
+   \`\`\`typescript
+   hive_agents_md({ action: 'apply' })
+   \`\`\`
+
+**Warning:** Don't auto-approve all proposals. One bad entry pollutes all future sessions.
+
+## When to Prune
+
+Remove entries when they become:
+
+**Outdated:**
+- "We use Redux" \u2192 Project migrated to Zustand
+- "Node 16 compatibility required" \u2192 Now on Node 22
+
+**Redundant:**
+- "Use single quotes" + "Strings use single quotes" \u2192 Keep one
+- Near-duplicates in different sections
+
+**Too generic:**
+- "Write clear code" \u2192 Applies to any project
+- "Test your changes" \u2192 Universal advice
+
+**Describing code:**
+- "TaskService manages tasks" \u2192 Agent can read \`TaskService\` class
+- "Worktrees are in \`.hive/.worktrees/\`" \u2192 Observable from filesystem
+
+**Proven unnecessary:**
+- Entry added 6 months ago, but agents haven't hit that issue since
+
+## Red Flags
+
+| Warning Sign | Why It's Bad | Fix |
+|-------------|-------------|-----|
+| AGENTS.md > 800 lines | Agents lose focus, miss critical info | Prune aggressively |
+| Describes what code does | Agent can read code | Remove descriptions |
+| Missing build/test commands | First thing agents need | Add at top |
+| No gotchas section | Agents repeat past mistakes | Document failure modes |
+| Generic best practices | Doesn't change behavior | Remove or make specific |
+| Outdated patterns | Misleads agents | Prune during sync |
+
+## Anti-Patterns
+
+| Anti-Pattern | Better Approach |
+|-------------|----------------|
+| "Document everything" | Document only what changes behavior |
+| "Keep for historical record" | Version control is history |
+| "Might be useful someday" | Add when proven necessary |
+| "Explains the system" | Agents read code for that |
+| "Comprehensive reference" | AGENTS.md is a filter, not docs |
+
+## Good Examples
+
+**Build Commands (High value, agents need immediately):**
+\`\`\`markdown
+## Build & Test Commands
+bun run build              # Build all packages
+bun run test               # Run all tests
+bun run release:check      # Full CI check
+\`\`\`
+
+**Project-Specific Convention (Prevents mistakes):**
+\`\`\`markdown
+## Code Style
+- Imports: Use \`.js\` extension for local imports (ESM requirement)
+- Paths: Import from \`../utils/paths.js\` never \`./paths\`
+\`\`\`
+
+**Non-Obvious Gotcha (Prevents build failure):**
+\`\`\`markdown
+## Important Patterns
+Use \`ensureDir\` from paths.ts \u2014 sync despite name
+NEVER use \`ensureDirSync\` (doesn't exist)
+\`\`\`
+
+## Bad Examples
+
+**Generic advice (agent already knows):**
+\`\`\`markdown
+## Best Practices
+- Use meaningful variable names
+- Write unit tests
+- Follow DRY principle
+\`\`\`
+
+**Describes code (agent can read it):**
+\`\`\`markdown
+## Architecture
+The FeatureService class manages features. It has methods
+for create, read, update, and delete operations.
+\`\`\`
+
+**Irrelevant metadata:**
+\`\`\`markdown
+## Project History
+Created in January 2024 by the platform team.
+Originally built for internal use.
+\`\`\`
+
+## Verification
+
+Before finalizing AGENTS.md updates:
+
+- [ ] Every entry answers: "What mistake does this prevent?"
+- [ ] No generic advice that applies to all projects
+- [ ] Build/test commands are first
+- [ ] Gotchas section exists and is populated
+- [ ] Total length under 500 lines (800 absolute max)
+- [ ] No entries describing what code does
+- [ ] Fresh agent session would benefit from each entry
+
+## Summary
+
+AGENTS.md is **behavioral memory**, not documentation:
+- Write for agents, optimize for behavior change
+- Signal = prevents mistakes, Noise = describes observables
+- Sync after features, prune quarterly
+- Test: Would agent make a mistake without this entry?
+
+**Quality > quantity. Every line counts.**
+`
+  }
+];
+function getBuiltinSkills() {
+  return builtinSkillSources.map((skill) => ({
+    name: skill.name,
+    description: skill.description,
+    content: generateSkillFile({
+      name: skill.name,
+      description: skill.description,
+      content: skill.body
+    })
+  }));
+}
+
+// src/commands/initNest.ts
+var EXTENSION_ID = "tctinh.vscode-hive";
+var BACKWARD_COMPAT_SKILL = `---
+name: hive
+description: Hive plan-first development workflow
+---
+
+${generateHiveWorkflowInstructions().body.split(/^---$/m).slice(2).join("---").trim()}
+`;
+function ensureDir2(dirPath) {
+  fs13.mkdirSync(dirPath, { recursive: true });
+}
+function writeFile2(filePath, content) {
+  ensureDir2(path13.dirname(filePath));
+  fs13.writeFileSync(filePath, content);
+}
+async function loadVscode() {
+  return await import("vscode");
+}
+function generateAgents() {
+  return generateAllAgents({ extensionId: EXTENSION_ID });
+}
+function generateBuiltinSkills() {
+  return getBuiltinSkills();
+}
+function generateInstructions() {
+  return generateAllInstructions();
+}
+function generatePlugin() {
+  return generatePluginManifest();
+}
+async function initNest(projectRoot, deps) {
+  const vscode7 = deps?.vscodeApi ?? await loadVscode();
+  await vscode7.window.withProgress(
+    {
+      location: vscode7.ProgressLocation.Notification,
+      title: "Initializing Hive Nest"
+    },
+    async (progress) => {
+      progress.report({ message: "Creating Hive directories..." });
+      ensureDir2(path13.join(projectRoot, ".hive"));
+      ensureDir2(path13.join(projectRoot, ".hive", "features"));
+      ensureDir2(path13.join(projectRoot, ".hive", "skills"));
+      ensureDir2(path13.join(projectRoot, ".claude", "skills"));
+      ensureDir2(path13.join(projectRoot, ".opencode", "skill"));
+      progress.report({ message: "Generating Copilot agents..." });
+      for (const agent of generateAgents()) {
+        writeFile2(path13.join(projectRoot, ".github", "agents", agent.filename), agent.content);
+      }
+      progress.report({ message: "Generating builtin skills..." });
+      for (const skill of generateBuiltinSkills()) {
+        writeFile2(path13.join(projectRoot, ".github", "skills", skill.name, "SKILL.md"), skill.content);
+      }
+      progress.report({ message: "Generating hooks..." });
+      for (const hook of generateAllHooks()) {
+        writeFile2(path13.join(projectRoot, ".github", "hooks", hook.configFilename), `${JSON.stringify(hook.config, null, 2)}
+`);
+        for (const script of hook.scripts) {
+          const scriptPath = path13.join(projectRoot, ".github", "hooks", "scripts", script.filename);
+          writeFile2(scriptPath, script.content);
+          fs13.chmodSync(scriptPath, 493);
+        }
+      }
+      progress.report({ message: "Generating instructions..." });
+      for (const instruction of generateInstructions()) {
+        writeFile2(path13.join(projectRoot, ".github", "instructions", instruction.filename), instruction.body);
+      }
+      progress.report({ message: "Generating plugin manifest..." });
+      writeFile2(path13.join(projectRoot, "plugin.json"), `${JSON.stringify(generatePlugin(), null, 2)}
+`);
+      writeFile2(path13.join(projectRoot, ".claude", "skills", "hive", "SKILL.md"), BACKWARD_COMPAT_SKILL);
+      writeFile2(path13.join(projectRoot, ".opencode", "skill", "hive", "SKILL.md"), BACKWARD_COMPAT_SKILL);
+    }
+  );
+  await vscode7.window.showInformationMessage("Hive Nest initialized! Created 4 agents, 11 skills, 2 hooks, 2 instructions.");
+}
+
+// src/commands/regenerateAgents.ts
+var fs14 = __toESM(require("fs"));
+var path14 = __toESM(require("path"));
+var EXTENSION_ID2 = "tctinh.vscode-hive";
+async function loadVscode2() {
+  return await import("vscode");
+}
+async function loadGenerateAgents() {
+  const { generateAllAgents: generateAllAgents2 } = await Promise.resolve().then(() => (init_agents(), agents_exports));
+  return () => generateAllAgents2({ extensionId: EXTENSION_ID2 });
+}
+async function regenerateAgents(workspaceRoot, deps = {}) {
+  const vscode7 = deps.vscodeApi ?? await loadVscode2();
+  const generateAgents2 = deps.generateAgents ?? await loadGenerateAgents();
+  const confirm = await vscode7.window.showQuickPick(
+    [
+      { label: "Regenerate agents", description: "Overwrite all agent files with latest templates" },
+      { label: "Cancel", description: "Do nothing" }
+    ],
+    { title: "Regenerate Hive Agents" }
+  );
+  if (!confirm || confirm.label === "Cancel") {
+    return;
+  }
+  const agents = generateAgents2();
+  const agentsDir = path14.join(workspaceRoot, ".github", "agents");
+  fs14.mkdirSync(agentsDir, { recursive: true });
+  const existingFiles = fs14.readdirSync(agentsDir).filter((filename) => filename.endsWith(".agent.md"));
+  for (const filename of existingFiles) {
+    fs14.unlinkSync(path14.join(agentsDir, filename));
+  }
+  for (const agent of agents) {
+    fs14.writeFileSync(path14.join(agentsDir, agent.filename), agent.content);
+  }
+  await vscode7.window.showInformationMessage(`Hive: Regenerated ${agents.length} agents`);
 }
 
 // src/extension.ts
+function getReviewTarget(workspaceRoot, filePath) {
+  const normalizedWorkspace = workspaceRoot.replace(/\\/g, "/").replace(/\/+$/, "");
+  const normalizedPath = filePath.replace(/\\/g, "/");
+  const compareWorkspace = process.platform === "win32" ? normalizedWorkspace.toLowerCase() : normalizedWorkspace;
+  const comparePath = process.platform === "win32" ? normalizedPath.toLowerCase() : normalizedPath;
+  if (!comparePath.startsWith(`${compareWorkspace}/`)) {
+    return null;
+  }
+  const planMatch = normalizedPath.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
+  if (planMatch) {
+    return { featureName: planMatch[1], document: "plan" };
+  }
+  const overviewMatch = normalizedPath.match(/\.hive\/features\/([^/]+)\/context\/overview\.md$/);
+  if (overviewMatch) {
+    return { featureName: overviewMatch[1], document: "overview" };
+  }
+  return null;
+}
+function getReviewCommentsPath2(workspaceRoot, featureName, document2) {
+  if (document2 === "plan") {
+    const canonicalPath = path15.join(workspaceRoot, ".hive", "features", featureName, "comments", "plan.json");
+    const legacyPath = path15.join(workspaceRoot, ".hive", "features", featureName, "comments.json");
+    return fs15.existsSync(canonicalPath) ? canonicalPath : fs15.existsSync(legacyPath) ? legacyPath : canonicalPath;
+  }
+  return path15.join(workspaceRoot, ".hive", "features", featureName, "comments", "overview.json");
+}
 function findHiveRoot(startPath) {
   let current = startPath;
-  while (current !== path10.dirname(current)) {
-    if (fs10.existsSync(path10.join(current, ".hive"))) {
+  while (current !== path15.dirname(current)) {
+    if (fs15.existsSync(path15.join(current, ".hive"))) {
       return current;
     }
-    current = path10.dirname(current);
+    current = path15.dirname(current);
   }
   return null;
 }
@@ -8269,9 +12210,9 @@ var HiveExtension = class {
     this.sidebarProvider = new HiveSidebarProvider(workspaceRoot);
     this.launcher = new Launcher(workspaceRoot);
     this.commentController = new PlanCommentController(workspaceRoot);
-    vscode7.window.registerTreeDataProvider("hive.features", this.sidebarProvider);
+    vscode6.window.registerTreeDataProvider("hive.features", this.sidebarProvider);
     this.commentController.registerCommands(this.context);
-    vscode7.commands.executeCommand("setContext", "hive.hasHiveRoot", true);
+    vscode6.commands.executeCommand("setContext", "hive.hasHiveRoot", true);
     registerAllTools(this.context, [
       ...getFeatureTools(workspaceRoot),
       ...getPlanTools(workspaceRoot),
@@ -8279,7 +12220,9 @@ var HiveExtension = class {
       ...getExecTools(workspaceRoot),
       ...getMergeTools(workspaceRoot),
       ...getContextTools(workspaceRoot),
-      ...getStatusTools(workspaceRoot)
+      ...getStatusTools(workspaceRoot),
+      ...getAgentsMdTools(workspaceRoot),
+      ...getSkillTools(workspaceRoot)
     ]);
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => {
       this.sidebarProvider?.refresh();
@@ -8291,16 +12234,16 @@ var HiveExtension = class {
     }
   }
   initializeWithoutHive() {
-    vscode7.commands.executeCommand("setContext", "hive.hasHiveRoot", false);
-    this.creationWatcher = vscode7.workspace.createFileSystemWatcher(
-      new vscode7.RelativePattern(this.workspaceFolder, ".hive/**")
+    vscode6.commands.executeCommand("setContext", "hive.hasHiveRoot", false);
+    this.creationWatcher = vscode6.workspace.createFileSystemWatcher(
+      new vscode6.RelativePattern(this.workspaceFolder, ".hive/**")
     );
     const onHiveCreated = () => {
       const newRoot = findHiveRoot(this.workspaceFolder);
       if (newRoot && !this.initialized) {
         this.workspaceRoot = newRoot;
         this.initializeWithHive(newRoot);
-        vscode7.window.showInformationMessage("Hive: .hive directory detected, extension activated");
+        vscode6.window.showInformationMessage("Hive: .hive directory detected, extension activated");
       }
     };
     this.creationWatcher.onDidCreate(onHiveCreated);
@@ -8309,7 +12252,7 @@ var HiveExtension = class {
   registerCommands() {
     const workspaceFolder = this.workspaceFolder;
     this.context.subscriptions.push(
-      vscode7.commands.registerCommand("hive.initNest", async () => {
+      vscode6.commands.registerCommand("hive.initNest", async () => {
         await initNest(workspaceFolder);
         const newRoot = findHiveRoot(workspaceFolder);
         if (newRoot && !this.initialized) {
@@ -8317,21 +12260,26 @@ var HiveExtension = class {
           this.initializeWithHive(newRoot);
         }
       }),
-      vscode7.commands.registerCommand("hive.refresh", () => {
+      vscode6.commands.registerCommand("hive.refresh", () => {
         if (!this.initialized) {
           const newRoot = findHiveRoot(workspaceFolder);
           if (newRoot) {
             this.workspaceRoot = newRoot;
             this.initializeWithHive(newRoot);
           } else {
-            vscode7.window.showWarningMessage("Hive: No .hive directory found. Use @Hive in Copilot Chat to create a feature.");
+            vscode6.window.showWarningMessage("Hive: No .hive directory found. Use @Hive in Copilot Chat to create a feature.");
             return;
           }
         }
         this.sidebarProvider?.refresh();
       }),
-      vscode7.commands.registerCommand("hive.newFeature", async () => {
-        const name = await vscode7.window.showInputBox({
+      vscode6.commands.registerCommand("hive.regenerateAgents", async () => {
+        if (this.workspaceRoot) {
+          await regenerateAgents(this.workspaceRoot);
+        }
+      }),
+      vscode6.commands.registerCommand("hive.newFeature", async () => {
+        const name = await vscode6.window.showInputBox({
           prompt: "Feature name",
           placeHolder: "my-feature"
         });
@@ -8340,58 +12288,64 @@ var HiveExtension = class {
           try {
             featureService.create(name);
             this.sidebarProvider?.refresh();
-            vscode7.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
+            vscode6.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
           } catch (error) {
-            vscode7.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
+            vscode6.window.showErrorMessage(`Hive: Failed to create feature - ${error}`);
           }
         } else if (name) {
-          const hiveDir = path10.join(workspaceFolder, ".hive");
-          fs10.mkdirSync(hiveDir, { recursive: true });
+          const hiveDir = path15.join(workspaceFolder, ".hive");
+          fs15.mkdirSync(hiveDir, { recursive: true });
           this.workspaceRoot = workspaceFolder;
           this.initializeWithHive(workspaceFolder);
           const featureService = new FeatureService(workspaceFolder);
           featureService.create(name);
           this.sidebarProvider?.refresh();
-          vscode7.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
+          vscode6.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`);
         }
       }),
-      vscode7.commands.registerCommand("hive.openFeature", (featureName) => {
+      vscode6.commands.registerCommand("hive.openFeature", (featureName) => {
         this.launcher?.openFeature(featureName);
       }),
-      vscode7.commands.registerCommand("hive.openTask", (item) => {
+      vscode6.commands.registerCommand("hive.openTask", (item) => {
         if (item?.featureName && item?.folder) {
           this.launcher?.openTask(item.featureName, item.folder);
         }
       }),
-      vscode7.commands.registerCommand("hive.openFile", (filePath) => {
+      vscode6.commands.registerCommand("hive.openFile", (filePath) => {
         if (filePath) {
           this.launcher?.openFile(filePath);
         }
       }),
-      vscode7.commands.registerCommand("hive.approvePlan", async (item) => {
+      vscode6.commands.registerCommand("hive.approvePlan", async (item) => {
         if (item?.featureName && this.workspaceRoot) {
+          const featureService = new FeatureService(this.workspaceRoot);
           const planService = new PlanService(this.workspaceRoot);
-          const comments2 = planService.getComments(item.featureName);
-          if (comments2.length > 0) {
-            vscode7.window.showWarningMessage(`Hive: Cannot approve - ${comments2.length} unresolved comment(s). Address them first.`);
+          const reviewCounts = featureService.getInfo(item.featureName)?.reviewCounts ?? { plan: 0, overview: 0 };
+          const unresolvedTotal = reviewCounts.plan + reviewCounts.overview;
+          if (unresolvedTotal > 0) {
+            const documents = [
+              reviewCounts.plan > 0 ? `plan (${reviewCounts.plan})` : null,
+              reviewCounts.overview > 0 ? `overview (${reviewCounts.overview})` : null
+            ].filter(Boolean).join(", ");
+            vscode6.window.showWarningMessage(`Hive: Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`);
             return;
           }
           try {
             planService.approve(item.featureName);
             this.sidebarProvider?.refresh();
-            vscode7.window.showInformationMessage(`Hive: Plan approved for "${item.featureName}". Use @Hive to sync tasks.`);
+            vscode6.window.showInformationMessage(`Hive: Plan approved for "${item.featureName}". Use @Hive to sync tasks.`);
           } catch (error) {
-            vscode7.window.showErrorMessage(`Hive: Failed to approve plan - ${error}`);
+            vscode6.window.showErrorMessage(`Hive: Failed to approve plan - ${error}`);
           }
         }
       }),
-      vscode7.commands.registerCommand("hive.syncTasks", async (item) => {
+      vscode6.commands.registerCommand("hive.syncTasks", async (item) => {
         if (item?.featureName && this.workspaceRoot) {
           const featureService = new FeatureService(this.workspaceRoot);
           const taskService = new TaskService(this.workspaceRoot);
           const featureData = featureService.get(item.featureName);
           if (!featureData || featureData.status === "planning") {
-            vscode7.window.showWarningMessage("Hive: Plan must be approved before syncing tasks.");
+            vscode6.window.showWarningMessage("Hive: Plan must be approved before syncing tasks.");
             return;
           }
           try {
@@ -8400,24 +12354,24 @@ var HiveExtension = class {
               featureService.updateStatus(item.featureName, "executing");
             }
             this.sidebarProvider?.refresh();
-            vscode7.window.showInformationMessage(`Hive: ${result.created.length} tasks created for "${item.featureName}".`);
+            vscode6.window.showInformationMessage(`Hive: ${result.created.length} tasks created for "${item.featureName}".`);
           } catch (error) {
-            vscode7.window.showErrorMessage(`Hive: Failed to sync tasks - ${error}`);
+            vscode6.window.showErrorMessage(`Hive: Failed to sync tasks - ${error}`);
           }
         }
       }),
-      vscode7.commands.registerCommand("hive.startTask", async (item) => {
+      vscode6.commands.registerCommand("hive.startTask", async (item) => {
         if (item?.featureName && item?.folder && this.workspaceRoot) {
           const worktreeService = new WorktreeService({
             baseDir: this.workspaceRoot,
-            hiveDir: path10.join(this.workspaceRoot, ".hive")
+            hiveDir: path15.join(this.workspaceRoot, ".hive")
           });
           const taskService = new TaskService(this.workspaceRoot);
           try {
             const worktree = await worktreeService.create(item.featureName, item.folder);
             taskService.update(item.featureName, item.folder, { status: "in_progress" });
             this.sidebarProvider?.refresh();
-            const openWorktree = await vscode7.window.showInformationMessage(
+            const openWorktree = await vscode6.window.showInformationMessage(
               `Hive: Worktree created at ${worktree.path}`,
               "Open in New Window"
             );
@@ -8425,35 +12379,34 @@ var HiveExtension = class {
               this.launcher?.openTask(item.featureName, item.folder);
             }
           } catch (error) {
-            vscode7.window.showErrorMessage(`Hive: Failed to start task - ${error}`);
+            vscode6.window.showErrorMessage(`Hive: Failed to start task - ${error}`);
           }
         }
       }),
-      vscode7.commands.registerCommand("hive.plan.doneReview", async () => {
-        const editor = vscode7.window.activeTextEditor;
+      vscode6.commands.registerCommand("hive.plan.doneReview", async () => {
+        const editor = vscode6.window.activeTextEditor;
         if (!editor) return;
         if (!this.workspaceRoot) {
-          vscode7.window.showErrorMessage("Hive: No .hive directory found");
+          vscode6.window.showErrorMessage("Hive: No .hive directory found");
           return;
         }
         const filePath = editor.document.uri.fsPath;
-        const normalized = filePath.replace(/\\/g, "/");
-        const featureMatch = normalized.match(/\.hive\/features\/([^/]+)\/plan\.md$/);
-        if (!featureMatch) {
-          vscode7.window.showErrorMessage("Not a plan.md file");
+        const target = getReviewTarget(this.workspaceRoot, filePath);
+        if (!target) {
+          vscode6.window.showErrorMessage("Not a reviewable plan.md or context/overview.md file");
           return;
         }
-        const featureName = featureMatch[1];
-        const commentsPath = path10.join(this.workspaceRoot, ".hive", "features", featureName, "comments.json");
+        const commentsPath = getReviewCommentsPath2(this.workspaceRoot, target.featureName, target.document);
         let comments2 = [];
         try {
-          const commentsData = JSON.parse(fs10.readFileSync(commentsPath, "utf-8"));
+          const commentsData = JSON.parse(fs15.readFileSync(commentsPath, "utf-8"));
           comments2 = commentsData.threads || [];
         } catch (error) {
         }
         const hasComments = comments2.length > 0;
-        const inputPrompt = hasComments ? `${comments2.length} comment(s) found. Add feedback or leave empty to submit comments only` : "Enter your review feedback (or leave empty to approve)";
-        const userInput = await vscode7.window.showInputBox({
+        const documentLabel = target.document === "overview" ? "Overview" : "Plan";
+        const inputPrompt = hasComments ? `${documentLabel}: ${comments2.length} comment(s) found. Add feedback or leave empty to submit comments only` : `Enter your ${documentLabel.toLowerCase()} review feedback (or leave empty to approve)`;
+        const userInput = await vscode6.window.showInputBox({
           prompt: inputPrompt,
           placeHolder: hasComments ? "Additional feedback (optional)" : 'e.g., "looks good" to approve, or describe changes needed'
         });
@@ -8461,25 +12414,25 @@ var HiveExtension = class {
         let feedback;
         if (hasComments) {
           const allComments = comments2.map((c) => `Line ${c.line}: ${c.body}`).join("\n");
-          feedback = userInput === "" ? `Review comments:
-${allComments}` : `Review comments:
+          feedback = userInput === "" ? `${documentLabel} review comments:
+${allComments}` : `${documentLabel} review comments:
 ${allComments}
 
 Additional feedback: ${userInput}`;
         } else {
-          feedback = userInput === "" ? "Plan approved" : `Review feedback: ${userInput}`;
+          feedback = userInput === "" ? `${documentLabel} approved` : `${documentLabel} review feedback: ${userInput}`;
         }
-        vscode7.window.showInformationMessage(
+        vscode6.window.showInformationMessage(
           `Hive: ${hasComments ? "Comments submitted" : "Review submitted"}. Use @Hive in Copilot Chat to continue.`
         );
-        await vscode7.env.clipboard.writeText(`@Hive ${feedback}`);
-        vscode7.window.showInformationMessage("Hive: Feedback copied to clipboard. Paste in Copilot Chat.");
+        await vscode6.env.clipboard.writeText(`@Hive ${feedback}`);
+        vscode6.window.showInformationMessage("Hive: Feedback copied to clipboard. Paste in Copilot Chat.");
       })
     );
   }
 };
 function activate(context) {
-  const workspaceFolder = vscode7.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const workspaceFolder = vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!workspaceFolder) return;
   const extension = new HiveExtension(context, workspaceFolder);
   extension.registerCommands();

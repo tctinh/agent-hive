@@ -46,7 +46,7 @@ The answer became this platform.
 | **Comb** | Task Structure | The organized grid of cells (tasks) within a nest. The work breakdown structure. |
 | **Cells** | Tasks | Individual tasks within a comb. Each cell is isolated (worktree) and produces one unit of work. |
 | **Royal Jelly** | Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
-| **Honey** | Artifacts | The output — `plan.md`, `spec.md`, `report.md`, code. Persistent documentation that emerges from work. |
+| **Honey** | Artifacts | The human-facing sweetness of the work — led by `plan.md`, with optional pre-task Mermaid overviews, `spec.md`, `report.md`, context files, and code behind it. |
 | **Propolis** | Verification | Best-effort worker checks + orchestrator batch testing that seal work as complete. |
 | **Wax Seal** | Sandbox | Docker container that isolates worker execution. Tests run inside, results flow out. |
 | **Waggle Dance** | Planning | The planning phase. Architect communicates, Beekeeper reviews, alignment before action. |
@@ -155,7 +155,7 @@ Two phases with a clear gate between them.
 | **Planning** | Dialogue | Shape, question, refine |
 | **Execution** | Trust | Agent runs, human monitors |
 
-Planning is collaborative. Execution is autonomous. The approval gate is where trust is earned.
+Planning is collaborative. Execution is autonomous. Humans should usually review `plan.md` first for the narrative and execution contract, then inspect supporting context files only when needed. The approval gate is where trust is earned.
 
 *Inspired by Boris's Tip 6: "Most sessions should start in Plan mode... A good plan makes all the difference."*
 

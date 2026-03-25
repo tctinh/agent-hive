@@ -148,6 +148,27 @@ describe('Architect (Planner) prompt', () => {
   it('contains test strategy assessment', () => {
     expect(ARCHITECT_BEE_PROMPT).toContain('Test Strategy');
   });
+
+  it('requires a human-facing summary in plan.md before tasks', () => {
+    expect(ARCHITECT_BEE_PROMPT).toContain('Design Summary');
+    expect(ARCHITECT_BEE_PROMPT).toContain('before `## Tasks`');
+    expect(ARCHITECT_BEE_PROMPT).toContain('human-facing summary');
+    expect(ARCHITECT_BEE_PROMPT).toContain('plan.md');
+  });
+
+  it('describes mermaid as optional in the plan preamble only', () => {
+    expect(ARCHITECT_BEE_PROMPT).toContain('optional Mermaid');
+    expect(ARCHITECT_BEE_PROMPT).toContain('dependency or sequence overview');
+    expect(ARCHITECT_BEE_PROMPT).not.toContain('context/overview.md');
+    expect(ARCHITECT_BEE_PROMPT).not.toContain('primary human review surface');
+  });
+
+  it('teaches hive hybrid planning to keep the summary in plan.md', () => {
+    expect(QUEEN_BEE_PROMPT).toContain('Design Summary');
+    expect(QUEEN_BEE_PROMPT).toContain('before `## Tasks`');
+    expect(QUEEN_BEE_PROMPT).toContain('optional Mermaid');
+    expect(QUEEN_BEE_PROMPT).not.toContain('context/overview.md');
+  });
 });
 
 describe('Swarm (Orchestrator) prompt', () => {
@@ -210,6 +231,15 @@ describe('Swarm (Orchestrator) prompt', () => {
 
   it('contains verification checklist', () => {
     expect(SWARM_BEE_PROMPT).toContain('After Delegation - VERIFY');
+  });
+
+  it('teaches orchestrators to maintain overview at execution milestones', () => {
+    expect(SWARM_BEE_PROMPT).toContain('hive_context_write({ name: "overview", content: ... })');
+    expect(SWARM_BEE_PROMPT).toContain('execution start');
+    expect(SWARM_BEE_PROMPT).toContain('scope shift');
+    expect(SWARM_BEE_PROMPT).toContain('completion');
+    expect(SWARM_BEE_PROMPT).toContain('primary human-facing document');
+    expect(SWARM_BEE_PROMPT).toContain('plan.md');
   });
 });
 

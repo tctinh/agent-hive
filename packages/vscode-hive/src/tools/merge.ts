@@ -23,12 +23,18 @@ export function getMergeTools(workspaceRoot: string): ToolRegistration[] {
             enum: ['merge', 'squash', 'rebase'],
             description: 'Merge strategy (default: merge)',
           },
+          message: { type: 'string', description: 'Optional merge commit message for merge/squash only. Empty uses default.' },
         },
         required: ['feature', 'task'],
       },
       invoke: async (input) => {
-        const { feature, task, strategy = 'merge' } = input as { feature: string; task: string; strategy?: string };
-        const result = await worktreeService.merge(feature, task, strategy as any);
+        const { feature, task, strategy = 'merge', message } = input as {
+          feature: string;
+          task: string;
+          strategy?: string;
+          message?: string;
+        };
+        const result = await worktreeService.merge(feature, task, strategy as any, message);
         return JSON.stringify({
           success: result.success,
           strategy,

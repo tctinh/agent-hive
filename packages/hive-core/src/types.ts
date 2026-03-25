@@ -10,6 +10,12 @@ export interface FeatureJson {
   completedAt?: string;
 }
 
+export interface FeatureDirectoryInfo {
+  directoryName: string;
+  logicalName: string;
+  index: number | null;
+}
+
 export type TaskStatusType = 'pending' | 'in_progress' | 'done' | 'cancelled' | 'blocked' | 'failed' | 'partial';
 export type TaskOrigin = 'plan' | 'manual';
 export type SubtaskType = 'test' | 'implement' | 'review' | 'verify' | 'research' | 'debug' | 'custom';
@@ -74,22 +80,30 @@ export interface TaskStatus {
   dependsOn?: string[];
 }
 
-export interface PlanComment {
+export type ReviewDocument = 'plan' | 'overview';
+
+export interface ReviewThread {
   id: string;
   line: number;
   body: string;
-  author: string;
-  timestamp: string;
+  replies: string[];
 }
 
 export interface CommentsJson {
-  threads: PlanComment[];
+  threads: ReviewThread[];
 }
+
+export interface ReviewCounts {
+  plan: number;
+  overview: number;
+}
+
+export type PlanComment = ReviewThread;
 
 export interface PlanReadResult {
   content: string;
   status: FeatureStatusType;
-  comments: PlanComment[];
+  comments: ReviewThread[];
 }
 
 export interface TasksSyncResult {
@@ -113,7 +127,9 @@ export interface FeatureInfo {
   status: FeatureStatusType;
   tasks: TaskInfo[];
   hasPlan: boolean;
+  hasOverview: boolean;
   commentCount: number;
+  reviewCounts: ReviewCounts;
 }
 
 export interface ContextFile {
