@@ -392,7 +392,7 @@ describe("e2e: Forager compaction loop mitigation (in-process)", () => {
     const compactionPrompt = buildCompactionPrompt();
     expect(compactionPrompt).not.toMatch(/hive_status/);
     expect(compactionPrompt).toMatch(/worker-prompt\.md|task spec|spec file/i);
-    expect(compactionPrompt).toMatch(/continue/i);
+    expect(compactionPrompt).toContain("Next action: resume from where you left off.");
     expect(compactionPrompt).not.toMatch(/use hive_status to check feature state/i);
   });
 

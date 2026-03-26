@@ -87,6 +87,16 @@ describe('SessionService', () => {
       expect(updated.sessionKind).toBe('task-worker');
       expect(updated.messageCount).toBe(5);
     });
+
+    it('preserves earlier global sessions across successive writes', () => {
+      service.trackGlobal('sess-a', { agent: 'hive-master', sessionKind: 'primary' });
+      service.trackGlobal('sess-b', { agent: 'forager-worker', sessionKind: 'task-worker' });
+
+      const globalPath = getGlobalSessionsPath(PROJECT_ROOT);
+      const data = JSON.parse(fs.readFileSync(globalPath, 'utf-8'));
+      expect(data.sessions.some((s: { sessionId: string }) => s.sessionId === 'sess-a')).toBe(true);
+      expect(data.sessions.some((s: { sessionId: string }) => s.sessionId === 'sess-b')).toBe(true);
+    });
   });
 
   describe('getGlobal', () => {

@@ -37,9 +37,22 @@ function resolveRole(ctx: CompactionSessionContext): string | undefined {
   return undefined;
 }
 
+function resolveWorkerPromptPath(ctx: CompactionSessionContext): string | undefined {
+  if (ctx.workerPromptPath) {
+    return ctx.workerPromptPath;
+  }
+
+  if (ctx.featureName && ctx.taskFolder) {
+    return `.hive/features/${ctx.featureName}/tasks/${ctx.taskFolder}/worker-prompt.md`;
+  }
+
+  return undefined;
+}
+
 export function buildCompactionReanchor(ctx: CompactionSessionContext): CompactionReanchor {
   const role = resolveRole(ctx);
   const kind = ctx.sessionKind ?? 'unknown';
+  const workerPromptPath = resolveWorkerPromptPath(ctx);
   const lines: string[] = [];
   const context: string[] = [];
 
@@ -50,15 +63,16 @@ export function buildCompactionReanchor(ctx: CompactionSessionContext): Compacti
   }
 
   lines.push('Do not switch roles.');
+  lines.push('Do not call status tools to rediscover state.');
   lines.push('Do not re-read the full codebase.');
 
   if (kind === 'task-worker') {
     lines.push('Do not delegate.');
-    if (ctx.workerPromptPath) {
+    if (workerPromptPath) {
       lines.push('Re-read worker-prompt.md now to recall your assignment.');
-      context.push(ctx.workerPromptPath);
+      context.push(workerPromptPath);
     } else {
-      lines.push('Re-read worker-prompt.md in your task worktree root to recall your assignment.');
+      lines.push('Re-read worker-prompt.md from the Hive task metadata to recall your assignment.');
     }
   }
 

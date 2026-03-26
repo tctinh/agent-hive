@@ -201,7 +201,6 @@ import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { formatRelativeTime } from "./utils/format";
 import { createVariantHook } from "./hooks/variant-hook.js";
 import { HIVE_SYSTEM_PROMPT, shouldExecuteHook } from "./hooks/system-hook.js";
-import { buildCompactionPrompt } from "./utils/compaction-prompt.js";
 import { buildCompactionReanchor } from "./utils/compaction-anchor.js";
 import type { CompactionSessionContext } from "./utils/compaction-anchor.js";
 
@@ -216,7 +215,7 @@ type ToolContext = {
 };
 
 const plugin: Plugin = async (ctx) => {
-  const { directory, client } = ctx;
+  const { directory, client, worktree } = ctx;
 
   const featureService = new FeatureService(directory);
   const planService = new PlanService(directory);
@@ -239,6 +238,21 @@ const plugin: Plugin = async (ctx) => {
   });
 
   const customAgentConfigsForClassification = getCustomAgentConfigsCompat(configService);
+  const runtimeContext = detectContext(worktree || directory);
+  const taskWorkerRecovery = runtimeContext.isWorktree && runtimeContext.feature && runtimeContext.task
+    ? {
+        featureName: runtimeContext.feature,
+        taskFolder: runtimeContext.task,
+        workerPromptPath: path.posix.join(
+          '.hive',
+          'features',
+          resolveFeatureDirectoryName(directory, runtimeContext.feature),
+          'tasks',
+          runtimeContext.task,
+          'worker-prompt.md',
+        ),
+      }
+    : undefined;
 
   /**
    * Check if OMO-Slim delegation is enabled via user config.
@@ -883,7 +897,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
     // Type assertion needed because TypeScript's contravariance rules are too strict
     // for the hook's output parameter type. The hook only accesses output.message.variant
     // which exists on UserMessage.
-    "chat.message": createVariantHook(configService, sessionService, customAgentConfigsForClassification) as any,
+    "chat.message": createVariantHook(configService, sessionService, customAgentConfigsForClassification, taskWorkerRecovery) as any,
 
     "tool.execute.before": async (input, output) => {
       // Cadence gate: check if this hook should execute this turn

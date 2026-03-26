@@ -10,8 +10,8 @@ import * as os from 'os';
 describe('buildCompactionPrompt', () => {
   test('includes resume instruction to continue current task', () => {
     const prompt = buildCompactionPrompt();
-    expect(prompt).toMatch(/continue/i);
-    expect(prompt).toMatch(/task/i);
+    expect(prompt).toContain('Next action: resume from where you left off.');
+    expect(prompt).toMatch(/worker|assignment|resume/i);
   });
 
   test('instructs reading task spec file, not full repo', () => {
@@ -50,7 +50,7 @@ describe('buildCompactionPrompt', () => {
 describe('experimental.session.compacting hook output', () => {
   test('context includes resume directives (via buildCompactionPrompt)', () => {
     const prompt = buildCompactionPrompt();
-    expect(prompt).toMatch(/continue/i);
+    expect(prompt).toContain('Next action: resume from where you left off.');
     expect(prompt).not.toMatch(/hive_status/);
   });
 });

@@ -52,6 +52,14 @@ describe('buildCompactionReanchor', () => {
           expect(anchor.prompt).toContain('Do not re-read the full codebase');
         });
 
+        it('contains explicit anti-loop guidance for status tools', () => {
+          anchor = buildCompactionReanchor({
+            sessionKind: kind,
+            agent: kind === 'primary' ? 'hive-master' : undefined,
+          });
+          expect(anchor.prompt).toContain('Do not call status tools');
+        });
+
         it('contains Next action:', () => {
           anchor = buildCompactionReanchor({
             sessionKind: kind,
@@ -156,6 +164,17 @@ describe('buildCompactionReanchor', () => {
         workerPromptPath: '.hive/features/feature-a/tasks/01-first-task/worker-prompt.md',
       });
       expect(anchor.prompt).toContain('Do not delegate');
+    });
+
+    it('without an exact path, points the worker to the Hive task path instead of the worktree root', () => {
+      const anchor = buildCompactionReanchor({
+        agent: 'forager-worker',
+        sessionKind: 'task-worker',
+        featureName: 'feature-a',
+        taskFolder: '01-first-task',
+      });
+      expect(anchor.context.join('\n')).toContain('.hive/features/feature-a/tasks/01-first-task/worker-prompt.md');
+      expect(anchor.prompt).not.toContain('task worktree root');
     });
 
     it('includes the worker-prompt.md path in context', () => {

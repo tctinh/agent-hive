@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { getFeaturePath, getGlobalSessionsPath, ensureDir, readJson, writeJson } from '../utils/paths.js';
+import { getFeaturePath, getGlobalSessionsPath, ensureDir, readJson, writeJson, acquireLockSync, writeJsonAtomic } from '../utils/paths.js';
 import type { SessionInfo, SessionsJson } from '../types.js';
 
 export class SessionService {
@@ -41,47 +41,63 @@ export class SessionService {
     writeJson(globalPath, data);
   }
 
-  trackGlobal(sessionId: string, patch?: Partial<SessionInfo>): SessionInfo {
-    const data = this.getGlobalSessions();
-    const now = new Date().toISOString();
+  private updateGlobalSessions(mutator: (data: SessionsJson) => SessionInfo): SessionInfo {
+    const globalPath = getGlobalSessionsPath(this.projectRoot);
+    ensureDir(path.dirname(globalPath));
+    const release = acquireLockSync(globalPath);
 
-    let session = data.sessions.find(s => s.sessionId === sessionId);
-    if (session) {
-      session.lastActiveAt = now;
-      this.applySessionPatch(session, patch);
-    } else {
-      session = {
-        sessionId,
-        startedAt: now,
-        lastActiveAt: now,
-      };
-      this.applySessionPatch(session, patch);
-      data.sessions.push(session);
+    try {
+      const data = readJson<SessionsJson>(globalPath) || { sessions: [] };
+      const session = mutator(data);
+      writeJsonAtomic(globalPath, data);
+      return session;
+    } finally {
+      release();
     }
+  }
 
-    this.saveGlobalSessions(data);
-    return session;
+  trackGlobal(sessionId: string, patch?: Partial<SessionInfo>): SessionInfo {
+    return this.updateGlobalSessions((data) => {
+      const now = new Date().toISOString();
+
+      let session = data.sessions.find(s => s.sessionId === sessionId);
+      if (session) {
+        session.lastActiveAt = now;
+        this.applySessionPatch(session, patch);
+      } else {
+        session = {
+          sessionId,
+          startedAt: now,
+          lastActiveAt: now,
+        };
+        this.applySessionPatch(session, patch);
+        data.sessions.push(session);
+      }
+
+      return session;
+    });
   }
 
   bindFeature(sessionId: string, featureName: string, patch?: Partial<SessionInfo>): SessionInfo {
-    const data = this.getGlobalSessions();
-    let session = data.sessions.find(s => s.sessionId === sessionId);
-    const now = new Date().toISOString();
+    const session = this.updateGlobalSessions((data) => {
+      let current = data.sessions.find(s => s.sessionId === sessionId);
+      const now = new Date().toISOString();
 
-    if (!session) {
-      session = {
-        sessionId,
-        startedAt: now,
-        lastActiveAt: now,
-      };
-      data.sessions.push(session);
-    }
+      if (!current) {
+        current = {
+          sessionId,
+          startedAt: now,
+          lastActiveAt: now,
+        };
+        data.sessions.push(current);
+      }
 
-    session.featureName = featureName;
-    session.lastActiveAt = now;
-    this.applySessionPatch(session, patch);
+      current.featureName = featureName;
+      current.lastActiveAt = now;
+      this.applySessionPatch(current, patch);
 
-    this.saveGlobalSessions(data);
+      return current;
+    });
 
     const featureData = this.getSessions(featureName);
     let featureSession = featureData.sessions.find(s => s.sessionId === sessionId);

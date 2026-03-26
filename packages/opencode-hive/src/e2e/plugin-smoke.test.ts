@@ -2088,4 +2088,73 @@ Do it
     expect(workerSession.taskFolder).toBe(FIRST_TASK);
     expect(workerSession.workerPromptPath).toContain("worker-prompt.md");
   });
+
+  it("worker chat.message in task worktree binds featureName, taskFolder, and workerPromptPath before commit", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_start_bind");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "start-bind-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_write.execute(
+      {
+        content: createSingleTaskPlan(
+          "Start Bind Feature",
+          "Yes, this regression test validates that hive_worktree_start binds featureName, taskFolder, and workerPromptPath early enough for compaction recovery before worker commit."
+        ),
+        feature: "start-bind-feature",
+      },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_approve.execute(
+      { feature: "start-bind-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_tasks_sync.execute(
+      { feature: "start-bind-feature" },
+      toolContext
+    );
+
+    const startRaw = await hooks.tool!.hive_worktree_start.execute(
+      { feature: "start-bind-feature", task: FIRST_TASK },
+      toolContext
+    );
+    const startResult = JSON.parse(startRaw as string);
+    expect(startResult.success).toBe(true);
+
+    const workerHooks = await plugin({
+      directory: testRoot,
+      worktree: startResult.worktreePath,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(startResult.worktreePath),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    });
+
+    await workerHooks["chat.message"]?.(
+      { sessionID: "sess_worker_start_bind", agent: "forager-worker" },
+      { message: {}, parts: [] }
+    );
+
+    const sessionsPath = path.join(testRoot, ".hive", "sessions.json");
+    expect(fs.existsSync(sessionsPath)).toBe(true);
+    const sessions = JSON.parse(fs.readFileSync(sessionsPath, "utf-8"));
+    const workerSession = sessions.sessions.find(
+      (s: { sessionId: string }) => s.sessionId === "sess_worker_start_bind"
+    );
+    expect(workerSession).toBeDefined();
+    expect(workerSession.featureName).toBe("start-bind-feature");
+    expect(workerSession.taskFolder).toBe(FIRST_TASK);
+    expect(workerSession.workerPromptPath).toContain("worker-prompt.md");
+  });
 });
