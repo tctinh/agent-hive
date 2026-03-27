@@ -291,6 +291,72 @@ const plugin: Plugin = async (ctx) => {
     sessionService.bindFeature(ctx.sessionID, feature, patch as any);
   };
 
+  type ReplayMessageInfo = {
+    id: string;
+    sessionID: string;
+    role: 'user' | 'assistant';
+    time: { created: number };
+  };
+
+  type ReplayPart = {
+    id: string;
+    sessionID: string;
+    messageID: string;
+    type: string;
+    text?: string;
+    synthetic?: boolean;
+  };
+
+  type ReplayMessageEntry = {
+    info: ReplayMessageInfo;
+    parts: ReplayPart[];
+  };
+
+  const extractTextParts = (parts: ReplayPart[] | unknown): string[] => {
+    if (!Array.isArray(parts)) return [];
+    return parts
+      .filter((part): part is ReplayPart & { type: 'text'; text: string; synthetic?: boolean } => {
+        return !!part && typeof part === 'object' && part.type === 'text' && typeof part.text === 'string';
+      })
+      .map((part) => part.text.trim())
+      .filter(Boolean);
+  };
+
+  const shouldCaptureDirective = (info: ReplayMessageInfo, parts: ReplayPart[]): boolean => {
+    if (info.role !== 'user') return false;
+    const textParts = parts.filter((part): part is ReplayPart & { type: 'text'; synthetic?: boolean } => {
+      return !!part && typeof part === 'object' && part.type === 'text';
+    });
+    if (textParts.length === 0) return false;
+    return !textParts.every((part) => part.synthetic === true);
+  };
+
+  const buildDirectiveReplayText = (session: { agent?: string; baseAgent?: string; directivePrompt?: string; sessionKind?: string }): string | null => {
+    if (!session.directivePrompt) return null;
+    const role = session.agent === 'scout-researcher' || session.baseAgent === 'scout-researcher'
+      ? 'Scout'
+      : session.agent === 'hygienic-reviewer' || session.baseAgent === 'hygienic-reviewer'
+        ? 'Hygienic'
+        : session.agent === 'architect-planner' || session.baseAgent === 'architect-planner'
+          ? 'Architect'
+          : session.agent === 'swarm-orchestrator' || session.baseAgent === 'swarm-orchestrator'
+            ? 'Swarm'
+            : session.agent === 'hive-master' || session.baseAgent === 'hive-master'
+              ? 'Hive'
+              : 'current role';
+
+    return [
+      `Post-compaction recovery: You are still ${role}.`,
+      'Resume the original assignment below. Do not replace it with a new goal.',
+      '',
+      session.directivePrompt,
+    ].join('\n');
+  };
+
+  const shouldUseDirectiveReplay = (session: { sessionKind?: string } | undefined): boolean => {
+    return session?.sessionKind === 'primary' || session?.sessionKind === 'subagent';
+  };
+
   /**
    * Check if a feature is blocked by the Beekeeper.
    * Returns the block message if blocked, null otherwise.
@@ -827,6 +893,20 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
   };
 
   return {
+    event: async (input) => {
+      if (input.event.type !== 'session.compacted') {
+        return;
+      }
+
+      const sessionID = input.event.properties.sessionID;
+      const existing = sessionService.getGlobal(sessionID);
+      if (!existing?.directivePrompt || !shouldUseDirectiveReplay(existing)) {
+        return;
+      }
+
+      sessionService.trackGlobal(sessionID, { replayDirectivePending: true });
+    },
+
     "experimental.chat.system.transform": async (
       input: { agent?: string } | unknown,
       output: { system: string[] },
@@ -882,6 +962,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
           featureName: session.featureName,
           taskFolder: session.taskFolder,
           workerPromptPath: session.workerPromptPath,
+          directivePrompt: session.directivePrompt,
         };
         const reanchor = buildCompactionReanchor(ctx);
         output.prompt = reanchor.prompt;
@@ -898,6 +979,71 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
     // for the hook's output parameter type. The hook only accesses output.message.variant
     // which exists on UserMessage.
     "chat.message": createVariantHook(configService, sessionService, customAgentConfigsForClassification, taskWorkerRecovery) as any,
+
+    "experimental.chat.messages.transform": async (
+      _input: {},
+      output: { messages: ReplayMessageEntry[] },
+    ) => {
+      if (!Array.isArray(output.messages) || output.messages.length === 0) {
+        return;
+      }
+
+      const firstMessage = output.messages[0];
+      const sessionID = firstMessage?.info?.sessionID;
+      if (!sessionID) {
+        return;
+      }
+
+      const session = sessionService.getGlobal(sessionID);
+
+      const captureCandidates = output.messages.filter(
+        ({ info, parts }) => info.sessionID === sessionID && shouldCaptureDirective(info, parts),
+      );
+      const latestDirective = captureCandidates.at(-1);
+      if (latestDirective) {
+        const directiveText = extractTextParts(latestDirective.parts).join('\n\n');
+        const existingDirective = session?.directivePrompt;
+        if (directiveText && directiveText !== existingDirective && shouldUseDirectiveReplay(session ?? { sessionKind: 'subagent' })) {
+          sessionService.trackGlobal(sessionID, { directivePrompt: directiveText });
+        }
+      }
+
+      const refreshed = sessionService.getGlobal(sessionID);
+      if (!refreshed?.replayDirectivePending || !shouldUseDirectiveReplay(refreshed)) {
+        if (refreshed?.replayDirectivePending && !shouldUseDirectiveReplay(refreshed)) {
+          sessionService.trackGlobal(sessionID, { replayDirectivePending: false });
+        }
+        return;
+      }
+
+      const replayText = buildDirectiveReplayText(refreshed);
+      if (!replayText) {
+        sessionService.trackGlobal(sessionID, { replayDirectivePending: false });
+        return;
+      }
+
+      const now = Date.now();
+      output.messages.push({
+        info: {
+          id: `msg_replay_${sessionID}`,
+          sessionID,
+          role: 'user',
+          time: { created: now },
+        },
+        parts: [
+          {
+            id: `prt_replay_${sessionID}`,
+            sessionID,
+            messageID: `msg_replay_${sessionID}`,
+            type: 'text',
+            text: replayText,
+            synthetic: true,
+          },
+        ],
+      });
+
+      sessionService.trackGlobal(sessionID, { replayDirectivePending: false });
+    },
 
     "tool.execute.before": async (input, output) => {
       // Cadence gate: check if this hook should execute this turn

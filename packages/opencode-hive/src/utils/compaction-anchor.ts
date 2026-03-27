@@ -5,6 +5,7 @@ export interface CompactionSessionContext {
   featureName?: string;
   taskFolder?: string;
   workerPromptPath?: string;
+  directivePrompt?: string;
 }
 
 export interface CompactionReanchor {
@@ -74,6 +75,10 @@ export function buildCompactionReanchor(ctx: CompactionSessionContext): Compacti
     } else {
       lines.push('Re-read worker-prompt.md from the Hive task metadata to recall your assignment.');
     }
+  }
+
+  if ((kind === 'primary' || kind === 'subagent') && ctx.directivePrompt) {
+    lines.push('Original directive survives via post-compaction replay.');
   }
 
   lines.push('Next action: resume from where you left off.');

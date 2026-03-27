@@ -82,10 +82,11 @@ describe('SessionService', () => {
 
     it('merges repeated updates rather than replacing metadata', () => {
       service.trackGlobal('sess-merge', { agent: 'forager-worker', sessionKind: 'task-worker' });
-      const updated = service.trackGlobal('sess-merge', { messageCount: 5 });
+      const updated = service.trackGlobal('sess-merge', { messageCount: 5, directivePrompt: 'Investigate the current issue.' });
       expect(updated.agent).toBe('forager-worker');
       expect(updated.sessionKind).toBe('task-worker');
       expect(updated.messageCount).toBe(5);
+      expect(updated.directivePrompt).toBe('Investigate the current issue.');
     });
 
     it('preserves earlier global sessions across successive writes', () => {

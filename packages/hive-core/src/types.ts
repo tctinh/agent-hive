@@ -148,6 +148,8 @@ export interface SessionInfo {
   baseAgent?: string;
   sessionKind?: SessionKind;
   workerPromptPath?: string;
+  directivePrompt?: string;
+  replayDirectivePending?: boolean;
   startedAt: string;
   lastActiveAt: string;
   messageCount?: number;

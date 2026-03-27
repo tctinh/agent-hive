@@ -3,6 +3,7 @@ import { buildCompactionPrompt } from '../utils/compaction-prompt.js';
 import { buildCompactionReanchor } from '../utils/compaction-anchor.js';
 import type { PluginInput } from '@opencode-ai/plugin';
 import { SessionService } from 'hive-core';
+import type { Message, Part } from '@opencode-ai/sdk';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -137,6 +138,7 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
     sessionService.trackGlobal('sess-scout', {
       agent: 'scout-researcher',
       sessionKind: 'subagent',
+      directivePrompt: 'Inspect the LSP errors in trading/pipeline.py and return findings only.',
     } as any);
 
     const output = { context: [] as string[], prompt: undefined as string | undefined };
@@ -145,8 +147,243 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
     expect(output.prompt).toBeDefined();
     expect(output.prompt).toContain('Compaction recovery');
     expect(output.prompt).toContain('Role: Scout');
+    expect(output.prompt).toContain('Original directive survives via post-compaction replay.');
     expect(output.prompt).not.toContain('worker-prompt.md');
     expect(output.context.join('\n')).not.toContain('worker-prompt.md');
+  });
+
+  test('session.compacted marks directive replay pending and messages.transform replays stored directive once', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-replay', {
+      agent: 'scout-researcher',
+      sessionKind: 'subagent',
+      directivePrompt: 'Inspect the LSP errors in trading/pipeline.py and return findings only.',
+      replayDirectivePending: false,
+    } as any);
+
+    await hooks.event?.({
+      event: {
+        type: 'session.compacted',
+        properties: { sessionID: 'sess-replay' },
+      } as any,
+    });
+
+    const marked = sessionService.getGlobal('sess-replay');
+    expect(marked?.replayDirectivePending).toBe(true);
+
+    const output = {
+      messages: [
+        {
+          info: {
+            id: 'msg-summary',
+            sessionID: 'sess-replay',
+            role: 'assistant',
+            time: { created: Date.now() },
+            system: [],
+            modelID: 'm',
+            providerID: 'p',
+            mode: 'compaction',
+            path: { cwd: testRoot, root: testRoot },
+            cost: 0,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            summary: true,
+          } as Message,
+          parts: [{ id: 'prt-summary', sessionID: 'sess-replay', messageID: 'msg-summary', type: 'text', text: 'Summary text' } as Part],
+        },
+        {
+          info: {
+            id: 'msg-continue',
+            sessionID: 'sess-replay',
+            role: 'user',
+            time: { created: Date.now() },
+          } as Message,
+          parts: [{ id: 'prt-continue', sessionID: 'sess-replay', messageID: 'msg-continue', type: 'text', text: 'Continue if you have next steps.', synthetic: true } as Part],
+        },
+      ],
+    };
+
+    await hooks['experimental.chat.messages.transform']?.({}, output as any);
+
+    expect(output.messages).toHaveLength(3);
+    const replay = output.messages[2];
+    expect(replay.info.role).toBe('user');
+    expect((replay.parts[0] as any).text).toContain('You are still Scout.');
+    expect((replay.parts[0] as any).text).toContain('Inspect the LSP errors in trading/pipeline.py and return findings only.');
+
+    const cleared = sessionService.getGlobal('sess-replay');
+    expect(cleared?.replayDirectivePending).toBe(false);
+  });
+
+  test('messages.transform captures initial non-synthetic user directive for later recovery', async () => {
+    const output = {
+      messages: [
+        {
+          info: {
+            id: 'msg-user',
+            sessionID: 'sess-capture',
+            role: 'user',
+            time: { created: Date.now() },
+          } as Message,
+          parts: [
+            {
+              id: 'prt-user',
+              sessionID: 'sess-capture',
+              messageID: 'msg-user',
+              type: 'text',
+              text: 'Investigate why the compacted scout forgot its role and return findings only.',
+            } as Part,
+          ],
+        },
+      ],
+    };
+
+    await hooks['experimental.chat.messages.transform']?.({}, output as any);
+
+    const sessionService = new SessionService(testRoot);
+    const session = sessionService.getGlobal('sess-capture');
+    expect(session?.directivePrompt).toBe('Investigate why the compacted scout forgot its role and return findings only.');
+  });
+
+  test('messages.transform does not capture directives from a different session id', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-target', {
+      agent: 'scout-researcher',
+      sessionKind: 'subagent',
+    } as any);
+
+    const output = {
+      messages: [
+        {
+          info: {
+            id: 'msg-target',
+            sessionID: 'sess-target',
+            role: 'assistant',
+            time: { created: Date.now() },
+            system: [],
+            modelID: 'm',
+            providerID: 'p',
+            mode: 'normal',
+            path: { cwd: testRoot, root: testRoot },
+            cost: 0,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          } as Message,
+          parts: [],
+        },
+        {
+          info: {
+            id: 'msg-other',
+            sessionID: 'sess-other',
+            role: 'user',
+            time: { created: Date.now() },
+          } as Message,
+          parts: [
+            {
+              id: 'prt-other',
+              sessionID: 'sess-other',
+              messageID: 'msg-other',
+              type: 'text',
+              text: 'Wrong session directive',
+            } as Part,
+          ],
+        },
+      ],
+    };
+
+    await hooks['experimental.chat.messages.transform']?.({}, output as any);
+
+    const session = sessionService.getGlobal('sess-target');
+    expect(session?.directivePrompt).toBeUndefined();
+  });
+
+  test('messages.transform does not replay stored directive for task-worker sessions', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-worker-replay', {
+      agent: 'forager-worker',
+      sessionKind: 'task-worker',
+      directivePrompt: 'Old worker directive',
+      replayDirectivePending: true,
+    } as any);
+
+    const output = {
+      messages: [
+        {
+          info: {
+            id: 'msg-worker',
+            sessionID: 'sess-worker-replay',
+            role: 'assistant',
+            time: { created: Date.now() },
+            system: [],
+            modelID: 'm',
+            providerID: 'p',
+            mode: 'compaction',
+            path: { cwd: testRoot, root: testRoot },
+            cost: 0,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            summary: true,
+          } as Message,
+          parts: [],
+        },
+      ],
+    };
+
+    await hooks['experimental.chat.messages.transform']?.({}, output as any);
+
+    expect(output.messages).toHaveLength(1);
+    const session = sessionService.getGlobal('sess-worker-replay');
+    expect(session?.replayDirectivePending).toBe(false);
+  });
+
+  test('messages.transform updates stored directive when a later real user message re-scopes a primary session', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-primary-rescope', {
+      agent: 'hive-master',
+      sessionKind: 'primary',
+      directivePrompt: 'Old directive',
+    } as any);
+
+    const output = {
+      messages: [
+        {
+          info: {
+            id: 'msg-old',
+            sessionID: 'sess-primary-rescope',
+            role: 'user',
+            time: { created: Date.now() - 1000 },
+          } as Message,
+          parts: [
+            {
+              id: 'prt-old',
+              sessionID: 'sess-primary-rescope',
+              messageID: 'msg-old',
+              type: 'text',
+              text: 'Old directive',
+            } as Part,
+          ],
+        },
+        {
+          info: {
+            id: 'msg-new',
+            sessionID: 'sess-primary-rescope',
+            role: 'user',
+            time: { created: Date.now() },
+          } as Message,
+          parts: [
+            {
+              id: 'prt-new',
+              sessionID: 'sess-primary-rescope',
+              messageID: 'msg-new',
+              type: 'text',
+              text: 'New directive from the operator',
+            } as Part,
+          ],
+        },
+      ],
+    };
+
+    await hooks['experimental.chat.messages.transform']?.({}, output as any);
+
+    const session = sessionService.getGlobal('sess-primary-rescope');
+    expect(session?.directivePrompt).toBe('New directive from the operator');
   });
 
   test('forager session with known prompt path → role re-anchor + exact path', async () => {
