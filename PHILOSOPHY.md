@@ -46,7 +46,7 @@ The answer became this platform.
 | **Comb** | Task Structure | The organized grid of cells (tasks) within a nest. The work breakdown structure. |
 | **Cells** | Tasks | Individual tasks within a comb. Each cell is isolated (worktree) and produces one unit of work. |
 | **Royal Jelly** | Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
-| **Honey** | Artifacts | The human-facing sweetness of the work — led by `plan.md`, with optional pre-task Mermaid overviews, `spec.md`, `report.md`, context files, and code behind it. |
+| **Honey** | Artifacts | The human-facing sweetness of the work — centered on `context/overview.md` for humans, `plan.md` for execution truth, plus `spec.md`, `report.md`, context files, and code behind it. |
 | **Propolis** | Verification | Best-effort worker checks + orchestrator batch testing that seal work as complete. |
 | **Wax Seal** | Sandbox | Docker container that isolates worker execution. Tests run inside, results flow out. |
 | **Waggle Dance** | Planning | The planning phase. Architect communicates, Beekeeper reviews, alignment before action. |
@@ -131,7 +131,7 @@ Vibe coding is powerful but chaotic. We identified 6 pain points:
 
 ---
 
-## The 7 Core Principles
+## The 8 Core Principles
 
 ### P1: Context Persists
 
@@ -155,7 +155,7 @@ Two phases with a clear gate between them.
 | **Planning** | Dialogue | Shape, question, refine |
 | **Execution** | Trust | Agent runs, human monitors |
 
-Planning is collaborative. Execution is autonomous. Humans should usually review `plan.md` first for the narrative and execution contract, then inspect supporting context files only when needed. The approval gate is where trust is earned.
+Planning is collaborative. Execution is autonomous. Humans should usually review `context/overview.md` first for the narrative summary and release-facing history, then inspect `plan.md` as the execution truth that tasks and workers follow. The approval gate is where trust is earned.
 
 *Inspired by Boris's Tip 6: "Most sessions should start in Plan mode... A good plan makes all the difference."*
 
@@ -266,6 +266,16 @@ Always:
 *Why this works*: Agent must consciously write `## Discovery` section. Agent must mention verification in summary. No silent bypassing.
 
 *Inspired by Git's philosophy*: Simple primitives, hard enforcement. `git commit` refuses without staged changes. No exceptions.
+
+### P8: Cross-Model Prompts
+
+Hive prompts must survive across supported model providers.
+
+- Prefer conditional guidance: "when X, do Y"
+- Avoid brittle absolutes that only work for one model family
+- Keep behavior tied to observable gates, tools, and artifacts
+
+This keeps the system portable without changing its philosophy.
 
 ---
 
@@ -415,7 +425,8 @@ Hive didn't emerge in a vacuum. We studied existing tools, took what worked, and
 - Specs should EMERGE from dialogue, not precede it
 
 **What we built:**
-- `plan.md` emerges from conversation, not a template
+- `context/overview.md` is the primary human-facing summary/history artifact
+- `plan.md` emerges from conversation, not a template, and remains the execution truth
 - `spec.md` per task captures just enough context
 - No forced structure — content matters, not format
 
@@ -685,6 +696,27 @@ v1.3.1 adds `customAgents` to the Hive config. Users define derived agents with 
 The fix is a clean API split: `hive_worktree_start` for normal starts (pending/failed), `hive_worktree_create` exclusively for blocked resumes. Calling `hive_worktree_create` on a non-blocked task now returns `terminal: true, reason: "task_not_blocked", correctTool: "hive_worktree_start"` — a machine-readable dead-end signal that tells orchestrators exactly what went wrong and what to do instead.
 
 **Design insight:** P7 (Iron Laws + Hard Gates) says: build explicit gates, not soft suggestions. The old worktree API had a soft gate — it tried to do the "right thing" regardless of intent. The new split makes intent explicit. Orchestrators state whether they're starting fresh or resuming blocked, and the system rejects the wrong choice immediately. Hard gates prevent loops. Soft gates accumulate them.
+
+### v1.3.2 (Overview for Humans, Plan for Execution)
+
+**Theme:** Split the human-facing story from the execution contract without losing alignment.
+
+- Added reserved `context/overview.md` as the primary human-facing summary, review, and release-history surface
+- Kept `plan.md` as the execution truth that task generation and workers rely on
+- Made review tracking document-aware so feedback can distinguish overview narrative from plan execution details
+- Shifted status/sidebar surfacing toward overview-first UX while preserving plan-driven execution underneath
+
+**Design insight:** Humans and workers need different artifacts. Humans benefit from a concise narrative and history surface. Workers need a precise execution contract. Separating `context/overview.md` from `plan.md` keeps each artifact honest about its job.
+
+### v1.3.3 (History Correction on the 1.3.x Line)
+
+**Theme:** Correct the release line's record without pretending the branch history was cleaner than it was.
+
+- Documented the 1.3.x release-branch recovery work after the earlier release-path mistakes
+- Clarified that release-history corrections are part of shipping honestly, not a substitute for source verification
+- Preserved the overview-vs-plan split and document-aware review model as the stable 1.3.x workflow
+
+**Design insight:** Release process mistakes should be corrected explicitly. Accurate history is part of the product surface for agent systems because humans depend on those documents to understand what actually shipped.
 ---
 
 <p align="center">

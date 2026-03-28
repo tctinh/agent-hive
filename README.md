@@ -578,7 +578,7 @@ Clean git history (worktree merges), full documentation (generated as you work),
 
 ## Philosophy
 
-Hive is built on 7 core principles:
+Hive is built on 8 core principles:
 
 1. **Context Persists** — Calibration survives sessions. The "3 months later" problem solved.
 2. **Plan → Approve → Execute** — Dialogue until approved, then trust. Two phases with a clear gate.
@@ -587,6 +587,7 @@ Hive is built on 7 core principles:
 5. **Batched Parallelism** — Parallel tasks in batches. Sequential batches share context.
 6. **Tests Define Done** — Workers do best-effort checks; orchestrator runs full suite after batch merge.
 7. **Iron Laws + Hard Gates** — Non-negotiable constraints enforced by tools, not guidelines.
+8. **Cross-Model Prompts** — Prompts must work across supported LLM providers using conditional, portable guidance.
 
 See [PHILOSOPHY.md](PHILOSOPHY.md) for the full framework.
 
