@@ -761,29 +761,15 @@ var __getProtoOf2 = Object.getPrototypeOf;
 var __defProp2 = Object.defineProperty;
 var __getOwnPropNames2 = Object.getOwnPropertyNames;
 var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-function __accessProp(key) {
-  return this[key];
-}
-var __toESMCache_node;
-var __toESMCache_esm;
 var __toESM2 = (mod, isNodeMode, target) => {
-  var canCache = mod != null && typeof mod === "object";
-  if (canCache) {
-    var cache2 = isNodeMode ? __toESMCache_node ??= /* @__PURE__ */ new WeakMap() : __toESMCache_esm ??= /* @__PURE__ */ new WeakMap();
-    var cached = cache2.get(mod);
-    if (cached)
-      return cached;
-  }
   target = mod != null ? __create2(__getProtoOf2(mod)) : {};
   const to = isNodeMode || !mod || !mod.__esModule ? __defProp2(target, "default", { value: mod, enumerable: true }) : target;
   for (let key of __getOwnPropNames2(mod))
     if (!__hasOwnProp2.call(to, key))
       __defProp2(to, key, {
-        get: __accessProp.bind(mod, key),
+        get: () => mod[key],
         enumerable: true
       });
-  if (canCache)
-    cache2.set(mod, to);
   return to;
 };
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
@@ -8908,14 +8894,11 @@ function getExecTools(workspaceRoot) {
         success: false,
         terminal: true,
         reason: "task_not_blocked",
-        canRetry: false,
-        retryReason: `Task is in ${taskInfo.status} state. Run hive_status() and follow the current status flow instead of blocked resume.`,
         feature,
         task,
         currentStatus: taskInfo.status,
         error: `continueFrom: 'blocked' was specified but task "${task}" is not in blocked state (current status: ${taskInfo.status}).`,
         hints: [
-          "This blocked-resume call cannot be retried with the same parameters.",
           "Use hive_worktree_start({ feature, task }) for normal starts or re-dispatch.",
           "Use hive_status to verify the current task status before retrying."
         ]
@@ -12266,6 +12249,7 @@ var HiveExtension = class {
       if (newRoot && !this.initialized) {
         this.workspaceRoot = newRoot;
         this.initializeWithHive(newRoot);
+        vscode6.window.showInformationMessage("Hive: .hive directory detected, extension activated");
       }
     };
     this.creationWatcher.onDidCreate(onHiveCreated);

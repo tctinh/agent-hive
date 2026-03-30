@@ -86,10 +86,43 @@ This enables:
 
 ## Session Tracking
 
-Sessions tracked per feature in `sessions/` directory:
-- Each session captures: id, title, startedAt, endedAt
-- Sessions can be forked (continue from existing) or fresh (new start)
-- VSCode extension shows session history per feature
+Hive uses a two-level session model so compaction recovery can find the right role before it finds the right feature:
+
+- Global session identity lives in global `.hive/sessions.json`.
+- Once a session is bound to a feature, it is mirrored into feature-local `sessions.json` files at `.hive/features/<feature>/sessions.json`.
+- The global file is the recovery source of truth; feature-local mirrors keep history discoverable from the feature folder.
+
+Tracked metadata can include:
+
+- `sessionId`
+- `agent` / `baseAgent`
+- `sessionKind`
+- `featureName`
+- `taskFolder`
+- `workerPromptPath`
+- `directivePrompt`
+- replay flags and activity metadata
+
+### Session kinds
+
+Hive distinguishes `primary`, `subagent`, `task-worker`, and `unknown` sessions.
+
+- `primary`: top-level Hive / Architect / Swarm conversations
+- `subagent`: delegated Scout or Hygienic sessions
+- `task-worker`: Forager workers and forager-derived custom agents executing a task
+- `unknown`: safe fallback when Hive cannot classify the session confidently
+
+### Recovery behavior after compaction
+
+When OpenCode emits a compaction event, Hive rebuilds a minimal re-anchor prompt from stored session metadata.
+
+- Primary and subagent sessions are re-anchored to their role.
+- Primary and subagent sessions can restore the last real user directive through post-compaction replay.
+- Task-worker sessions do not rely on directive replay; they recover from durable worktree metadata and re-read `worker-prompt.md`.
+- If `workerPromptPath` was stored explicitly, Hive uses it. Otherwise it reconstructs the expected `.hive/features/<feature>/tasks/<task>/worker-prompt.md` path from `featureName` and `taskFolder`.
+- Recovery prompts tell sessions not to switch roles, not to rediscover state through status tools, and not to re-read the full codebase.
+
+This keeps recovery narrow and deterministic: orchestrators recover their role and directive, while workers recover their exact task contract.
 
 ## Task Lifecycle
 

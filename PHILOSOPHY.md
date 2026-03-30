@@ -46,7 +46,7 @@ The answer became this platform.
 | **Comb** | Task Structure | The organized grid of cells (tasks) within a nest. The work breakdown structure. |
 | **Cells** | Tasks | Individual tasks within a comb. Each cell is isolated (worktree) and produces one unit of work. |
 | **Royal Jelly** | Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
-| **Honey** | Artifacts | The human-facing sweetness of the work — centered on `context/overview.md` for humans, `plan.md` for execution truth, plus `spec.md`, `report.md`, context files, and code behind it. |
+| **Honey** | Artifacts | The human-facing sweetness of the work — led by `plan.md`, with optional pre-task Mermaid overviews, `spec.md`, `report.md`, context files, and code behind it. |
 | **Propolis** | Verification | Best-effort worker checks + orchestrator batch testing that seal work as complete. |
 | **Wax Seal** | Sandbox | Docker container that isolates worker execution. Tests run inside, results flow out. |
 | **Waggle Dance** | Planning | The planning phase. Architect communicates, Beekeeper reviews, alignment before action. |
@@ -131,7 +131,7 @@ Vibe coding is powerful but chaotic. We identified 6 pain points:
 
 ---
 
-## The 8 Core Principles
+## The 7 Core Principles
 
 ### P1: Context Persists
 
@@ -155,7 +155,7 @@ Two phases with a clear gate between them.
 | **Planning** | Dialogue | Shape, question, refine |
 | **Execution** | Trust | Agent runs, human monitors |
 
-Planning is collaborative. Execution is autonomous. Humans should usually review `context/overview.md` first for the narrative summary and release-facing history, then inspect `plan.md` as the execution truth that tasks and workers follow. The approval gate is where trust is earned.
+Planning is collaborative. Execution is autonomous. Humans should usually review `plan.md` first for the narrative and execution contract, then inspect supporting context files only when needed. The approval gate is where trust is earned.
 
 *Inspired by Boris's Tip 6: "Most sessions should start in Plan mode... A good plan makes all the difference."*
 
@@ -266,16 +266,6 @@ Always:
 *Why this works*: Agent must consciously write `## Discovery` section. Agent must mention verification in summary. No silent bypassing.
 
 *Inspired by Git's philosophy*: Simple primitives, hard enforcement. `git commit` refuses without staged changes. No exceptions.
-
-### P8: Cross-Model Prompts
-
-Hive prompts must survive across supported model providers.
-
-- Prefer conditional guidance: "when X, do Y"
-- Avoid brittle absolutes that only work for one model family
-- Keep behavior tied to observable gates, tools, and artifacts
-
-This keeps the system portable without changing its philosophy.
 
 ---
 
@@ -425,8 +415,7 @@ Hive didn't emerge in a vacuum. We studied existing tools, took what worked, and
 - Specs should EMERGE from dialogue, not precede it
 
 **What we built:**
-- `context/overview.md` is the primary human-facing summary/history artifact
-- `plan.md` emerges from conversation, not a template, and remains the execution truth
+- `plan.md` emerges from conversation, not a template
 - `spec.md` per task captures just enough context
 - No forced structure — content matters, not format
 
@@ -697,26 +686,18 @@ The fix is a clean API split: `hive_worktree_start` for normal starts (pending/f
 
 **Design insight:** P7 (Iron Laws + Hard Gates) says: build explicit gates, not soft suggestions. The old worktree API had a soft gate — it tried to do the "right thing" regardless of intent. The new split makes intent explicit. Orchestrators state whether they're starting fresh or resuming blocked, and the system rejects the wrong choice immediately. Hard gates prevent loops. Soft gates accumulate them.
 
-### v1.3.2 (Overview for Humans, Plan for Execution)
+### v1.3.5 (Compaction Recovery)
 
-**Theme:** Split the human-facing story from the execution contract without losing alignment.
+**Theme:** When OpenCode compacts a long-running session, Hive must restore role and task boundaries from durable state instead of hoping the model remembers them.
 
-- Added reserved `context/overview.md` as the primary human-facing summary, review, and release-history surface
-- Kept `plan.md` as the execution truth that task generation and workers rely on
-- Made review tracking document-aware so feedback can distinguish overview narrative from plan execution details
-- Shifted status/sidebar surfacing toward overview-first UX while preserving plan-driven execution underneath
+PR #64 formalizes that recovery model. Hive now tracks session identity in global `.hive/sessions.json` and mirrors bound sessions into feature-local `sessions.json` files once a feature is known. That split solves two different needs at once: global recovery can find the right feature after compaction, while feature-local recovery keeps session history close to the work it belongs to.
 
-**Design insight:** Humans and workers need different artifacts. Humans benefit from a concise narrative and history surface. Workers need a precise execution contract. Separating `context/overview.md` from `plan.md` keeps each artifact honest about its job.
+**Recovery by session kind:** Compacted sessions are classified as `primary`, `subagent`, `task-worker`, or `unknown`. Primary and subagent sessions recover by re-anchoring to their role and using directive replay to restore the stored user directive once after compaction. Task workers recover differently: they keep the same worker role, do not delegate, and are told to re-read `worker-prompt.md` so they resume from the original task contract instead of improvising a new one.
 
-### v1.3.3 (History Correction on the 1.3.x Line)
+**Design rationale:** Compaction is a memory-loss event, not a planning event. Recovery should restore the smallest durable contract that gets the agent safely moving again: role identity for orchestrators and subagents, plus `worker-prompt.md` for task workers. The system does not ask compacted sessions to rediscover state by re-reading the whole codebase or by re-running orchestration tools, because that invites drift exactly when the context window is already weakest.
 
-**Theme:** Correct the release line's record without pretending the branch history was cleaner than it was.
+**Design insight:** Durable breadcrumbs beat speculative recovery. Persist the role, the feature binding, the directive, and the worker prompt path before compaction happens; then recovery can be narrow, deterministic, and safe.
 
-- Documented the 1.3.x release-branch recovery work after the earlier release-path mistakes
-- Clarified that release-history corrections are part of shipping honestly, not a substitute for source verification
-- Preserved the overview-vs-plan split and document-aware review model as the stable 1.3.x workflow
-
-**Design insight:** Release process mistakes should be corrected explicitly. Accurate history is part of the product surface for agent systems because humans depend on those documents to understand what actually shipped.
 ---
 
 <p align="center">

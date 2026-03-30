@@ -5,48 +5,48 @@ This repo publishes:
 - `opencode-hive` to npm (GitHub Actions `Release` workflow)
 - `vscode-hive` to the VS Code Marketplace (same workflow)
 
-The `Release` workflow runs **publishing only on tags** matching `v*`. Manual runs (`workflow_dispatch`) build and test only.
+The `Release` workflow publishes **only on tags** matching `v*`; tagged releases only. Manual runs (`workflow_dispatch`) are rehearsal runs: they build and test the release candidate without publishing anything.
 
 ## 1) Prep the release locally
 
-For the current patch line, work from `release/human-overview-context-v1`, pick a version (e.g. `1.3.4`), and run:
+Pick a version (for example `1.3.5`) and run:
 
 ```bash
-git checkout release/human-overview-context-v1
-git pull
-bun run release:prepare -- 1.3.4
+bun run release:prepare -- 1.3.5
 ```
 
 This will:
 
 - Bump versions in `package.json` + workspace packages
-- Generate `docs/releases/v1.3.4.md` (draft release notes)
+- Generate `docs/releases/v1.3.5.md` (draft release notes)
 - Create/update `CHANGELOG.md`
 
 Review/edit the generated notes and changelog before continuing.
 
-Manual `workflow_dispatch` runs of `release.yml` are branch-safe rehearsal runs: they build and test the selected ref, but they do not publish packages.
-
 ## 2) Validate
 
-Run the normal build/test loop:
+Install dependencies and run the release validation flow:
 
 ```bash
 bun install
 bun run build
-bun run --filter hive-core test
-bun run --filter opencode-hive test
-bun run --filter vscode-hive test
-bun test release-artifacts.test.mjs
-```
-
-Or use the combined helper:
-
-```bash
 bun run release:check
 ```
 
-## 3) Merge to the release branch
+`bun run release:check` is the pre-release safety net. It performs the repo install/build/test flow used for release preparation. If it fails, fix the branch before opening the release PR.
+
+## 3) Rehearse the GitHub workflow with `workflow_dispatch`
+
+Before tagging, run the `Release` GitHub Actions workflow manually from the release branch or the merge commit you expect to tag.
+
+Use this rehearsal to confirm:
+
+- the workflow still boots on the current branch
+- build and test steps pass in CI
+- generated release artifacts look correct
+- no publish step runs during the manual rehearsal
+
+## 4) Merge to `main`
 
 Open a PR with:
 
@@ -54,18 +54,17 @@ Open a PR with:
 - `CHANGELOG.md` updates
 - `docs/releases/vX.Y.Z.md` release notes
 
-Target `release/human-overview-context-v1` for the active `1.3.x` line. Do not switch this patch workflow back to `main`.
+Merge only after local validation and the `workflow_dispatch` rehearsal both pass.
 
-## 4) Tag and release
+## 5) Tag and release
 
-After merging to `release/human-overview-context-v1`, create and push a tag:
+After merging to `main`, create and push a tag:
 
 ```bash
-git checkout release/human-overview-context-v1
+git checkout main
 git pull
-gh workflow run release.yml --ref release/human-overview-context-v1
-git tag -a v1.3.4 -m "Release v1.3.4"
-git push origin v1.3.4
+git tag -a v1.3.5 -m "Release 1.3.5"
+git push origin v1.3.5
 ```
 
-The manual workflow run rehearses the exact release branch without publishing. The pushed tag then triggers `.github/workflows/release.yml` to build, publish, and create a GitHub Release.
+That tag triggers `.github/workflows/release.yml` to build, publish, and create the GitHub Release.

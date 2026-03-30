@@ -186,6 +186,7 @@ import {
   ConfigService,
   AgentsMdService,
   DockerSandboxService,
+  SessionService,
   buildEffectiveDependencies,
   computeRunnableAndBlocked,
   detectContext,
@@ -200,7 +201,8 @@ import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { formatRelativeTime } from "./utils/format";
 import { createVariantHook } from "./hooks/variant-hook.js";
 import { HIVE_SYSTEM_PROMPT, shouldExecuteHook } from "./hooks/system-hook.js";
-import { buildCompactionPrompt } from "./utils/compaction-prompt.js";
+import { buildCompactionReanchor } from "./utils/compaction-anchor.js";
+import type { CompactionSessionContext } from "./utils/compaction-anchor.js";
 
 /**
  * Core plugin implementation.
@@ -213,7 +215,7 @@ type ToolContext = {
 };
 
 const plugin: Plugin = async (ctx) => {
-  const { directory, client } = ctx;
+  const { directory, client, worktree } = ctx;
 
   const emitConfigWarning = (message: string): void => {
     const prefixedMessage = `[hive:config] ${message}`;
@@ -249,6 +251,7 @@ const plugin: Plugin = async (ctx) => {
   const contextService = new ContextService(directory);
   const agentsMdService = new AgentsMdService(directory, contextService);
   const configService = new ConfigService(directory);
+  const sessionService = new SessionService(directory);
   const disabledMcps = configService.getDisabledMcps();
   const disabledSkills = configService.getDisabledSkills();
   const configFallbackWarning = configService.getLastFallbackWarning()?.message ?? null;
@@ -265,6 +268,23 @@ const plugin: Plugin = async (ctx) => {
     baseDir: directory,
     hiveDir: path.join(directory, '.hive'),
   });
+
+  const customAgentConfigsForClassification = getCustomAgentConfigsCompat(configService);
+  const runtimeContext = detectContext(worktree || directory);
+  const taskWorkerRecovery = runtimeContext.isWorktree && runtimeContext.feature && runtimeContext.task
+    ? {
+        featureName: runtimeContext.feature,
+        taskFolder: runtimeContext.task,
+        workerPromptPath: path.posix.join(
+          '.hive',
+          'features',
+          resolveFeatureDirectoryName(directory, runtimeContext.feature),
+          'tasks',
+          runtimeContext.task,
+          'worker-prompt.md',
+        ),
+      }
+    : undefined;
 
   /**
    * Check if OMO-Slim delegation is enabled via user config.
@@ -293,6 +313,82 @@ const plugin: Plugin = async (ctx) => {
         featureService.setSession(feature, ctx.sessionID);
       }
     }
+  };
+
+  const bindFeatureSession = (
+    feature: string,
+    toolContext: unknown,
+    patch?: Partial<{ taskFolder: string; workerPromptPath: string }>,
+  ) => {
+    const ctx = toolContext as ToolContext;
+    if (!ctx?.sessionID) return;
+    sessionService.bindFeature(ctx.sessionID, feature, patch as any);
+  };
+
+  type ReplayMessageInfo = {
+    id: string;
+    sessionID: string;
+    role: 'user' | 'assistant';
+    time: { created: number };
+  };
+
+  type ReplayPart = {
+    id: string;
+    sessionID: string;
+    messageID: string;
+    type: string;
+    text?: string;
+    synthetic?: boolean;
+  };
+
+  type ReplayMessageEntry = {
+    info: ReplayMessageInfo;
+    parts: ReplayPart[];
+  };
+
+  const extractTextParts = (parts: ReplayPart[] | unknown): string[] => {
+    if (!Array.isArray(parts)) return [];
+    return parts
+      .filter((part): part is ReplayPart & { type: 'text'; text: string; synthetic?: boolean } => {
+        return !!part && typeof part === 'object' && part.type === 'text' && typeof part.text === 'string';
+      })
+      .map((part) => part.text.trim())
+      .filter(Boolean);
+  };
+
+  const shouldCaptureDirective = (info: ReplayMessageInfo, parts: ReplayPart[]): boolean => {
+    if (info.role !== 'user') return false;
+    const textParts = parts.filter((part): part is ReplayPart & { type: 'text'; synthetic?: boolean } => {
+      return !!part && typeof part === 'object' && part.type === 'text';
+    });
+    if (textParts.length === 0) return false;
+    return !textParts.every((part) => part.synthetic === true);
+  };
+
+  const buildDirectiveReplayText = (session: { agent?: string; baseAgent?: string; directivePrompt?: string; sessionKind?: string }): string | null => {
+    if (!session.directivePrompt) return null;
+    const role = session.agent === 'scout-researcher' || session.baseAgent === 'scout-researcher'
+      ? 'Scout'
+      : session.agent === 'hygienic-reviewer' || session.baseAgent === 'hygienic-reviewer'
+        ? 'Hygienic'
+        : session.agent === 'architect-planner' || session.baseAgent === 'architect-planner'
+          ? 'Architect'
+          : session.agent === 'swarm-orchestrator' || session.baseAgent === 'swarm-orchestrator'
+            ? 'Swarm'
+            : session.agent === 'hive-master' || session.baseAgent === 'hive-master'
+              ? 'Hive'
+              : 'current role';
+
+    return [
+      `Post-compaction recovery: You are still ${role}.`,
+      'Resume the original assignment below. Do not replace it with a new goal.',
+      '',
+      session.directivePrompt,
+    ].join('\n');
+  };
+
+  const shouldUseDirectiveReplay = (session: { sessionKind?: string } | undefined): boolean => {
+    return session?.sessionKind === 'primary' || session?.sessionKind === 'subagent';
   };
 
   /**
@@ -835,6 +931,20 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
   };
 
   return {
+    event: async (input) => {
+      if (input.event.type !== 'session.compacted') {
+        return;
+      }
+
+      const sessionID = input.event.properties.sessionID;
+      const existing = sessionService.getGlobal(sessionID);
+      if (!existing?.directivePrompt || !shouldUseDirectiveReplay(existing)) {
+        return;
+      }
+
+      sessionService.trackGlobal(sessionID, { replayDirectivePending: true });
+    },
+
     "experimental.chat.system.transform": async (
       input: { agent?: string } | unknown,
       output: { system: string[] },
@@ -881,14 +991,97 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       _input: { sessionID: string },
       output: { context: string[]; prompt?: string },
     ) => {
-      output.context.push(buildCompactionPrompt());
+      const session = sessionService.getGlobal(_input.sessionID);
+      if (session) {
+        const ctx: CompactionSessionContext = {
+          agent: session.agent,
+          baseAgent: session.baseAgent,
+          sessionKind: session.sessionKind,
+          featureName: session.featureName,
+          taskFolder: session.taskFolder,
+          workerPromptPath: session.workerPromptPath,
+          directivePrompt: session.directivePrompt,
+        };
+        const reanchor = buildCompactionReanchor(ctx);
+        output.prompt = reanchor.prompt;
+        output.context.push(...reanchor.context);
+      } else {
+        const reanchor = buildCompactionReanchor({});
+        output.prompt = reanchor.prompt;
+        output.context.push(...reanchor.context);
+      }
     },
 
     // Apply per-agent variant to messages (covers built-in and accepted custom task() agents)
     // Type assertion needed because TypeScript's contravariance rules are too strict
     // for the hook's output parameter type. The hook only accesses output.message.variant
     // which exists on UserMessage.
-    "chat.message": createVariantHook(configService) as any,
+    "chat.message": createVariantHook(configService, sessionService, customAgentConfigsForClassification, taskWorkerRecovery) as any,
+
+    "experimental.chat.messages.transform": async (
+      _input: {},
+      output: { messages: ReplayMessageEntry[] },
+    ) => {
+      if (!Array.isArray(output.messages) || output.messages.length === 0) {
+        return;
+      }
+
+      const firstMessage = output.messages[0];
+      const sessionID = firstMessage?.info?.sessionID;
+      if (!sessionID) {
+        return;
+      }
+
+      const session = sessionService.getGlobal(sessionID);
+
+      const captureCandidates = output.messages.filter(
+        ({ info, parts }) => info.sessionID === sessionID && shouldCaptureDirective(info, parts),
+      );
+      const latestDirective = captureCandidates.at(-1);
+      if (latestDirective) {
+        const directiveText = extractTextParts(latestDirective.parts).join('\n\n');
+        const existingDirective = session?.directivePrompt;
+        if (directiveText && directiveText !== existingDirective && shouldUseDirectiveReplay(session ?? { sessionKind: 'subagent' })) {
+          sessionService.trackGlobal(sessionID, { directivePrompt: directiveText });
+        }
+      }
+
+      const refreshed = sessionService.getGlobal(sessionID);
+      if (!refreshed?.replayDirectivePending || !shouldUseDirectiveReplay(refreshed)) {
+        if (refreshed?.replayDirectivePending && !shouldUseDirectiveReplay(refreshed)) {
+          sessionService.trackGlobal(sessionID, { replayDirectivePending: false });
+        }
+        return;
+      }
+
+      const replayText = buildDirectiveReplayText(refreshed);
+      if (!replayText) {
+        sessionService.trackGlobal(sessionID, { replayDirectivePending: false });
+        return;
+      }
+
+      const now = Date.now();
+      output.messages.push({
+        info: {
+          id: `msg_replay_${sessionID}`,
+          sessionID,
+          role: 'user',
+          time: { created: now },
+        },
+        parts: [
+          {
+            id: `prt_replay_${sessionID}`,
+            sessionID,
+            messageID: `msg_replay_${sessionID}`,
+            type: 'text',
+            text: replayText,
+            synthetic: true,
+          },
+        ],
+      });
+
+      sessionService.trackGlobal(sessionID, { replayDirectivePending: false });
+    },
 
     "tool.execute.before": async (input, output) => {
       // Cadence gate: check if this hook should execute this turn
@@ -1045,6 +1238,7 @@ Expand your Discovery section and try again.`;
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
           captureSession(feature, toolContext);
+          bindFeatureSession(feature, toolContext);
           const result = planService.read(feature);
           if (!result) return "Error: No plan.md found";
           return JSON.stringify(result, null, 2);
@@ -1169,7 +1363,7 @@ Expand your Discovery section and try again.`;
           }).optional().describe('Blocker info when status is blocked'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
         },
-        async execute({ task, summary, message, status = 'completed', blocker, feature: explicitFeature }) {
+        async execute({ task, summary, message, status = 'completed', blocker, feature: explicitFeature }, toolContext) {
           const respond = (payload: Record<string, unknown>) => JSON.stringify(payload, null, 2);
           const feature = resolveFeature(explicitFeature);
           if (!feature) {
@@ -1212,6 +1406,10 @@ Expand your Discovery section and try again.`;
               nextAction: 'Only in_progress or blocked tasks can be committed. Start/resume the task first.',
             });
           }
+
+          const featureDir = resolveFeatureDirectoryName(directory, feature);
+          const workerPromptPath = path.posix.join('.hive', 'features', featureDir, 'tasks', task, 'worker-prompt.md');
+          bindFeatureSession(feature, toolContext, { taskFolder: task, workerPromptPath });
 
           // ADVISORY: Track verification status (workers do best-effort)
           let verificationNote: string | undefined;
@@ -1401,10 +1599,11 @@ Expand your Discovery section and try again.`;
           content: tool.schema.string().describe('Markdown content to write'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
         },
-        async execute({ name, content, feature: explicitFeature }) {
+        async execute({ name, content, feature: explicitFeature }, toolContext) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
+          bindFeatureSession(feature, toolContext);
           const filePath = contextService.write(feature, name, content);
           return `Context file written: ${filePath}`;
         },

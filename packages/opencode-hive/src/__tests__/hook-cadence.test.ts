@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { ConfigService } from 'hive-core';
 import { shouldExecuteHook, HIVE_SYSTEM_PROMPT } from '../hooks/system-hook.js';
 import { buildCompactionPrompt } from '../utils/compaction-prompt.js';
+import { buildCompactionReanchor } from '../utils/compaction-anchor.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -403,6 +404,34 @@ describe('Compaction hook — no hive_status reinjection after compaction', () =
     expect(prompt).not.toMatch(/hive_status/);
     expect(prompt).toMatch(/worker-prompt\.md|task spec|spec file/i);
   });
+});
+
+describe('Compaction re-anchor — anti-loop safeguards for all session kinds', () => {
+  const sessionKinds = [
+    { sessionKind: 'primary' as const, agent: 'hive-master' },
+    { sessionKind: 'subagent' as const, agent: 'scout-researcher' },
+    { sessionKind: 'task-worker' as const, agent: 'forager-worker' },
+    { sessionKind: 'unknown' as const, agent: undefined },
+  ];
+
+  for (const { sessionKind, agent } of sessionKinds) {
+    it(`${sessionKind} re-anchor does not reference hive_status`, () => {
+      const anchor = buildCompactionReanchor({ sessionKind, agent });
+      expect(anchor.prompt).not.toMatch(/hive_status/);
+      expect(anchor.context.join('\n')).not.toMatch(/hive_status/);
+    });
+
+    it(`${sessionKind} re-anchor does not reference hive_plan_read`, () => {
+      const anchor = buildCompactionReanchor({ sessionKind, agent });
+      expect(anchor.prompt).not.toMatch(/hive_plan_read/);
+      expect(anchor.context.join('\n')).not.toMatch(/hive_plan_read/);
+    });
+
+    it(`${sessionKind} re-anchor does not instruct re-reading the full codebase`, () => {
+      const anchor = buildCompactionReanchor({ sessionKind, agent });
+      expect(anchor.prompt).not.toMatch(/read (the |all |entire |full )?(repo|codebase|project)/i);
+    });
+  }
 });
 
 describe('hive_worktree_commit error guidance — no out-of-surface tool references for Forager', () => {
