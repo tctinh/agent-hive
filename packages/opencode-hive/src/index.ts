@@ -357,20 +357,21 @@ const plugin: Plugin = async (ctx) => {
     return session?.sessionKind === 'primary' || session?.sessionKind === 'subagent';
   };
 
-  const shouldUseWorkerReplay = (session: { sessionKind?: string; featureName?: string; taskFolder?: string } | undefined): boolean => {
-    return session?.sessionKind === 'task-worker' && !!session.featureName && !!session.taskFolder;
+  const shouldUseWorkerReplay = (session: { sessionKind?: string; featureName?: string; taskFolder?: string; workerPromptPath?: string } | undefined): boolean => {
+    return session?.sessionKind === 'task-worker'
+      && !!session.featureName
+      && !!session.taskFolder
+      && !!session.workerPromptPath;
   };
 
   const buildWorkerReplayText = (session: { agent?: string; baseAgent?: string; featureName?: string; taskFolder?: string; workerPromptPath?: string }): string | null => {
-    if (!session.featureName || !session.taskFolder) return null;
+    if (!session.featureName || !session.taskFolder || !session.workerPromptPath) return null;
     const role = 'Forager';
-    const promptPath = session.workerPromptPath
-      ?? `.hive/features/${session.featureName}/tasks/${session.taskFolder}/worker-prompt.md`;
     return [
       `Post-compaction recovery: You are still the ${role} worker for task ${session.taskFolder}.`,
       `Resume only this task. Do not merge, do not start the next task, and do not replace this assignment with a new goal.`,
       `Do not call orchestration tools unless the worker prompt explicitly says so.`,
-      `Re-read @${promptPath} and continue from the existing worktree state.`,
+      `Re-read @${session.workerPromptPath} and continue from the existing worktree state.`,
     ].join('\n');
   };
 

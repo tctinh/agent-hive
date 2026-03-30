@@ -476,6 +476,45 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
     expect(session?.replayDirectivePending).toBe(false);
   });
 
+  test('messages.transform clears replay pending without injection when workerPromptPath is missing', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-tw-missing-path', {
+      agent: 'forager-worker',
+      sessionKind: 'task-worker',
+      featureName: 'my-feature',
+      taskFolder: '05-implement-dashboard',
+      replayDirectivePending: true,
+    } as any);
+
+    const output = {
+      messages: [
+        {
+          info: {
+            id: 'msg-worker',
+            sessionID: 'sess-tw-missing-path',
+            role: 'assistant',
+            time: { created: Date.now() },
+            system: [],
+            modelID: 'm',
+            providerID: 'p',
+            mode: 'compaction',
+            path: { cwd: testRoot, root: testRoot },
+            cost: 0,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            summary: true,
+          } as Message,
+          parts: [],
+        },
+      ],
+    };
+
+    await hooks['experimental.chat.messages.transform']?.({}, output as any);
+
+    expect(output.messages).toHaveLength(1);
+    const session = sessionService.getGlobal('sess-tw-missing-path');
+    expect(session?.replayDirectivePending).toBe(false);
+  });
+
   test('messages.transform updates stored directive when a later real user message re-scopes a primary session', async () => {
     const sessionService = new SessionService(testRoot);
     sessionService.trackGlobal('sess-primary-rescope', {
