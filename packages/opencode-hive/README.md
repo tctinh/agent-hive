@@ -120,7 +120,8 @@ Where:
 - Feature-local mirrors are written to `.hive/features/<feature>/sessions.json`.
 - Session classification distinguishes `primary`, `subagent`, `task-worker`, and `unknown`.
 - Primary and subagent recovery can replay the stored user directive once after compaction.
-- For task workers, the re-anchor context can include `.hive/features/<feature>/tasks/<task>/worker-prompt.md`.
+- Task-worker recovery uses the strict re-anchor plus one worker-specific synthetic replay after compaction.
+- The task-worker replay can reference `.hive/features/<feature>/tasks/<task>/worker-prompt.md`.
 
 Task-worker recovery is intentionally strict:
 
@@ -128,11 +129,15 @@ Task-worker recovery is intentionally strict:
 - do not delegate
 - do not re-read the full codebase
 - re-read `worker-prompt.md`
+- finish only the current task assignment
+- do not merge
+- do not start the next task
+- do not use orchestration tools unless the worker prompt explicitly says so
 - continue from the last known point
 
-This split is deliberate: post-compaction replay is for primary/subagent intent, while task-worker recovery comes from durable worktree context plus `worker-prompt.md` so implementation sessions stay attached to the exact task contract.
+This split is deliberate: primary and subagent sessions replay the stored user directive once after compaction, while task-workers also receive one worker-specific synthetic replay after compaction that restates the active task identity and worker boundaries.
 
-This matters most for `forager-worker` and forager-derived custom agents, because they are the sessions most likely to be compacted mid-implementation.
+This recovery path applies to the built-in `forager-worker` and custom agents derived from it, because they are the sessions most likely to be compacted mid-implementation.
 
 ## Prompt Budgeting & Observability
 
