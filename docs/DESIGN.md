@@ -88,8 +88,8 @@ This enables:
 
 Hive uses a two-level session model so compaction recovery can find the right role before it finds the right feature:
 
-- Global session identity lives in `.hive/sessions.json`.
-- Once a session is bound to a feature, it is mirrored into `.hive/features/<feature>/sessions.json`.
+- Global session identity lives in global `.hive/sessions.json`.
+- Once a session is bound to a feature, it is mirrored into feature-local `sessions.json` files at `.hive/features/<feature>/sessions.json`.
 - The global file is the recovery source of truth; feature-local mirrors keep history discoverable from the feature folder.
 
 Tracked metadata can include:

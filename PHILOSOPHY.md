@@ -690,7 +690,7 @@ The fix is a clean API split: `hive_worktree_start` for normal starts (pending/f
 
 **Theme:** When OpenCode compacts a long-running session, Hive must restore role and task boundaries from durable state instead of hoping the model remembers them.
 
-PR #64 formalizes that recovery model. Hive now tracks session identity globally in `.hive/sessions.json` and mirrors bound sessions into per-feature `sessions.json` files once a feature is known. That split solves two different needs at once: global recovery can find the right feature after compaction, while feature-local recovery keeps session history close to the work it belongs to.
+PR #64 formalizes that recovery model. Hive now tracks session identity in global `.hive/sessions.json` and mirrors bound sessions into feature-local `sessions.json` files once a feature is known. That split solves two different needs at once: global recovery can find the right feature after compaction, while feature-local recovery keeps session history close to the work it belongs to.
 
 **Recovery by session kind:** Compacted sessions are classified as `primary`, `subagent`, `task-worker`, or `unknown`. Primary and subagent sessions recover by re-anchoring to their role and using directive replay to restore the stored user directive once after compaction. Task workers recover differently: they keep the same worker role, do not delegate, and are told to re-read `worker-prompt.md` so they resume from the original task contract instead of improvising a new one.
 

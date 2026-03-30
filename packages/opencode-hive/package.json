@@ -1,6 +1,6 @@
 {
   "name": "opencode-hive",
-  "version": "1.3.3",
+  "version": "1.3.5",
   "type": "module",
   "description": "OpenCode plugin for Agent Hive - from vibe coding to hive coding",
   "license": "MIT WITH Commons-Clause",
@@ -39,17 +39,17 @@
     "simple-git": "^3.27.0"
   },
   "optionalDependencies": {
-    "grep-mcp": "^1.1.0",
     "@notprolands/ast-grep-mcp": "^1.1.1",
     "@upstash/context7-mcp": "^2.1.0",
-    "exa-mcp-server": "^3.1.5"
+    "exa-mcp-server": "^3.1.5",
+    "grep-mcp": "^1.1.0"
   },
   "devDependencies": {
-    "hive-core": "workspace:*",
     "@opencode-ai/plugin": "^1.0.143",
     "@opencode-ai/sdk": "^0.13.0",
     "@types/bun": "^1.2.0",
     "@types/node": "^20.0.0",
+    "hive-core": "workspace:*",
     "typescript": "^5.0.0"
   },
   "files": [

@@ -5,7 +5,7 @@ This repo publishes:
 - `opencode-hive` to npm (GitHub Actions `Release` workflow)
 - `vscode-hive` to the VS Code Marketplace (same workflow)
 
-The `Release` workflow publishes **only on tags** matching `v*`. Manual runs (`workflow_dispatch`) are rehearsal runs: they build and test the release candidate without publishing anything.
+The `Release` workflow publishes **only on tags** matching `v*`; tagged releases only. Manual runs (`workflow_dispatch`) are rehearsal runs: they build and test the release candidate without publishing anything.
 
 ## 1) Prep the release locally
 
