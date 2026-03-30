@@ -119,6 +119,7 @@ Where:
 - Global session state is written to `.hive/sessions.json`.
 - Feature-local mirrors are written to `.hive/features/<feature>/sessions.json`.
 - Session classification distinguishes `primary`, `subagent`, `task-worker`, and `unknown`.
+- Primary and subagent recovery can replay the stored user directive once after compaction.
 - For task workers, the re-anchor context can include `.hive/features/<feature>/tasks/<task>/worker-prompt.md`.
 
 Task-worker recovery is intentionally strict:
@@ -128,6 +129,8 @@ Task-worker recovery is intentionally strict:
 - do not re-read the full codebase
 - re-read `worker-prompt.md`
 - continue from the last known point
+
+This split is deliberate: post-compaction replay is for primary/subagent intent, while task-worker recovery comes from durable worktree context plus `worker-prompt.md` so implementation sessions stay attached to the exact task contract.
 
 This matters most for `forager-worker` and forager-derived custom agents, because they are the sessions most likely to be compacted mid-implementation.
 

@@ -65,4 +65,49 @@ describe('release 1.3.5 contract on main', () => {
       'CHANGELOG.md should list 1.3.5 before 1.3.4'
     );
   });
+
+  it('updates philosophy and design docs for the PR #64 recovery model', () => {
+    const philosophy = readText('PHILOSOPHY.md');
+    const design = readText('docs/DESIGN.md');
+
+    assert.match(philosophy, /### v1\.3\.5 \(Compaction Recovery\)/i);
+    assert.match(philosophy, /global `?\.hive\/sessions\.json`?/i);
+    assert.match(philosophy, /directive replay/i);
+    assert.match(philosophy, /worker-prompt\.md/i);
+
+    assert.match(design, /global `?\.hive\/sessions\.json`?/i);
+    assert.match(design, /feature-local `?sessions\.json`?/i);
+    assert.match(design, /`primary`, `subagent`, `task-worker`, and `unknown`/i);
+    assert.match(design, /directive replay|post-compaction replay/i);
+    assert.match(design, /worker-prompt\.md/i);
+  });
+
+  it('documents session recovery in the user and plugin readmes', () => {
+    const rootReadme = readText('README.md');
+    const pluginReadme = readText('packages/opencode-hive/README.md');
+
+    assert.match(rootReadme, /Primary sessions are re-anchored/i);
+    assert.match(rootReadme, /Scout and Hygienic subagents/i);
+    assert.match(rootReadme, /Forager workers? and forager-derived custom agents/i);
+    assert.match(rootReadme, /worker-prompt\.md/i);
+
+    assert.match(pluginReadme, /\.hive\/sessions\.json/i);
+    assert.match(pluginReadme, /feature-local mirrors are written to `?\.hive\/features\/<feature>\/sessions\.json`?/i);
+    assert.match(pluginReadme, /`primary`, `subagent`, `task-worker`, and `unknown`/i);
+    assert.match(pluginReadme, /post-compaction replay/i);
+    assert.match(pluginReadme, /worker-prompt\.md/i);
+  });
+
+  it('refreshes releasing guidance for 1.3.5 and current bun workflows', () => {
+    const releasing = readText('docs/RELEASING.md');
+
+    assert.doesNotMatch(releasing, /0\.8\.3/);
+    assert.doesNotMatch(releasing, /npm run build --workspaces/);
+    assert.doesNotMatch(releasing, /npm -ws --if-present run test/);
+    assert.match(releasing, /1\.3\.5/);
+    assert.match(releasing, /bun run release:prepare -- 1\.3\.5/);
+    assert.match(releasing, /bun run release:check/);
+    assert.match(releasing, /workflow_dispatch/i);
+    assert.match(releasing, /tags? matching `v\*`|tagged releases only/i);
+  });
 });

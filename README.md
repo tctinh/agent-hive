@@ -300,16 +300,22 @@ Also keep OpenCode plugin config as `"opencode-hive"` (not `"opencode-hive@lates
 
 OpenCode session compaction can strip away role and task framing at exactly the point Hive depends on it. Hive now persists enough session metadata to rebuild that framing after compaction.
 
+Recovery state is stored in two places:
+
+- Global session identity in `.hive/sessions.json`
+- Feature-local mirrors in `.hive/features/<feature>/sessions.json` after a feature is bound
+
 Where:
 
 - Primary sessions are re-anchored to their current Hive role.
 - Scout and Hygienic subagents are re-anchored as subagents.
 - Forager workers and forager-derived custom agents are re-anchored as task workers.
+- Primary and subagent sessions replay the stored user directive once after compaction.
 - Task workers are told to re-read `worker-prompt.md` instead of rediscovering the assignment from scratch.
 
-The recovery prompt is intentionally narrow. It reminds the session that compaction happened, restores the expected role, points task workers back to `worker-prompt.md`, and tells the agent to continue from where it left off without re-reading the full codebase.
+The recovery prompt is intentionally narrow. It reminds the session that compaction happened, restores the expected role, replays the directive only for primary/subagent sessions, points task workers back to `worker-prompt.md`, and tells the agent to continue from where it left off without re-reading the full codebase.
 
-To make it simple: if a long-running Hive session or worker is compacted mid-task, Hive now has a durable breadcrumb trail in `.hive/sessions.json` and feature-local `sessions.json` files so the session can resume with the right constraints instead of improvising a new role.
+To make it simple: if a long-running Hive session or worker is compacted mid-task, Hive now has a durable breadcrumb trail in `.hive/sessions.json`, feature-local `sessions.json` files, and task `worker-prompt.md` files so the session can resume with the right constraints instead of improvising a new role.
 
 ---
 

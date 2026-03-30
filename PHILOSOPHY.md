@@ -685,6 +685,19 @@ v1.3.1 adds `customAgents` to the Hive config. Users define derived agents with 
 The fix is a clean API split: `hive_worktree_start` for normal starts (pending/failed), `hive_worktree_create` exclusively for blocked resumes. Calling `hive_worktree_create` on a non-blocked task now returns `terminal: true, reason: "task_not_blocked", correctTool: "hive_worktree_start"` — a machine-readable dead-end signal that tells orchestrators exactly what went wrong and what to do instead.
 
 **Design insight:** P7 (Iron Laws + Hard Gates) says: build explicit gates, not soft suggestions. The old worktree API had a soft gate — it tried to do the "right thing" regardless of intent. The new split makes intent explicit. Orchestrators state whether they're starting fresh or resuming blocked, and the system rejects the wrong choice immediately. Hard gates prevent loops. Soft gates accumulate them.
+
+### v1.3.5 (Compaction Recovery)
+
+**Theme:** When OpenCode compacts a long-running session, Hive must restore role and task boundaries from durable state instead of hoping the model remembers them.
+
+PR #64 formalizes that recovery model. Hive now tracks session identity globally in `.hive/sessions.json` and mirrors bound sessions into per-feature `sessions.json` files once a feature is known. That split solves two different needs at once: global recovery can find the right feature after compaction, while feature-local recovery keeps session history close to the work it belongs to.
+
+**Recovery by session kind:** Compacted sessions are classified as `primary`, `subagent`, `task-worker`, or `unknown`. Primary and subagent sessions recover by re-anchoring to their role and using directive replay to restore the stored user directive once after compaction. Task workers recover differently: they keep the same worker role, do not delegate, and are told to re-read `worker-prompt.md` so they resume from the original task contract instead of improvising a new one.
+
+**Design rationale:** Compaction is a memory-loss event, not a planning event. Recovery should restore the smallest durable contract that gets the agent safely moving again: role identity for orchestrators and subagents, plus `worker-prompt.md` for task workers. The system does not ask compacted sessions to rediscover state by re-reading the whole codebase or by re-running orchestration tools, because that invites drift exactly when the context window is already weakest.
+
+**Design insight:** Durable breadcrumbs beat speculative recovery. Persist the role, the feature binding, the directive, and the worker prompt path before compaction happens; then recovery can be narrow, deterministic, and safe.
+
 ---
 
 <p align="center">
