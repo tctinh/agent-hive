@@ -32,6 +32,10 @@ export function getActiveFeaturePath(projectRoot: string): string {
   return path.join(getHivePath(projectRoot), ACTIVE_FEATURE_FILE);
 }
 
+export function getGlobalSessionsPath(projectRoot: string): string {
+  return path.join(getHivePath(projectRoot), 'sessions.json');
+}
+
 function parseIndexedFeatureDirectoryName(directoryName: string): { index: number; logicalName: string } | null {
   const match = directoryName.match(/^(\d+)[_-](.+)$/);
   if (!match) {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
-import { normalizeVariant, createVariantHook } from './variant-hook.js';
+import { normalizeVariant, createVariantHook, classifySession } from './variant-hook.js';
+import type { SessionKind } from 'hive-core';
 
 describe('normalizeVariant', () => {
   it('returns trimmed string for valid variant', () => {
@@ -231,5 +232,204 @@ describe('createVariantHook', () => {
 
       expect(output.message.variant).toBe('high');
     });
+  });
+});
+
+describe('classifySession', () => {
+  const NO_CUSTOM_AGENTS: Record<string, { baseAgent: string }> = {};
+
+  describe('built-in agent classification', () => {
+    it('classifies hive-master as primary', () => {
+      const result = classifySession('hive-master', NO_CUSTOM_AGENTS);
+      expect(result.sessionKind).toBe('primary');
+      expect(result.baseAgent).toBe('hive-master');
+    });
+
+    it('classifies architect-planner as primary', () => {
+      const result = classifySession('architect-planner', NO_CUSTOM_AGENTS);
+      expect(result.sessionKind).toBe('primary');
+      expect(result.baseAgent).toBe('architect-planner');
+    });
+
+    it('classifies swarm-orchestrator as primary', () => {
+      const result = classifySession('swarm-orchestrator', NO_CUSTOM_AGENTS);
+      expect(result.sessionKind).toBe('primary');
+      expect(result.baseAgent).toBe('swarm-orchestrator');
+    });
+
+    it('classifies forager-worker as task-worker', () => {
+      const result = classifySession('forager-worker', NO_CUSTOM_AGENTS);
+      expect(result.sessionKind).toBe('task-worker');
+      expect(result.baseAgent).toBe('forager-worker');
+    });
+
+    it('classifies scout-researcher as subagent', () => {
+      const result = classifySession('scout-researcher', NO_CUSTOM_AGENTS);
+      expect(result.sessionKind).toBe('subagent');
+      expect(result.baseAgent).toBe('scout-researcher');
+    });
+
+    it('classifies hygienic-reviewer as subagent', () => {
+      const result = classifySession('hygienic-reviewer', NO_CUSTOM_AGENTS);
+      expect(result.sessionKind).toBe('subagent');
+      expect(result.baseAgent).toBe('hygienic-reviewer');
+    });
+  });
+
+  describe('custom agent classification', () => {
+    const customAgents: Record<string, { baseAgent: string }> = {
+      'forager-ui': { baseAgent: 'forager-worker' },
+      'reviewer-security': { baseAgent: 'hygienic-reviewer' },
+    };
+
+    it('classifies custom forager-derived agent as task-worker', () => {
+      const result = classifySession('forager-ui', customAgents);
+      expect(result.sessionKind).toBe('task-worker');
+      expect(result.baseAgent).toBe('forager-worker');
+    });
+
+    it('classifies custom hygienic-derived agent as subagent', () => {
+      const result = classifySession('reviewer-security', customAgents);
+      expect(result.sessionKind).toBe('subagent');
+      expect(result.baseAgent).toBe('hygienic-reviewer');
+    });
+  });
+
+  describe('unknown agent classification', () => {
+    it('classifies unconfigured custom-like agent as unknown', () => {
+      const result = classifySession('scout-custom', NO_CUSTOM_AGENTS);
+      expect(result.sessionKind).toBe('unknown');
+      expect(result.baseAgent).toBeUndefined();
+    });
+
+    it('classifies completely unknown agent as unknown', () => {
+      const result = classifySession('some-random-agent', NO_CUSTOM_AGENTS);
+      expect(result.sessionKind).toBe('unknown');
+      expect(result.baseAgent).toBeUndefined();
+    });
+  });
+});
+
+describe('createVariantHook with session tracking', () => {
+  const createMockConfigService = (
+    agentVariants: Record<string, string | undefined>,
+    configuredAgents: string[] = Object.keys(agentVariants),
+  ) => ({
+    hasConfiguredAgent: (agent: string) => configuredAgents.includes(agent),
+    getAgentConfig: (agent: string) => ({
+      variant: agentVariants[agent],
+    }),
+  });
+
+  const createOutput = (variant?: string) => ({
+    message: { variant },
+    parts: [],
+  });
+
+  it('records global session with baseAgent and sessionKind on first message', async () => {
+    const tracked: Array<{ sessionId: string; patch: Record<string, unknown> }> = [];
+    const mockSessionService = {
+      trackGlobal: (sessionId: string, patch?: Record<string, unknown>) => {
+        tracked.push({ sessionId, patch: patch ?? {} });
+        return { sessionId, startedAt: '', lastActiveAt: '' };
+      },
+    };
+
+    const hook = createVariantHook(
+      createMockConfigService({ 'forager-worker': 'high' }) as any,
+      mockSessionService as any,
+      { 'forager-ui': { baseAgent: 'forager-worker' } },
+    );
+
+    const output = createOutput(undefined);
+    await hook({ sessionID: 'sess-123', agent: 'forager-ui' }, output);
+
+    expect(tracked.length).toBe(1);
+    expect(tracked[0].sessionId).toBe('sess-123');
+    expect(tracked[0].patch).toEqual({
+      agent: 'forager-ui',
+      baseAgent: 'forager-worker',
+      sessionKind: 'task-worker',
+    });
+  });
+
+  it('classifies primary agents on the chat.message path', async () => {
+    const tracked: Array<{ sessionId: string; patch: Record<string, unknown> }> = [];
+    const mockSessionService = {
+      trackGlobal: (sessionId: string, patch?: Record<string, unknown>) => {
+        tracked.push({ sessionId, patch: patch ?? {} });
+        return { sessionId, startedAt: '', lastActiveAt: '' };
+      },
+    };
+
+    const hook = createVariantHook(
+      createMockConfigService({ 'hive-master': 'max' }) as any,
+      mockSessionService as any,
+    );
+
+    const output = createOutput(undefined);
+    await hook({ sessionID: 'sess-primary', agent: 'hive-master' }, output);
+
+    expect(tracked.length).toBe(1);
+    expect(tracked[0].patch).toEqual({
+      agent: 'hive-master',
+      baseAgent: 'hive-master',
+      sessionKind: 'primary',
+    });
+  });
+
+  it('classifies unknown agents that are not in customAgents', async () => {
+    const tracked: Array<{ sessionId: string; patch: Record<string, unknown> }> = [];
+    const mockSessionService = {
+      trackGlobal: (sessionId: string, patch?: Record<string, unknown>) => {
+        tracked.push({ sessionId, patch: patch ?? {} });
+        return { sessionId, startedAt: '', lastActiveAt: '' };
+      },
+    };
+
+    const hook = createVariantHook(
+      createMockConfigService({}) as any,
+      mockSessionService as any,
+    );
+
+    const output = createOutput(undefined);
+    await hook({ sessionID: 'sess-unknown', agent: 'scout-custom' }, output);
+
+    expect(tracked.length).toBe(1);
+    expect(tracked[0].patch).toEqual({
+      agent: 'scout-custom',
+      sessionKind: 'unknown',
+    });
+  });
+
+  it('skips session tracking when no sessionService provided', async () => {
+    const hook = createVariantHook(
+      createMockConfigService({ 'forager-worker': 'high' }) as any,
+    );
+
+    const output = createOutput(undefined);
+    await hook({ sessionID: 'sess-no-svc', agent: 'forager-worker' }, output);
+
+    expect(output.message.variant).toBe('high');
+  });
+
+  it('skips session tracking when no agent in input', async () => {
+    const tracked: Array<{ sessionId: string; patch: Record<string, unknown> }> = [];
+    const mockSessionService = {
+      trackGlobal: (sessionId: string, patch?: Record<string, unknown>) => {
+        tracked.push({ sessionId, patch: patch ?? {} });
+        return { sessionId, startedAt: '', lastActiveAt: '' };
+      },
+    };
+
+    const hook = createVariantHook(
+      createMockConfigService({}) as any,
+      mockSessionService as any,
+    );
+
+    const output = createOutput(undefined);
+    await hook({ sessionID: 'sess-no-agent' }, output);
+
+    expect(tracked.length).toBe(0);
   });
 });

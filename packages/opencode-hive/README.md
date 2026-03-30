@@ -108,6 +108,29 @@ When using Dynamic Context Pruning (DCP), use a Hive-safe config in `~/.config/o
 
 For local plugin testing, keep OpenCode plugin entry as `"opencode-hive"` (not `"opencode-hive@latest"`).
 
+#### Compaction recovery and session re-anchoring
+
+OpenCode can compact long sessions. When that happens mid-orchestration or mid-task, Hive needs the session to recover its role and task boundaries without re-reading the whole repository.
+
+The plugin now persists durable session metadata and uses it during `experimental.session.compacting` to rebuild a compact re-anchor prompt.
+
+Where:
+
+- Global session state is written to `.hive/sessions.json`.
+- Feature-local mirrors are written to `.hive/features/<feature>/sessions.json`.
+- Session classification distinguishes `primary`, `subagent`, `task-worker`, and `unknown`.
+- For task workers, the re-anchor context can include `.hive/features/<feature>/tasks/<task>/worker-prompt.md`.
+
+Task-worker recovery is intentionally strict:
+
+- keep the same role
+- do not delegate
+- do not re-read the full codebase
+- re-read `worker-prompt.md`
+- continue from the last known point
+
+This matters most for `forager-worker` and forager-derived custom agents, because they are the sessions most likely to be compacted mid-implementation.
+
 ## Prompt Budgeting & Observability
 
 Hive automatically bounds worker prompt sizes to prevent context overflow and tool output truncation.
@@ -135,6 +158,8 @@ When limits are exceeded, content is truncated with `...[truncated]` markers and
 ### Prompt Files
 
 Large prompts are written to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` and passed by file reference (`workerPromptPath`) rather than inlined in tool output. This prevents truncation of large prompts.
+
+That same `worker-prompt.md` path is also reused during compaction recovery so task workers can re-anchor to the exact task assignment after a compacted session resumes.
 
 ## Plan Format
 
@@ -358,6 +383,13 @@ ID guardrails:
 - `customAgents` keys cannot reuse built-in Hive agent IDs
 - plugin-reserved aliases are blocked (`hive`, `architect`, `swarm`, `scout`, `forager`, `hygienic`, `receiver`)
 - operational IDs are blocked (`build`, `plan`, `code`)
+
+Compaction classification follows the base agent:
+
+- `forager-worker` derivatives are treated as `task-worker`
+- `hygienic-reviewer` derivatives are treated as `subagent`
+
+This ensures custom workers recover with the same execution constraints as their base role.
 
 ### Custom Models
 

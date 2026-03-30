@@ -296,6 +296,21 @@ Recommended baseline:
 
 Also keep OpenCode plugin config as `"opencode-hive"` (not `"opencode-hive@latest"`) during local testing.
 
+#### Compaction recovery for Hive sessions
+
+OpenCode session compaction can strip away role and task framing at exactly the point Hive depends on it. Hive now persists enough session metadata to rebuild that framing after compaction.
+
+Where:
+
+- Primary sessions are re-anchored to their current Hive role.
+- Scout and Hygienic subagents are re-anchored as subagents.
+- Forager workers and forager-derived custom agents are re-anchored as task workers.
+- Task workers are told to re-read `worker-prompt.md` instead of rediscovering the assignment from scratch.
+
+The recovery prompt is intentionally narrow. It reminds the session that compaction happened, restores the expected role, points task workers back to `worker-prompt.md`, and tells the agent to continue from where it left off without re-reading the full codebase.
+
+To make it simple: if a long-running Hive session or worker is compacted mid-task, Hive now has a durable breadcrumb trail in `.hive/sessions.json` and feature-local `sessions.json` files so the session can resume with the right constraints instead of improvising a new role.
+
 ---
 
 ## How It Works
@@ -341,6 +356,23 @@ You: Clear visibility into everything ✅
 | **Scout (Explorer/Researcher/Retrieval)** 🔍 | Explores codebase + external docs/data |
 | **Forager (Worker/Coder)** 🍯 | Executes tasks in isolated worktrees |
 | **Hygienic (Consultant/Reviewer/Debugger)** 🧹 | Reviews plan quality, OKAY/REJECT verdict |
+
+### Compaction-safe recovery path
+
+Within OpenCode, compaction is expected to happen on long sessions. Hive now treats that as a recovery path, not a fresh start.
+
+Recovery involves the following:
+
+1. The plugin records durable session metadata as the session runs.
+2. Feature-aware tool boundaries attach feature, task, and worker-prompt metadata when that metadata becomes known.
+3. When OpenCode compacts a session, the compaction hook rebuilds a minimal re-anchor prompt from that durable state.
+4. Task workers get their `worker-prompt.md` path added back into context so they can recover the exact assignment without broad rediscovery.
+
+Some notes:
+
+- Custom subagents derived from `forager-worker` are treated as task workers for compaction recovery.
+- Custom subagents derived from `hygienic-reviewer` are treated as subagents.
+- The recovery prompt avoids telling agents to call broad status tools or re-scan the repository because that tends to recreate drift after compaction.
 
 ---
 

@@ -14,6 +14,8 @@ import {
   getLockPath,
   readJson,
   normalizePath,
+  getGlobalSessionsPath,
+  getHivePath,
 } from "./paths";
 
 const TEST_DIR = "/tmp/hive-core-test-" + process.pid;
@@ -431,6 +433,19 @@ describe("Atomic + Locked JSON Utilities", () => {
 
     it("leaves Unix paths unchanged", () => {
       expect(normalizePath("/home/user/project")).toBe("/home/user/project");
+    });
+  });
+
+  describe("getGlobalSessionsPath", () => {
+    it("returns .hive/sessions.json under project root", () => {
+      const result = getGlobalSessionsPath("/my/project");
+      expect(result).toBe(path.join("/my/project", ".hive", "sessions.json"));
+    });
+
+    it("is consistent with getHivePath", () => {
+      const hivePath = getHivePath("/my/project");
+      const sessionsPath = getGlobalSessionsPath("/my/project");
+      expect(sessionsPath).toBe(path.join(hivePath, "sessions.json"));
     });
   });
 });
