@@ -106,7 +106,7 @@ When using Dynamic Context Pruning (DCP), use a Hive-safe config in `~/.config/o
   - `strategies.supersedeWrites.enabled: false`
   - `strategies.purgeErrors.enabled: false`
 
-For local plugin testing, keep OpenCode plugin entry as `"opencode-hive"` (not `"opencode-hive@latest"`).
+For normal usage, set the OpenCode plugin entry to `"opencode-hive@latest"`. Keep `"opencode-hive"` only for local contributor testing with a symlinked checkout.
 
 #### Compaction recovery and session re-anchoring
 
@@ -188,7 +188,7 @@ Hive reads config from these locations, in order:
 1. `<project>/.opencode/agent_hive.json` (preferred)
 2. `~/.config/opencode/agent_hive.json` (fallback)
 
-If project config exists but is invalid JSON or invalid shape, Hive falls back to global config and surfaces a runtime warning.
+If project config is missing, invalid JSON, or invalid shape, Hive reads `~/.config/opencode/agent_hive.json` next and then falls back to defaults, surfacing a runtime warning when the project config is invalid.
 
 You can customize agent models, variants, disable skills, and disable MCP servers.
 
