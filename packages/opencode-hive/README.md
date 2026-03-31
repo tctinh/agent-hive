@@ -185,8 +185,9 @@ Description.
 
 Hive reads config from these locations, in order:
 
-1. `<project>/.opencode/agent_hive.json` (preferred)
-2. `~/.config/opencode/agent_hive.json` (fallback)
+1. `<project>/.hive/agent-hive.json` (preferred)
+2. `<project>/.opencode/agent_hive.json` (legacy fallback during migration)
+3. `~/.config/opencode/agent_hive.json` (fallback)
 
 If project config is missing, invalid JSON, or invalid shape, Hive reads `~/.config/opencode/agent_hive.json` next and then falls back to defaults, surfacing a runtime warning when the project config is invalid.
 
@@ -194,7 +195,7 @@ You can customize agent models, variants, disable skills, and disable MCP server
 
 ### Project-local config example
 
-Create `.opencode/agent_hive.json`:
+Create `.hive/agent-hive.json`:
 
 ```json
 {

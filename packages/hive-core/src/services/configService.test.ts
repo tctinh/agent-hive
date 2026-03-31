@@ -651,7 +651,7 @@ describe("ConfigService sandbox config", () => {
 describe('ConfigService project-aware read source selection', () => {
   it('reads from project config when project config exists and is valid', () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-project-'));
-    const projectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
+    const projectConfigPath = path.join(projectRoot, '.hive', 'agent-hive.json');
     const globalConfigPath = path.join(tempHome, '.config', 'opencode', 'agent_hive.json');
 
     fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
@@ -676,6 +676,29 @@ describe('ConfigService project-aware read source selection', () => {
     expect(config.sandbox).toBe('docker');
     expect(service.getActiveReadSourceType()).toBe('project');
     expect(service.getActiveReadPath()).toBe(projectConfigPath);
+    expect(service.getLastFallbackWarning()).toBeNull();
+
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('falls back to legacy project config when the new project config is missing', () => {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-project-'));
+    const legacyProjectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
+
+    fs.mkdirSync(path.dirname(legacyProjectConfigPath), { recursive: true });
+    fs.writeFileSync(
+      legacyProjectConfigPath,
+      JSON.stringify({
+        sandbox: 'docker',
+      }),
+    );
+
+    const service = new ConfigService(projectRoot);
+    const config = service.get();
+
+    expect(config.sandbox).toBe('docker');
+    expect(service.getActiveReadSourceType()).toBe('project');
+    expect(service.getActiveReadPath()).toBe(legacyProjectConfigPath);
     expect(service.getLastFallbackWarning()).toBeNull();
 
     fs.rmSync(projectRoot, { recursive: true, force: true });
@@ -706,7 +729,7 @@ describe('ConfigService project-aware read source selection', () => {
 
   it('falls back to global config and records warning metadata when project config is invalid', () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-project-'));
-    const projectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
+    const projectConfigPath = path.join(projectRoot, '.hive', 'agent-hive.json');
     const globalConfigPath = path.join(tempHome, '.config', 'opencode', 'agent_hive.json');
 
     fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
@@ -740,7 +763,7 @@ describe('ConfigService project-aware read source selection', () => {
 
   it('falls back to global config when project config has invalid object field types', () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-project-'));
-    const projectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
+    const projectConfigPath = path.join(projectRoot, '.hive', 'agent-hive.json');
     const globalConfigPath = path.join(tempHome, '.config', 'opencode', 'agent_hive.json');
 
     fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
@@ -779,7 +802,7 @@ describe('ConfigService project-aware read source selection', () => {
 
   it('falls back to global config when project config has invalid nested built-in agent fields', () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-project-'));
-    const projectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
+    const projectConfigPath = path.join(projectRoot, '.hive', 'agent-hive.json');
     const globalConfigPath = path.join(tempHome, '.config', 'opencode', 'agent_hive.json');
 
     fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
@@ -848,7 +871,7 @@ describe('ConfigService project-aware read source selection', () => {
 
   it('falls back to defaults when both project and global configs are invalid', () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-project-'));
-    const projectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
+    const projectConfigPath = path.join(projectRoot, '.hive', 'agent-hive.json');
     const globalConfigPath = path.join(tempHome, '.config', 'opencode', 'agent_hive.json');
 
     fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
@@ -890,7 +913,7 @@ describe('ConfigService project-aware read source selection', () => {
 
   it('falls back to defaults when project config is invalid and global config is missing', () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hive-project-'));
-    const projectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
+    const projectConfigPath = path.join(projectRoot, '.hive', 'agent-hive.json');
     const globalConfigPath = path.join(tempHome, '.config', 'opencode', 'agent_hive.json');
 
     fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });

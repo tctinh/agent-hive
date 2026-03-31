@@ -309,7 +309,8 @@ The previous worker's progress is preserved. Include the user's decision in the 
 **Docker sandbox** provides isolated test environments for workers:
 
 - **Config read precedence**:
-  1. `<project>/.opencode/agent_hive.json` (preferred)
+  1. `<project>/.hive/agent-hive.json` (preferred)
+  2. `<project>/.opencode/agent_hive.json` (legacy fallback during migration)
   2. `~/.config/opencode/agent_hive.json` (fallback)
 - **Invalid project config behavior**: Falls back to global config and surfaces a runtime warning.
 - **Fields**:

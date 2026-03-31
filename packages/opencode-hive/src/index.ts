@@ -289,8 +289,9 @@ const plugin: Plugin = async (ctx) => {
   /**
    * Check if OMO-Slim delegation is enabled via user config.
    * Config read precedence:
-   * 1. <project>/.opencode/agent_hive.json
-   * 2. ~/.config/opencode/agent_hive.json
+   * 1. <project>/.hive/agent-hive.json
+   * 2. <project>/.opencode/agent_hive.json
+   * 3. ~/.config/opencode/agent_hive.json
    */
   const isOmoSlimEnabled = (): boolean => {
     return configService.isOmoSlimEnabled();

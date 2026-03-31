@@ -17,14 +17,16 @@ import type { SandboxConfig } from './dockerSandboxService.js';
 
 /**
  * ConfigService manages Agent Hive config with read precedence:
- * 1. <project>/.opencode/agent_hive.json (preferred when present and valid)
- * 2. ~/.config/opencode/agent_hive.json (fallback)
+ * 1. <project>/.hive/agent-hive.json (preferred when present and valid)
+ * 2. <project>/.opencode/agent_hive.json (legacy fallback during migration)
+ * 3. ~/.config/opencode/agent_hive.json (fallback)
  *
  * Writes remain global-only at ~/.config/opencode/agent_hive.json.
  */
 export class ConfigService {
   private configPath: string;
   private projectConfigPath?: string;
+  private legacyProjectConfigPath?: string;
   private cachedConfig: HiveConfig | null = null;
   private cachedCustomAgentConfigs: Record<string, ResolvedCustomAgentConfig> | null = null;
   private activeReadSourceType: 'project' | 'global' = 'global';
@@ -44,7 +46,8 @@ export class ConfigService {
     this.configPath = path.join(configDir, 'agent_hive.json');
     this.activeReadPath = this.configPath;
     if (projectRoot) {
-      this.projectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
+      this.projectConfigPath = path.join(projectRoot, '.hive', 'agent-hive.json');
+      this.legacyProjectConfigPath = path.join(projectRoot, '.opencode', 'agent_hive.json');
     }
   }
 
@@ -63,22 +66,29 @@ export class ConfigService {
       return this.cachedConfig;
     }
 
-    if (this.projectConfigPath && fs.existsSync(this.projectConfigPath)) {
-      const projectStored = this.readStoredConfig(this.projectConfigPath);
+    const projectConfigCandidates = [this.projectConfigPath, this.legacyProjectConfigPath].filter(
+      (candidate): candidate is string => !!candidate,
+    );
+
+    for (const projectConfigPath of projectConfigCandidates) {
+      if (!fs.existsSync(projectConfigPath)) {
+        continue;
+      }
+
+      const projectStored = this.readStoredConfig(projectConfigPath);
       if (projectStored.ok) {
         this.activeReadSourceType = 'project';
-        this.activeReadPath = this.projectConfigPath;
+        this.activeReadPath = projectConfigPath;
         this.lastFallbackWarning = null;
         this.cachedConfig = this.mergeWithDefaults(projectStored.value);
         return this.cachedConfig;
       }
 
       const fallbackReason = 'reason' in projectStored ? projectStored.reason : 'read_error';
-      this.lastFallbackWarning = this.createProjectFallbackWarning(
-        this.projectConfigPath,
-        fallbackReason,
-      );
-    } else {
+      this.lastFallbackWarning = this.createProjectFallbackWarning(projectConfigPath, fallbackReason);
+    }
+
+    if (!this.projectConfigPath && !this.legacyProjectConfigPath) {
       this.lastFallbackWarning = null;
     }
 
@@ -88,11 +98,11 @@ export class ConfigService {
       this.cachedConfig = { ...DEFAULT_HIVE_CONFIG };
       this.cachedCustomAgentConfigs = null;
 
-      if (this.projectConfigPath && fs.existsSync(this.projectConfigPath) && this.lastFallbackWarning) {
+      if (this.lastFallbackWarning && this.lastFallbackWarning.fallbackType !== 'defaults') {
         this.lastFallbackWarning = {
-          message: `Failed to read project config at ${this.projectConfigPath}; global config at ${this.configPath} is missing; using defaults`,
-          sourceType: 'project',
-          sourcePath: this.projectConfigPath,
+          message: `Failed to read project config at ${this.lastFallbackWarning.sourcePath}; global config at ${this.configPath} is missing; using defaults`,
+          sourceType: this.lastFallbackWarning.sourceType,
+          sourcePath: this.lastFallbackWarning.sourcePath,
           fallbackType: 'defaults',
           reason: this.lastFallbackWarning.reason,
         };
@@ -116,11 +126,11 @@ export class ConfigService {
     this.cachedConfig = { ...DEFAULT_HIVE_CONFIG };
     this.cachedCustomAgentConfigs = null;
 
-    if (this.projectConfigPath && fs.existsSync(this.projectConfigPath) && this.lastFallbackWarning) {
+    if (this.lastFallbackWarning) {
       this.lastFallbackWarning = {
-        message: `Failed to read project config at ${this.projectConfigPath}; global config at ${this.configPath} is also invalid; using defaults`,
-        sourceType: 'project',
-        sourcePath: this.projectConfigPath,
+        message: `Failed to read project config at ${this.lastFallbackWarning.sourcePath}; global config at ${this.configPath} is also invalid; using defaults`,
+        sourceType: this.lastFallbackWarning.sourceType,
+        sourcePath: this.lastFallbackWarning.sourcePath,
         fallbackType: 'defaults',
         reason: this.lastFallbackWarning.reason,
       };

@@ -106,12 +106,13 @@ For local plugin testing:
 
 Agent Hive reads configuration from the following locations (in order):
 
-1. `<project>/.opencode/agent_hive.json` (preferred)
-2. `~/.config/opencode/agent_hive.json` (fallback)
+1. `<project>/.hive/agent-hive.json` (preferred)
+2. `<project>/.opencode/agent_hive.json` (legacy fallback during migration)
+3. `~/.config/opencode/agent_hive.json` (fallback)
 
 If the project config is missing, invalid JSON, or invalid shape, Agent Hive reads `~/.config/opencode/agent_hive.json` next and then falls back to defaults, surfacing a runtime warning when the project config is invalid.
 
-Create a project-local config at `.opencode/agent_hive.json`:
+Create a project-local config at `.hive/agent-hive.json`:
 
 ```json
 {

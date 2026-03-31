@@ -12,7 +12,7 @@ By configuring this hook to fire every 3rd turn instead of every turn, you can r
 
 ## Configuration
 
-Add a `hook_cadence` field to config. Hive reads from `<project>/.opencode/agent_hive.json` first, then falls back to `~/.config/opencode/agent_hive.json`:
+Add a `hook_cadence` field to config. Hive reads from `<project>/.hive/agent-hive.json` first, then legacy `<project>/.opencode/agent_hive.json`, then falls back to `~/.config/opencode/agent_hive.json`:
 
 ```json
 {
@@ -183,7 +183,7 @@ bun test src/__tests__/hook-cadence.test.ts
 
 ### Hook not firing as expected
 
-1. Check project config file syntax first: `cat .opencode/agent_hive.json`
+1. Check project config file syntax first: `cat .hive/agent-hive.json`
 2. If project config is missing/invalid, check global fallback: `cat ~/.config/opencode/agent_hive.json`
 3. Verify the hook name is spelled correctly (case-sensitive)
 4. Check console logs for validation warnings: `[hive:cadence]`
