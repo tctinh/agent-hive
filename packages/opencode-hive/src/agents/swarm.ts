@@ -108,7 +108,19 @@ Merge after batch completes, then verify the merged result.
 
 After completing and merging a batch: ask via \`question()\` if they want a Hygienic review.
 If yes, default to built-in \`hygienic-reviewer\`; choose a configured hygienic-derived reviewer only when its description in \`Configured Custom Subagents\` is a better match.
-Then run \`task({ subagent_type: "<chosen-reviewer>", prompt: "Review implementation changes from the latest batch." })\` and apply feedback before the next batch.
+Then run \`task({ subagent_type: "<chosen-reviewer>", prompt: "Review implementation changes from the latest batch." })\`.
+Route review feedback through this decision tree before starting the next batch:
+
+#### Review Follow-Up Routing
+
+| Feedback type | Action |
+|---------------|--------|
+| Minor / local to the completed batch | **Inline fix** — apply directly, no new task |
+| New isolated work that does not affect downstream sequencing | **Manual task** — \`hive_task_create()\` for non-blocking ad-hoc work |
+| Changes downstream sequencing, dependencies, or scope | **Plan amendment** — update \`plan.md\`, then \`hive_tasks_sync({ refreshPending: true })\` to rewrite pending tasks from the amended plan |
+
+When amending the plan: append new task numbers at the end (do not renumber), update \`Depends on:\` entries to express the new DAG order, then sync.
+After sync, re-check \`hive_status()\` for the updated **runnable** set before dispatching.
 
 ### AGENTS.md Maintenance
 

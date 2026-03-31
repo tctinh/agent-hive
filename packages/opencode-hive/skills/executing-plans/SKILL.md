@@ -50,12 +50,22 @@ When batch complete:
 ### Step 4.5: Post-Batch Hygienic Review
 
 After the batch report, ask the operator if they want a Hygienic code review for the batch.
-If yes, run `task({ subagent_type: "hygienic", prompt: "Review implementation changes from the latest batch." })` and apply feedback before starting the next batch.
+If yes, run `task({ subagent_type: "hygienic", prompt: "Review implementation changes from the latest batch." })`.
+Route review feedback through this decision tree before continuing:
+
+| Feedback type | Action |
+|---------------|--------|
+| Minor / local to the completed batch | **Inline fix** — apply directly, no new task |
+| New isolated work that does not affect downstream sequencing | **Manual task** — `hive_task_create()` for non-blocking ad-hoc work |
+| Changes downstream sequencing, dependencies, or scope | **Plan amendment** — update `plan.md`, then `hive_tasks_sync({ refreshPending: true })` to rewrite pending tasks from the amended plan |
+
+When amending the plan: append new task numbers at the end (do not renumber), update `Depends on:` entries to express the new DAG order, then sync.
 
 ### Step 5: Continue
-Based on feedback:
-- Apply changes if needed
-- Execute next batch
+After applying review feedback (or if none):
+- Re-check `hive_status()` for the updated **runnable** set — tasks whose dependencies are all satisfied
+- Tasks blocked by unmet dependencies stay blocked until predecessors complete
+- Execute the next batch of runnable tasks
 - Repeat until complete
 
 ### Step 6: Complete Development
