@@ -37,21 +37,33 @@
 
 - `context/overview.md` is the primary human-facing summary and review surface.
 - Update it with the existing context tool: `hive_context_write({ name: "overview", content })`.
-- `plan.md` remains authoritative for task generation and execution.
+- `plan.md` remains the graph source of truth for plan-backed task generation, dependency parsing, and execution.
 - `context/overview.md` is intentionally excluded from worker execution context so the narrative summary does not blur implementation truth.
 
 ## Task status.json
 
 ```json
 {
-  "status": "done",
-  "origin": "plan",
-  "planTitle": "Implement login",
-  "summary": "Login endpoint implemented with JWT",
-  "startedAt": "2025-01-05T09:00:00Z",
-  "completedAt": "2025-01-05T10:30:00Z",
-  "baseCommit": "abc123",
-  "dependsOn": ["01-setup", "02-database-schema"]
+  "status": "pending",
+  "origin": "manual",
+  "planTitle": "capture dag handoff",
+  "dependsOn": ["02-route-review-follow-up"],
+  "metadata": {
+    "goal": "Record the operator-facing workflow after the review batch",
+    "description": "Write the handoff notes after the isolated follow-up task finishes",
+    "acceptanceCriteria": [
+      "handoff.md lists the commands that passed",
+      "overview.md reflects the final DAG workflow"
+    ],
+    "references": [
+      "packages/opencode-hive/docs/DATA-MODEL.md:43-190"
+    ],
+    "files": [
+      "packages/opencode-hive/docs/DATA-MODEL.md"
+    ],
+    "reason": "Operator requested final handoff notes",
+    "source": "ad_hoc"
+  }
 }
 ```
 
@@ -59,6 +71,7 @@
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `schemaVersion` | number? | Forward-compatibility version for `status.json`. Current value is `1`. |
 | `status` | string | Task status (see Status Values below) |
 | `origin` | string | `"plan"` (from plan.md) or `"manual"` (manually created) |
 | `planTitle` | string? | Task title from plan.md |
@@ -66,11 +79,55 @@
 | `startedAt` | string? | ISO timestamp when task started |
 | `completedAt` | string? | ISO timestamp when task completed |
 | `baseCommit` | string? | Git commit hash at task start |
-| `dependsOn` | string[]? | Task folder names this task depends on (e.g., `["01-setup"]`). A task cannot start until all dependencies have status `done`. Resolved from plan.md `Depends on:` annotations during `hive_tasks_sync`. |
+| `subtasks` | object[]? | Optional nested subtask state when a task is decomposed during execution. |
+| `idempotencyKey` | string? | Safe-retry key for background worker completion patches. |
+| `workerSession` | object? | Background worker session metadata such as heartbeat, attempt count, and message count. |
+| `dependsOn` | string[]? | Task folder names this task depends on (for example, `["01-setup"]`). A task is runnable only when every dependency is `done`. Plan tasks resolve this from `plan.md` `Depends on:` annotations during `hive_tasks_sync`; manual tasks persist an explicit array and default to `[]`. |
+| `metadata` | object? | Structured manual-task metadata used to generate `spec.md`. Omitted for normal plan-backed tasks. |
 
 **Dependency rules**:
 - Only status `done` satisfies a dependency.
-- If `dependsOn` is omitted (legacy/manual tasks), Hive applies implicit sequential ordering based on the numeric task prefix (N depends on N-1).
+- `plan.md` is the graph source of truth for plan-backed dependencies.
+- Manual tasks always write explicit dependency metadata. Omitting `dependsOn` at creation time means `[]`, not "infer the previous task".
+- Explicit manual dependencies are for isolated ad-hoc/operator work only.
+- Review-sourced manual tasks cannot declare explicit dependencies. If review feedback changes downstream sequencing, dependencies, or scope, amend `plan.md` instead.
+- If `dependsOn` is omitted by a legacy task record, Hive applies implicit sequential ordering based on the numeric task prefix (N depends on N-1).
+
+### Manual-task metadata
+
+Manual tasks support the following structured metadata in `status.json.metadata`:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `goal` | string? | Why this task exists and what done means |
+| `description` | string? | Worker-facing execution summary |
+| `acceptanceCriteria` | string[]? | Observable outcomes the operator expects |
+| `references` | string[]? | Relevant files, docs, or line ranges |
+| `files` | string[]? | Likely edit targets |
+| `reason` | string? | Why the task was created |
+| `source` | string? | One of `review`, `operator`, or `ad_hoc` |
+
+Some notes:
+- `hive_task_create()` accepts `dependsOn` alongside the metadata fields, but stores it at the top level in `status.json.dependsOn`.
+- `buildManualTaskSpec()` turns these structured fields into a worker-ready `spec.md` with `Goal`, `Description`, `Acceptance Criteria`, `Files`, `References`, and `Origin` sections.
+
+## Pending-task refresh path
+
+Within execution, `plan.md` stays authoritative for the plan-backed DAG. When the operator amends `plan.md` and wants pending plan tasks to match the new graph, run:
+
+```ts
+hive_tasks_sync({ refreshPending: true })
+```
+
+`refreshPending` does the following:
+- Rewrites pending plan-backed tasks from the current `plan.md`
+- Updates `status.json.planTitle`
+- Updates `status.json.dependsOn`
+- Regenerates `spec.md`
+- Deletes pending plan-backed tasks removed from `plan.md`
+- Preserves manual tasks and any task with execution history (`in_progress`, `done`, `blocked`, `failed`, `partial`)
+
+To make it simple: use manual tasks for isolated ad-hoc work, but route sequencing or scope changes back through `plan.md`, then refresh pending tasks from that graph.
 
 ## Status Values
 
@@ -91,15 +148,17 @@ Feature statuses (FeatureStatusType):
 
 ## hive_status Output
 
-`hive_status` returns a JSON summary of feature state and task readiness.
+`hive_status` returns a JSON summary of feature state, review state, and DAG readiness.
 
-### Feature-Level Fields
+### Top-Level Objects
 
-Feature metadata includes overview-aware review signals:
-- `hasOverview` (boolean)
-- `commentCount` (number, total across review documents)
-- `reviewCounts.plan` (number)
-- `reviewCounts.overview` (number)
+- `feature.name`, `feature.status`, `feature.ticket`, `feature.createdAt`
+- `plan.exists`, `plan.status`, `plan.approved`
+- `overview.exists`, `overview.path`, `overview.updatedAt`
+- `review.unresolvedTotal`, `review.byDocument.overview`, `review.byDocument.plan`
+- `tasks.total`, `tasks.pending`, `tasks.inProgress`, `tasks.done`, `tasks.list`, `tasks.runnable`, `tasks.blockedBy`
+- `context.fileCount`, `context.files[]`
+- `nextAction`
 
 ### Task List Fields
 
@@ -109,7 +168,7 @@ Each entry in `tasks.list` includes:
 - `status` (string)
 - `origin` (string)
 - `summary` (string | null)
-- `dependsOn` (string[] | null)
+- `dependsOn` (string[] | null, raw dependency metadata from `status.json`)
 
 ### Runnable and Blocked
 
@@ -120,27 +179,43 @@ tasks.blockedBy  # map: task folder -> array of unmet dependency folders
 
 Rules:
 - Only `done` satisfies dependencies.
-- If `dependsOn` is omitted (legacy/manual tasks), runnable/blocked uses implicit sequential ordering (N depends on N-1).
+- `tasks.runnable` lists task folders whose effective dependency set is fully satisfied.
+- `tasks.blockedBy` maps task folders to the unmet dependency folders keeping them blocked.
+- `tasks.list[].dependsOn` shows the raw stored dependency metadata; `tasks.runnable` and `tasks.blockedBy` are computed from the effective graph, which applies legacy sequential fallback only when a task record omits `dependsOn`.
 
 Example:
 
 ```json
 {
+  "overview": {
+    "exists": true,
+    "path": ".hive/features/example/context/overview.md",
+    "updatedAt": "2026-03-31T10:30:00.000Z"
+  },
+  "review": {
+    "unresolvedTotal": 1,
+    "byDocument": {
+      "overview": 0,
+      "plan": 1
+    }
+  },
   "tasks": {
     "list": [
       {"folder":"01-setup","status":"done","dependsOn":[]},
       {"folder":"02-core","status":"pending","dependsOn":["01-setup"]},
-      {"folder":"03-ui","status":"pending","dependsOn":[]}
+      {"folder":"03-ui","status":"pending","dependsOn":["02-core"]}
     ],
-    "runnable": ["02-core","03-ui"],
-    "blockedBy": {}
+    "runnable": ["02-core"],
+    "blockedBy": {
+      "03-ui": ["02-core"]
+    }
   }
 }
 ```
 
 ## spec.md Structure
 
-`spec.md` is generated for each task. It always includes a **Dependencies** section:
+`spec.md` is generated for each task. Every generated spec includes a **Dependencies** section:
 
 ```
 ## Dependencies
@@ -153,6 +228,16 @@ If a task has no dependencies (explicit `Depends on: none`), the section is:
 ## Dependencies
 _None_
 ```
+
+Plan-backed specs also include the matching `## Plan Section` excerpt from `plan.md`.
+
+Manual-task specs derive their sections from structured metadata and may include:
+- `## Goal`
+- `## Description`
+- `## Acceptance Criteria`
+- `## Files`
+- `## References`
+- `## Origin`
 
 ## Session Metadata
 
