@@ -90,7 +90,7 @@ Add `opencode-hive` to your `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-hive"]
+  "plugin": ["opencode-hive@latest"]
 }
 ```
 
@@ -98,7 +98,7 @@ OpenCode handles the rest — no manual npm install needed.
 
 For local plugin testing:
 
-1. Keep `plugin: ["opencode-hive"]` in `opencode.json` (not `opencode-hive@latest`).
+1. Keep `plugin: ["opencode-hive"]` in `opencode.json` as a temporary contributor-only override.
 2. Build `packages/hive-core` first, then `packages/opencode-hive`.
 3. Symlink `~/.cache/opencode/node_modules/opencode-hive` to your local `packages/opencode-hive` checkout.
 
@@ -109,7 +109,7 @@ Agent Hive reads configuration from the following locations (in order):
 1. `<project>/.opencode/agent_hive.json` (preferred)
 2. `~/.config/opencode/agent_hive.json` (fallback)
 
-If the project config exists but is invalid JSON or invalid shape, Agent Hive falls back to the global config and surfaces a runtime warning.
+If the project config is missing, invalid JSON, or invalid shape, Agent Hive reads `~/.config/opencode/agent_hive.json` next and then falls back to defaults, surfacing a runtime warning when the project config is invalid.
 
 Create a project-local config at `.opencode/agent_hive.json`:
 
@@ -310,7 +310,7 @@ Recommended baseline:
 }
 ```
 
-Also keep OpenCode plugin config as `"opencode-hive"` (not `"opencode-hive@latest"`) during local testing.
+Also keep OpenCode plugin config as `"opencode-hive"` during local testing only; the normal install should use `"opencode-hive@latest"`.
 
 #### Compaction recovery for Hive sessions
 
