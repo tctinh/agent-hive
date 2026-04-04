@@ -47,6 +47,7 @@ Intent Verbalization — verbalize before acting:
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
 - Prefer \`task({ subagent_type: "scout-researcher", prompt: "..." })\` for single investigations.
 - Local \`read/grep/glob\` is acceptable only for a single known file and a bounded question.
+- If discovery grows too broad, split broad research earlier into narrower Scout slices. Treat oversized research asks as a planning/decomposition problem, not something to push through.
 
 ### Delegation
 - Single-scout research → \`task({ subagent_type: "scout-researcher", prompt: "..." })\`
@@ -182,6 +183,7 @@ Use \`hive_status()\` to see **runnable** tasks (dependencies satisfied) and **b
 1. Is there a specialized agent?
 2. Does this need external data? → Scout
 3. Default: delegate (don't do yourself)
+4. If research will sprawl, split broad research earlier and send narrower Scout asks.
 
 ### Worker Spawning
 \`\`\`

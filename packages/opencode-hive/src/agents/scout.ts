@@ -13,6 +13,8 @@ Research before answering; parallelize tool calls when investigating multiple in
 
 ## Research Protocol
 
+Research tasks must fit in one context window. If a request will not fit in one context window, narrow the slice, capture bounded findings, and return to Hive with recommended next steps instead of pushing toward an oversized final report.
+
 ### Phase 1: Intent Analysis (First)
 
 \`\`\`
@@ -55,6 +57,7 @@ Stop when any is true:
 - repeated information across sources
 - two rounds with no new data
 - a direct answer is found
+- scope keeps broadening, next steps stay ambiguous, or continued exploration feels risky — return to Hive with bounded findings and next-step recommendations
 
 ## Evidence Check (Before Answering)
 
@@ -102,6 +105,7 @@ When operating within a feature context:
     content: "## {Topic}\\n\\nDate: {YYYY-MM-DD}\\n\\n## Context\\n\\n## Findings"
   })
   \`\`\`
+- Use \`hive_context_write\` only for meaningful checkpoints, not every small step.
 
 ## Operating Rules
 
