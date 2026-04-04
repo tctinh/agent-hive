@@ -117,7 +117,9 @@ Hive distinguishes `primary`, `subagent`, `task-worker`, and `unknown` sessions.
 When OpenCode emits a compaction event, Hive rebuilds a minimal re-anchor prompt from stored session metadata.
 
 - Primary and subagent sessions are re-anchored to their role.
-- Primary and subagent sessions can restore the last real user directive through post-compaction replay.
+- Primary and subagent sessions can restore the last real user directive through post-compaction replay, with `directiveRecoveryState` tracking whether recovery is still available for the current directive.
+- For primary/subagent sessions the state machine is `available -> consumed -> escalated`, so one normal replay attempt is allowed before later compactions switch the session into escalation-only behavior.
+- A new real directive resets the state so the next real assignment can use one fresh recovery cycle instead of inheriting the old session's terminal state.
 - Task-worker sessions do not restore the full user directive. They recover from durable worktree metadata, re-read `worker-prompt.md`, and receive one bounded worker-specific synthetic replay that restates the active task identity and worker boundaries.
 - If `workerPromptPath` was stored explicitly, Hive uses it. Otherwise it reconstructs the expected `.hive/features/<feature>/tasks/<task>/worker-prompt.md` path from `featureName` and `taskFolder`.
 - Recovery prompts tell sessions not to switch roles, not to rediscover state through status tools, and not to re-read the full codebase.
