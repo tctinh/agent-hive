@@ -103,8 +103,28 @@ ${spec}
 Before writing code, confirm:
 1. Dependencies are satisfied and required context is present.
 2. The exact files/sections to touch (from references) are identified.
-3. The first failing test to write is clear (TDD).
+3. The verification path is clear: a failing test for new behavior, or the existing coverage to keep green for refactor-only work.
 4. The minimal change needed to reach green is planned.
+
+---
+
+## TDD Protocol (Required)
+
+1. **Red**: Write failing test first
+2. **Green**: Minimal code to pass
+3. **Refactor**: Clean up, keep tests green
+
+When adding new behavior, write the test before the implementation.
+When refactoring existing tested code, keep tests green throughout; no new failing test is required.
+
+## Debugging Protocol (When stuck)
+
+1. **Reproduce**: Get consistent failure
+2. **Isolate**: Binary search to find cause
+3. **Hypothesize**: Form theory, test it
+4. **Fix**: Minimal change that resolves
+
+After 3 failed attempts at same fix: STOP and report blocker.
 
 ---
 
@@ -139,6 +159,24 @@ The Hive Master will:
 3. Spawn a NEW worker to continue with the decision
 
 This keeps the user focused on ONE conversation (Hive Master) instead of multiple worker panes.
+
+---
+
+## Verification Evidence
+
+Before claiming completion, verify your work with command-first evidence proportional to the change type:
+
+| Change type | Required verification |
+|---|---|
+| New behavior | Run tests covering the new code; record pass/fail counts |
+| Bug fix | Reproduce the original failure, then confirm the fix |
+| Refactor | Run existing tests; confirm no regressions |
+| Prompt / text-only | Run relevant local tests if available; otherwise do file-specific sanity checks such as generation, syntax/parse, or conflict-marker scans |
+
+**Rules:**
+- Run the command, then record observed output. Do not substitute explanation for execution.
+- If a check cannot be run (missing deps, no test runner in worktree), explicitly state "Not run: <reason>" instead of omitting it silently.
+- command-first means: execute first, interpret second. Never claim a result you have not observed.
 
 ---
 
@@ -204,26 +242,6 @@ hive_worktree_commit({
 
 ---
 
-## TDD Protocol (Required)
-
-1. **Red**: Write failing test first
-2. **Green**: Minimal code to pass
-3. **Refactor**: Clean up, keep tests green
-
-Never write implementation before test exists.
-Exception: Pure refactoring of existing tested code.
-
-## Debugging Protocol (When stuck)
-
-1. **Reproduce**: Get consistent failure
-2. **Isolate**: Binary search to find cause
-3. **Hypothesize**: Form theory, test it
-4. **Fix**: Minimal change that resolves
-
-After 3 failed attempts at same fix: STOP and report blocker.
-
----
-
 ## Tool Access
 
 **You have access to:**
@@ -248,10 +266,6 @@ After 3 failed attempts at same fix: STOP and report blocker.
 3. **Escalate blockers** - Don't guess on important decisions
 4. **Save context** - Use hive_context_write for discoveries
 5. **Complete cleanly** - Always call hive_worktree_commit when done
-
----
-
-**User Input:** ALWAYS use \`question()\` tool for any user input - NEVER ask questions via plain text. This ensures structured responses.
 
 ---
 
