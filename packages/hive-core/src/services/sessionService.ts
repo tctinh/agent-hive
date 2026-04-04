@@ -12,7 +12,11 @@ export class SessionService {
     }
 
     const { sessionId: _sessionId, ...rest } = patch;
-    Object.assign(target, rest);
+    for (const [key, value] of Object.entries(rest) as Array<[keyof Omit<SessionInfo, 'sessionId'>, SessionInfo[keyof Omit<SessionInfo, 'sessionId'>]]>) {
+      if (value !== undefined || key === 'directiveRecoveryState') {
+        target[key] = value as never;
+      }
+    }
   }
 
   private getSessionsPath(featureName: string): string {

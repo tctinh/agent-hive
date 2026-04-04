@@ -357,6 +357,28 @@ const plugin: Plugin = async (ctx) => {
     return session?.sessionKind === 'primary' || session?.sessionKind === 'subagent';
   };
 
+  const getDirectiveReplayCompactionPatch = (session: { directivePrompt?: string; directiveRecoveryState?: 'available' | 'consumed' | 'escalated'; sessionKind?: string } | undefined) => {
+    if (!session?.directivePrompt || !shouldUseDirectiveReplay(session)) {
+      return null;
+    }
+
+    if (session.directiveRecoveryState === 'escalated') {
+      return null;
+    }
+
+    if (session.directiveRecoveryState === 'consumed') {
+      return {
+        directiveRecoveryState: 'escalated' as const,
+        replayDirectivePending: true,
+      };
+    }
+
+    return {
+      directiveRecoveryState: 'available' as const,
+      replayDirectivePending: true,
+    };
+  };
+
   const shouldUseWorkerReplay = (session: { sessionKind?: string; featureName?: string; taskFolder?: string; workerPromptPath?: string } | undefined): boolean => {
     return session?.sessionKind === 'task-worker'
       && !!session.featureName
@@ -928,8 +950,9 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
 
       const sessionID = input.event.properties.sessionID;
       const existing = sessionService.getGlobal(sessionID);
-      if (existing?.directivePrompt && shouldUseDirectiveReplay(existing)) {
-        sessionService.trackGlobal(sessionID, { replayDirectivePending: true });
+      const directiveReplayPatch = getDirectiveReplayCompactionPatch(existing);
+      if (directiveReplayPatch) {
+        sessionService.trackGlobal(sessionID, directiveReplayPatch);
         return;
       }
       if (shouldUseWorkerReplay(existing)) {
@@ -1035,7 +1058,11 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         const directiveText = extractTextParts(latestDirective.parts).join('\n\n');
         const existingDirective = session?.directivePrompt;
         if (directiveText && directiveText !== existingDirective && shouldUseDirectiveReplay(session ?? { sessionKind: 'subagent' })) {
-          sessionService.trackGlobal(sessionID, { directivePrompt: directiveText });
+          sessionService.trackGlobal(sessionID, {
+            directivePrompt: directiveText,
+            directiveRecoveryState: undefined,
+            replayDirectivePending: false,
+          });
         }
       }
 
@@ -1106,7 +1133,12 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         ],
       });
 
-      sessionService.trackGlobal(sessionID, { replayDirectivePending: false });
+      sessionService.trackGlobal(sessionID, {
+        replayDirectivePending: false,
+        directiveRecoveryState: refreshed.directiveRecoveryState === 'available'
+          ? 'consumed'
+          : refreshed.directiveRecoveryState,
+      });
     },
 
     "tool.execute.before": async (input, output) => {
