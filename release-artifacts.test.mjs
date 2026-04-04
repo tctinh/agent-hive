@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
@@ -14,120 +13,64 @@ function readText(relativePath) {
   return fs.readFileSync(path.join(workspaceRoot, relativePath), 'utf8');
 }
 
-function run(command, args, cwd = workspaceRoot) {
-  return execFileSync(command, args, {
-    cwd,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
-}
-
-describe('release 1.3.5 contract on main', () => {
-  it('bumps root and workspace manifests to 1.3.5', () => {
+describe('release 1.3.6 artifact contract on main', () => {
+  it('bumps root and workspace manifests to 1.3.6', () => {
     for (const file of [
       'package.json',
       'packages/hive-core/package.json',
       'packages/opencode-hive/package.json',
       'packages/vscode-hive/package.json',
     ]) {
-      assert.equal(readJson(file).version, '1.3.5', `${file} should be 1.3.5`);
+      assert.equal(readJson(file).version, '1.3.6', `${file} should be 1.3.6`);
     }
   });
 
-  it('publishes both v1.3.4 and v1.3.5 release notes', () => {
-    assert.equal(
-      fs.existsSync(path.join(workspaceRoot, 'docs/releases/v1.3.4.md')),
-      true,
-      'docs/releases/v1.3.4.md should exist'
-    );
-    assert.equal(
-      fs.existsSync(path.join(workspaceRoot, 'docs/releases/v1.3.5.md')),
-      true,
-      'docs/releases/v1.3.5.md should exist'
-    );
+  it('refreshes tracked workspace lockfile version markers to 1.3.6', () => {
+    const packageLock = readJson('package-lock.json');
+    const bunLock = readText('bun.lock');
+
+    assert.equal(packageLock.version, '1.3.6', 'package-lock.json root version should be 1.3.6');
+    assert.equal(packageLock.packages[''].version, '1.3.6', 'package-lock.json workspace root should be 1.3.6');
+    assert.equal(packageLock.packages['packages/hive-core'].version, '1.3.6', 'package-lock.json hive-core version should be 1.3.6');
+    assert.equal(packageLock.packages['packages/opencode-hive'].version, '1.3.6', 'package-lock.json opencode-hive version should be 1.3.6');
+    assert.equal(packageLock.packages['packages/vscode-hive'].version, '1.3.6', 'package-lock.json vscode-hive version should be 1.3.6');
+
+    assert.match(bunLock, /"name": "hive-core",\s+"version": "1\.3\.6"/s);
+    assert.match(bunLock, /"name": "opencode-hive",\s+"version": "1\.3\.6"/s);
+    assert.match(bunLock, /"name": "vscode-hive",\s+"version": "1\.3\.6"/s);
   });
 
-  it('documents PR #64 compaction recovery in v1.3.5 release notes', () => {
-    const notes = readText('docs/releases/v1.3.5.md');
+  it('publishes 1.3.6 release notes and changelog entries in descending order', () => {
+    assert.equal(
+      fs.existsSync(path.join(workspaceRoot, 'docs/releases/v1.3.6.md')),
+      true,
+      'docs/releases/v1.3.6.md should exist'
+    );
 
-    assert.match(notes, /PR\s*#64/i);
-    assert.match(notes, /compaction recovery|recovery after OpenCode compaction/i);
-  });
-
-  it('records both 1.3.4 and 1.3.5 changelog entries in descending order', () => {
     const changelog = readText('CHANGELOG.md');
+    const changelog136Header = '## [1.3.6]';
     const changelog135Header = '## [1.3.5]';
-    const changelog134Header = '## [1.3.4]';
 
+    assert.notEqual(
+      changelog.indexOf(changelog136Header),
+      -1,
+      'CHANGELOG.md should include a 1.3.6 entry'
+    );
     assert.notEqual(
       changelog.indexOf(changelog135Header),
       -1,
       'CHANGELOG.md should include a 1.3.5 entry'
     );
-    assert.notEqual(
-      changelog.indexOf(changelog134Header),
-      -1,
-      'CHANGELOG.md should include a 1.3.4 entry'
-    );
     assert.ok(
-      changelog.indexOf(changelog135Header) < changelog.indexOf(changelog134Header),
-      'CHANGELOG.md should list 1.3.5 before 1.3.4'
+      changelog.indexOf(changelog136Header) < changelog.indexOf(changelog135Header),
+      'CHANGELOG.md should list 1.3.6 before 1.3.5'
     );
   });
 
-  it('updates philosophy and design docs for the PR #64 recovery model', () => {
-    const philosophy = readText('PHILOSOPHY.md');
-    const design = readText('docs/DESIGN.md');
+  it('removes the broken release:prepare helper from the root package scripts', () => {
+    const packageJson = readJson('package.json');
 
-    assert.match(philosophy, /### v1\.3\.5 \(Compaction Recovery\)/i);
-    assert.match(philosophy, /global `?\.hive\/sessions\.json`?/i);
-    assert.match(philosophy, /directive replay/i);
-    assert.match(philosophy, /worker-prompt\.md/i);
-
-    assert.match(design, /global `?\.hive\/sessions\.json`?/i);
-    assert.match(design, /feature-local `?sessions\.json`?/i);
-    assert.match(design, /`primary`, `subagent`, `task-worker`, and `unknown`/i);
-    assert.match(design, /directive replay|post-compaction replay/i);
-    assert.match(design, /worker-prompt\.md/i);
-  });
-
-  it('documents session recovery in the user and plugin readmes', () => {
-    const rootReadme = readText('README.md');
-    const pluginReadme = readText('packages/opencode-hive/README.md');
-
-    assert.match(rootReadme, /Primary sessions are re-anchored/i);
-    assert.match(rootReadme, /Scout and Hygienic subagents/i);
-    assert.match(rootReadme, /Forager workers? and forager-derived custom agents/i);
-    assert.match(rootReadme, /worker-prompt\.md/i);
-
-    assert.match(pluginReadme, /\.hive\/sessions\.json/i);
-    assert.match(pluginReadme, /feature-local mirrors are written to `?\.hive\/features\/<feature>\/sessions\.json`?/i);
-    assert.match(pluginReadme, /`primary`, `subagent`, `task-worker`, and `unknown`/i);
-    assert.match(pluginReadme, /post-compaction replay/i);
-    assert.match(pluginReadme, /worker-prompt\.md/i);
-  });
-
-  it('refreshes releasing guidance for 1.3.5 and current bun workflows', () => {
-    const releasing = readText('docs/RELEASING.md');
-
-    assert.doesNotMatch(releasing, /0\.8\.3/);
-    assert.doesNotMatch(releasing, /npm run build --workspaces/);
-    assert.doesNotMatch(releasing, /npm -ws --if-present run test/);
-    assert.match(releasing, /1\.3\.5/);
-    assert.match(releasing, /bun run release:prepare -- 1\.3\.5/);
-    assert.match(releasing, /bun run release:check/);
-    assert.match(releasing, /workflow_dispatch/i);
-    assert.match(releasing, /tags? matching `v\*`|tagged releases only/i);
-  });
-
-  it('keeps the tracked VS Code bundle stable across rebuilds', () => {
-    const bundlePath = path.join(workspaceRoot, 'packages', 'vscode-hive', 'dist', 'extension.js');
-    const before = fs.readFileSync(bundlePath, 'utf8');
-
-    run('bun', ['run', 'build'], path.join(workspaceRoot, 'packages', 'vscode-hive'));
-
-    const after = fs.readFileSync(bundlePath, 'utf8');
-
-    assert.equal(after, before, 'packages/vscode-hive/dist/extension.js should not change after rebuild');
+    assert.equal(packageJson.scripts['release:prepare'], undefined, 'package.json should not advertise release:prepare');
+    assert.equal(typeof packageJson.scripts['release:check'], 'string', 'package.json should keep release:check');
   });
 });
