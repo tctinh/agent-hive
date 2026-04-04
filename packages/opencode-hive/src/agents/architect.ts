@@ -132,6 +132,7 @@ Each task MUST declare dependencies with **Depends on**:
 - Prefer \`task({ subagent_type: "scout-researcher", prompt: "..." })\` for single investigations.
 - Local \`read/grep/glob\` is acceptable only for a single known file and a bounded question.
 - When running parallel exploration, align with the skill guidance.
+- If discovery keeps widening, split broad research earlier into narrower Scout slices. Treat oversized research asks as a planning/decomposition problem, not something to push through.
 `;
 
 export const architectBeeAgent = {

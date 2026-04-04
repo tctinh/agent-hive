@@ -65,6 +65,10 @@ describe('Hive (Hybrid) prompt', () => {
       expect(QUEEN_BEE_PROMPT).toContain('its description in `Configured Custom Subagents` is a better match');
       expect(QUEEN_BEE_PROMPT).toContain('task({ subagent_type: "<chosen-reviewer>"');
     });
+
+    it('tells hybrid planners to split broad research earlier', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('split broad research earlier');
+    });
   });
 
   describe('turn termination and hard blocks', () => {
@@ -122,6 +126,10 @@ describe('Architect (Planner) prompt', () => {
 
     it('broadens research to include internal repo exploration', () => {
       expect(ARCHITECT_BEE_PROMPT).toContain('internal codebase');
+    });
+
+    it('tells planners to split broad research earlier', () => {
+      expect(ARCHITECT_BEE_PROMPT).toContain('split broad research earlier');
     });
   });
 
@@ -209,6 +217,10 @@ describe('Swarm (Orchestrator) prompt', () => {
       expect(SWARM_BEE_PROMPT).toContain('its description in `Configured Custom Subagents` is a better match');
       expect(SWARM_BEE_PROMPT).toContain('task({ subagent_type: "<chosen-reviewer>"');
     });
+
+    it('tells orchestrators to split broad research earlier', () => {
+      expect(SWARM_BEE_PROMPT).toContain('split broad research earlier');
+    });
   });
 
   it('does NOT contain oracle reference', () => {
@@ -287,6 +299,14 @@ describe('Scout (Explorer/Researcher) prompt', () => {
 
   it('mentions year awareness', () => {
     expect(SCOUT_BEE_PROMPT).toContain('current year');
+  });
+
+  it('limits discovery to one context window', () => {
+    expect(SCOUT_BEE_PROMPT).toContain('fit in one context window');
+  });
+
+  it('teaches return-to-hive escalation', () => {
+    expect(SCOUT_BEE_PROMPT).toContain('return to Hive');
   });
 });
 
