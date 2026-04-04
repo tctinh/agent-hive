@@ -153,6 +153,8 @@ export interface ContextFile {
 
 export type SessionKind = 'primary' | 'subagent' | 'task-worker' | 'unknown';
 
+export type DirectiveRecoveryState = 'available' | 'consumed' | 'escalated';
+
 export interface SessionInfo {
   sessionId: string;
   featureName?: string;
@@ -162,6 +164,7 @@ export interface SessionInfo {
   sessionKind?: SessionKind;
   workerPromptPath?: string;
   directivePrompt?: string;
+  directiveRecoveryState?: DirectiveRecoveryState;
   replayDirectivePending?: boolean;
   startedAt: string;
   lastActiveAt: string;

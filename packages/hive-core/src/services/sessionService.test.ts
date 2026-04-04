@@ -89,6 +89,21 @@ describe('SessionService', () => {
       expect(updated.directivePrompt).toBe('Investigate the current issue.');
     });
 
+    it('preserves directiveRecoveryState across successive global updates', () => {
+      service.trackGlobal('sess-recovery-global', {
+        agent: 'scout-researcher',
+        sessionKind: 'subagent',
+        directivePrompt: 'Investigate the current issue.',
+        directiveRecoveryState: 'available',
+      });
+
+      const updated = service.trackGlobal('sess-recovery-global', { messageCount: 5 });
+
+      expect(updated.directiveRecoveryState).toBe('available');
+      expect(updated.directivePrompt).toBe('Investigate the current issue.');
+      expect(updated.messageCount).toBe(5);
+    });
+
     it('preserves earlier global sessions across successive writes', () => {
       service.trackGlobal('sess-a', { agent: 'hive-master', sessionKind: 'primary' });
       service.trackGlobal('sess-b', { agent: 'forager-worker', sessionKind: 'task-worker' });
@@ -157,6 +172,27 @@ describe('SessionService', () => {
       expect(session.agent).toBe('forager-worker');
       expect(session.baseAgent).toBe('forager-worker');
       expect(session.sessionKind).toBe('task-worker');
+    });
+
+    it('persists directiveRecoveryState through bindFeature mirroring', () => {
+      service.trackGlobal('sess-recovery-bind', {
+        agent: 'scout-researcher',
+        sessionKind: 'subagent',
+        directivePrompt: 'Investigate the current issue.',
+        directiveRecoveryState: 'consumed',
+      });
+      setupFeature('feature-recovery');
+
+      const session = service.bindFeature('sess-recovery-bind', 'feature-recovery', {
+        taskFolder: '03-task',
+      });
+
+      expect(session.directiveRecoveryState).toBe('consumed');
+      expect(session.directivePrompt).toBe('Investigate the current issue.');
+
+      const featureSession = service.get('feature-recovery', 'sess-recovery-bind');
+      expect(featureSession?.directiveRecoveryState).toBe('consumed');
+      expect(featureSession?.directivePrompt).toBe('Investigate the current issue.');
     });
   });
 

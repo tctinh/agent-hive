@@ -70,6 +70,39 @@ function createStubShell(): PluginInput['$'] {
   });
 }
 
+function buildCompactionTransformOutput(sessionID: string, cwd: string) {
+  return {
+    messages: [
+      {
+        info: {
+          id: `msg-summary-${sessionID}`,
+          sessionID,
+          role: 'assistant',
+          time: { created: Date.now() },
+          system: [],
+          modelID: 'm',
+          providerID: 'p',
+          mode: 'compaction',
+          path: { cwd, root: cwd },
+          cost: 0,
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          summary: true,
+        } as Message,
+        parts: [{ id: `prt-summary-${sessionID}`, sessionID, messageID: `msg-summary-${sessionID}`, type: 'text', text: 'Summary text' } as Part],
+      },
+      {
+        info: {
+          id: `msg-continue-${sessionID}`,
+          sessionID,
+          role: 'user',
+          time: { created: Date.now() },
+        } as Message,
+        parts: [{ id: `prt-continue-${sessionID}`, sessionID, messageID: `msg-continue-${sessionID}`, type: 'text', text: 'Continue if you have next steps.', synthetic: true } as Part],
+      },
+    ],
+  };
+}
+
 describe('experimental.session.compacting hook — session-aware re-anchoring', () => {
   let testRoot: string;
   let originalHome: string | undefined;
@@ -212,6 +245,76 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
 
     const cleared = sessionService.getGlobal('sess-replay');
     expect(cleared?.replayDirectivePending).toBe(false);
+  });
+
+  test('primary/subagent compaction recovery transitions available -> consumed -> escalated', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-state-machine', {
+      agent: 'scout-researcher',
+      sessionKind: 'subagent',
+      directivePrompt: 'Inspect the LSP errors in trading/pipeline.py and return findings only.',
+      replayDirectivePending: false,
+    } as any);
+
+    await hooks.event?.({
+      event: {
+        type: 'session.compacted',
+        properties: { sessionID: 'sess-state-machine' },
+      } as any,
+    });
+
+    let session = sessionService.getGlobal('sess-state-machine');
+    expect(session?.directiveRecoveryState).toBe('available');
+    expect(session?.replayDirectivePending).toBe(true);
+
+    const firstReplayOutput = buildCompactionTransformOutput('sess-state-machine', testRoot);
+    await hooks['experimental.chat.messages.transform']?.({}, firstReplayOutput as any);
+
+    session = sessionService.getGlobal('sess-state-machine');
+    expect(firstReplayOutput.messages).toHaveLength(3);
+    expect(session?.directiveRecoveryState).toBe('consumed');
+    expect(session?.replayDirectivePending).toBe(false);
+
+    await hooks.event?.({
+      event: {
+        type: 'session.compacted',
+        properties: { sessionID: 'sess-state-machine' },
+      } as any,
+    });
+
+    session = sessionService.getGlobal('sess-state-machine');
+    expect(session?.directiveRecoveryState).toBe('escalated');
+    expect(session?.replayDirectivePending).toBe(true);
+
+    const secondReplayOutput = buildCompactionTransformOutput('sess-state-machine', testRoot);
+    await hooks['experimental.chat.messages.transform']?.({}, secondReplayOutput as any);
+
+    session = sessionService.getGlobal('sess-state-machine');
+    expect(secondReplayOutput.messages).toHaveLength(3);
+    expect(session?.directiveRecoveryState).toBe('escalated');
+    expect(session?.replayDirectivePending).toBe(false);
+  });
+
+  test('later compaction events do not reset escalated primary/subagent sessions back to available', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-escalated-terminal', {
+      agent: 'hive-master',
+      sessionKind: 'primary',
+      directivePrompt: 'Stay on the current assignment.',
+      directiveRecoveryState: 'escalated',
+      replayDirectivePending: false,
+    } as any);
+
+    await hooks.event?.({
+      event: {
+        type: 'session.compacted',
+        properties: { sessionID: 'sess-escalated-terminal' },
+      } as any,
+    });
+
+    const session = sessionService.getGlobal('sess-escalated-terminal');
+    expect(session?.directiveRecoveryState).toBe('escalated');
+    expect(session?.replayDirectivePending).toBe(false);
   });
 
   test('messages.transform captures initial non-synthetic user directive for later recovery', async () => {
@@ -521,6 +624,7 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
       agent: 'hive-master',
       sessionKind: 'primary',
       directivePrompt: 'Old directive',
+      directiveRecoveryState: 'escalated',
     } as any);
 
     const output = {
@@ -566,6 +670,7 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
 
     const session = sessionService.getGlobal('sess-primary-rescope');
     expect(session?.directivePrompt).toBe('New directive from the operator');
+    expect(session?.directiveRecoveryState).toBeUndefined();
   });
 
   test('forager session with known prompt path → role re-anchor + exact path', async () => {
