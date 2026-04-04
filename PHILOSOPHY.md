@@ -698,6 +698,17 @@ PR #64 formalizes that recovery model. Hive now tracks session identity in globa
 
 **Design insight:** Durable breadcrumbs beat speculative recovery. Persist the role, the feature binding, the directive, and the worker prompt path before compaction happens; then recovery can be narrow, deterministic, and safe.
 
+### Prompt Steering Hardening (Rationale Note)
+
+**Theme:** Use sharper prompt contracts where they reduce ambiguity, while keeping Hive's own workflow model intact.
+
+- **Delegation synthesis**: Orchestrators now restate file paths, expected outcomes, and done conditions before dispatch. That makes handoffs more concrete without changing plan-first or worktree-based execution
+- **Read-only research discipline**: Scout guidance now makes local-first search order, no-write boundaries, and anti-speculation rules explicit
+- **Verification steering**: Workers and reviewers are pushed toward command-backed evidence, and Hygienic can route implementation verification through a falsification-first skill
+- **Workflow preserved**: Approval gates, blocker escalation, task batching, and the split between planning, execution, and merge verification remain where they were
+
+**Design insight:** The import here is prompt discipline, not workflow philosophy. Hive keeps its own operating model and borrows tighter wording only where it reduces delegation drift and weak completion claims.
+
 ### v1.3.6 (Bounded Worker Replay + Explicit DAG Follow-up)
 
 **Theme:** Recovery and review follow-up both need hard boundaries. Restoring context is not enough if a resumed worker can drift into the wrong task, and capturing follow-up work is not enough if new tasks inherit hidden sequencing assumptions.

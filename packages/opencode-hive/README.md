@@ -43,6 +43,10 @@ This enables tools like `grep_app_searchGitHub`, `context7_query-docs`, `websear
 
 During planning, "don't execute" means "don't implement" (no code edits, no worktrees). Read-only exploration is explicitly allowed and encouraged, both via local tools and by delegating to Scout.
 
+When delegation is warranted, synthesize the task before handing it off: name the file paths or search target, state the expected result, and say what done looks like. Workers do not inherit planner context.
+
+For execution work, treat worker output as evidence to inspect, not proof to trust blindly. Read changed files yourself and run the shared verification commands on the main branch before claiming the batch is complete.
+
 #### Canonical Delegation Threshold
 
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
