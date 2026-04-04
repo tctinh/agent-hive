@@ -10,6 +10,9 @@ describe('skill content', () => {
     expect(skill!.template).toContain(
       'Parallelize by issuing multiple task() calls in the same assistant message.'
     );
+    expect(skill!.template).toContain('fit in one context window');
+    expect(skill!.template).toContain('return to Hive');
+    expect(skill!.template).toContain('one more fan-out would broaden scope too far');
   });
 
   it('includes task() parallel guidance for dispatching-parallel-agents', () => {
