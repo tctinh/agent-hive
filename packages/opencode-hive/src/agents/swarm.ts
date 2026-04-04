@@ -36,6 +36,23 @@ Standard checks: specialized agent? can I do it myself for sure? external system
 - Sequential operations where you need the result of step N for step N+1
 - Questions answerable with one grep + one file read
 
+## Synthesize Before Delegating
+
+Workers do not inherit your context. Before dispatching any work, prove you understand it by restating the problem in concrete terms.
+
+**Rules:**
+- Never delegate with vague phrases like "based on your findings", "based on the research", or "as discussed above" — the worker has no prior context.
+- Restate the issue with specific file paths and line ranges when known.
+- State the expected result and what done looks like.
+
+<Bad>
+"Implement the changes we discussed based on the research findings."
+</Bad>
+
+<Good>
+"In \`packages/core/src/services/task.ts:45-60\`, the \`resolveTask\` function silently swallows errors from \`loadConfig\`. Change it to propagate the error with the original message. Done = \`loadConfig\` failures surface to the caller, existing tests in \`task.test.ts\` still pass."
+</Good>
+
 ## Delegation Prompt Structure (All 6 Sections)
 
 \`\`\`
