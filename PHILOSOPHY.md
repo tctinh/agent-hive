@@ -698,6 +698,16 @@ PR #64 formalizes that recovery model. Hive now tracks session identity in globa
 
 **Design insight:** Durable breadcrumbs beat speculative recovery. Persist the role, the feature binding, the directive, and the worker prompt path before compaction happens; then recovery can be narrow, deterministic, and safe.
 
+### v1.3.6 (Bounded Worker Replay + Explicit DAG Follow-up)
+
+**Theme:** Recovery and review follow-up both need hard boundaries. Restoring context is not enough if a resumed worker can drift into the wrong task, and capturing follow-up work is not enough if new tasks inherit hidden sequencing assumptions.
+
+`v1.3.5` established the durable recovery base: persist session identity, classify the resumed session, and tell task workers to re-read `worker-prompt.md`. PR #67 is the follow-up hardening step. A compacted task worker no longer gets only a generic reminder that it is a worker. It now receives a worker-specific synthetic replay that re-binds it to the exact task folder, tells it to resume only that task, forbids merging or starting the next task, and points it back to the original `worker-prompt.md` path. The system treats compaction recovery as bounded continuation, not as permission to improvise.
+
+PR #69 applies the same philosophy to review-driven execution. Review feedback is not one generic bucket. Some feedback should be fixed inline. Some should become a manual task with structured metadata and its own spec. Some changes truly alter downstream sequencing and therefore require a plan amendment plus `hive_tasks_sync({ refreshPending: true })`. Manual tasks now carry explicit `dependsOn` instead of inheriting accidental sequential order, and refreshing pending tasks rewrites the future DAG without erasing manual work or execution history.
+
+**Design insight:** Durable state only becomes trustworthy when it also encodes the boundaries of the next move. A safe recovery path says what the worker must continue and what it must not do; a safe task graph says what depends on what instead of relying on folder order folklore.
+
 ---
 
 <p align="center">

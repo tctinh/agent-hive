@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-04-04
+
+### Added
+- **Worker-specific post-compaction replay (PR #67)**: Task-worker recovery now replays a bounded resume contract that re-binds the resumed Forager to the exact current task, re-reads the original `worker-prompt.md`, and explicitly forbids turning compaction recovery into merge/planning work
+- **Structured DAG-aware manual tasks (PR #69)**: Manual tasks now carry structured metadata/spec content, explicit `dependsOn`, and refreshed pending-task sync support so follow-up work can be modeled as first-class DAG nodes instead of implicit sequential leftovers
+
+### Changed
+- **Review follow-up routing is now explicit**: Hive and Swarm now distinguish inline fixes, isolated manual tasks, and true plan amendments so review feedback changes the right execution surface instead of being forced through one generic path
+- **Pending task refreshes preserve execution history**: `hive_tasks_sync({ refreshPending: true })` now rewrites only pending plan tasks from the latest approved plan while keeping manual tasks and tasks with execution history intact
+
+### Fixed
+- **Task-worker drift after compaction**: Resumed workers are re-bounded to their stored feature/task assignment instead of recovering into a generic assistant posture that can drift past the active task
+- **Implicit dependency mistakes in follow-up work**: Manual-task creation and plan refresh flows now make dependencies explicit, reducing accidental sequencing errors when review feedback introduces new DAG edges
+
 ## [1.3.5] - 2026-03-30
 
 ### Added
