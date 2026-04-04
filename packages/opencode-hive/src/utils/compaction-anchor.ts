@@ -67,6 +67,11 @@ export function buildCompactionReanchor(ctx: CompactionSessionContext): Compacti
   lines.push('Do not call status tools to rediscover state.');
   lines.push('Do not re-read the full codebase.');
 
+   if (kind === 'primary' || kind === 'subagent') {
+    lines.push('Keep the handoff compact and explicit.');
+    lines.push('Do not broaden the scope or re-read the full codebase.');
+  }
+
   if (kind === 'task-worker') {
     lines.push('Do not delegate.');
     if (workerPromptPath) {

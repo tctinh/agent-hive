@@ -348,6 +348,8 @@ const plugin: Plugin = async (ctx) => {
     return [
       `Post-compaction recovery: You are still ${role}.`,
       'Resume the original assignment below. Do not replace it with a new goal.',
+      'Do not broaden the scope or re-read the full codebase.',
+      'If you are no longer confident about the exact next step, return control to the parent/orchestrator instead of improvising.',
       '',
       session.directivePrompt,
     ].join('\n');

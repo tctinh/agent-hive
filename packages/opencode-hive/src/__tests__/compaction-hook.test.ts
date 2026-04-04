@@ -181,6 +181,8 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
     expect(output.prompt).toContain('Compaction recovery');
     expect(output.prompt).toContain('Role: Scout');
     expect(output.prompt).toContain('Original directive survives via post-compaction replay.');
+    expect(output.prompt).toContain('Keep the handoff compact and explicit.');
+    expect(output.prompt).toContain('Do not broaden the scope or re-read the full codebase.');
     expect(output.prompt).not.toContain('worker-prompt.md');
     expect(output.context.join('\n')).not.toContain('worker-prompt.md');
   });
@@ -241,9 +243,44 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
     const replay = output.messages[2];
     expect(replay.info.role).toBe('user');
     expect((replay.parts[0] as any).text).toContain('You are still Scout.');
+    expect((replay.parts[0] as any).text).toContain('Resume the original assignment below. Do not replace it with a new goal.');
+    expect((replay.parts[0] as any).text).toContain('Do not broaden the scope or re-read the full codebase.');
+    expect((replay.parts[0] as any).text).toContain('If you are no longer confident about the exact next step, return control to the parent/orchestrator instead of improvising.');
     expect((replay.parts[0] as any).text).toContain('Inspect the LSP errors in trading/pipeline.py and return findings only.');
 
     const cleared = sessionService.getGlobal('sess-replay');
+    expect(cleared?.replayDirectivePending).toBe(false);
+  });
+
+  test('primary Hive directive replay keeps the original assignment boundary and bounded next-step recovery', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-primary-replay', {
+      agent: 'hive-master',
+      sessionKind: 'primary',
+      directivePrompt: 'Finish task 04 and report only the regression coverage changes.',
+      replayDirectivePending: false,
+    } as any);
+
+    await hooks.event?.({
+      event: {
+        type: 'session.compacted',
+        properties: { sessionID: 'sess-primary-replay' },
+      } as any,
+    });
+
+    const output = buildCompactionTransformOutput('sess-primary-replay', testRoot);
+    await hooks['experimental.chat.messages.transform']?.({}, output as any);
+
+    expect(output.messages).toHaveLength(3);
+    const replayText = (output.messages[2].parts[0] as any).text;
+    expect(replayText).toContain('You are still Hive.');
+    expect(replayText).toContain('Resume the original assignment below. Do not replace it with a new goal.');
+    expect(replayText).toContain('Do not broaden the scope or re-read the full codebase.');
+    expect(replayText).toContain('If you are no longer confident about the exact next step, return control to the parent/orchestrator instead of improvising.');
+    expect(replayText).toContain('Finish task 04 and report only the regression coverage changes.');
+
+    const cleared = sessionService.getGlobal('sess-primary-replay');
+    expect(cleared?.directiveRecoveryState).toBe('consumed');
     expect(cleared?.replayDirectivePending).toBe(false);
   });
 
