@@ -17,10 +17,11 @@ bun run dev
 bun run test              # Run all tests
 bun run test -- <file>    # Run specific test
 
-# Release preparation
+# Release verification / manual preparation
 bun run release:check     # Install, build, and test all packages
-bun run release:prepare   # Prepare release
 ```
+
+Release note: prepare version bumps, lockfile updates, changelog entries, and `docs/releases/vX.Y.Z.md` manually before running the GitHub `workflow_dispatch` rehearsal and tagging.
 
 Worktree dependency note: worktrees are lightweight checkouts without project dependencies. Workers do best-effort verification using ast-grep (no dependencies needed). Full build and test verification (`bun run build` + `bun run test`) runs on the main branch after the orchestrator merges a batch of task branches.
 

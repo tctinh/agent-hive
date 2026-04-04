@@ -118,11 +118,12 @@ When OpenCode emits a compaction event, Hive rebuilds a minimal re-anchor prompt
 
 - Primary and subagent sessions are re-anchored to their role.
 - Primary and subagent sessions can restore the last real user directive through post-compaction replay.
-- Task-worker sessions do not rely on directive replay; they recover from durable worktree metadata and re-read `worker-prompt.md`.
+- Task-worker sessions do not restore the full user directive. They recover from durable worktree metadata, re-read `worker-prompt.md`, and receive one bounded worker-specific synthetic replay that restates the active task identity and worker boundaries.
 - If `workerPromptPath` was stored explicitly, Hive uses it. Otherwise it reconstructs the expected `.hive/features/<feature>/tasks/<task>/worker-prompt.md` path from `featureName` and `taskFolder`.
 - Recovery prompts tell sessions not to switch roles, not to rediscover state through status tools, and not to re-read the full codebase.
+- Worker recovery stays intentionally narrow: keep the same role, finish only the current assignment, re-read `worker-prompt.md`, do not merge, and do not start the next task.
 
-This keeps recovery narrow and deterministic: orchestrators recover their role and directive, while workers recover their exact task contract.
+This keeps recovery narrow and deterministic: orchestrators recover their role and directive, while workers recover their exact task contract without drifting into orchestration.
 
 ## Task Lifecycle
 
@@ -213,6 +214,8 @@ Task `status.json` fields and who writes them:
 | `completedAt` | `hive_worktree_commit` | On completion |
 | `baseCommit` | `hive_worktree_start` / `hive_worktree_create` | On worktree creation/resume |
 | `blocker` | Worker via `hive_worktree_commit` | When blocked |
+| `dependsOn` | `hive_tasks_sync` / `hive_task_create` | On plan sync or manual task creation |
+| `metadata` | `hive_task_create` | On structured manual task creation |
 
 ## Idempotency Expectations
 
@@ -227,11 +230,21 @@ These operations are safe to retry:
 These operations have side effects:
 - `hive_feature_create` - Creates feature directory (errors if exists)
 - `hive_plan_write` - Overwrites plan.md, clears comments
-- `hive_tasks_sync` - Reconciles tasks (additive, removes orphans)
+- `hive_tasks_sync` - Reconciles plan-backed tasks; `refreshPending: true` rewrites pending plan tasks from `plan.md`, updates `planTitle` / `dependsOn`, regenerates `spec.md`, and removes pending plan tasks deleted from the plan while preserving manual tasks and execution history
+- `hive_task_create` - Creates a manual task with explicit `dependsOn` and optional structured metadata
+- `hive_task_update` - Mutates task status/summary and is not a retry-safe read
 - `hive_worktree_start` - Creates worktree for normal start
 - `hive_worktree_create` - Resumes blocked task in existing worktree
 - `hive_worktree_commit` - Commits changes, writes report (once per completion)
 - `hive_merge` - Merges branch (fails if already merged)
+
+### Manual task model
+
+Manual tasks are first-class task records, not loose notes.
+
+- Manual tasks always persist an explicit `dependsOn` array. Omitting it means `[]`, not "infer the previous task".
+- Structured manual-task `metadata` can carry `goal`, `description`, `acceptanceCriteria`, `references`, `files`, `reason`, and `source` so Hive can generate a worker-ready `spec.md`.
+- Review-sourced manual tasks are for isolated follow-up only. If feedback changes sequencing, dependencies, or scope, update `plan.md` and run `hive_tasks_sync({ refreshPending: true })` so pending plan tasks match the amended DAG.
 
 ### Recovery Patterns
 

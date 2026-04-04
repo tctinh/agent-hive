@@ -18,9 +18,16 @@
 ### Task Management (3 tools)
 | Tool | Purpose |
 |------|---------|
-| `hive_tasks_sync` | Generate tasks from approved plan (parses ### headers) |
-| `hive_task_create` | Create manual task (not from plan) |
+| `hive_tasks_sync` | Generate tasks from approved plan, or refresh pending plan-backed tasks with `refreshPending: true` after a plan amendment |
+| `hive_task_create` | Create manual task (not from plan) with explicit `dependsOn` and optional structured metadata |
 | `hive_task_update` | Update task status or summary |
+
+#### Task model notes
+
+- Plan-backed tasks get their DAG from `plan.md` `Depends on:` annotations during `hive_tasks_sync`.
+- Manual tasks always persist explicit `dependsOn`; omitting it means `[]`, not implicit sequential ordering.
+- Structured manual task metadata can include `goal`, `description`, `acceptanceCriteria`, `references`, `files`, `reason`, and `source`; Hive uses it to build worker-facing `spec.md` content.
+- Use manual tasks for isolated ad-hoc/operator work. If review feedback changes downstream sequencing, dependencies, or scope, amend `plan.md` instead, then run `hive_tasks_sync({ refreshPending: true })`.
 
 ### Worktree (4 tools)
 | Tool | Purpose |

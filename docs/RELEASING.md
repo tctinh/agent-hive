@@ -9,23 +9,21 @@ The `Release` workflow publishes **only on tags** matching `v*`; tagged releases
 
 ## 1) Prep the release locally
 
-Pick a version (for example `1.3.5`) and run:
+For `1.3.6`, release preparation is manual. Do not rely on the old release-prep helper; it is not part of the real release flow.
 
-```bash
-bun run release:prepare -- 1.3.5
-```
+Update the release branch explicitly:
 
-This will:
+- bump the root and workspace package versions to `1.3.6`
+- refresh tracked workspace lockfiles so their version markers also read `1.3.6`
+- add `docs/releases/v1.3.6.md`
+- add the `1.3.6` entry near the top of `CHANGELOG.md`
+- update any operator-facing release/version docs that still mention the previous release contract
 
-- Bump versions in `package.json` + workspace packages
-- Generate `docs/releases/v1.3.5.md` (draft release notes)
-- Create/update `CHANGELOG.md`
-
-Review/edit the generated notes and changelog before continuing.
+Review those edits before validation. The release workflow publishes `docs/releases/${github.ref_name}.md` as the GitHub Release body, so the matching release note file must exist before tagging.
 
 ## 2) Validate
 
-Install dependencies and run the release validation flow:
+Install dependencies and run the release validation flow locally:
 
 ```bash
 bun install
@@ -33,11 +31,11 @@ bun run build
 bun run release:check
 ```
 
-`bun run release:check` is the pre-release safety net. It performs the repo install/build/test flow used for release preparation. If it fails, fix the branch before opening the release PR.
+`bun run release:check` is the pre-release safety net. Treat it as verification, not preparation. If any step fails, fix the branch before opening the release PR.
 
 ## 3) Rehearse the GitHub workflow with `workflow_dispatch`
 
-Before tagging, run the `Release` GitHub Actions workflow manually from the release branch or the merge commit you expect to tag.
+Before tagging, run the `Release` GitHub Actions workflow manually with `workflow_dispatch` from the release branch or the merge commit you expect to tag.
 
 Use this rehearsal to confirm:
 
@@ -48,23 +46,24 @@ Use this rehearsal to confirm:
 
 ## 4) Merge to `main`
 
-Open a PR with:
+Open a PR with the manual `1.3.6` prep changes:
 
-- Version bumps
+- version bumps
+- lockfile refreshes
 - `CHANGELOG.md` updates
-- `docs/releases/vX.Y.Z.md` release notes
+- `docs/releases/v1.3.6.md` release notes
 
 Merge only after local validation and the `workflow_dispatch` rehearsal both pass.
 
 ## 5) Tag and release
 
-After merging to `main`, create and push a tag:
+After merging to `main`, create and push the release tag:
 
 ```bash
 git checkout main
 git pull
-git tag -a v1.3.5 -m "Release 1.3.5"
-git push origin v1.3.5
+git tag -a v1.3.6 -m "Release 1.3.6"
+git push origin v1.3.6
 ```
 
 That tag triggers `.github/workflows/release.yml` to build, publish, and create the GitHub Release.

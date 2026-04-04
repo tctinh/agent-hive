@@ -66,8 +66,8 @@ During planning, "don't execute" means "don't implement" (no code edits, no work
 ### Tasks
 | Tool | Description |
 |------|-------------|
-| `hive_tasks_sync` | Generate tasks from plan |
-| `hive_task_create` | Create manual task |
+| `hive_tasks_sync` | Generate tasks from plan, or rewrite pending plan tasks with `refreshPending: true` after a plan amendment |
+| `hive_task_create` | Create a manual task with explicit `dependsOn` and optional structured metadata |
 | `hive_task_update` | Update task status/summary |
 
 ### Worktree
@@ -120,7 +120,7 @@ Where:
 - Feature-local mirrors are written to `.hive/features/<feature>/sessions.json`.
 - Session classification distinguishes `primary`, `subagent`, `task-worker`, and `unknown`.
 - Primary and subagent recovery can replay the stored user directive once after compaction.
-- Task-worker recovery uses the strict re-anchor plus one worker-specific synthetic replay after compaction.
+- Task-worker recovery uses the strict re-anchor plus one bounded worker-specific synthetic replay after compaction.
 - The task-worker replay can reference `.hive/features/<feature>/tasks/<task>/worker-prompt.md`.
 
 Task-worker recovery is intentionally strict:
@@ -136,6 +136,12 @@ Task-worker recovery is intentionally strict:
 - continue from the last known point
 
 This split is deliberate: primary and subagent sessions replay the stored user directive once after compaction, while task-workers also receive one worker-specific synthetic replay after compaction that restates the active task identity and worker boundaries.
+
+Manual tasks follow the same DAG model as plan-backed tasks:
+
+- `hive_task_create()` stores manual tasks with explicit `dependsOn` metadata instead of inferring sequential order.
+- Structured manual-task fields such as `goal`, `description`, `acceptanceCriteria`, `files`, and `references` are turned into worker-facing `spec.md` content.
+- If review feedback changes downstream sequencing or scope, update `plan.md` and run `hive_tasks_sync({ refreshPending: true })` so pending plan tasks pick up the new `dependsOn` graph and regenerated specs.
 
 This recovery path applies to the built-in `forager-worker` and custom agents derived from it, because they are the sessions most likely to be compacted mid-implementation.
 
