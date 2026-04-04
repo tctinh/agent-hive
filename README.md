@@ -374,10 +374,17 @@ Recovery involves the following:
 3. When OpenCode compacts a session, the compaction hook rebuilds a minimal re-anchor prompt from that durable state.
 4. Task workers get their `worker-prompt.md` path added back into context so they can recover the exact assignment without broad rediscovery.
 
+This recovery model has a strict ownership boundary:
+
+- Use context-window-sized discovery up front so one delegated investigation still fits safely in a single working session.
+- Prefer conservative early return when a Scout run starts widening or losing confidence.
+- Treat compaction recovery as a fallback, with one-recovery-attempt escalation instead of permission to keep stretching the same exploration indefinitely.
+
 Some notes:
 
 - Custom subagents derived from `forager-worker` are treated as task workers for compaction recovery.
 - Custom subagents derived from `hygienic-reviewer` are treated as subagents.
+- One-recovery-attempt escalation means a primary or subagent session gets one normal directive replay cycle after compaction, then must escalate back to the parent/orchestrator instead of looping through repeated compact-and-replay retries.
 - The recovery prompt avoids telling agents to call broad status tools or re-scan the repository because that tends to recreate drift after compaction.
 
 ---

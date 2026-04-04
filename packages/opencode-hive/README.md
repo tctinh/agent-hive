@@ -114,6 +114,12 @@ OpenCode can compact long sessions. When that happens mid-orchestration or mid-t
 
 The plugin now persists durable session metadata and uses it during `experimental.session.compacting` to rebuild a compact re-anchor prompt.
 
+At the plugin/runtime layer:
+
+- custom Scout-derived agents are treated like other subagents for recovery semantics.
+- the compaction-time handoff stays intentionally small and role-preserving.
+- there is no first-class near-compaction hook to warn Hive before OpenCode actually compacts the session.
+
 Where:
 
 - Global session state is written to `.hive/sessions.json`.

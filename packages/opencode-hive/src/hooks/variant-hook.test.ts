@@ -279,6 +279,7 @@ describe('classifySession', () => {
   describe('custom agent classification', () => {
     const customAgents: Record<string, { baseAgent: string }> = {
       'forager-ui': { baseAgent: 'forager-worker' },
+      'scout-custom': { baseAgent: 'scout-researcher' },
       'reviewer-security': { baseAgent: 'hygienic-reviewer' },
     };
 
@@ -292,6 +293,12 @@ describe('classifySession', () => {
       const result = classifySession('reviewer-security', customAgents);
       expect(result.sessionKind).toBe('subagent');
       expect(result.baseAgent).toBe('hygienic-reviewer');
+    });
+
+    it('classifies custom scout-derived agent as subagent', () => {
+      const result = classifySession('scout-custom', customAgents);
+      expect(result.sessionKind).toBe('subagent');
+      expect(result.baseAgent).toBe('scout-researcher');
     });
   });
 
@@ -399,6 +406,32 @@ describe('createVariantHook with session tracking', () => {
     expect(tracked[0].patch).toEqual({
       agent: 'scout-custom',
       sessionKind: 'unknown',
+    });
+  });
+
+  it('tracks custom scout-derived agents as subagents', async () => {
+    const tracked: Array<{ sessionId: string; patch: Record<string, unknown> }> = [];
+    const mockSessionService = {
+      trackGlobal: (sessionId: string, patch?: Record<string, unknown>) => {
+        tracked.push({ sessionId, patch: patch ?? {} });
+        return { sessionId, startedAt: '', lastActiveAt: '' };
+      },
+    };
+
+    const hook = createVariantHook(
+      createMockConfigService({ 'scout-custom': 'low' }, ['scout-custom']) as any,
+      mockSessionService as any,
+      { 'scout-custom': { baseAgent: 'scout-researcher' } },
+    );
+
+    const output = createOutput(undefined);
+    await hook({ sessionID: 'sess-scout-custom', agent: 'scout-custom' }, output);
+
+    expect(tracked.length).toBe(1);
+    expect(tracked[0].patch).toEqual({
+      agent: 'scout-custom',
+      baseAgent: 'scout-researcher',
+      sessionKind: 'subagent',
     });
   });
 
