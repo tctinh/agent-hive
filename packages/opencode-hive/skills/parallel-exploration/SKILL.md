@@ -9,7 +9,7 @@ description: Use when you need parallel, read-only exploration with task() (Scou
 
 When you need to answer "where/how does X work?" across multiple domains (codebase, tests, docs, OSS), investigating sequentially wastes time. Each investigation is independent and can happen in parallel.
 
-**Core principle:** Decompose into independent sub-questions, spawn one task per sub-question, collect results asynchronously.
+**Core principle:** Decompose into independent sub-questions that fit in one context window, spawn one task per sub-question, then synthesize the bounded results.
 
 **Safe in Planning mode:** This is read-only exploration. It is OK to use during exploratory research even when there is no feature, no plan, and no approved tasks.
 
@@ -39,7 +39,7 @@ When you need to answer "where/how does X work?" across multiple domains (codeba
 
 ### 1. Decompose Into Independent Questions
 
-Split your investigation into 2-4 independent sub-questions. Good decomposition:
+Split your investigation into 2-4 independent sub-questions. Each sub-question should fit in one context window. If a request will not fit in one context window, narrow the slice, capture bounded findings, and return to Hive with recommended next steps instead of pushing toward an oversized final report. Good decomposition:
 
 | Domain | Question Example |
 |--------|------------------|
@@ -51,6 +51,11 @@ Split your investigation into 2-4 independent sub-questions. Good decomposition:
 **Bad decomposition (dependent questions):**
 - "What is X?" then "How is X used?" (second depends on first)
 - "Find the bug" then "Fix the bug" (not read-only)
+
+**Stop and return to Hive when:**
+- one more fan-out would broaden scope too far
+- a sub-question no longer fits in one context window
+- the next useful step is implementation rather than exploration
 
 ### 2. Spawn Tasks (Fan-Out)
 
@@ -91,27 +96,21 @@ task({
 - Give each task a clear, focused `description`
 - Make prompts specific about what evidence to return
 
-### 3. Continue Working (Optional)
+### 3. Collect Results
 
-While tasks run, you can:
-- Work on other aspects of the problem
-- Prepare synthesis structure
-- Start drafting based on what you already know
+After the fan-out message, collect the task results through the normal `task()` return flow. Do not invent background polling or a separate async workflow.
 
-You'll receive a `<system-reminder>` notification when each task completes.
-
-### 4. Collect Results
+### 4. Synthesize Findings
 
 When each task completes, its result is returned directly. Collect the outputs from each task and proceed to synthesis.
 
-### 5. Synthesize Findings
+### 5. Cleanup (If Needed)
 
 Combine results from all tasks:
 - Cross-reference findings (file X mentioned by tasks A and B)
 - Identify gaps (task C found nothing, need different approach)
 - Build coherent answer from parallel evidence
-
-### 6. Cleanup (If Needed)
+- If the remaining work would no longer fit in one context window, return to Hive with bounded findings and recommended next steps
 
 No manual cancellation is required in task mode.
 
