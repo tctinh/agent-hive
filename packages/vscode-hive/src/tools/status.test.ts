@@ -126,20 +126,16 @@ describe('getStatusTools', () => {
     expect(status.nextAction).toBe('Generate tasks from plan with hive_tasks_sync');
   });
 
-  it('tells planners that plan md is the human-facing review artifact', async () => {
+  it('guides planners to overview-first status messaging', async () => {
     const featureName = 'refresh-overview-feature';
     const featureService = new FeatureService(testRoot);
-    const planService = new PlanService(testRoot);
-    const contextService = new ContextService(testRoot);
 
     featureService.create(featureName);
-    planService.write(featureName, '# Plan\n');
-    contextService.write(featureName, 'overview', '# Overview\n');
-    featureService.updateStatus(featureName, 'approved');
-
     const status = await invokeStatus(testRoot, { feature: featureName });
 
-    expect(status.nextAction).toBe('Generate tasks from plan with hive_tasks_sync');
+    expect(status.nextAction).toBe(
+      'Write or revise plan with hive_plan_write. Refresh context/overview.md first for human review; plan.md remains execution truth and pre-task Mermaid overview diagrams are optional.'
+    );
   });
 
   it('registers hive_status for VS Code language model tools', () => {

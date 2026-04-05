@@ -164,7 +164,7 @@ function getNextAction(
     return 'Wait for plan approval or revise based on comments';
   }
   if (!hasPlan || planStatus === 'draft') {
-    return 'Write or revise plan with hive_plan_write. Keep plan.md as the human-facing review artifact; pre-task Mermaid overview diagrams are optional.';
+    return 'Write or revise plan with hive_plan_write. Refresh context/overview.md first for human review; plan.md remains execution truth and pre-task Mermaid overview diagrams are optional.';
   }
   if (tasks.length === 0) {
     return 'Generate tasks from plan with hive_tasks_sync';

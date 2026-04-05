@@ -1136,7 +1136,42 @@ Do it
     );
   });
 
-  it("guides planners to plan-centered status messaging", async () => {
+  it("keeps plan tool messaging overview-first while plan.md remains execution truth", async () => {
+    const { hooks, toolContext } = await createHooksForTest(
+      testRoot,
+      'sess_overview_first_plan_messaging'
+    );
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: 'overview-first-plan-feature' },
+      toolContext
+    );
+
+    const planOutput = await hooks.tool!.hive_plan_write.execute(
+      {
+        content: createSingleTaskPlan(
+          'Overview First Plan Feature',
+          'Yes, this regression test validates that plan write and approve messaging point reviewers to context/overview.md first while keeping plan.md as execution truth.'
+        ),
+        feature: 'overview-first-plan-feature',
+      },
+      toolContext
+    );
+
+    const approveOutput = await hooks.tool!.hive_plan_approve.execute(
+      { feature: 'overview-first-plan-feature' },
+      toolContext
+    );
+
+    expect(planOutput).toContain('Review context/overview.md first');
+    expect(planOutput).toContain('plan.md remains execution truth');
+    expect(planOutput).not.toContain('plan.md is the human-facing');
+    expect(approveOutput).toContain('context/overview.md is the primary human-facing surface');
+    expect(approveOutput).toContain('plan.md remains execution truth');
+    expect(approveOutput).not.toContain('plan.md is the primary human-facing');
+  });
+
+  it("guides planners to overview-first status messaging", async () => {
     const ctx: PluginInput = {
       directory: testRoot,
       worktree: testRoot,
@@ -1167,7 +1202,7 @@ A: Yes, this regression test validates that plan messaging and hive_status guida
 Do it
 `;
 
-    const planOutput = await hooks.tool!.hive_plan_write.execute(
+    await hooks.tool!.hive_plan_write.execute(
       { content: plan, feature: "overview-guidance-feature" },
       toolContext
     );
@@ -1183,6 +1218,22 @@ Do it
     );
     const status = JSON.parse(statusRaw as string) as { nextAction?: string };
     expect(status.nextAction).toBe('Generate tasks from plan with hive_tasks_sync');
+
+    const draftFeature = 'draft-overview-guidance-feature';
+    await hooks.tool!.hive_feature_create.execute(
+      { name: draftFeature },
+      createToolContext('sess_overview_guidance_draft')
+    );
+
+    const draftStatusRaw = await hooks.tool!.hive_status.execute(
+      { feature: draftFeature },
+      toolContext
+    );
+    const draftStatus = JSON.parse(draftStatusRaw as string) as { nextAction?: string };
+
+    expect(draftStatus.nextAction).toBe(
+      'Write or revise plan with hive_plan_write. Refresh context/overview.md first for human review; plan.md remains execution truth and pre-task Mermaid overview diagrams are optional.'
+    );
   });
 
   it("blocks plan approval when overview review comments remain", async () => {
@@ -2330,7 +2381,7 @@ Do the first thing.
 
     await workerHooks["chat.message"]?.(
       { sessionID: "sess_worker_start_bind", agent: "forager-worker" },
-      { message: {}, parts: [] }
+      { message: {} as any, parts: [] }
     );
 
     const sessionsPath = path.join(testRoot, ".hive", "sessions.json");
