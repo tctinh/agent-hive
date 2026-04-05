@@ -738,7 +738,7 @@ var vscode6 = __toESM(require("vscode"));
 var fs15 = __toESM(require("fs"));
 var path15 = __toESM(require("path"));
 
-// ../../../../../../packages/hive-core/dist/index.js
+// ../hive-core/dist/index.js
 var import_node_module = require("node:module");
 var path = __toESM(require("path"), 1);
 var fs = __toESM(require("fs"), 1);
@@ -7366,6 +7366,16 @@ var WorktreeService = class {
   }
 };
 var RESERVED_OVERVIEW_CONTEXT = "overview";
+var DEFAULT_CONTEXT_CLASSIFICATION = {
+  role: "durable",
+  includeInExecution: true,
+  includeInAgentsMdSync: true
+};
+var SPECIAL_CONTEXTS = {
+  overview: { role: "human", includeInExecution: false, includeInAgentsMdSync: false },
+  draft: { role: "scratchpad", includeInExecution: false, includeInAgentsMdSync: false },
+  "execution-decisions": { role: "operational", includeInExecution: false, includeInAgentsMdSync: false }
+};
 var ContextService = class {
   projectRoot;
   constructor(projectRoot) {
@@ -7393,15 +7403,18 @@ var ContextService = class {
     const contextPath = getContextPath(this.projectRoot, featureName);
     if (!fileExists(contextPath))
       return [];
-    const files = fs8.readdirSync(contextPath, { withFileTypes: true }).filter((f) => f.isFile() && f.name.endsWith(".md")).map((f) => f.name);
+    const files = fs8.readdirSync(contextPath, { withFileTypes: true }).filter((f) => f.isFile() && f.name.endsWith(".md")).map((f) => f.name).sort((a, b) => a.localeCompare(b));
     return files.map((name) => {
       const filePath = path5.join(contextPath, name);
       const stat2 = fs8.statSync(filePath);
       const content = readText(filePath) || "";
+      const normalizedName = name.replace(/\.md$/, "");
+      const classification = this.classifyContextName(normalizedName);
       return {
-        name: name.replace(/\.md$/, ""),
+        name: normalizedName,
         content,
-        updatedAt: stat2.mtime.toISOString()
+        updatedAt: stat2.mtime.toISOString(),
+        ...classification
       };
     });
   }
@@ -7409,7 +7422,10 @@ var ContextService = class {
     return this.list(featureName).find((file) => file.name === RESERVED_OVERVIEW_CONTEXT) ?? null;
   }
   listExecutionContext(featureName) {
-    return this.list(featureName).filter((file) => file.name !== RESERVED_OVERVIEW_CONTEXT);
+    return this.list(featureName).filter((file) => file.includeInExecution);
+  }
+  listAgentsMdSyncContext(featureName) {
+    return this.list(featureName).filter((file) => file.includeInAgentsMdSync);
   }
   delete(featureName, fileName) {
     const contextPath = getContextPath(this.projectRoot, featureName);
@@ -7468,6 +7484,9 @@ ${f.content}`);
     const normalized = name.replace(/\.md$/, "");
     return `${normalized}.md`;
   }
+  classifyContextName(name) {
+    return SPECIAL_CONTEXTS[name] ?? DEFAULT_CONTEXT_CLASSIFICATION;
+  }
 };
 var AgentsMdService = class {
   rootDir;
@@ -7487,7 +7506,7 @@ var AgentsMdService = class {
     return { content, existed: false };
   }
   async sync(featureName) {
-    const contexts = this.contextService.list(featureName);
+    const contexts = this.contextService.listAgentsMdSyncContext(featureName);
     const agentsMdPath = path8.join(this.rootDir, "AGENTS.md");
     const current = await fs11.promises.readFile(agentsMdPath, "utf-8").catch(() => "");
     const findings = this.extractFindings(contexts);
@@ -9278,6 +9297,22 @@ function getContextTools(workspaceRoot) {
 // src/tools/status.ts
 var fs10 = __toESM(require("fs"));
 var path11 = __toESM(require("path"));
+
+// src/tools/contextMetadata.ts
+var SPECIAL_CONTEXTS2 = {
+  overview: { role: "human", includeInExecution: false, includeInAgentsMdSync: false },
+  draft: { role: "scratchpad", includeInExecution: false, includeInAgentsMdSync: false },
+  "execution-decisions": { role: "operational", includeInExecution: false, includeInAgentsMdSync: false }
+};
+function classifyContextName(name) {
+  return SPECIAL_CONTEXTS2[name] ?? {
+    role: "durable",
+    includeInExecution: true,
+    includeInAgentsMdSync: true
+  };
+}
+
+// src/tools/status.ts
 function getStatusTools(workspaceRoot) {
   const featureService = new FeatureService(workspaceRoot);
   const taskService = new TaskService(workspaceRoot);
@@ -9307,8 +9342,11 @@ function getStatusTools(workspaceRoot) {
     }
     const plan = planService.read(feature);
     const tasks = taskService.list(feature);
-    const contextFiles = contextService.list(feature);
-    const overview = contextFiles.find((file) => file.name === "overview") ?? null;
+    const contextFiles = contextService.list(feature).map((file) => ({
+      ...file,
+      ...classifyContextName(file.name)
+    }));
+    const overview = contextService.getOverview(feature);
     const reviewCounts = readReviewCounts(workspaceRoot, feature);
     const tasksSummary = tasks.map((t) => {
       const rawStatus = taskService.getRawStatus(feature, t.folder);
@@ -9335,7 +9373,10 @@ function getStatusTools(workspaceRoot) {
     const contextSummary = contextFiles.map((c) => ({
       name: c.name,
       chars: c.content.length,
-      updatedAt: c.updatedAt
+      updatedAt: c.updatedAt,
+      role: c.role,
+      includeInExecution: c.includeInExecution,
+      includeInAgentsMdSync: c.includeInAgentsMdSync
     }));
     const pendingTasks = tasksSummary.filter((t) => t.status === "pending");
     const inProgressTasks = tasksSummary.filter((t) => t.status === "in_progress");
