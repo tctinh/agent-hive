@@ -145,10 +145,15 @@ export interface FeatureInfo {
   reviewCounts: ReviewCounts;
 }
 
+export type ContextRole = 'human' | 'scratchpad' | 'operational' | 'durable';
+
 export interface ContextFile {
   name: string;
   content: string;
   updatedAt: string;
+  role: ContextRole;
+  includeInExecution: boolean;
+  includeInAgentsMdSync: boolean;
 }
 
 export type SessionKind = 'primary' | 'subagent' | 'task-worker' | 'unknown';

@@ -15,6 +15,7 @@ import { FORAGER_BEE_PROMPT } from './agents/forager.js';
 import { HYGIENIC_BEE_PROMPT } from './agents/hygienic.js';
 import { buildCustomSubagents } from './agents/custom-agents.js';
 import { createBuiltinMcps } from './mcp/index.js';
+import { classifyContextName } from './utils/context-metadata.js';
 
 // ============================================================================
 // Skill Tool - Uses generated registry (no file-based discovery)
@@ -508,13 +509,7 @@ To unblock: Remove .hive/features/${featureDir}/BLOCKED`;
     const planResult = planService.read(feature);
     const allTasks = taskService.list(feature);
 
-    const executionContextFiles = typeof (contextService as ContextService & {
-      listExecutionContext?: (featureName: string) => Array<{ name: string; content: string }>;
-    }).listExecutionContext === 'function'
-      ? (contextService as ContextService & {
-          listExecutionContext: (featureName: string) => Array<{ name: string; content: string }>;
-        }).listExecutionContext(feature)
-      : contextService.list(feature).filter(f => f.name !== 'overview');
+    const executionContextFiles = contextService.list(feature).filter(file => classifyContextName(file.name).includeInExecution);
 
     const rawContextFiles = executionContextFiles.map(f => ({
       name: f.name,
@@ -1733,8 +1728,11 @@ Expand your Discovery section and try again.`;
 
           const plan = planService.read(feature);
           const tasks = taskService.list(feature);
-          const contextFiles = contextService.list(feature);
-          const overview = contextFiles.find(file => file.name === 'overview') ?? null;
+          const contextFiles = contextService.list(feature).map(file => ({
+            ...file,
+            ...classifyContextName(file.name),
+          }));
+          const overview = contextService.getOverview(feature);
           const readThreads = (filePath: string): Array<unknown> | null => {
             if (!fs.existsSync(filePath)) {
               return null;
@@ -1780,6 +1778,9 @@ Expand your Discovery section and try again.`;
             name: c.name,
             chars: c.content.length,
             updatedAt: c.updatedAt,
+            role: c.role,
+            includeInExecution: c.includeInExecution,
+            includeInAgentsMdSync: c.includeInAgentsMdSync,
           }));
 
           const pendingTasks = tasksSummary.filter(t => t.status === 'pending');

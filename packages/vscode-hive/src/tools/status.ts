@@ -3,6 +3,7 @@ import * as path from 'path';
 import { FeatureService, TaskService, PlanService, ContextService, buildEffectiveDependencies, computeRunnableAndBlocked, getFeaturePath } from 'hive-core';
 import type { TaskWithDeps } from 'hive-core';
 import type { ToolRegistration } from './base';
+import { classifyContextName } from './contextMetadata';
 
 export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
   const featureService = new FeatureService(workspaceRoot);
@@ -37,8 +38,11 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
 
     const plan = planService.read(feature);
     const tasks = taskService.list(feature);
-    const contextFiles = contextService.list(feature);
-    const overview = contextFiles.find(file => file.name === 'overview') ?? null;
+    const contextFiles = contextService.list(feature).map(file => ({
+      ...file,
+      ...classifyContextName(file.name),
+    }));
+    const overview = contextService.getOverview(feature);
     const reviewCounts = readReviewCounts(workspaceRoot, feature);
 
     // Build task summaries with dependency info from raw status
@@ -71,6 +75,9 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
       name: c.name,
       chars: c.content.length,
       updatedAt: c.updatedAt,
+      role: c.role,
+      includeInExecution: c.includeInExecution,
+      includeInAgentsMdSync: c.includeInAgentsMdSync,
     }));
 
     const pendingTasks = tasksSummary.filter(t => t.status === 'pending');

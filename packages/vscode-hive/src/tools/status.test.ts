@@ -19,7 +19,7 @@ describe('getStatusTools', () => {
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
   });
 
-  it('reports overview metadata and review counts', async () => {
+  it('reports context handling metadata and review counts', async () => {
     const featureName = 'status-overview-feature';
     const featureService = new FeatureService(testRoot);
     const planService = new PlanService(testRoot);
@@ -28,6 +28,9 @@ describe('getStatusTools', () => {
     featureService.create(featureName);
     planService.write(featureName, '# Plan\n');
     contextService.write(featureName, 'overview', '# Overview\n');
+    contextService.write(featureName, 'draft', '# Draft\n');
+    contextService.write(featureName, 'execution-decisions', '# Execution Decisions\n');
+    contextService.write(featureName, 'learnings', '# Learnings\n');
     const featurePath = getFeaturePath(testRoot, featureName);
 
     fs.mkdirSync(path.join(featurePath, 'comments'), { recursive: true });
@@ -62,6 +65,32 @@ describe('getStatusTools', () => {
         plan: 1,
       },
     });
+    expect(status.context.files).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'draft',
+        role: 'scratchpad',
+        includeInExecution: false,
+        includeInAgentsMdSync: false,
+      }),
+      expect.objectContaining({
+        name: 'execution-decisions',
+        role: 'operational',
+        includeInExecution: false,
+        includeInAgentsMdSync: false,
+      }),
+      expect.objectContaining({
+        name: 'learnings',
+        role: 'durable',
+        includeInExecution: true,
+        includeInAgentsMdSync: true,
+      }),
+      expect.objectContaining({
+        name: 'overview',
+        role: 'human',
+        includeInExecution: false,
+        includeInAgentsMdSync: false,
+      }),
+    ]));
   });
 
   it('reports logical feature names in hive_status even when storage is indexed', async () => {
