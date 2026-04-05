@@ -41,8 +41,8 @@ export class AgentsMdService {
   }
 
   async sync(featureName: string): Promise<SyncResult> {
-    // 1. Read all context files using ContextService.list()
-    const contexts: ContextFile[] = this.contextService.list(featureName);
+    // 1. Read only durable context files eligible for AGENTS.md sync
+    const contexts: ContextFile[] = this.contextService.listAgentsMdSyncContext(featureName);
 
     // 2. Read current AGENTS.md
     const agentsMdPath = path.join(this.rootDir, 'AGENTS.md');
