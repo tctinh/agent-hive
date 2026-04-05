@@ -37,6 +37,7 @@ const EXPECTED_TOOLS = [
 ] as const;
 
 const TEST_ROOT_BASE = "/tmp/hive-e2e-plugin";
+const STABLE_CWD = process.cwd();
 const FIRST_TASK = "01-first-task";
 
 function createStubShell(): PluginInput["$"] {
@@ -165,6 +166,7 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
   let originalHome: string | undefined;
 
   beforeEach(() => {
+    process.chdir(STABLE_CWD);
     originalHome = process.env.HOME;
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
     fs.mkdirSync(TEST_ROOT_BASE, { recursive: true });
@@ -180,6 +182,7 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
   });
 
   afterEach(() => {
+    process.chdir(STABLE_CWD);
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
     if (originalHome === undefined) {
       delete process.env.HOME;
@@ -481,7 +484,7 @@ Do it
     expect(execStart.instructions).not.toContain("Read the prompt file");
   });
 
-  it("excludes reserved overview context from worker prompt payloads", async () => {
+  it("excludes non-execution context from worker prompt payloads", async () => {
     const ctx: PluginInput = {
       directory: testRoot,
       worktree: testRoot,
@@ -535,8 +538,32 @@ Do it
     await hooks.tool!.hive_context_write.execute(
       {
         feature: "reserved-overview-feature",
+        name: "draft",
+        content: "Scratchpad draft that must stay out of worker execution context.",
+      },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "reserved-overview-feature",
+        name: "execution-decisions",
+        content: "Operational decision that must stay out of worker execution context.",
+      },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "reserved-overview-feature",
         name: "decisions",
         content: "Technical decision that workers should receive.",
+      },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "reserved-overview-feature",
+        name: "learnings",
+        content: "Durable learning that workers should receive.",
       },
       toolContext
     );
@@ -576,10 +603,19 @@ Do it
 
     expect(specContent).toContain("## decisions");
     expect(specContent).toContain("Technical decision that workers should receive.");
+    expect(specContent).toContain("## learnings");
+    expect(specContent).toContain("Durable learning that workers should receive.");
     expect(specContent).not.toContain("## overview");
     expect(specContent).not.toContain("Human-facing overview that must stay out of worker execution context.");
+    expect(specContent).not.toContain("## draft");
+    expect(specContent).not.toContain("Scratchpad draft that must stay out of worker execution context.");
+    expect(specContent).not.toContain("## execution-decisions");
+    expect(specContent).not.toContain("Operational decision that must stay out of worker execution context.");
     expect(workerPromptContent).toContain("Technical decision that workers should receive.");
+    expect(workerPromptContent).toContain("Durable learning that workers should receive.");
     expect(workerPromptContent).not.toContain("Human-facing overview that must stay out of worker execution context.");
+    expect(workerPromptContent).not.toContain("Scratchpad draft that must stay out of worker execution context.");
+    expect(workerPromptContent).not.toContain("Operational decision that must stay out of worker execution context.");
   });
 
   it("returns forager-derived eligible agents for worktree execution delegation", async () => {
@@ -948,7 +984,7 @@ Do it
     expect(Array.isArray(result.availableFeatures)).toBe(true);
   });
 
-  it("reports overview metadata and review counts in hive_status", async () => {
+  it("reports context handling metadata in hive_status", async () => {
     const ctx: PluginInput = {
       directory: testRoot,
       worktree: testRoot,
@@ -991,6 +1027,30 @@ Do it
       },
       toolContext
     );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "overview-status-feature",
+        name: "draft",
+        content: "# Draft\nScratchpad summary",
+      },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "overview-status-feature",
+        name: "execution-decisions",
+        content: "# Execution Decisions\nOperational summary",
+      },
+      toolContext
+    );
+    await hooks.tool!.hive_context_write.execute(
+      {
+        feature: "overview-status-feature",
+        name: "learnings",
+        content: "# Learnings\nDurable summary",
+      },
+      toolContext
+    );
 
     fs.mkdirSync(
       path.join(testRoot, ".hive", "features", "01_overview-status-feature", "comments"),
@@ -1027,6 +1087,14 @@ Do it
           overview: number;
         };
       };
+      context?: {
+        files: Array<{
+          name: string;
+          role: string;
+          includeInExecution: boolean;
+          includeInAgentsMdSync: boolean;
+        }>;
+      };
     };
 
     expect(result.overview).toMatchObject({
@@ -1041,6 +1109,34 @@ Do it
         overview: 1,
       },
     });
+    expect(result.context?.files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "draft",
+          role: "scratchpad",
+          includeInExecution: false,
+          includeInAgentsMdSync: false,
+        }),
+        expect.objectContaining({
+          name: "execution-decisions",
+          role: "operational",
+          includeInExecution: false,
+          includeInAgentsMdSync: false,
+        }),
+        expect.objectContaining({
+          name: "learnings",
+          role: "durable",
+          includeInExecution: true,
+          includeInAgentsMdSync: true,
+        }),
+        expect.objectContaining({
+          name: "overview",
+          role: "human",
+          includeInExecution: false,
+          includeInAgentsMdSync: false,
+        }),
+      ])
+    );
   });
 
   it("guides planners to plan-centered status messaging", async () => {
@@ -2237,7 +2333,7 @@ Do the first thing.
 
     await workerHooks["chat.message"]?.(
       { sessionID: "sess_worker_start_bind", agent: "forager-worker" },
-      { message: {}, parts: [] }
+      { message: {} as any, parts: [] } as any
     );
 
     const sessionsPath = path.join(testRoot, ".hive", "sessions.json");
