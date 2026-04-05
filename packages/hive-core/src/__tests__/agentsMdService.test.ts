@@ -147,20 +147,6 @@ describe('AgentsMdService', () => {
       expect(result.diff).toBe('');
     });
 
-    test('excludes non-agents-sync context names via ContextService classification', async () => {
-      contextService.write('test-feature', 'overview', 'We use overview notes only for humans.');
-      contextService.write('test-feature', 'draft', 'We use draft notes only for scratchpad work.');
-      contextService.write('test-feature', 'execution-decisions', 'We use operational notes only during execution.');
-      contextService.write('test-feature', 'learnings', 'We use TypeScript strict mode.');
-
-      const result = await service.sync('test-feature');
-
-      expect(result.proposals).toEqual(['We use TypeScript strict mode']);
-      expect(result.diff).toContain('We use TypeScript strict mode');
-      expect(result.diff).not.toContain('overview notes only for humans');
-      expect(result.diff).not.toContain('draft notes only for scratchpad work');
-      expect(result.diff).not.toContain('operational notes only during execution');
-    });
   });
 
   describe('apply()', () => {

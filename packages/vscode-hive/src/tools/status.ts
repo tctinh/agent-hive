@@ -3,7 +3,6 @@ import * as path from 'path';
 import { FeatureService, TaskService, PlanService, ContextService, buildEffectiveDependencies, computeRunnableAndBlocked, getFeaturePath } from 'hive-core';
 import type { TaskWithDeps } from 'hive-core';
 import type { ToolRegistration } from './base';
-import { classifyContextName } from './contextMetadata';
 
 export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
   const featureService = new FeatureService(workspaceRoot);
@@ -38,10 +37,7 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
 
     const plan = planService.read(feature);
     const tasks = taskService.list(feature);
-    const contextFiles = contextService.list(feature).map(file => ({
-      ...file,
-      ...classifyContextName(file.name),
-    }));
+    const contextFiles = contextService.list(feature);
     const overview = contextService.getOverview(feature);
     const reviewCounts = readReviewCounts(workspaceRoot, feature);
 

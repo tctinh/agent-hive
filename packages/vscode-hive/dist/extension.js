@@ -7506,7 +7506,7 @@ var AgentsMdService = class {
     return { content, existed: false };
   }
   async sync(featureName) {
-    const contexts = this.contextService.listAgentsMdSyncContext(featureName);
+    const contexts = this.contextService.list(featureName);
     const agentsMdPath = path8.join(this.rootDir, "AGENTS.md");
     const current = await fs11.promises.readFile(agentsMdPath, "utf-8").catch(() => "");
     const findings = this.extractFindings(contexts);
@@ -9297,22 +9297,6 @@ function getContextTools(workspaceRoot) {
 // src/tools/status.ts
 var fs10 = __toESM(require("fs"));
 var path11 = __toESM(require("path"));
-
-// src/tools/contextMetadata.ts
-var SPECIAL_CONTEXTS2 = {
-  overview: { role: "human", includeInExecution: false, includeInAgentsMdSync: false },
-  draft: { role: "scratchpad", includeInExecution: false, includeInAgentsMdSync: false },
-  "execution-decisions": { role: "operational", includeInExecution: false, includeInAgentsMdSync: false }
-};
-function classifyContextName(name) {
-  return SPECIAL_CONTEXTS2[name] ?? {
-    role: "durable",
-    includeInExecution: true,
-    includeInAgentsMdSync: true
-  };
-}
-
-// src/tools/status.ts
 function getStatusTools(workspaceRoot) {
   const featureService = new FeatureService(workspaceRoot);
   const taskService = new TaskService(workspaceRoot);
@@ -9342,10 +9326,7 @@ function getStatusTools(workspaceRoot) {
     }
     const plan = planService.read(feature);
     const tasks = taskService.list(feature);
-    const contextFiles = contextService.list(feature).map((file) => ({
-      ...file,
-      ...classifyContextName(file.name)
-    }));
+    const contextFiles = contextService.list(feature);
     const overview = contextService.getOverview(feature);
     const reviewCounts = readReviewCounts(workspaceRoot, feature);
     const tasksSummary = tasks.map((t) => {

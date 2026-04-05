@@ -37,7 +37,6 @@ const EXPECTED_TOOLS = [
 ] as const;
 
 const TEST_ROOT_BASE = "/tmp/hive-e2e-plugin";
-const STABLE_CWD = process.cwd();
 const FIRST_TASK = "01-first-task";
 
 function createStubShell(): PluginInput["$"] {
@@ -166,7 +165,6 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
   let originalHome: string | undefined;
 
   beforeEach(() => {
-    process.chdir(STABLE_CWD);
     originalHome = process.env.HOME;
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
     fs.mkdirSync(TEST_ROOT_BASE, { recursive: true });
@@ -182,7 +180,6 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
   });
 
   afterEach(() => {
-    process.chdir(STABLE_CWD);
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
     if (originalHome === undefined) {
       delete process.env.HOME;
@@ -2333,7 +2330,7 @@ Do the first thing.
 
     await workerHooks["chat.message"]?.(
       { sessionID: "sess_worker_start_bind", agent: "forager-worker" },
-      { message: {} as any, parts: [] } as any
+      { message: {}, parts: [] }
     );
 
     const sessionsPath = path.join(testRoot, ".hive", "sessions.json");
