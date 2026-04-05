@@ -115,21 +115,36 @@ describe('AgentsMdService', () => {
       expect(typeof result.diff).toBe('string');
     });
 
-    test('generates proposals only for findings NOT already in AGENTS.md', async () => {
+    test('skips non-durable context when proposing AGENTS updates', async () => {
+      contextService.write('test-feature', 'overview', 'We use TotallyWrongStack.');
+      contextService.write('test-feature', 'draft', 'Prefer scratch guesses over proof.');
+      contextService.write('test-feature', 'execution-decisions', 'We use temporary merge ordering.');
+      contextService.write('test-feature', 'learnings', 'We use TypeScript strict mode.');
+
+      const result = await service.sync('test-feature');
+
+      expect(result.proposals).toEqual(['We use TypeScript strict mode']);
+    });
+
+    test('still proposes durable free-form context findings', async () => {
       // Create AGENTS.md with existing content
       const existingContent = `# Agent Guidelines\n\n## Code Style\n\nWe use Zustand for state management.\n`;
       fs.writeFileSync(path.join(testDir, 'AGENTS.md'), existingContent);
 
       // Add context with duplicate and new findings
-      contextService.write('test-feature', 'conventions',
-        'We use Zustand for state management.\nWe use TypeScript strict mode.');
+      contextService.write(
+        'test-feature',
+        'conventions',
+        'We use Zustand for state management.\nWe use TypeScript strict mode.',
+      );
+      contextService.write('test-feature', 'learnings', 'Prefer async/await over callbacks.');
 
       const result = await service.sync('test-feature');
 
-      // Should only propose the new finding (TypeScript strict mode)
-      expect(result.proposals.length).toBe(1);
-      expect(result.proposals[0]).toContain('TypeScript strict mode');
-      expect(result.proposals[0]).not.toContain('Zustand');
+      expect(result.proposals).toEqual([
+        'We use TypeScript strict mode',
+        'Prefer async/await over callbacks',
+      ]);
     });
 
     test('returns empty proposals array when all findings already present', async () => {
