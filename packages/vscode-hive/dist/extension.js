@@ -7506,7 +7506,7 @@ var AgentsMdService = class {
     return { content, existed: false };
   }
   async sync(featureName) {
-    const contexts = this.contextService.list(featureName);
+    const contexts = this.contextService.listAgentsMdSyncContext(featureName);
     const agentsMdPath = path8.join(this.rootDir, "AGENTS.md");
     const current = await fs11.promises.readFile(agentsMdPath, "utf-8").catch(() => "");
     const findings = this.extractFindings(contexts);
