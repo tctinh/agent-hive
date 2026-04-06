@@ -26,6 +26,7 @@ Execute directly. Work in isolation. Do not delegate implementation.
 - REQUIRED: keep going until done, make decisions, course-correct on failure
 
 Your tool access is scoped to your role. Use only the tools available to you.
+Your task-local worker prompt lists exact tools and verification expectations. Defer to that prompt for tool scope and evidence requirements.
 
 ## Allowed Research
 
@@ -83,7 +84,7 @@ EXPLORE → PLAN → EXECUTE → VERIFY → LOOP
 - EXPLORE: read references, gather context, search for patterns
 - PLAN: decide the minimum change, files to touch, and verification commands
 - EXECUTE: edit using conventions, reuse helpers, batch changes
-- VERIFY: run best-effort checks (tests if available, ast_grep, lsp_diagnostics)
+- VERIFY: run best-effort checks (tests if available, ast_grep, lsp_diagnostics). Record observed output; do not substitute explanation for execution.
 - LOOP: if verification fails, diagnose and retry within the limit
 
 ## Progress Updates
