@@ -1,6 +1,6 @@
 # Hive Tools Inventory
 
-## Tools (15 total)
+## Tools (18 total)
 
 ### Feature Management (2 tools)
 | Tool | Purpose |
@@ -95,15 +95,46 @@
 |------|---------|
 | `hive_context_write` | Write context file, including reserved `context/overview.md` via `name: "overview"` |
 
+### Network (1 tool)
+| Tool | Purpose |
+|------|---------|
+| `hive_network_query` | Query prior features for deterministic `plan.md` + network-safe context snippets only |
+
+#### hive_network_query input
+
+- `feature?: string` — current feature to exclude from results; defaults to the active feature when available
+- `query: string` — case-insensitive substring query over `plan.md` and network-safe context files
+
+#### hive_network_query output
+
+- Always returns JSON with exactly these top-level fields:
+  - `query`
+  - `currentFeature` (`string | null`)
+  - `results`
+- `results` is an array of snippet records:
+  - `feature`
+  - `sourceType` (`plan` | `context`)
+  - `sourceName`
+  - `path`
+  - `updatedAt`
+  - `snippet`
+- No-match responses are explicit JSON with `results: []`.
+- The tool is read-only and does **not** auto-inject returned snippets into prompts.
+
 ### Status (1 tool)
 | Tool | Purpose |
 |------|---------|
-| `hive_status` | Get comprehensive feature status as JSON, including overview metadata and per-document review counts |
+| `hive_status` | Get comprehensive feature status as JSON, including overview metadata, per-document review counts, and context inclusion flags |
 
-### Steering (1 tool)
+### AGENTS.md (1 tool)
 | Tool | Purpose |
 |------|---------|
-| `hive_steering` | Get steering comments from VSCode sidebar |
+| `hive_agents_md` | Initialize or sync AGENTS.md from codebase or feature context |
+
+### Skill (1 tool)
+| Tool | Purpose |
+|------|---------|
+| `hive_skill` | Load a Hive skill by name |
 
 ---
 
@@ -128,9 +159,11 @@
 | Worktree | 4 | start, create, commit, discard |
 | Merge | 1 | merge |
 | Context | 1 | write |
+| Network | 1 | query |
 | Status | 1 | status |
-| Steering | 1 | steering |
-| **Total** | **15** | |
+| AGENTS.md | 1 | agents_md |
+| Skill | 1 | skill |
+| **Total** | **18** | |
 
 ## Reserved Overview Convention
 
