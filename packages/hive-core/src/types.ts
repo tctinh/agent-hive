@@ -226,7 +226,6 @@ export const CUSTOM_AGENT_RESERVED_NAMES = [
   'swarm',
   'scout',
   'forager',
-  'hive-helper',
   'hygienic',
   'receiver',
   'build',

@@ -2035,6 +2035,54 @@ Do it
     });
   });
 
+  it("returns helper-friendly merge JSON when task is not completed", async () => {
+    const feature = "merge-incomplete-task-feature";
+    const { hooks, toolContext } = await createSingleTaskWorktree(
+      testRoot,
+      "sess_merge_incomplete_task",
+      feature,
+      "Merge Incomplete Task Feature",
+      "Yes, this test validates the early hive_merge JSON contract for incomplete tasks.",
+    );
+
+    const mergeRaw = await hooks.tool!.hive_merge.execute(
+      {
+        feature,
+        task: FIRST_TASK,
+        strategy: "merge",
+      },
+      toolContext
+    );
+
+    const mergeResult = JSON.parse(mergeRaw as string) as {
+      success: boolean;
+      merged: boolean;
+      strategy: string;
+      filesChanged: string[];
+      conflicts: string[];
+      conflictState: string;
+      cleanup: { worktreeRemoved: boolean; branchDeleted: boolean; pruned: boolean };
+      error?: string;
+      message: string;
+    };
+
+    expect(mergeResult).toEqual({
+      success: false,
+      merged: false,
+      strategy: 'merge',
+      filesChanged: [],
+      conflicts: [],
+      conflictState: 'none',
+      cleanup: {
+        worktreeRemoved: false,
+        branchDeleted: false,
+        pruned: false,
+      },
+      error: 'Task must be completed before merging. Use hive_worktree_commit first.',
+      message: 'Merge failed: Task must be completed before merging. Use hive_worktree_commit first.',
+    });
+  });
+
   it("auto-loads parallel exploration for planner agents by default", async () => {
     // Test unified mode agents
     const ctx: PluginInput = {

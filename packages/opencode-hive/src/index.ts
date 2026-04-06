@@ -1648,12 +1648,28 @@ Expand your Discovery section and try again.`;
           feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
         },
         async execute({ task, strategy = 'merge', message, preserveConflicts, cleanup, feature: explicitFeature }) {
+          const failure = (error: string) => respond({
+            success: false,
+            merged: false,
+            strategy,
+            filesChanged: [],
+            conflicts: [],
+            conflictState: 'none',
+            cleanup: {
+              worktreeRemoved: false,
+              branchDeleted: false,
+              pruned: false,
+            },
+            error,
+            message: `Merge failed: ${error}`,
+          });
+
           const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+          if (!feature) return failure('No feature specified. Create a feature or provide feature param.');
 
           const taskInfo = taskService.get(feature, task);
-          if (!taskInfo) return `Error: Task "${task}" not found`;
-          if (taskInfo.status !== 'done') return "Error: Task must be completed before merging. Use hive_worktree_commit first.";
+          if (!taskInfo) return failure(`Task "${task}" not found`);
+          if (taskInfo.status !== 'done') return failure('Task must be completed before merging. Use hive_worktree_commit first.');
 
           const result = await worktreeService.merge(feature, task, strategy, message, {
             preserveConflicts,
