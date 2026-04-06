@@ -148,4 +148,34 @@ describe("agentMode gating", () => {
 
     expect(opencodeConfig.agent["hive-master"]).toBeUndefined();
   });
+
+  it("exposes hive_network_query only to planning orchestration and review roles", async () => {
+    const configPath = path.join(testRoot, ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agentMode: "dedicated",
+      }),
+    );
+
+    const ctx: any = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+    };
+
+    const hooks = await plugin(ctx);
+    const opencodeConfig: any = { agent: {} };
+    await hooks.config!(opencodeConfig);
+
+    expect(opencodeConfig.agent["architect-planner"]?.tools?.["hive_network_query"]).toBeUndefined();
+    expect(opencodeConfig.agent["swarm-orchestrator"]?.tools?.["hive_network_query"]).toBeUndefined();
+    expect(opencodeConfig.agent["hygienic-reviewer"]?.tools?.["hive_network_query"]).toBeUndefined();
+    expect(opencodeConfig.agent["forager-worker"]?.tools?.["hive_network_query"]).toBe(false);
+    expect(opencodeConfig.agent["scout-researcher"]?.tools?.["hive_network_query"]).toBe(false);
+    expect(opencodeConfig.agent["hive-helper"]?.tools?.["hive_network_query"]).toBe(false);
+  });
 });
