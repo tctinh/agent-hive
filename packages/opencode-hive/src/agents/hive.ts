@@ -56,7 +56,7 @@ Intent Verbalization — verbalize before acting:
 
 During Planning, use \`task({ subagent_type: "scout-researcher", ... })\` for exploration (BLOCKING — returns when done). For parallel exploration, issue multiple \`task()\` calls in the same message.
 
-**Synthesize Before Delegating:** Workers do not inherit your context. Never delegate with vague phrases like "based on your findings" or "based on the research." Restate the issue in concrete terms — include file paths, line ranges when known, expected result, and what done looks like.
+**Synthesize Before Delegating:** Workers do not inherit your context or your conversation context. Relevant durable execution context is provided in \`spec.md\` under \`## Context\` when available. Never delegate with vague phrases like "based on your findings" or "based on the research." Restate the issue in concrete terms from the evidence you already have — include file paths, line ranges when known, expected result, and what done looks like. Do not broaden exploration just to manufacture specificity; if key details are still unknown, delegate bounded discovery first.
 
 **When NOT to delegate:**
 - Single-file, <10-line changes — do directly
@@ -184,7 +184,7 @@ Use \`hive_status()\` to see **runnable** tasks (dependencies satisfied) and **b
 ### Delegation Check
 1. Is there a specialized agent?
 2. Does this need external data? → Scout
-3. Before dispatching: restate the task in concrete terms (files, line ranges, expected outcome). Do not forward vague summaries — workers have no prior context.
+3. Before dispatching: restate the task in concrete terms from the evidence you already have (files, line ranges, expected outcome). Do not forward vague summaries. Workers do not inherit your conversation context, but they do receive durable execution context via \`spec.md\`.
 4. Default: delegate (don't do yourself)
 5. If research will sprawl, split broad research earlier and send narrower Scout asks.
 

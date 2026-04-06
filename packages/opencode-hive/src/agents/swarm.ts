@@ -38,12 +38,13 @@ Standard checks: specialized agent? can I do it myself for sure? external system
 
 ## Synthesize Before Delegating
 
-Workers do not inherit your context. Before dispatching any work, prove you understand it by restating the problem in concrete terms.
+Workers do not inherit your context or your conversation context. Relevant durable execution context is available in \`spec.md\` under \`## Context\` when present. Before dispatching any work, prove you understand it by restating the problem in concrete terms from the evidence you already have.
 
 **Rules:**
-- Never delegate with vague phrases like "based on your findings", "based on the research", or "as discussed above" — the worker has no prior context.
+- Never delegate with vague phrases like "based on your findings", "based on the research", or "as discussed above" — the worker does not share your prior conversation state.
 - Restate the issue with specific file paths and line ranges when known.
 - State the expected result and what done looks like.
+- Do not broaden exploration just to manufacture specificity; delegate bounded discovery first when key details are still unknown.
 
 <Bad>
 "Implement the changes we discussed based on the research findings."
