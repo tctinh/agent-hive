@@ -361,7 +361,7 @@ You: Clear visibility into everything ✅
 | **Swarm (Orchestrator)** 🐝 | Orchestrates execution, delegates to workers |
 | **Scout (Explorer/Researcher/Retrieval)** 🔍 | Explores codebase + external docs/data |
 | **Forager (Worker/Coder)** 🍯 | Executes tasks in isolated worktrees |
-| **Hive Helper** 🛠️ | Runtime-only merge recovery helper for isolated branch reconciliation |
+| **Hive Helper** 🛠️ | Runtime-only merge recovery helper for isolated branch reconciliation; not a network consumer |
 | **Hygienic (Consultant/Reviewer/Debugger)** 🧹 | Reviews plan quality, OKAY/REJECT verdict |
 
 ### Compaction-safe recovery path
@@ -385,6 +385,7 @@ Some notes:
 
 - Custom subagents derived from `forager-worker` are treated as task workers for compaction recovery.
 - `hive-helper` is treated as a runtime-only subagent for merge recovery; it does not appear in generated `.github/agents/` docs and does not appear in `packages/vscode-hive/src/generators/` in v1.
+- `hive-helper` is not a network consumer; it benefits indirectly from better upstream planning/orchestration/review decisions.
 - Custom subagents derived from `hygienic-reviewer` are treated as subagents.
 - One-recovery-attempt escalation means a primary or subagent session gets one normal directive replay cycle after compaction, then must escalate back to the parent/orchestrator instead of looping through repeated compact-and-replay retries.
 - The recovery prompt avoids telling agents to call broad status tools or re-scan the repository because that tends to recreate drift after compaction.
@@ -567,10 +568,12 @@ The extension watches your `.hive/` directory and displays the current state. Al
 
 | Package | Platform | Description |
 |---------|----------|-------------|
-| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 7 specialized bee agents, 15 tools, 11 skills |
+| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 7 specialized bee agents, 15 tools, 11 skills. `hive_network_query` is a read-only retrieval tool for planning, orchestration, and review roles first. |
 | **[vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive)** | VS Code | Visual management — review, comment, approve |
 
 **Agent Selection:** Use `hive`, `architect`, or `swarm` as your primary agent. Use `@scout`, `@forager`, or `@hygienic` to mention subagents directly.
+
+When Hive Network is available, treat it as an optional lookup with no startup lookup. Start from the live request and live repository state, then query prior features only when it would materially improve planning, orchestration, or review. planning, orchestration, and review roles get network access first. live-file verification still required.
 
 ---
 

@@ -24,6 +24,8 @@ If you are asked to VERIFY implementation claims (confirm acceptance criteria, v
 3. Return its evidence-backed report format
 4. Do NOT accept rationalizations as evidence — only command output and observable results count
 
+If \`hive_network_query\` results are included in a review, treat them as historical contrast with citations, never as authority over live repository state. Always prefer current diffs, files, and command output when they disagree.
+
 Self-check before every critique:
 > "Am I questioning APPROACH or DOCUMENTATION?"
 > APPROACH → Stay silent

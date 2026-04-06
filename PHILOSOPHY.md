@@ -37,16 +37,16 @@ The answer became this platform.
 | **Beekeeper** | You | The human operator. Observes, steers, approves. Doesn't do the work — manages the hive. |
 | **Hive** | Platform | The Agent Hive platform itself. The structured workspace where agents operate. |
 | **Hive Bee** | Hybrid | Plans AND orchestrates. Phase-aware — detects whether to plan or execute. The default agent. |
-| **Architect Bee** | Planner | Plans features, interviews you, writes plan.md. NEVER executes or delegates. |
+| **Architect Bee** | Planner | Plans features, interviews you, writes plan.md. May use optional read-only retrieval when prior feature evidence materially improves planning. |
 | **Swarm Bee** | Orchestrator | Coordinates execution, delegates to workers, merges results. The Hive Queen. |
 | **Scout Bee** | Researcher | Researches codebase and external docs in parallel. Uses MCP tools. |
 | **Forager Bee** | Executor | Executes tasks in isolated worktrees. Does the actual coding. |
-| **Hygienic Bee** | Reviewer | Reviews plan documentation quality. Returns OKAY/REJECT verdict. |
+| **Hygienic Bee** | Reviewer | Reviews plan documentation quality and implementation evidence. Uses historical contrast with citations, never authority over live repository state. |
 | **Nest** | Feature | A feature. Self-contained with its own plan, context, and tasks. (`.hive/features/<name>/`) |
 | **Comb** | Task Structure | The organized grid of cells (tasks) within a nest. The work breakdown structure. |
 | **Cells** | Tasks | Individual tasks within a comb. Each cell is isolated (worktree) and produces one unit of work. |
 | **Royal Jelly** | Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
-| **Honey** | Artifacts | The human-facing sweetness of the work — led by `context/overview.md` for branch review, while `plan.md` and `spec.md` remain execution truth alongside `report.md`, optional context files, and code behind it. |
+| **Honey** | Artifacts | The human-facing sweetness of the work — led by `context/overview.md` for branch review, while `plan.md` and `spec.md` remain execution truth alongside `report.md`, optional context files, and code behind it. Hive Network retrieval is read-only retrieval, not authority over live files. |
 | **Propolis** | Verification | Best-effort worker checks + orchestrator batch testing that seal work as complete. |
 | **Wax Seal** | Sandbox | Docker container that isolates worker execution. Tests run inside, results flow out. |
 | **Waggle Dance** | Planning | The planning phase. Architect communicates, Beekeeper reviews, alignment before action. |
@@ -719,6 +719,18 @@ PR #64 formalizes that recovery model. Hive now tracks session identity in globa
 PR #69 applies the same philosophy to review-driven execution. Review feedback is not one generic bucket. Some feedback should be fixed inline. Some should become a manual task with structured metadata and its own spec. Some changes truly alter downstream sequencing and therefore require a plan amendment plus `hive_tasks_sync({ refreshPending: true })`. Manual tasks now carry explicit `dependsOn` instead of inheriting accidental sequential order, and refreshing pending tasks rewrites the future DAG without erasing manual work or execution history.
 
 **Design insight:** Durable state only becomes trustworthy when it also encodes the boundaries of the next move. A safe recovery path says what the worker must continue and what it must not do; a safe task graph says what depends on what instead of relying on folder order folklore.
+
+### v1.3.7 (Selective Hive Network + Docs Alignment)
+
+**Theme:** Add narrow cross-feature retrieval without turning memory into authority or making every agent query history by default.
+
+PRs #73, #74, #75, and #76 established the post-1.3.6 baseline: compaction recovery is durable, delegation/verification prompts are more evidence-first, `overview.md` remains the branch-facing review surface while `plan.md` stays execution truth, and `hive-helper` exists as a runtime-only merge isolation helper. `hive_network_query` builds on that baseline as read-only retrieval, not as a replacement for reading the current repository.
+
+The key operating rule is selective use. There is no startup lookup. Agents start from the live request, live repository state, and current feature context. `hive_network_query` becomes an optional lookup only when prior feature evidence would materially improve a planning choice, an orchestration decision, or a review route. In other words: planning, orchestration, and review roles get network access first.
+
+That role boundary matters. Workers still execute from `spec.md`, live files, and direct verification. `hive-helper` is not a network consumer; it benefits only indirectly when upstream planning/orchestration/review choices are better grounded. Hygienic may use retrieved snippets as historical contrast with citations, but never as authority over live repository state.
+
+**Design insight:** File-based memory is useful when it narrows judgment, not when it replaces judgment. Hive Network works only if it stays read-only, selective, and subordinate to current code and command-backed verification.
 
 ---
 

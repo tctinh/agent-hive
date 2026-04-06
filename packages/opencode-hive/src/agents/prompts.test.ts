@@ -497,6 +497,35 @@ describe('Hygienic (Consultant/Reviewer) prompt', () => {
   });
 });
 
+describe('Hive Network selective usage guidance', () => {
+  it('teaches Hive to use hive_network_query only as an optional lookup with no startup lookup', () => {
+    expect(QUEEN_BEE_PROMPT).toContain('hive_network_query');
+    expect(QUEEN_BEE_PROMPT).toContain('optional lookup');
+    expect(QUEEN_BEE_PROMPT).toContain('no startup lookup');
+    expect(QUEEN_BEE_PROMPT).toContain('live-file verification still required');
+  });
+
+  it('teaches Architect to use hive_network_query selectively for planning only', () => {
+    expect(ARCHITECT_BEE_PROMPT).toContain('hive_network_query');
+    expect(ARCHITECT_BEE_PROMPT).toContain('optional lookup');
+    expect(ARCHITECT_BEE_PROMPT).toContain('planning, orchestration, and review roles get network access first');
+    expect(ARCHITECT_BEE_PROMPT).toContain('live-file verification still required');
+  });
+
+  it('teaches Swarm to use hive_network_query selectively for orchestration decisions only', () => {
+    expect(SWARM_BEE_PROMPT).toContain('hive_network_query');
+    expect(SWARM_BEE_PROMPT).toContain('optional lookup');
+    expect(SWARM_BEE_PROMPT).toContain('no startup lookup');
+    expect(SWARM_BEE_PROMPT).toContain('planning, orchestration, and review roles get network access first');
+  });
+
+  it('teaches Hygienic to treat network results as historical contrast, never authority over live repository state', () => {
+    expect(HYGIENIC_BEE_PROMPT).toContain('historical contrast');
+    expect(HYGIENIC_BEE_PROMPT).toContain('live repository state');
+    expect(HYGIENIC_BEE_PROMPT).toContain('citations');
+  });
+});
+
 describe('README.md documentation', () => {
   const README_PATH = path.resolve(import.meta.dir, '..', '..', 'README.md');
   const readmeContent = readFileSync(README_PATH, 'utf-8');
@@ -504,6 +533,8 @@ describe('README.md documentation', () => {
   const rootReadmeContent = readFileSync(ROOT_README_PATH, 'utf-8');
   const HIVE_TOOLS_PATH = path.resolve(import.meta.dir, '..', '..', 'docs', 'HIVE-TOOLS.md');
   const hiveToolsContent = readFileSync(HIVE_TOOLS_PATH, 'utf-8');
+  const PHILOSOPHY_PATH = path.resolve(import.meta.dir, '..', '..', '..', '..', 'PHILOSOPHY.md');
+  const philosophyContent = readFileSync(PHILOSOPHY_PATH, 'utf-8');
 
   describe('delegation planning alignment', () => {
     it('contains the heading "### Planning-mode delegation"', () => {
@@ -558,6 +589,31 @@ describe('README.md documentation', () => {
       expect(hiveToolsContent).toContain('branchDeleted');
       expect(hiveToolsContent).toContain('pruned');
       expect(hiveToolsContent).toContain('message');
+    });
+  });
+
+  describe('Hive Network docs alignment', () => {
+    it('documents network access as optional and role-scoped in package docs', () => {
+      expect(readmeContent).toContain('optional lookup');
+      expect(readmeContent).toContain('no startup lookup');
+      expect(readmeContent).toContain('planning, orchestration, and review roles get network access first');
+      expect(readmeContent).toContain('live-file verification still required');
+    });
+
+    it('documents hive-helper as indirectly benefiting but not consuming network access', () => {
+      expect(readmeContent).toContain('hive-helper');
+      expect(readmeContent).toContain('not a network consumer');
+      expect(rootReadmeContent).toContain('not a network consumer');
+    });
+
+    it('updates philosophy with the post-1.3.6 architecture narrative and network boundaries', () => {
+      expect(philosophyContent).toContain('v1.3.7');
+      expect(philosophyContent).toContain('#73');
+      expect(philosophyContent).toContain('#74');
+      expect(philosophyContent).toContain('#75');
+      expect(philosophyContent).toContain('#76');
+      expect(philosophyContent).toContain('read-only retrieval');
+      expect(philosophyContent).toContain('planning, orchestration, and review roles get network access first');
     });
   });
 });
