@@ -52,7 +52,7 @@ We studied what actually works in the AI coding community and built upon it:
 |--------|-----------------|---------------------|
 | **[Boris Cherny's 13 Tips](https://www.anthropic.com/research/claude-code-best-practices)** | Feedback loops = 2-3x quality | Best-effort worker verification + batch testing |
 | **[Spec Kit](https://github.com/github/spec-kit)** | Specs are valuable | Specs emerge from dialogue, not upfront |
-| **[Conductor](https://github.com/gemini-cli-extensions/conductor)** | Context persistence matters | Feature-scoped `.hive/context/` |
+| **[Conductor](https://github.com/gemini-cli-extensions/conductor)** | Context persistence matters | Feature-scoped `.hive/features/<name>/context/` |
 | **[Ralph Wiggum](https://awesomeclaude.ai/ralph-wiggum)** | Retry loops work for verification | Best-effort verification, not infinite retries |
 | **[Oh My OpenCode](https://github.com/code-yeongyu/oh-my-opencode)** | Agent delegation scales | OMO as Hive Queen, Hive as workflow |
 | **Antigravity** | Plan gates build trust | Plan → Approve → Execute workflow |
@@ -419,12 +419,12 @@ Convert all routes to use the new AuthService.
 
 ### Step 2: Review in VS Code
 
-Open VS Code. The Hive sidebar shows each feature's status and task progress, while `plan.md` remains the human-facing plan artifact. You can:
+Open VS Code. The Hive sidebar shows each feature's status and task progress, while `context/overview.md` is the primary human-facing branch summary and `plan.md` remains execution truth. You can:
 
-- Open `plan.md` for the human-facing summary, optional Mermaid overview diagram, and numbered task details
-- Add comments on `plan.md` as the main review surface
+- Open `context/overview.md` for the branch summary/history and main review surface
+- Open `plan.md` for the execution contract, optional Design Summary, and numbered task details
 - Browse other context files when supporting detail helps
-- Approve when the plan story and execution details both look right
+- Approve when the overview and execution details both look right
 
 ### Step 3: Execute
 
@@ -445,12 +445,13 @@ When done, you have:
 ```
 .hive/features/01_user-auth/
 ├── feature.json         # Feature metadata
-├── plan.md              # Human-facing plan artifact and execution source of truth
+├── plan.md              # Execution source of truth (can include a readable design summary before ## Tasks)
 ├── tasks.json           # Task list with status
 ├── comments/            # Review threads (plan comments live here)
 │   └── plan.json
 ├── context/             # Persistent knowledge files
-│   └── architecture.md
+│   ├── overview.md      # Primary human-facing branch summary/history
+│   └── architecture.md  # Optional example context file
 └── tasks/
     ├── 01-extract-auth-logic/
     │   ├── status.json  # Task state
@@ -479,7 +480,7 @@ When done, you have:
 │  Agent creates structured plan in .hive/                    │
 ├─────────────────────────────────────────────────────────────┤
 │  2. REVIEW (in VS Code)                                     │
-│  Review plan.md, inspect context files when useful          │
+│  Review context/overview.md first, then plan.md             │
 │  Add inline comments, refine, approve                       │
 ├─────────────────────────────────────────────────────────────┤
 │  3. EXECUTE (parallel-friendly)                             │
@@ -499,8 +500,8 @@ When done, you have:
 Visual management without leaving your editor:
 
 - **Sidebar** — See all features and progress at a glance
-- **Plan-Centered Review** — Open `plan.md` as the human-facing review and execution artifact
-- **Inline Comments** — Add review comments on `plan.md`
+- **Overview-First Review** — Open `context/overview.md` first, then use `plan.md` for execution details
+- **Inline Comments** — Add review comments on `context/overview.md` or `plan.md`
 - **Approve Button** — One-click plan approval
 - **Real-time Updates** — Watches `.hive/` for changes
 - **Launch Tasks** — Open tasks in OpenCode from VS Code
@@ -521,14 +522,14 @@ Visual management without leaving your editor:
 └─────────────────────────────────────┘
 ```
 
-**Review plan.md, optionally include a pre-task Mermaid overview, add comments, approve — all without leaving VS Code.**
+**Review `context/overview.md` first, then `plan.md`; optionally include a Mermaid summary before `## Tasks`, add comments, approve — all without leaving VS Code.**
 
 ### Extension Features
 
 | Feature | Description |
 |---------|-------------|
 | **Feature Tree** | Hierarchical view of all features, tasks, and their status |
-| **Plan Review** | Open `plan.md` for the human-facing summary, optional Mermaid overview, execution details, and inline commenting |
+| **Plan Review** | Open `context/overview.md` for branch review, then `plan.md` for execution details, optional design summary, and inline commenting |
 | **Task Details** | Expand any task to see spec.md (context) and report.md (results) |
 | **Status Icons** | Visual indicators: ✅ done, 🔄 in-progress, ⏳ pending, ❌ failed |
 | **Context Files** | Browse per-feature context files for supporting detail alongside the plan |
@@ -551,11 +552,12 @@ The extension watches your `.hive/` directory and displays the current state. Al
 2. **Click the Hive icon** in the Activity Bar (left sidebar)
 3. **Browse features** — Expand to see tasks, context, sessions
    - New features may be stored on disk as `01_feature-name`, while `.hive/active-feature` keeps the active logical feature name
-4. **Review the plan** — Click `plan.md` for the human-facing summary and numbered tasks
-5. **Use Mermaid only when it helps** — Optional pre-task `graph TD`, `graph LR`, or `sequenceDiagram` blocks can summarize the work
-6. **Add comments** — Use VS Code's comment feature on plan lines
-7. **Approve plans** — Click the approve button when the plan is aligned
-8. **Monitor progress** — Watch task status update in real-time as OpenCode executes
+4. **Review the branch summary** — Click `context/overview.md` first for the current summary/history
+5. **Review the execution plan** — Open `plan.md` for the execution contract and numbered tasks
+6. **Use Mermaid only when it helps** — Optional pre-task `graph TD`, `graph LR`, or `sequenceDiagram` blocks can summarize the work
+7. **Add comments** — Use VS Code's comment feature on overview or plan lines
+8. **Approve plans** — Click the approve button when the branch summary and plan are aligned
+9. **Monitor progress** — Watch task status update in real-time as OpenCode executes
 
 ---
 

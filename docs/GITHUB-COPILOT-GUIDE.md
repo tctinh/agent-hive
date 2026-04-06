@@ -104,7 +104,7 @@ Use #tool:runSubagent to delegate tasks:
 
 Use #tool:runSubagent to execute task "2-add-token-refresh":
 - Call execStart for the task
-- Read context files from .hive/features/<name>/contexts/
+- Read context files from .hive/features/<name>/context/
 - Implement the feature
 - Call execComplete with summary
 - Do NOT call merge
@@ -213,6 +213,8 @@ Copy this file to your repository and customize as needed.
 ## Tips
 
 1. **Context is King** - Save context continuously with `contextWrite`. Sub-agents work blind without it.
+
+   `context/overview.md` is the primary human-facing summary/history file for the branch, while `plan.md` remains the execution source of truth.
 
 2. **Plan Format Matters** - Use `### N. Task Name` headers for `tasksSync` to parse correctly.
 

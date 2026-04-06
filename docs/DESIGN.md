@@ -17,9 +17,9 @@ PROBLEM  -> CONTEXT  -> EXECUTION -> REPORT
 ├── features/             <- Feature-scoped work
 │   └── 01_feature-name/
 │       ├── feature.json  <- Feature metadata and state
-│       ├── plan.md       <- Human-facing plan artifact and execution truth
+│       ├── plan.md       <- Execution truth (may include a readable design summary before ## Tasks)
 │       ├── tasks.json    <- Task list with status
-│       ├── contexts/     <- Persistent knowledge files
+│       ├── context/      <- Persistent knowledge files (overview is human-facing; others are free-form)
 │       └── tasks/        <- Individual task folders
 │           └── {task}/
 │               ├── status.json      <- Task state
@@ -39,7 +39,7 @@ packages/
 
 1. User creates feature via `hive_feature_create`
 2. Agent writes plan via `hive_plan_write`
-3. User reviews in VSCode, adds comments
+3. User reviews `context/overview.md` first, then `plan.md`, and adds comments
 4. User approves via `hive_plan_approve`
 5. Tasks synced via `hive_tasks_sync` (generates spec.md for each)
 6. Each task executed via `hive_worktree_start` -> work -> `hive_worktree_commit`
