@@ -69,7 +69,7 @@ Launch tasks directly in OpenCode from the sidebar.
 1. Hive activates when `.hive/` folder exists in your workspace
 2. Click the Hive icon in the Activity Bar
 3. View features, tasks, and execution progress
-4. Open `context/overview.md` first, then `plan.md` if needed, to add review comments
+4. Open `context/overview.md` first for the branch summary/history, then `plan.md` for execution details, to add review comments
 5. Click "Done Review" when ready to continue
 
 ## Commands
@@ -132,9 +132,9 @@ You can customize this file to add your own workflows and preferences.
 ### Usage Tips
 
 - **Task names**: Use kebab-case or snake_case. Spaces in task names may cause git worktree errors.
-- **Context management**: Copilot saves research findings automatically. Check `.hive/features/<name>/context/` for reference.
+- **Context management**: Copilot saves research findings automatically. Check `.hive/features/<name>/context/` for reference; `overview.md` is reserved, while files like `decisions.md` or `architecture.md` are optional examples.
 - **Parallel execution**: Use `runSubagent` for independent tasks. Each sub-agent gets full tool access.
-- **Plan review**: Open `plan.md` in VS Code to add comments, then click "Done Review" in the Hive sidebar.
+- **Plan review**: Open `context/overview.md` first, then `plan.md`; `plan.md` remains execution truth and can still contain a readable design summary before `## Tasks`.
 - **Merging**: `hiveExecComplete` commits changes, but you must call `hiveMerge` to integrate.
 
 ### Troubleshooting

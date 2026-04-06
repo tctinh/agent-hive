@@ -96,9 +96,10 @@ Add JWT auth so humans can review the scope without reading task mechanics.
     ```
 
    Review flow:
-   - `context/overview.md` is the primary human-facing summary/history file
-   - `plan.md` remains the execution contract that `hiveTasksSync` parses
-   - Comments can exist on either document and should be resolved before approval
+    - `context/overview.md` is the primary human-facing summary/history/review surface on this branch
+    - `plan.md` remains the execution contract that `hiveTasksSync` parses
+    - `plan.md` can still include a readable design summary before `## Tasks`
+    - Comments can exist on either document and should be resolved before approval
 
 6. **Iterate until approved** - Revise based on feedback
 
@@ -203,6 +204,7 @@ Save context continuously - sub-agents depend on it:
 - User preferences: "use Zustand, not Redux"
 - Rejected alternatives: "tried X, too complex"
 - Architecture decisions: "auth in /lib/auth"
+- Optional examples: `decisions.md`, `architecture.md`, `constraints.md`
 
 ```
 hiveContextWrite({ 
@@ -217,7 +219,7 @@ hiveContextWrite({
 - Git-trackable audit trail
 - No drift over time
 
-`context/overview.md` is a reserved context filename: it is maintained with `hiveContextWrite({ name: "overview", content })`, shown first to humans, and kept out of worker execution context so it does not replace `plan.md` or `spec.md` as execution truth.
+`context/overview.md` is a reserved context filename: it is maintained with `hiveContextWrite({ name: "overview", content })`, shown first to humans, and kept out of worker execution context so it does not replace `plan.md` or `spec.md` as execution truth. Other filenames remain durable free-form context by default.
 
 ## Plan Format
 

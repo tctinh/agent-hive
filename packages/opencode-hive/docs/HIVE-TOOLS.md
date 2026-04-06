@@ -117,5 +117,5 @@
 
 - There is no dedicated overview write tool.
 - Use `hive_context_write({ name: "overview", content })` to maintain `.hive/features/<feature>/context/overview.md`.
-- Humans review `context/overview.md` first; `plan.md` stays authoritative for execution and task parsing.
+- Humans review `context/overview.md` first; `plan.md` stays authoritative for execution and task parsing, and can still include a readable design summary before `## Tasks`.
 - `hive_status` and the VS Code extension surface the overview as the primary human-facing document.

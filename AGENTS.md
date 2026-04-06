@@ -154,11 +154,11 @@ Features stored in `.hive/features/<name>/`:
 ```
 .hive/features/my-feature/
 ├── feature.json       # Feature metadata
-├── plan.md            # Implementation plan
+├── plan.md            # Execution plan (can include a readable design summary before ## Tasks)
 ├── tasks.json         # Generated tasks
-└── contexts/          # Persistent context files
-    ├── research.md
-    └── decisions.md
+└── context/           # Persistent context files (free-form by default)
+    ├── overview.md    # Primary human-facing branch summary/history
+    └── decisions.md   # Optional example context file
 ```
 
 ## Development Workflow

@@ -14,10 +14,10 @@
         │   └── plan.json        # Comments on plan.md
         ├── sessions.json        # Session tracking
         ├── context/             # Persistent knowledge files
-        │   ├── overview.md      # Reserved human-facing summary/history file
-        │   ├── decisions.md
-        │   ├── architecture.md
-        │   └── constraints.md
+        │   ├── overview.md      # Reserved human-facing summary/history/review file
+        │   ├── decisions.md     # Optional example context file
+        │   ├── architecture.md  # Optional example context file
+        │   └── constraints.md   # Optional example context file
         └── tasks/               # Individual task folders (PRIMARY)
             └── {NN-task-name}/
                 ├── status.json  # Task state + metadata
@@ -37,8 +37,9 @@
 
 - `context/overview.md` is the primary human-facing summary and review surface.
 - Update it with the existing context tool: `hive_context_write({ name: "overview", content })`.
-- `plan.md` remains the graph source of truth for plan-backed task generation, dependency parsing, and execution.
+- `plan.md` remains the graph source of truth for plan-backed task generation, dependency parsing, and execution, and may still include a readable design summary before `## Tasks`.
 - `context/overview.md` is intentionally excluded from worker execution context so the narrative summary does not blur implementation truth.
+- Other context filenames remain durable free-form notes by default; files like `decisions.md`, `architecture.md`, and `constraints.md` are examples, not required schema.
 
 ## Task status.json
 

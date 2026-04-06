@@ -46,7 +46,7 @@ The answer became this platform.
 | **Comb** | Task Structure | The organized grid of cells (tasks) within a nest. The work breakdown structure. |
 | **Cells** | Tasks | Individual tasks within a comb. Each cell is isolated (worktree) and produces one unit of work. |
 | **Royal Jelly** | Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
-| **Honey** | Artifacts | The human-facing sweetness of the work — led by `plan.md`, with optional pre-task Mermaid overviews, `spec.md`, `report.md`, context files, and code behind it. |
+| **Honey** | Artifacts | The human-facing sweetness of the work — led by `context/overview.md` for branch review, while `plan.md` and `spec.md` remain execution truth alongside `report.md`, optional context files, and code behind it. |
 | **Propolis** | Verification | Best-effort worker checks + orchestrator batch testing that seal work as complete. |
 | **Wax Seal** | Sandbox | Docker container that isolates worker execution. Tests run inside, results flow out. |
 | **Waggle Dance** | Planning | The planning phase. Architect communicates, Beekeeper reviews, alignment before action. |
@@ -105,7 +105,7 @@ Hive's design is grounded in proven practices from the AI coding community, part
 
 | Boris's Tip | Hive Implementation |
 |-------------|---------------------|
-| **Tip 4: Team CLAUDE.md** | Context persists per-feature in `.hive/context/` |
+| **Tip 4: Team CLAUDE.md** | Context persists per-feature in `.hive/features/<name>/context/` |
 | **Tip 6: Start in Plan mode** | Plan → Approve → Execute workflow |
 | **Tip 8: Leverage subagents** | Batched parallelism with worktree isolation |
 | **Tip 13: Give feedback loops** | Best-effort worker verification + orchestrator batch testing |
@@ -155,7 +155,7 @@ Two phases with a clear gate between them.
 | **Planning** | Dialogue | Shape, question, refine |
 | **Execution** | Trust | Agent runs, human monitors |
 
-Planning is collaborative. Execution is autonomous. Humans should usually review `plan.md` first for the narrative and execution contract, then inspect supporting context files only when needed. The approval gate is where trust is earned.
+Planning is collaborative. Execution is autonomous. Humans should usually review `context/overview.md` first for the branch summary/history, then inspect `plan.md` for the execution contract and supporting context files when needed. The approval gate is where trust is earned.
 
 *Inspired by Boris's Tip 6: "Most sessions should start in Plan mode... A good plan makes all the difference."*
 
@@ -341,13 +341,14 @@ Workers pause for decisions. They don't guess.
 
 ### Free-form context
 
-Context structure is free-form. Content matters, not structure.
+Context structure is free-form by default. Content matters more than rigid taxonomy.
 
 - Agent writes what's useful
-- No forced directory structure
-- No prescribed file names
+- `overview`, `draft`, and `execution-decisions` are special-purpose reserved names
+- Other context filenames remain durable free-form notes
+- Files like `decisions.md`, `architecture.md`, and `constraints.md` are optional examples, not required schema
 
-Already have injection via `agents.md`, `CLAUDE.md`. Hive adds feature-scoped context.
+Already have injection via `agents.md`, `CLAUDE.md`. Hive adds feature-scoped context in `.hive/features/<name>/context/`.
 
 ### Platform, not replacement
 
@@ -432,7 +433,7 @@ Hive didn't emerge in a vacuum. We studied existing tools, took what worked, and
 - Parallel execution needs coordination, not just parallelism
 
 **What we built:**
-- Feature-scoped context in `.hive/context/`
+- Feature-scoped context in `.hive/features/<name>/context/`
 - Git worktrees for true isolation (not just logical tracks)
 - Batched parallelism with context flow between batches
 
@@ -479,7 +480,7 @@ Hive didn't emerge in a vacuum. We studied existing tools, took what worked, and
 - Tip 13: Feedback loops — 2-3x quality improvement
 
 **What we built:**
-- `.hive/context/` for feature-scoped CLAUDE.md equivalent
+- `.hive/features/<name>/context/` for feature-scoped CLAUDE.md equivalent
 - Plan approval gate enforces "plan mode first"
 - Batched parallelism with worktree isolation
 - Best-effort worker verification + orchestrator batch testing for feedback loops
