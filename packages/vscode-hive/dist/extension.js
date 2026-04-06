@@ -213,6 +213,14 @@ Save discoveries with \`hive_context_write\`:
 - User preferences
 - Research findings
 
+Use the lightweight context model explicitly:
+- \`overview\` = human-facing summary/history
+- \`draft\` = planner scratchpad
+- \`execution-decisions\` = orchestration log
+- all other names = durable free-form context
+
+Treat the reserved names above as special-purpose files, not general notes.
+
 When Scout returns substantial findings (3+ files discovered, architecture patterns, or key decisions), persist them to a feature context file via \`hive_context_write\`.
 
 ### Checkpoints
@@ -279,7 +287,7 @@ hive_feature_create({ name: "feature-name" })
 hive_plan_write({ content: "..." })
 \`\`\`
 
-Plan includes: Discovery (Original Request, Interview Summary, Research Findings), Non-Goals, Tasks (### N. Title with Depends on/Files/What/Must NOT/References/Verify)
+Plan includes: Discovery (Original Request, Interview Summary, Research Findings), Non-Goals, Design Summary (human-facing summary before \`## Tasks\`; optional Mermaid for dependency or sequence overview only), Tasks (### N. Title with Depends on/Files/What/Must NOT/References/Verify)
 - Files must list Create/Modify/Test with exact paths and line ranges where applicable
 - References must use file:line format
 - Verify must include exact command + expected output
@@ -287,6 +295,11 @@ Plan includes: Discovery (Original Request, Interview Summary, Research Findings
 Each task declares dependencies with **Depends on**:
 - **Depends on**: none for no dependencies / parallel starts
 - **Depends on**: 1, 3 for explicit task-number dependencies
+
+Refresh \`context/overview.md\` as the primary human-facing review surface, while \`plan.md\` remains execution truth.
+- Keep a readable \`Design Summary\` before \`## Tasks\` in \`plan.md\`.
+- Optional Mermaid is allowed only in the pre-task summary.
+- Never require Mermaid.
 
 ### After Plan Written
 Ask the user directly in chat whether they want a Hygienic review.
@@ -489,7 +502,8 @@ When asked to retrieve raw data from external systems:
 ## Persistence
 
 When operating within a feature context:
-- If findings are substantial (3+ files, architecture patterns, or key decisions), save them with \`hive_context_write\`
+- If findings are substantial (3+ files, architecture patterns, or key decisions), save them with names like \`research-{topic}\` via \`hive_context_write\`
+- Use reserved names like \`overview\`, \`draft\`, and \`execution-decisions\` only for their special-purpose workflows, not for general research notes
 
 ## Operating Rules
 
@@ -552,6 +566,8 @@ Do not modify the plan file.
 
 For substantial discoveries (architecture patterns, key decisions, gotchas that affect multiple tasks), use:
 \`hive_context_write({ name: "learnings", content: "..." })\`.
+
+Treat reserved names like \`overview\`, \`draft\`, and \`execution-decisions\` as special-purpose files rather than general worker notes.
 
 ## Working Rules
 
@@ -9958,6 +9974,12 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 ---
 
+## Design Summary
+
+{Concise human-facing summary of the feature before task details. Optional Mermaid is allowed here for dependency or sequence overview only.}
+
+---
+
 ## Tasks
 
 ### 1. Task Name
@@ -10033,6 +10055,10 @@ All verification MUST be agent-executable (no human intervention):
 - Reference relevant skills with @ syntax
 - DRY, YAGNI, TDD, frequent commits
 - All acceptance criteria must be agent-executable (zero human intervention)
+- Treat \`context/overview.md\` as the human-facing review surface
+- \`plan.md\` remains execution truth
+- Every plan needs a concise human-facing \`Design Summary\` before \`## Tasks\`
+- The \`Design Summary\` in \`plan.md\` should stay readable and review-friendly even though overview-first review happens in \`context/overview.md\`
 
 ## Execution Handoff
 
