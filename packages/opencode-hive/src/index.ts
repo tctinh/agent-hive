@@ -2032,7 +2032,7 @@ Expand your Discovery section and try again.`;
         temperature: architectUserConfig.temperature ?? 0.7,
         description: 'Architect (Planner) - Plans features, interviews, writes plans. NEVER executes.',
         prompt: ARCHITECT_BEE_PROMPT + architectAutoLoadedSkills + (agentMode === 'dedicated' ? customSubagentAppendix : ''),
-        tools: agentTools(['hive_feature_create', 'hive_plan_write', 'hive_plan_read', 'hive_context_write', 'hive_status', 'hive_skill']),
+        tools: agentTools(['hive_feature_create', 'hive_plan_write', 'hive_plan_read', 'hive_context_write', 'hive_network_query', 'hive_status', 'hive_skill']),
         permission: {
           edit: "deny",  // Planners don't edit code
           task: "allow",
@@ -2056,7 +2056,7 @@ Expand your Discovery section and try again.`;
           'hive_feature_create', 'hive_feature_complete', 'hive_plan_read', 'hive_plan_approve',
           'hive_tasks_sync', 'hive_task_create', 'hive_task_update',
           'hive_worktree_start', 'hive_worktree_create', 'hive_worktree_discard', 'hive_merge',
-          'hive_context_write', 'hive_status', 'hive_skill', 'hive_agents_md',
+          'hive_context_write', 'hive_network_query', 'hive_status', 'hive_skill', 'hive_agents_md',
         ]),
         permission: {
           question: "allow",
@@ -2127,7 +2127,7 @@ Expand your Discovery section and try again.`;
         mode: 'subagent' as const,
         description: 'Hygienic (Consultant/Reviewer/Debugger) - Reviews plan documentation quality. OKAY/REJECT verdict.',
         prompt: HYGIENIC_BEE_PROMPT + hygienicAutoLoadedSkills,
-        tools: agentTools(['hive_plan_read', 'hive_context_write', 'hive_status', 'hive_skill']),
+        tools: agentTools(['hive_plan_read', 'hive_context_write', 'hive_network_query', 'hive_status', 'hive_skill']),
         permission: {
           edit: "deny",  // Reviewers don't edit
           task: "deny",
