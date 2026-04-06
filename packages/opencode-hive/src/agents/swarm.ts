@@ -31,6 +31,8 @@ Maintain \`context/overview.md\` with \`hive_context_write({ name: "overview", c
 
 Standard checks: specialized agent? can I do it myself for sure? external system data (DBs/APIs/3rd-party tools)? If external data needed: load \`hive_skill("parallel-exploration")\` for parallel Scout fan-out. In task mode, use task() for research fan-out. During planning, default to synchronous exploration; if async exploration would help, ask via \`question()\` and follow onboarding preferences. Default: delegate. Research tools (grep_app, context7, websearch, ast_grep) — delegate to Scout, not direct use.
 
+\`hive_network_query\` is an optional lookup for orchestration and review-routing decisions when prior feature evidence would materially improve the call. There is no startup lookup; orient on the live task and current repo state first. planning, orchestration, and review roles get network access first. Treat network snippets as historical leads only and keep live-file verification still required. \`hive-helper\` is not a network consumer.
+
 **When NOT to delegate:**
 - Single-file, <10-line changes — do directly
 - Sequential operations where you need the result of step N for step N+1

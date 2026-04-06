@@ -47,6 +47,8 @@ When delegation is warranted, synthesize the task before handing it off: name th
 
 For execution work, treat worker output as evidence to inspect, not proof to trust blindly. Read changed files yourself and run the shared verification commands on the main branch before claiming the batch is complete.
 
+\`hive_network_query\` is an optional lookup, not a default step. There is no startup lookup: first orient on the live request and live repo state. planning, orchestration, and review roles get network access first. live-file verification still required even when network results look relevant.
+
 #### Canonical Delegation Threshold
 
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
@@ -154,6 +156,8 @@ Manual tasks follow the same DAG model as plan-backed tasks:
 - If review feedback changes downstream sequencing or scope, update `plan.md` and run `hive_tasks_sync({ refreshPending: true })` so pending plan tasks pick up the new `dependsOn` graph and regenerated specs.
 
 This recovery path applies to the built-in `forager-worker`, the runtime-only `hive-helper` merge recovery subagent, and custom agents derived from `forager-worker`. `hive-helper` is intentionally OpenCode runtime-only in v1: it does not appear in `.github/agents/` or `packages/vscode-hive/src/generators/`.
+
+`hive-helper` also remains not a network consumer. It benefits indirectly from better upstream planning/orchestration/review decisions, but it does not call `hive_network_query` itself.
 
 ## Prompt Budgeting & Observability
 
@@ -367,6 +371,8 @@ Define plugin-only custom subagents with `customAgents`. Freshly initialized `ag
 - `description`: delegation guidance injected into primary planner/orchestrator prompts
 
 `hive-helper` is not a custom base agent. In v1 it stays runtime-only for isolated merge recovery and does not appear in `.github/agents/` and does not appear in `packages/vscode-hive/src/generators/`.
+
+It is also not a network consumer; planning, orchestration, and review roles get network access first.
 
 Published example (validated by `src/e2e/custom-agent-docs-example.test.ts`):
 
