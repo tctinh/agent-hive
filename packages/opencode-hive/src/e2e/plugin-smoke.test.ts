@@ -32,6 +32,7 @@ const EXPECTED_TOOLS = [
   "hive_worktree_discard",
   "hive_merge",
   "hive_context_write",
+  "hive_network_query",
   "hive_status",
   "hive_skill",
 ] as const;
@@ -1090,6 +1091,7 @@ Do it
           role: string;
           includeInExecution: boolean;
           includeInAgentsMdSync: boolean;
+          includeInNetwork: boolean;
         }>;
       };
     };
@@ -1125,12 +1127,14 @@ Do it
           role: "durable",
           includeInExecution: true,
           includeInAgentsMdSync: true,
+          includeInNetwork: true,
         }),
         expect.objectContaining({
           name: "overview",
           role: "human",
           includeInExecution: false,
           includeInAgentsMdSync: false,
+          includeInNetwork: false,
         }),
       ])
     );

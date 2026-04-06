@@ -184,6 +184,7 @@ import {
   PlanService,
   TaskService,
   ContextService,
+  NetworkService,
   ConfigService,
   AgentsMdService,
   DockerSandboxService,
@@ -222,6 +223,7 @@ const plugin: Plugin = async (ctx) => {
   const planService = new PlanService(directory);
   const taskService = new TaskService(directory);
   const contextService = new ContextService(directory);
+  const networkService = new NetworkService(directory);
   const agentsMdService = new AgentsMdService(directory, contextService);
   const configService = new ConfigService(); // User config at ~/.config/opencode/agent_hive.json
   const sessionService = new SessionService(directory);
@@ -1705,6 +1707,30 @@ Expand your Discovery section and try again.`;
         },
       }),
 
+      hive_network_query: tool({
+        description: 'Query prior features for deterministic plan/context snippets. Returns JSON with query, currentFeature, and snippet results only. Does not auto-inject results into prompts.',
+        args: {
+          feature: tool.schema.string().optional().describe('Current feature to exclude from results. Defaults to active feature when available.'),
+          query: tool.schema.string().describe('Case-insensitive substring query over plan.md and network-safe context'),
+        },
+        async execute({ feature: explicitFeature, query }) {
+          const currentFeature = resolveFeature(explicitFeature) ?? null;
+          const results = networkService.query({
+            currentFeature: currentFeature ?? undefined,
+            query,
+            maxFeatures: 10,
+            maxSnippetsPerFeature: 3,
+            maxSnippetChars: 240,
+          });
+
+          return respond({
+            query,
+            currentFeature,
+            results,
+          });
+        },
+      }),
+
       // Status Tool
       hive_status: tool({
         description: 'Get comprehensive status of a feature including plan, tasks, and context. Returns JSON with all relevant state for resuming work.',
@@ -1801,6 +1827,7 @@ Expand your Discovery section and try again.`;
             role: c.role,
             includeInExecution: c.includeInExecution,
             includeInAgentsMdSync: c.includeInAgentsMdSync,
+            includeInNetwork: c.includeInNetwork,
           }));
 
           const pendingTasks = tasksSummary.filter(t => t.status === 'pending');
@@ -1957,7 +1984,7 @@ Expand your Discovery section and try again.`;
           'hive_plan_write', 'hive_plan_read', 'hive_plan_approve',
           'hive_tasks_sync', 'hive_task_create', 'hive_task_update',
           'hive_worktree_start', 'hive_worktree_create', 'hive_worktree_commit', 'hive_worktree_discard',
-          'hive_merge', 'hive_context_write', 'hive_status', 'hive_skill', 'hive_agents_md',
+          'hive_merge', 'hive_context_write', 'hive_network_query', 'hive_status', 'hive_skill', 'hive_agents_md',
         ];
         const result: Record<string, boolean> = {};
         for (const tool of allHiveTools) {
