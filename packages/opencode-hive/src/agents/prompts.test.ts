@@ -157,15 +157,24 @@ describe('Architect (Planner) prompt', () => {
   it('describes mermaid as optional in the plan preamble only', () => {
     expect(ARCHITECT_BEE_PROMPT).toContain('optional Mermaid');
     expect(ARCHITECT_BEE_PROMPT).toContain('dependency or sequence overview');
-    expect(ARCHITECT_BEE_PROMPT).not.toContain('context/overview.md');
-    expect(ARCHITECT_BEE_PROMPT).not.toContain('primary human review surface');
+    expect(ARCHITECT_BEE_PROMPT).toContain('context/overview.md');
+    expect(ARCHITECT_BEE_PROMPT).toContain('primary human-facing review surface');
   });
 
   it('teaches hive hybrid planning to keep the summary in plan.md', () => {
     expect(QUEEN_BEE_PROMPT).toContain('Design Summary');
     expect(QUEEN_BEE_PROMPT).toContain('before `## Tasks`');
     expect(QUEEN_BEE_PROMPT).toContain('optional Mermaid');
-    expect(QUEEN_BEE_PROMPT).not.toContain('context/overview.md');
+    expect(QUEEN_BEE_PROMPT).toContain('context/overview.md');
+  });
+
+  it('includes clarified context model in the hive agent', () => {
+    expect(QUEEN_BEE_PROMPT).toContain('`overview` = human-facing summary/history');
+    expect(QUEEN_BEE_PROMPT).toContain('`draft` = planner scratchpad');
+    expect(QUEEN_BEE_PROMPT).toContain('`execution-decisions` = orchestration log');
+    expect(QUEEN_BEE_PROMPT).toContain('all other names');
+    expect(QUEEN_BEE_PROMPT).toContain('durable');
+    expect(QUEEN_BEE_PROMPT).not.toContain('`plan.md` is the primary human-facing summary');
   });
 });
 
@@ -243,6 +252,12 @@ describe('Swarm (Orchestrator) prompt', () => {
     expect(SWARM_BEE_PROMPT).toContain('primary human-facing document');
     expect(SWARM_BEE_PROMPT).toContain('plan.md');
   });
+
+  it('treats reserved context names as special-purpose files', () => {
+    expect(SWARM_BEE_PROMPT).toContain('reserved special-purpose files');
+    expect(SWARM_BEE_PROMPT).toContain('research-*');
+    expect(SWARM_BEE_PROMPT).toContain('learnings');
+  });
 });
 
 describe('Forager (Worker/Coder) prompt', () => {
@@ -295,6 +310,11 @@ describe('Scout (Explorer/Researcher) prompt', () => {
   it('has clean persistence example', () => {
     expect(SCOUT_BEE_PROMPT).not.toContain('Worker Prompt Builder');
     expect(SCOUT_BEE_PROMPT).toContain('research-{topic}');
+  });
+
+  it('treats reserved context names as special-purpose files', () => {
+    expect(SCOUT_BEE_PROMPT).toContain('reserved names like `overview`, `draft`, and `execution-decisions`');
+    expect(SCOUT_BEE_PROMPT).toContain('not for general research notes');
   });
 
   it('mentions year awareness', () => {

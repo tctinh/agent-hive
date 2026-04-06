@@ -126,6 +126,12 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 ---
 
+## Design Summary
+
+{Concise human-facing summary of the feature before task details. Optional Mermaid is allowed here for dependency or sequence overview only.}
+
+---
+
 ## Tasks
 
 ### 1. Task Name
@@ -201,6 +207,10 @@ All verification MUST be agent-executable (no human intervention):
 - Reference relevant skills with @ syntax
 - DRY, YAGNI, TDD, frequent commits
 - All acceptance criteria must be agent-executable (zero human intervention)
+- Treat \`context/overview.md\` as the human-facing review surface
+- \`plan.md\` remains execution truth
+- Every plan needs a concise human-facing \`Design Summary\` before \`## Tasks\`
+- The \`Design Summary\` in \`plan.md\` should stay readable and review-friendly even though overview-first review happens in \`context/overview.md\`
 
 ## Execution Handoff
 

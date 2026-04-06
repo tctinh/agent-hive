@@ -36,6 +36,17 @@ describe('skills generator', () => {
     expect(executingPlans).not.toContain('question()');
   });
 
+  it('includes overview-first context guidance in writing-plans', () => {
+    const byName = new Map(skills.map((skill) => [skill.name, skill.content]));
+    const writingPlans = byName.get('writing-plans');
+
+    expect(writingPlans).toContain('context/overview.md');
+    expect(writingPlans).toContain('human-facing review surface');
+    expect(writingPlans).toContain('plan.md` remains execution truth');
+    expect(writingPlans).toContain('Design Summary');
+    expect(writingPlans).not.toContain('Treat `plan.md` as the human-facing review surface and execution truth');
+  });
+
   it('generates skill files with normalized required frontmatter', () => {
     const content = generateSkillFile({
       name: 'example-skill',

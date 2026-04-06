@@ -105,6 +105,7 @@ When operating within a feature context:
     content: "## {Topic}\\n\\nDate: {YYYY-MM-DD}\\n\\n## Context\\n\\n## Findings"
   })
   \`\`\`
+- Use reserved names like \`overview\`, \`draft\`, and \`execution-decisions\` only for their special-purpose workflows, not for general research notes.
 - Use \`hive_context_write\` only for meaningful checkpoints, not every small step.
 
 ## Operating Rules
