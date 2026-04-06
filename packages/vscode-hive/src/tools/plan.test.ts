@@ -19,6 +19,43 @@ describe('getPlanTools', () => {
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
   });
 
+  it('describes overview-first review and plan execution truth', async () => {
+    const featureName = 'overview-first-plan-description-feature';
+    const featureService = new FeatureService(testRoot);
+
+    featureService.create(featureName);
+
+    const tools = getPlanTools(testRoot);
+    const writeTool = tools.find(candidate => candidate.name === 'hive_plan_write');
+    const readTool = tools.find(candidate => candidate.name === 'hive_plan_read');
+    const approveTool = tools.find(candidate => candidate.name === 'hive_plan_approve');
+
+    if (!writeTool || !readTool || !approveTool) {
+      throw new Error('Expected plan tools not found');
+    }
+
+    expect(writeTool.modelDescription).toContain('context/overview.md');
+    expect(writeTool.modelDescription).toContain('plan.md remains execution truth');
+    expect(writeTool.modelDescription).not.toContain('plan.md is the human-facing review surface');
+
+    expect(readTool.modelDescription).toContain('context/overview.md');
+    expect(readTool.modelDescription).toContain('plan.md execution contract');
+    expect(readTool.modelDescription).not.toContain('in-plan human-facing summary');
+
+    expect(approveTool.modelDescription).toContain('context/overview.md first');
+    expect(approveTool.modelDescription).toContain('plan.md as the execution contract');
+    expect(approveTool.modelDescription).not.toContain('user has reviewed plan.md');
+
+    const writeOutput = JSON.parse(await writeTool.invoke({
+      feature: featureName,
+      content: '# Plan\n\n## Tasks\n',
+    }, {} as any)) as { message?: string };
+
+    expect(writeOutput.message).toContain('Review context/overview.md first');
+    expect(writeOutput.message).toContain('plan.md remains execution truth');
+    expect(writeOutput.message).not.toContain('plan.md as the human-facing surface');
+  });
+
   it('blocks approval when overview review comments remain', async () => {
     const featureName = 'overview-approval-blocked-feature';
     const featureService = new FeatureService(testRoot);

@@ -1665,9 +1665,9 @@ Expand your Discovery section and try again.`;
 
       // Context Tools
       hive_context_write: tool({
-        description: 'Write a context file for the feature. Context files store persistent notes, decisions, and reference material.',
+        description: 'Write a context file for the feature. System-known names: overview = human-facing summary/history, draft = planner scratchpad, execution-decisions = orchestration log; all other names stay durable free-form context.',
         args: {
-          name: tool.schema.string().describe('Context file name (e.g., "decisions", "architecture", "notes")'),
+          name: tool.schema.string().describe('Context file name (e.g., "overview", "draft", "execution-decisions", "learnings"). overview is the human-facing summary/history file, draft is planner scratchpad, execution-decisions is the orchestration log; other names remain durable free-form context.'),
           content: tool.schema.string().describe('Markdown content to write'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
         },
@@ -1677,7 +1677,7 @@ Expand your Discovery section and try again.`;
 
           bindFeatureSession(feature, toolContext);
           const filePath = contextService.write(feature, name, content);
-          return `Context file written: ${filePath}`;
+          return `Context file written: ${filePath}. Known names: overview = human-facing summary/history, draft = planner scratchpad, execution-decisions = orchestration log; all other context names remain durable free-form notes.`;
         },
       }),
 
@@ -1806,7 +1806,7 @@ Expand your Discovery section and try again.`;
               return 'Wait for plan approval or revise based on comments';
             }
             if (!hasPlan || planStatus === 'draft') {
-              return 'Write or revise plan with hive_plan_write. Keep plan.md as the human-facing review artifact; pre-task Mermaid overview diagrams are optional.';
+              return 'Write or revise plan with hive_plan_write. Refresh context/overview.md first for human review; plan.md remains execution truth and pre-task Mermaid overview diagrams are optional.';
             }
             if (tasks.length === 0) {
               return 'Generate tasks from plan with hive_tasks_sync';
