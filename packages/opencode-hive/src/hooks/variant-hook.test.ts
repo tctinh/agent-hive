@@ -295,10 +295,10 @@ describe('classifySession', () => {
       expect(result.baseAgent).toBe('hygienic-reviewer');
     });
 
-    it('classifies custom scout-derived agent as subagent', () => {
+    it('treats unsupported custom scout-derived agent as unknown', () => {
       const result = classifySession('scout-custom', customAgents);
-      expect(result.sessionKind).toBe('subagent');
-      expect(result.baseAgent).toBe('scout-researcher');
+      expect(result.sessionKind).toBe('unknown');
+      expect(result.baseAgent).toBeUndefined();
     });
   });
 
@@ -409,7 +409,7 @@ describe('createVariantHook with session tracking', () => {
     });
   });
 
-  it('tracks custom scout-derived agents as subagents', async () => {
+  it('does not classify unsupported custom scout-derived agents as subagents', async () => {
     const tracked: Array<{ sessionId: string; patch: Record<string, unknown> }> = [];
     const mockSessionService = {
       trackGlobal: (sessionId: string, patch?: Record<string, unknown>) => {
@@ -430,8 +430,7 @@ describe('createVariantHook with session tracking', () => {
     expect(tracked.length).toBe(1);
     expect(tracked[0].patch).toEqual({
       agent: 'scout-custom',
-      baseAgent: 'scout-researcher',
-      sessionKind: 'subagent',
+      sessionKind: 'unknown',
     });
   });
 
