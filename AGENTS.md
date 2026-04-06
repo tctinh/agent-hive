@@ -136,6 +136,7 @@ feat!: change plan format to support subtasks
 6. **Tests Define Done** - Workers do best-effort checks; orchestrator runs full test suite after batch merge
 7. **Iron Laws + Hard Gates** - Non-negotiable constraints per agent
 8. **Cross-Model Prompts** — Agent prompts must work across all supported LLM providers. Use conditional triggers ("when X, do Y") instead of absolute mandates ("always do Y") or blanket defaults ("by default, do Y").
+9. **Deterministic Contracts Beat Soft Memory** — Prefer hard gates and deterministic tools over soft prompt-only memory when reliability matters.
 
 ### Agent Roles
 
@@ -304,6 +305,7 @@ The previous worker's progress is preserved. Include the user's decision in the 
 - task() is BLOCKING — when it returns, the worker is DONE
 - Call `hive_status()` immediately to check the new task state and find next runnable tasks
 - No notifications or polling needed — the result is already available
+- Prefer structured worker-result envelopes over free-form completion interpretation when extending worker/orchestrator flows
 
 ### Sandbox Configuration
 
