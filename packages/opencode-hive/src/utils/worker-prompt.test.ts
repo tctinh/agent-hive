@@ -148,7 +148,6 @@ UNIQUE_MARKER_12345
     const params = createTestParams();
     const prompt = buildWorkerPrompt(params);
     
-    // Must keep these critical sections
     expect(prompt).toContain('## Blocker Protocol');
     expect(prompt).toContain('## Completion Protocol');
     expect(prompt).toContain('## Assignment Details');
@@ -171,6 +170,56 @@ UNIQUE_MARKER_12345
     
     expect(prompt).toContain('All file operations MUST be within this worktree path');
     expect(prompt).toContain(params.worktreePath);
+  });
+
+  it('does not contain contradictory question() instruction', () => {
+    const params = createTestParams();
+    const prompt = buildWorkerPrompt(params);
+
+    expect(prompt).not.toContain('ALWAYS use `question()`');
+    expect(prompt).not.toContain('NEVER ask questions via plain text');
+  });
+
+  it('includes verification evidence contract', () => {
+    const params = createTestParams();
+    const prompt = buildWorkerPrompt(params);
+
+    expect(prompt).toContain('## Verification Evidence');
+    expect(prompt).toContain('command-first');
+    expect(prompt).toContain('file-specific sanity checks');
+  });
+
+  it('uses conditional verification path in pre-implementation checklist', () => {
+    const params = createTestParams();
+    const prompt = buildWorkerPrompt(params);
+
+    expect(prompt).toContain('The verification path is clear');
+    expect(prompt).toContain('failing test for new behavior');
+    expect(prompt).toContain('existing coverage to keep green for refactor-only work');
+    expect(prompt).not.toContain('The first failing test to write is clear (TDD).');
+  });
+
+  it('places TDD guidance before completion protocol', () => {
+    const params = createTestParams();
+    const prompt = buildWorkerPrompt(params);
+
+    const tddIndex = prompt.indexOf('## TDD Protocol');
+    const completionIndex = prompt.indexOf('## Completion Protocol');
+    expect(tddIndex).toBeGreaterThan(-1);
+    expect(completionIndex).toBeGreaterThan(-1);
+    expect(tddIndex).toBeLessThan(completionIndex);
+  });
+
+  it('allows refactor-only work in TDD section', () => {
+    const params = createTestParams();
+    const prompt = buildWorkerPrompt(params);
+
+    expect(prompt).toContain('refactor');
+    const tddSection = prompt.slice(
+      prompt.indexOf('## TDD Protocol'),
+      prompt.indexOf('##', prompt.indexOf('## TDD Protocol') + 1)
+    );
+    expect(tddSection.toLowerCase()).toContain('refactor');
   });
 });
 
