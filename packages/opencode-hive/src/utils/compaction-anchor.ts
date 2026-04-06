@@ -19,6 +19,7 @@ const AGENT_ROLE_MAP: Record<string, string> = {
   'swarm-orchestrator': 'Swarm',
   'forager-worker': 'Forager',
   'scout-researcher': 'Scout',
+  'hive-helper': 'Hive Helper',
   'hygienic-reviewer': 'Hygienic',
 };
 
@@ -26,6 +27,7 @@ const BASE_AGENT_ROLE_MAP: Record<string, string> = {
   'forager-worker': 'Forager',
   'hygienic-reviewer': 'Hygienic',
   'scout-researcher': 'Scout',
+  'hive-helper': 'Hive Helper',
 };
 
 function resolveRole(ctx: CompactionSessionContext): string | undefined {

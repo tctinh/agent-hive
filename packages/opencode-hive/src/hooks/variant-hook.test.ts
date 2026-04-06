@@ -64,6 +64,7 @@ describe('createVariantHook', () => {
         'swarm-orchestrator': 'medium',
         'scout-researcher': 'low',
         'forager-worker': 'high',
+        'hive-helper': 'medium',
         'hygienic-reviewer': 'medium',
       };
 
@@ -271,6 +272,12 @@ describe('classifySession', () => {
       const result = classifySession('hygienic-reviewer', NO_CUSTOM_AGENTS);
       expect(result.sessionKind).toBe('subagent');
       expect(result.baseAgent).toBe('hygienic-reviewer');
+    });
+
+    it('classifies hive-helper as subagent', () => {
+      const result = classifySession('hive-helper', NO_CUSTOM_AGENTS);
+      expect(result.sessionKind).toBe('subagent');
+      expect(result.baseAgent).toBe('hive-helper');
     });
   });
 

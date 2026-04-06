@@ -64,6 +64,7 @@ describe("agentMode gating", () => {
     expect(opencodeConfig.agent["swarm-orchestrator"]).toBeUndefined();
     expect(opencodeConfig.agent["scout-researcher"]).toBeDefined();
     expect(opencodeConfig.agent["forager-worker"]).toBeDefined();
+    expect(opencodeConfig.agent["hive-helper"]).toBeDefined();
     expect(opencodeConfig.agent["hygienic-reviewer"]).toBeDefined();
     expect(opencodeConfig.default_agent).toBe("hive-master");
   });
@@ -95,6 +96,7 @@ describe("agentMode gating", () => {
     expect(opencodeConfig.agent["swarm-orchestrator"]).toBeDefined();
     expect(opencodeConfig.agent["scout-researcher"]).toBeDefined();
     expect(opencodeConfig.agent["forager-worker"]).toBeDefined();
+    expect(opencodeConfig.agent["hive-helper"]).toBeDefined();
     expect(opencodeConfig.agent["hygienic-reviewer"]).toBeDefined();
     expect(opencodeConfig.default_agent).toBe("architect-planner");
   });

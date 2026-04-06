@@ -6,6 +6,7 @@ import { ARCHITECT_BEE_PROMPT } from './architect';
 import { SWARM_BEE_PROMPT } from './swarm';
 import { FORAGER_BEE_PROMPT } from './forager';
 import { SCOUT_BEE_PROMPT } from './scout';
+import { HIVE_HELPER_PROMPT } from './hive-helper';
 import { HYGIENIC_BEE_PROMPT } from './hygienic';
 
 describe('Hive (Hybrid) prompt', () => {
@@ -303,6 +304,24 @@ describe('Forager (Worker/Coder) prompt', () => {
 
   it('contains docker-mastery skill reference', () => {
     expect(FORAGER_BEE_PROMPT).toContain('docker-mastery');
+  });
+});
+
+describe('Hive Helper prompt', () => {
+  it('forbids planning and orchestration', () => {
+    expect(HIVE_HELPER_PROMPT).toContain('never plans or orchestrates');
+  });
+
+  it('uses hive_merge first and resolves preserved conflicts locally', () => {
+    expect(HIVE_HELPER_PROMPT).toContain('hive_merge');
+    expect(HIVE_HELPER_PROMPT).toContain("conflictState: 'preserved'");
+    expect(HIVE_HELPER_PROMPT).toContain('resolves locally');
+    expect(HIVE_HELPER_PROMPT).toContain('continues the merge batch');
+  });
+
+  it('requires concise summary-only output', () => {
+    expect(HIVE_HELPER_PROMPT).toContain('concise');
+    expect(HIVE_HELPER_PROMPT).toContain('merged/conflict/blocker summary');
   });
 });
 

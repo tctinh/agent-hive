@@ -114,6 +114,14 @@ describe('buildCompactionReanchor', () => {
       expect(anchor.prompt).toContain('Role: Hygienic');
     });
 
+    it('anchors hive-helper with Role: Hive Helper', () => {
+      const anchor = buildCompactionReanchor({
+        agent: 'hive-helper',
+        sessionKind: 'subagent',
+      });
+      expect(anchor.prompt).toContain('Role: Hive Helper');
+    });
+
     it('anchors custom hygienic-reviewer derivative with Role: Hygienic', () => {
       const anchor = buildCompactionReanchor({
         agent: 'my-custom-reviewer',

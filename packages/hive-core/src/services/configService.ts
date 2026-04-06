@@ -156,11 +156,13 @@ export class ConfigService {
     if (this.isBuiltInAgent(agent)) {
       const agentConfig = config.agents?.[agent] ?? {};
       const defaultAutoLoadSkills = DEFAULT_HIVE_CONFIG.agents?.[agent]?.autoLoadSkills ?? [];
-      const effectiveAutoLoadSkills = this.resolveAutoLoadSkills(
-        defaultAutoLoadSkills,
-        agentConfig.autoLoadSkills ?? [],
-        this.isPlannerAgent(agent),
-      );
+      const effectiveAutoLoadSkills = agent === 'hive-helper'
+        ? defaultAutoLoadSkills
+        : this.resolveAutoLoadSkills(
+            defaultAutoLoadSkills,
+            agentConfig.autoLoadSkills ?? [],
+            this.isPlannerAgent(agent),
+          );
 
       return {
         ...agentConfig,
