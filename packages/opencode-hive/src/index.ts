@@ -1708,7 +1708,7 @@ Expand your Discovery section and try again.`;
       }),
 
       hive_network_query: tool({
-        description: 'Query prior features for deterministic plan/context snippets. Returns JSON with query, currentFeature, and snippet results only. Does not auto-inject results into prompts.',
+        description: 'Query prior features for deterministic plan/context snippets. Returns JSON with query, currentFeature, and snippet results only. Callers must opt in to using the returned snippets.',
         args: {
           feature: tool.schema.string().optional().describe('Current feature to exclude from results. Defaults to active feature when available.'),
           query: tool.schema.string().describe('Case-insensitive substring query over plan.md and network-safe context'),

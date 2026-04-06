@@ -119,7 +119,7 @@
   - `updatedAt`
   - `snippet`
 - No-match responses are explicit JSON with `results: []`.
-- The tool is read-only and does **not** auto-inject returned snippets into prompts.
+- The tool is read-only and callers must opt in to using returned snippets.
 
 ### Status (1 tool)
 | Tool | Purpose |
