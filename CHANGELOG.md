@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-04-07
+
+### Added
+- **Deterministic Hive Network foundation (PR #75)**: Added `NetworkService` and `hive_network_query` so Hive, Architect, Swarm, and Hygienic can retrieve network-safe snippets from prior features with deterministic ordering and explicit JSON results.
+- **Reserved context semantics documented end-to-end**: Clarified `overview` as the human-facing summary/history surface, `draft` as planner scratchpad, and `execution-decisions` as orchestration log while keeping `plan.md` as execution truth and AGENTS promotion limited to durable context.
+
+### Changed
+- **OpenCode is now the first-class harness story**: `opencode-hive` remains the primary supported runtime, `vscode-hive` stays as the review/sidebar companion, and GitHub Copilot / VS Code language-model-tool support is no longer a first-class supported path starting in `1.4.0`.
+- **Branch hardening now ships as one coherent minor release**: Helper merge isolation, selective network visibility, and compaction/recovery guidance land together here instead of being described as separate patch follow-ups.
+- **Bootstrap continuity is kept for now**: Existing `.github/*` artifact generation remains available for teams that still rely on it, but it is continuity scaffolding rather than the recommended primary workflow.
+
+### Fixed
+- **Helper/runtime boundary drift**: `hive-helper` remains merge-only and network-blind, reducing the chance that helper flows escape their integration-only role.
+- **Historical context overreach**: Hive Network and AGENTS synchronization now respect network-safe / durable-only boundaries instead of treating all context as equal execution input.
+
 ## [1.3.6] - 2026-04-04
 
 ### Added
