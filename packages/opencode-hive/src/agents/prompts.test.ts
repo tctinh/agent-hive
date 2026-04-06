@@ -448,6 +448,8 @@ describe('Scout (Explorer/Researcher) prompt', () => {
   it('treats reserved context names as special-purpose files', () => {
     expect(SCOUT_BEE_PROMPT).toContain('reserved names like `overview`, `draft`, and `execution-decisions`');
     expect(SCOUT_BEE_PROMPT).toContain('not for general research notes');
+  });
+
   it('covers the sharpened operating contract with structural anchors', () => {
     expect(SCOUT_BEE_PROMPT).toContain('### Read-Only Contract');
     expect(SCOUT_BEE_PROMPT).toContain('### Preferred Search Sequence');
