@@ -34,6 +34,7 @@ describe('agent_hive schema customAgents contract', () => {
     expectReservedNameToFail('swarm-orchestrator');
     expectReservedNameToFail('scout-researcher');
     expectReservedNameToFail('forager-worker');
+    expectReservedNameToFail('hive-helper');
     expectReservedNameToFail('hygienic-reviewer');
     expectReservedNameToFail('hive');
     expectReservedNameToFail('architect');

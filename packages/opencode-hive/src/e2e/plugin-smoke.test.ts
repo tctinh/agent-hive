@@ -1897,7 +1897,7 @@ Do it
     expect(readHeadBody(worktreePath)).toBe(expectedMessage);
   });
 
-  it("passes custom merge message through for merge strategy", async () => {
+  it("returns helper-friendly merge JSON for merge strategy", async () => {
     const feature = "merge-custom-message-feature";
     const { hooks, toolContext, worktreePath } = await createSingleTaskWorktree(
       testRoot,
@@ -1937,7 +1937,33 @@ Do it
       toolContext
     );
 
-    expect(mergeRaw).toContain("merged successfully using merge strategy");
+    const mergeResult = JSON.parse(mergeRaw as string) as {
+      success: boolean;
+      merged: boolean;
+      strategy: string;
+      sha?: string;
+      filesChanged: string[];
+      conflicts: string[];
+      conflictState: string;
+      cleanup: { worktreeRemoved: boolean; branchDeleted: boolean; pruned: boolean };
+      message: string;
+    };
+
+    expect(mergeResult).toMatchObject({
+      success: true,
+      merged: true,
+      strategy: 'merge',
+      filesChanged: ['task-note.txt'],
+      conflicts: [],
+      conflictState: 'none',
+      cleanup: {
+        worktreeRemoved: false,
+        branchDeleted: false,
+        pruned: false,
+      },
+      message: 'Task "01-first-task" merged successfully using merge strategy.',
+    });
+    expect(typeof mergeResult.sha).toBe('string');
     expect(readHeadBody(testRoot)).toBe(customMessage);
   });
 
@@ -1980,8 +2006,81 @@ Do it
       toolContext
     );
 
-    expect(mergeRaw).toContain("Merge failed:");
-    expect(mergeRaw).toContain("Custom merge message is not supported for rebase strategy");
+    const mergeResult = JSON.parse(mergeRaw as string) as {
+      success: boolean;
+      merged: boolean;
+      strategy: string;
+      filesChanged: string[];
+      conflicts: string[];
+      conflictState: string;
+      cleanup: { worktreeRemoved: boolean; branchDeleted: boolean; pruned: boolean };
+      error?: string;
+      message: string;
+    };
+
+    expect(mergeResult).toEqual({
+      success: false,
+      merged: false,
+      strategy: 'rebase',
+      filesChanged: [],
+      conflicts: [],
+      conflictState: 'none',
+      cleanup: {
+        worktreeRemoved: false,
+        branchDeleted: false,
+        pruned: false,
+      },
+      error: 'Custom merge message is not supported for rebase strategy',
+      message: 'Merge failed: Custom merge message is not supported for rebase strategy',
+    });
+  });
+
+  it("returns helper-friendly merge JSON when task is not completed", async () => {
+    const feature = "merge-incomplete-task-feature";
+    const { hooks, toolContext } = await createSingleTaskWorktree(
+      testRoot,
+      "sess_merge_incomplete_task",
+      feature,
+      "Merge Incomplete Task Feature",
+      "Yes, this test validates the early hive_merge JSON contract for incomplete tasks.",
+    );
+
+    const mergeRaw = await hooks.tool!.hive_merge.execute(
+      {
+        feature,
+        task: FIRST_TASK,
+        strategy: "merge",
+      },
+      toolContext
+    );
+
+    const mergeResult = JSON.parse(mergeRaw as string) as {
+      success: boolean;
+      merged: boolean;
+      strategy: string;
+      filesChanged: string[];
+      conflicts: string[];
+      conflictState: string;
+      cleanup: { worktreeRemoved: boolean; branchDeleted: boolean; pruned: boolean };
+      error?: string;
+      message: string;
+    };
+
+    expect(mergeResult).toEqual({
+      success: false,
+      merged: false,
+      strategy: 'merge',
+      filesChanged: [],
+      conflicts: [],
+      conflictState: 'none',
+      cleanup: {
+        worktreeRemoved: false,
+        branchDeleted: false,
+        pruned: false,
+      },
+      error: 'Task must be completed before merging. Use hive_worktree_commit first.',
+      message: 'Merge failed: Task must be completed before merging. Use hive_worktree_commit first.',
+    });
   });
 
   it("auto-loads parallel exploration for planner agents by default", async () => {

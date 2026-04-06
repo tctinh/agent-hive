@@ -12,6 +12,7 @@ import { ARCHITECT_BEE_PROMPT } from './agents/architect.js';
 import { SWARM_BEE_PROMPT } from './agents/swarm.js';
 import { SCOUT_BEE_PROMPT } from './agents/scout.js';
 import { FORAGER_BEE_PROMPT } from './agents/forager.js';
+import { HIVE_HELPER_PROMPT } from './agents/hive-helper.js';
 import { HYGIENIC_BEE_PROMPT } from './agents/hygienic.js';
 import { buildCustomSubagents } from './agents/custom-agents.js';
 import { createBuiltinMcps } from './mcp/index.js';
@@ -335,6 +336,8 @@ const plugin: Plugin = async (ctx) => {
     if (!session.directivePrompt) return null;
     const role = session.agent === 'scout-researcher' || session.baseAgent === 'scout-researcher'
       ? 'Scout'
+      : session.agent === 'hive-helper' || session.baseAgent === 'hive-helper'
+        ? 'Hive Helper'
       : session.agent === 'hygienic-reviewer' || session.baseAgent === 'hygienic-reviewer'
         ? 'Hygienic'
         : session.agent === 'architect-planner' || session.baseAgent === 'architect-planner'
@@ -1640,26 +1643,47 @@ Expand your Discovery section and try again.`;
           task: tool.schema.string().describe('Task folder name to merge'),
           strategy: tool.schema.enum(['merge', 'squash', 'rebase']).optional().describe('Merge strategy (default: merge)'),
           message: tool.schema.string().optional().describe('Optional merge message for merge/squash. Empty uses default.'),
+          preserveConflicts: tool.schema.boolean().optional().describe('Keep merge conflict state intact instead of auto-aborting (default: false).'),
+          cleanup: tool.schema.enum(['none', 'worktree', 'worktree+branch']).optional().describe('Cleanup mode after a successful merge (default: none).'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
         },
-        async execute({ task, strategy = 'merge', message, feature: explicitFeature }) {
+        async execute({ task, strategy = 'merge', message, preserveConflicts, cleanup, feature: explicitFeature }) {
+          const failure = (error: string) => respond({
+            success: false,
+            merged: false,
+            strategy,
+            filesChanged: [],
+            conflicts: [],
+            conflictState: 'none',
+            cleanup: {
+              worktreeRemoved: false,
+              branchDeleted: false,
+              pruned: false,
+            },
+            error,
+            message: `Merge failed: ${error}`,
+          });
+
           const feature = resolveFeature(explicitFeature);
-          if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
+          if (!feature) return failure('No feature specified. Create a feature or provide feature param.');
 
           const taskInfo = taskService.get(feature, task);
-          if (!taskInfo) return `Error: Task "${task}" not found`;
-          if (taskInfo.status !== 'done') return "Error: Task must be completed before merging. Use hive_worktree_commit first.";
+          if (!taskInfo) return failure(`Task "${task}" not found`);
+          if (taskInfo.status !== 'done') return failure('Task must be completed before merging. Use hive_worktree_commit first.');
 
-          const result = await worktreeService.merge(feature, task, strategy, message);
+          const result = await worktreeService.merge(feature, task, strategy, message, {
+            preserveConflicts,
+            cleanup,
+          });
 
-          if (!result.success) {
-            if (result.conflicts && result.conflicts.length > 0) {
-              return `Merge failed with conflicts in:\n${result.conflicts.map(f => `- ${f}`).join('\n')}\n\nResolve conflicts manually or try a different strategy.`;
-            }
-            return `Merge failed: ${result.error}`;
-          }
+          const responseMessage = result.success
+            ? `Task "${task}" merged successfully using ${strategy} strategy.`
+            : `Merge failed: ${result.error}`;
 
-          return `Task "${task}" merged successfully using ${strategy} strategy.\nCommit: ${result.sha}\nFiles changed: ${result.filesChanged?.length || 0}`;
+          return respond({
+            ...result,
+            message: responseMessage,
+          });
         },
       }),
 
@@ -2051,6 +2075,22 @@ Expand your Discovery section and try again.`;
         },
       };
 
+      const hiveHelperUserConfig = configService.getAgentConfig('hive-helper');
+      const hiveHelperConfig = {
+        model: hiveHelperUserConfig.model,
+        variant: hiveHelperUserConfig.variant,
+        temperature: hiveHelperUserConfig.temperature ?? 0.3,
+        mode: 'subagent' as const,
+        description: 'Hive Helper - Runtime-only merge recovery helper. Merges branches and resolves preserved conflicts in isolation.',
+        prompt: HIVE_HELPER_PROMPT,
+        tools: agentTools(['hive_merge', 'hive_status', 'hive_context_write', 'hive_skill']),
+        permission: {
+          task: 'deny',
+          delegate: 'deny',
+          skill: 'allow',
+        },
+      };
+
       const hygienicUserConfig = configService.getAgentConfig('hygienic-reviewer');
       const hygienicAutoLoadedSkills = await buildAutoLoadedSkillsContent('hygienic-reviewer', configService, directory);
       const hygienicConfig = {
@@ -2075,6 +2115,7 @@ Expand your Discovery section and try again.`;
         'swarm-orchestrator': swarmConfig,
         'scout-researcher': scoutConfig,
         'forager-worker': foragerConfig,
+        'hive-helper': hiveHelperConfig,
         'hygienic-reviewer': hygienicConfig,
       };
 
@@ -2112,12 +2153,14 @@ Expand your Discovery section and try again.`;
         allAgents['hive-master'] = builtInAgentConfigs['hive-master'];
         allAgents['scout-researcher'] = builtInAgentConfigs['scout-researcher'];
         allAgents['forager-worker'] = builtInAgentConfigs['forager-worker'];
+        allAgents['hive-helper'] = builtInAgentConfigs['hive-helper'];
         allAgents['hygienic-reviewer'] = builtInAgentConfigs['hygienic-reviewer'];
       } else {
         allAgents['architect-planner'] = builtInAgentConfigs['architect-planner'];
         allAgents['swarm-orchestrator'] = builtInAgentConfigs['swarm-orchestrator'];
         allAgents['scout-researcher'] = builtInAgentConfigs['scout-researcher'];
         allAgents['forager-worker'] = builtInAgentConfigs['forager-worker'];
+        allAgents['hive-helper'] = builtInAgentConfigs['hive-helper'];
         allAgents['hygienic-reviewer'] = builtInAgentConfigs['hygienic-reviewer'];
       }
 
@@ -2142,6 +2185,7 @@ Expand your Discovery section and try again.`;
         delete (configAgent as Record<string, unknown>)['swarm-orchestrator'];
         delete (configAgent as Record<string, unknown>)['scout-researcher'];
         delete (configAgent as Record<string, unknown>)['forager-worker'];
+        delete (configAgent as Record<string, unknown>)['hive-helper'];
         delete (configAgent as Record<string, unknown>)['hygienic-reviewer'];
         Object.assign(configAgent, allAgents);
       }

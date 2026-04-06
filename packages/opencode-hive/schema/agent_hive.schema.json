@@ -96,6 +96,10 @@
           "$ref": "#/$defs/agentConfig",
           "description": "Forager Worker"
         },
+        "hive-helper": {
+          "$ref": "#/$defs/agentConfig",
+          "description": "Hive Helper"
+        },
         "hygienic-reviewer": {
           "$ref": "#/$defs/agentConfig",
           "description": "Hygienic Reviewer"
@@ -113,6 +117,7 @@
             "swarm-orchestrator",
             "scout-researcher",
             "forager-worker",
+            "hive-helper",
             "hygienic-reviewer",
             "hive",
             "architect",

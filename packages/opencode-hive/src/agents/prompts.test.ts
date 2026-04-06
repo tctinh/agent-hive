@@ -6,6 +6,7 @@ import { ARCHITECT_BEE_PROMPT } from './architect';
 import { SWARM_BEE_PROMPT } from './swarm';
 import { FORAGER_BEE_PROMPT } from './forager';
 import { SCOUT_BEE_PROMPT } from './scout';
+import { HIVE_HELPER_PROMPT } from './hive-helper';
 import { HYGIENIC_BEE_PROMPT } from './hygienic';
 
 describe('Orchestrator synthesis-before-delegation', () => {
@@ -166,6 +167,14 @@ describe('Hive (Hybrid) prompt', () => {
 
     it('tells hybrid planners to split broad research earlier', () => {
       expect(QUEEN_BEE_PROMPT).toContain('split broad research earlier');
+    });
+
+    it('delegates batch merges to hive-helper and keeps post-batch verification with Hive', () => {
+      expect(QUEEN_BEE_PROMPT).toContain("task({ subagent_type: 'hive-helper'");
+      expect(QUEEN_BEE_PROMPT).toContain('delegate the merge batch');
+      expect(QUEEN_BEE_PROMPT).toContain('After the helper returns');
+      expect(QUEEN_BEE_PROMPT).toContain('bun run build');
+      expect(QUEEN_BEE_PROMPT).toContain('bun run test');
     });
   });
 
@@ -328,6 +337,14 @@ describe('Swarm (Orchestrator) prompt', () => {
     it('tells orchestrators to split broad research earlier', () => {
       expect(SWARM_BEE_PROMPT).toContain('split broad research earlier');
     });
+
+    it('delegates batch merges to hive-helper and keeps post-batch verification with Swarm', () => {
+      expect(SWARM_BEE_PROMPT).toContain("task({ subagent_type: 'hive-helper'");
+      expect(SWARM_BEE_PROMPT).toContain('delegate the merge batch');
+      expect(SWARM_BEE_PROMPT).toContain('After the helper returns');
+      expect(SWARM_BEE_PROMPT).toContain('bun run build');
+      expect(SWARM_BEE_PROMPT).toContain('bun run test');
+    });
   });
 
   it('does NOT contain oracle reference', () => {
@@ -404,6 +421,24 @@ describe('Forager (Worker/Coder) prompt', () => {
   });
 });
 
+describe('Hive Helper prompt', () => {
+  it('forbids planning and orchestration', () => {
+    expect(HIVE_HELPER_PROMPT).toContain('never plans or orchestrates');
+  });
+
+  it('uses hive_merge first and resolves preserved conflicts locally', () => {
+    expect(HIVE_HELPER_PROMPT).toContain('hive_merge');
+    expect(HIVE_HELPER_PROMPT).toContain("conflictState: 'preserved'");
+    expect(HIVE_HELPER_PROMPT).toContain('resolves locally');
+    expect(HIVE_HELPER_PROMPT).toContain('continues the merge batch');
+  });
+
+  it('requires concise summary-only output', () => {
+    expect(HIVE_HELPER_PROMPT).toContain('concise');
+    expect(HIVE_HELPER_PROMPT).toContain('merged/conflict/blocker summary');
+  });
+});
+
 describe('Scout (Explorer/Researcher) prompt', () => {
   it('has clean persistence example', () => {
     expect(SCOUT_BEE_PROMPT).not.toContain('Worker Prompt Builder');
@@ -463,6 +498,10 @@ describe('Hygienic (Consultant/Reviewer) prompt', () => {
 describe('README.md documentation', () => {
   const README_PATH = path.resolve(import.meta.dir, '..', '..', 'README.md');
   const readmeContent = readFileSync(README_PATH, 'utf-8');
+  const ROOT_README_PATH = path.resolve(import.meta.dir, '..', '..', '..', '..', 'README.md');
+  const rootReadmeContent = readFileSync(ROOT_README_PATH, 'utf-8');
+  const HIVE_TOOLS_PATH = path.resolve(import.meta.dir, '..', '..', 'docs', 'HIVE-TOOLS.md');
+  const hiveToolsContent = readFileSync(HIVE_TOOLS_PATH, 'utf-8');
 
   describe('delegation planning alignment', () => {
     it('contains the heading "### Planning-mode delegation"', () => {
@@ -481,6 +520,42 @@ describe('README.md documentation', () => {
     it('contains the Canonical Delegation Threshold content', () => {
       expect(readmeContent).toContain('cannot name the file path upfront');
       expect(readmeContent).toContain('2+ files');
+    });
+  });
+
+  describe('hive-helper runtime docs alignment', () => {
+    it('documents hive-helper in runtime-facing recovery docs', () => {
+      expect(readmeContent).toContain('`hive-helper`');
+      expect(readmeContent).toContain('runtime-only');
+      expect(readmeContent).toContain('merge recovery');
+    });
+
+    it('documents hive-helper in the built-in agent defaults table', () => {
+      expect(readmeContent).toContain('| `hive-helper` | (none) |');
+    });
+
+    it('keeps hive-helper out of custom derived subagent docs', () => {
+      expect(readmeContent).toContain('does not appear in `.github/agents/`');
+      expect(readmeContent).toContain('does not appear in `packages/vscode-hive/src/generators/`');
+      expect(readmeContent).toContain('### Custom Derived Subagents');
+      expect(readmeContent).not.toContain('`baseAgent`: one of `forager-worker`, `hygienic-reviewer`, or `hive-helper`');
+    });
+
+    it('documents hive-helper in the top-level runtime roster and recovery notes', () => {
+      expect(rootReadmeContent).toContain('**Hive Helper**');
+      expect(rootReadmeContent).toContain('Runtime-only merge recovery helper');
+      expect(rootReadmeContent).toContain('does not appear in generated `.github/agents/` docs');
+      expect(rootReadmeContent).toContain('does not appear in `packages/vscode-hive/src/generators/`');
+    });
+
+    it('documents the expanded hive_merge contract', () => {
+      expect(hiveToolsContent).toContain('preserveConflicts');
+      expect(hiveToolsContent).toContain('cleanup');
+      expect(hiveToolsContent).toContain('conflictState');
+      expect(hiveToolsContent).toContain('worktreeRemoved');
+      expect(hiveToolsContent).toContain('branchDeleted');
+      expect(hiveToolsContent).toContain('pruned');
+      expect(hiveToolsContent).toContain('message');
     });
   });
 });

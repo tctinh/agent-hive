@@ -209,6 +209,7 @@ export const BUILT_IN_AGENT_NAMES = [
   'swarm-orchestrator',
   'scout-researcher',
   'forager-worker',
+  'hive-helper',
   'hygienic-reviewer',
 ] as const;
 
@@ -271,6 +272,8 @@ export interface HiveConfig {
     'scout-researcher'?: AgentModelConfig;
     /** Forager Worker */
     'forager-worker'?: AgentModelConfig;
+    /** Hive Helper */
+    'hive-helper'?: AgentModelConfig;
     /** Hygienic Reviewer */
     'hygienic-reviewer'?: AgentModelConfig;
   };
@@ -292,6 +295,7 @@ export const DEFAULT_AGENT_MODELS = {
   'swarm-orchestrator': 'github-copilot/claude-opus-4.5',
   'scout-researcher': 'zai-coding-plan/glm-4.7',
   'forager-worker': 'github-copilot/gpt-5.2-codex',
+  'hive-helper': 'github-copilot/gpt-5.2-codex',
   'hygienic-reviewer': 'github-copilot/gpt-5.2-codex',
 } as const;
 
@@ -351,6 +355,11 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
       model: DEFAULT_AGENT_MODELS['forager-worker'],
       temperature: 0.3,
       autoLoadSkills: ['test-driven-development', 'verification-before-completion'],
+    },
+    'hive-helper': {
+      model: DEFAULT_AGENT_MODELS['hive-helper'],
+      temperature: 0.3,
+      autoLoadSkills: [],
     },
     'hygienic-reviewer': {
       model: DEFAULT_AGENT_MODELS['hygienic-reviewer'],

@@ -63,13 +63,32 @@
 ### Merge (1 tool)
 | Tool | Purpose |
 |------|---------|
-| `hive_merge` | Merge task branch (strategies: merge/squash/rebase); optional `message` for merge/squash |
+| `hive_merge` | Merge task branch (strategies: merge/squash/rebase); optional helper-friendly conflict preservation, cleanup, and `message` for merge/squash |
 
 #### hive_merge input notes
 
+- `preserveConflicts?: boolean` defaults to `false`; when `true`, merge conflicts stay in place for an isolated helper session instead of being auto-aborted.
+- `cleanup?: 'none' | 'worktree' | 'worktree+branch'` defaults to `'none'`; successful merges can keep the worktree, remove only the worktree, or remove the worktree and delete the task branch.
 - `message` is optional and applies to `merge`/`squash` strategies.
 - Do not provide `message` with `strategy: 'rebase'`.
 - Omit `message` (or pass `''`) to use default merge/squash message behavior.
+
+#### hive_merge output
+
+- Returns JSON with the shared merge result envelope plus a concise `message` string.
+- Shared result fields:
+  - `success`
+  - `merged`
+  - `strategy`
+  - `sha?`
+  - `filesChanged`
+  - `conflicts`
+  - `conflictState` (`none`, `aborted`, or `preserved`)
+  - `cleanup.worktreeRemoved`
+  - `cleanup.branchDeleted`
+  - `cleanup.pruned`
+  - `error?`
+- `conflictState: 'preserved'` means the caller requested `preserveConflicts: true` and must resolve the merge locally before cleanup can finish.
 
 ### Context (1 tool)
 | Tool | Purpose |

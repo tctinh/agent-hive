@@ -361,6 +361,7 @@ You: Clear visibility into everything ✅
 | **Swarm (Orchestrator)** 🐝 | Orchestrates execution, delegates to workers |
 | **Scout (Explorer/Researcher/Retrieval)** 🔍 | Explores codebase + external docs/data |
 | **Forager (Worker/Coder)** 🍯 | Executes tasks in isolated worktrees |
+| **Hive Helper** 🛠️ | Runtime-only merge recovery helper for isolated branch reconciliation |
 | **Hygienic (Consultant/Reviewer/Debugger)** 🧹 | Reviews plan quality, OKAY/REJECT verdict |
 
 ### Compaction-safe recovery path
@@ -383,6 +384,7 @@ This recovery model has a strict ownership boundary:
 Some notes:
 
 - Custom subagents derived from `forager-worker` are treated as task workers for compaction recovery.
+- `hive-helper` is treated as a runtime-only subagent for merge recovery; it does not appear in generated `.github/agents/` docs and does not appear in `packages/vscode-hive/src/generators/` in v1.
 - Custom subagents derived from `hygienic-reviewer` are treated as subagents.
 - One-recovery-attempt escalation means a primary or subagent session gets one normal directive replay cycle after compaction, then must escalate back to the parent/orchestrator instead of looping through repeated compact-and-replay retries.
 - The recovery prompt avoids telling agents to call broad status tools or re-scan the repository because that tends to recreate drift after compaction.
@@ -565,7 +567,7 @@ The extension watches your `.hive/` directory and displays the current state. Al
 
 | Package | Platform | Description |
 |---------|----------|-------------|
-| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 6 specialized bee agents, 15 tools, 11 skills |
+| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 7 specialized bee agents, 15 tools, 11 skills |
 | **[vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive)** | VS Code | Visual management — review, comment, approve |
 
 **Agent Selection:** Use `hive`, `architect`, or `swarm` as your primary agent. Use `@scout`, `@forager`, or `@hygienic` to mention subagents directly.

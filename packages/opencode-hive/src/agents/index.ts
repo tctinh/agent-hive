@@ -16,6 +16,7 @@ export { architectBeeAgent, ARCHITECT_BEE_PROMPT } from './architect';
 export { swarmBeeAgent, SWARM_BEE_PROMPT } from './swarm';
 export { scoutBeeAgent, SCOUT_BEE_PROMPT } from './scout';
 export { foragerBeeAgent, FORAGER_BEE_PROMPT } from './forager';
+export { hiveHelperAgent, HIVE_HELPER_PROMPT } from './hive-helper';
 export { hygienicBeeAgent, HYGIENIC_BEE_PROMPT } from './hygienic';
 
 
@@ -55,6 +56,11 @@ export const hiveAgents = {
   forager: {
     name: 'Forager (Worker/Coder)',
     description: 'Executes tasks directly in isolated worktrees. Never delegates.',
+    mode: 'subagent' as const,
+  },
+  'hive-helper': {
+    name: 'Hive Helper',
+    description: 'Runtime-only merge recovery helper. Merges branches and resolves preserved conflicts in isolation.',
     mode: 'subagent' as const,
   },
   hygienic: {
