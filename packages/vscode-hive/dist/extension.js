@@ -1607,6 +1607,7 @@ var BUILT_IN_AGENT_NAMES = [
   "swarm-orchestrator",
   "scout-researcher",
   "forager-worker",
+  "hive-helper",
   "hygienic-reviewer"
 ];
 var CUSTOM_AGENT_RESERVED_NAMES = [
@@ -1628,6 +1629,7 @@ var DEFAULT_AGENT_MODELS = {
   "swarm-orchestrator": "github-copilot/claude-opus-4.5",
   "scout-researcher": "zai-coding-plan/glm-4.7",
   "forager-worker": "github-copilot/gpt-5.2-codex",
+  "hive-helper": "github-copilot/gpt-5.2-codex",
   "hygienic-reviewer": "github-copilot/gpt-5.2-codex"
 };
 var DEFAULT_HIVE_CONFIG = {
@@ -1686,6 +1688,11 @@ var DEFAULT_HIVE_CONFIG = {
       model: DEFAULT_AGENT_MODELS["forager-worker"],
       temperature: 0.3,
       autoLoadSkills: ["test-driven-development", "verification-before-completion"]
+    },
+    "hive-helper": {
+      model: DEFAULT_AGENT_MODELS["hive-helper"],
+      temperature: 0.3,
+      autoLoadSkills: []
     },
     "hygienic-reviewer": {
       model: DEFAULT_AGENT_MODELS["hygienic-reviewer"],
@@ -7130,21 +7137,29 @@ var WorktreeService = class {
     const worktreePath = this.getWorktreePath(feature, step);
     const branchName = this.getBranchName(feature, step);
     const git = this.getGit();
+    let worktreeRemoved = false;
+    let branchDeleted = false;
+    let pruned = false;
     try {
       await git.raw(["worktree", "remove", worktreePath, "--force"]);
+      worktreeRemoved = true;
     } catch {
       await fs7.rm(worktreePath, { recursive: true, force: true });
+      worktreeRemoved = true;
     }
     try {
       await git.raw(["worktree", "prune"]);
+      pruned = true;
     } catch {
     }
     if (deleteBranch) {
       try {
         await git.deleteLocalBranch(branchName, true);
+        branchDeleted = true;
       } catch {
       }
     }
+    return { worktreeRemoved, branchDeleted, pruned };
   }
   async list(feature) {
     const worktreesDir = this.getWorktreesDir();
@@ -7280,34 +7295,61 @@ var WorktreeService = class {
       };
     }
   }
-  async merge(feature, step, strategy = "merge", message) {
+  async merge(feature, step, strategy = "merge", message, options = {}) {
     const branchName = this.getBranchName(feature, step);
     const git = this.getGit();
+    const cleanupMode = options.cleanup ?? "none";
+    const preserveConflicts = options.preserveConflicts ?? false;
+    const emptyCleanup = {
+      worktreeRemoved: false,
+      branchDeleted: false,
+      pruned: false
+    };
     if (strategy === "rebase" && message) {
       return {
         success: false,
         merged: false,
+        strategy,
+        filesChanged: [],
+        conflicts: [],
+        conflictState: "none",
+        cleanup: emptyCleanup,
         error: "Custom merge message is not supported for rebase strategy"
       };
     }
+    let filesChanged = [];
     try {
       const branches = await git.branch();
       if (!branches.all.includes(branchName)) {
-        return { success: false, merged: false, error: `Branch ${branchName} not found` };
+        return {
+          success: false,
+          merged: false,
+          strategy,
+          filesChanged: [],
+          conflicts: [],
+          conflictState: "none",
+          cleanup: emptyCleanup,
+          error: `Branch ${branchName} not found`
+        };
       }
       const currentBranch = branches.current;
       const diffStat = await git.diff([`${currentBranch}...${branchName}`, "--stat"]);
-      const filesChanged = diffStat.split(`
+      filesChanged = diffStat.split(`
 `).filter((l) => l.trim() && l.includes("|")).map((l) => l.split("|")[0].trim());
       if (strategy === "squash") {
         await git.raw(["merge", "--squash", branchName]);
         const squashMessage = message || `hive: merge ${step} (squashed)`;
         const result = await git.commit(squashMessage);
+        const cleanup = cleanupMode === "none" ? emptyCleanup : await this.remove(feature, step, cleanupMode === "worktree+branch");
         return {
           success: true,
           merged: true,
+          strategy,
           sha: result.commit,
-          filesChanged
+          filesChanged,
+          conflicts: [],
+          conflictState: "none",
+          cleanup
         };
       } else if (strategy === "rebase") {
         const commits = await git.log([`${currentBranch}..${branchName}`]);
@@ -7316,43 +7358,65 @@ var WorktreeService = class {
           await git.raw(["cherry-pick", commit.hash]);
         }
         const head = (await git.revparse(["HEAD"])).trim();
+        const cleanup = cleanupMode === "none" ? emptyCleanup : await this.remove(feature, step, cleanupMode === "worktree+branch");
         return {
           success: true,
           merged: true,
+          strategy,
           sha: head,
-          filesChanged
+          filesChanged,
+          conflicts: [],
+          conflictState: "none",
+          cleanup
         };
       } else {
         const mergeMessage = message || `hive: merge ${step}`;
         const result = await git.merge([branchName, "--no-ff", "-m", mergeMessage]);
         const head = (await git.revparse(["HEAD"])).trim();
+        const cleanup = cleanupMode === "none" ? emptyCleanup : await this.remove(feature, step, cleanupMode === "worktree+branch");
         return {
           success: true,
           merged: !result.failed,
+          strategy,
           sha: head,
           filesChanged,
-          conflicts: result.conflicts?.map((c) => c.file || String(c)) || []
+          conflicts: result.conflicts?.map((c) => c.file || String(c)) || [],
+          conflictState: "none",
+          cleanup
         };
       }
     } catch (error) {
       const err = error;
       if (err.message?.includes("CONFLICT") || err.message?.includes("conflict")) {
-        await git.raw(["merge", "--abort"]).catch(() => {
-        });
-        await git.raw(["rebase", "--abort"]).catch(() => {
-        });
-        await git.raw(["cherry-pick", "--abort"]).catch(() => {
-        });
+        const conflicts2 = await this.getActiveConflictFiles(git, err.message || "");
+        const conflictState = preserveConflicts ? "preserved" : "aborted";
+        if (!preserveConflicts) {
+          await git.raw(["merge", "--abort"]).catch(() => {
+          });
+          await git.raw(["rebase", "--abort"]).catch(() => {
+          });
+          await git.raw(["cherry-pick", "--abort"]).catch(() => {
+          });
+        }
         return {
           success: false,
           merged: false,
-          error: "Merge conflicts detected",
-          conflicts: this.parseConflictsFromError(err.message || "")
+          strategy,
+          filesChanged,
+          conflicts: conflicts2,
+          conflictState,
+          cleanup: emptyCleanup,
+          error: "Merge conflicts detected"
         };
       }
       return {
         success: false,
         merged: false,
+        strategy,
+        filesChanged,
+        conflicts: [],
+        conflictState: "none",
+        cleanup: emptyCleanup,
         error: err.message || "Merge failed"
       };
     }
@@ -7379,6 +7443,16 @@ var WorktreeService = class {
       }
     }
     return conflicts2;
+  }
+  async getActiveConflictFiles(git, errorMessage) {
+    try {
+      const status = await git.status();
+      if (status.conflicted.length > 0) {
+        return [...new Set(status.conflicted)];
+      }
+    } catch {
+    }
+    return this.parseConflictsFromError(errorMessage);
   }
 };
 var RESERVED_OVERVIEW_CONTEXT = "overview";
@@ -9263,16 +9337,27 @@ function getMergeTools(workspaceRoot) {
             enum: ["merge", "squash", "rebase"],
             description: "Merge strategy (default: merge)"
           },
-          message: { type: "string", description: "Optional merge commit message for merge/squash only. Empty uses default." }
+          message: { type: "string", description: "Optional merge commit message for merge/squash only. Empty uses default." },
+          preserveConflicts: {
+            type: "boolean",
+            description: "Keep merge conflict state intact instead of auto-aborting (default: false)."
+          },
+          cleanup: {
+            type: "string",
+            enum: ["none", "worktree", "worktree+branch"],
+            description: "Cleanup mode after a successful merge (default: none)."
+          }
         },
         required: ["feature", "task"]
       },
       invoke: async (input) => {
-        const { feature, task, strategy = "merge", message } = input;
-        const result = await worktreeService.merge(feature, task, strategy, message);
+        const { feature, task, strategy = "merge", message, preserveConflicts, cleanup } = input;
+        const result = await worktreeService.merge(feature, task, strategy, message, {
+          preserveConflicts,
+          cleanup
+        });
         return JSON.stringify({
-          success: result.success,
-          strategy,
+          ...result,
           message: result.success ? "Merge completed." : result.error || "Merge failed."
         });
       }

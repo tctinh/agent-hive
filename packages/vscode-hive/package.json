@@ -364,7 +364,7 @@
       {
         "name": "hive_merge",
         "displayName": "Merge Task Branch",
-        "modelDescription": "Merge a completed task branch into current branch. Supports merge, squash, or rebase strategies. Use after hive_exec_complete to integrate changes.",
+        "modelDescription": "Merge a completed task branch into current branch. Supports merge, squash, or rebase strategies. Use after hive_worktree_commit to integrate changes.",
         "canBeReferencedInPrompt": true,
         "toolReferenceName": "hiveMerge",
         "inputSchema": {

@@ -362,7 +362,7 @@ Define plugin-only custom subagents with `customAgents`. Freshly initialized `ag
 - `baseAgent`: one of `forager-worker` or `hygienic-reviewer`
 - `description`: delegation guidance injected into primary planner/orchestrator prompts
 
-`hive-helper` is not a custom base agent. In v1 it stays runtime-only for isolated merge recovery and does not appear in `.github/agents/` or does not appear in `packages/vscode-hive/src/generators/`.
+`hive-helper` is not a custom base agent. In v1 it stays runtime-only for isolated merge recovery and does not appear in `.github/agents/` and does not appear in `packages/vscode-hive/src/generators/`.
 
 Published example (validated by `src/e2e/custom-agent-docs-example.test.ts`):
 
