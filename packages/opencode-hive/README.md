@@ -34,7 +34,7 @@ This enables tools like `grep_app_searchGitHub`, `context7_query-docs`, `websear
 
 1. **Create Feature** — `hive_feature_create("dark-mode")`
 2. **Write Plan** — AI generates structured plan
-3. **Review** — You review in VS Code, add comments
+3. **Review** — Optional `vscode-hive` companion for overview/plan review and comments
 4. **Approve** — `hive_plan_approve()`
 5. **Execute** — Tasks run in isolated git worktrees
 6. **Ship** — Clean commits, full audit trail
@@ -45,7 +45,7 @@ During planning, "don't execute" means "don't implement" (no code edits, no work
 
 When delegation is warranted, synthesize the task before handing it off: name the file paths or search target, state the expected result, and say what done looks like. Workers do not inherit planner context.
 
-For execution work, treat worker output as evidence to inspect, not proof to trust blindly. Read changed files yourself and run the shared verification commands on the main branch before claiming the batch is complete.
+For execution work, treat worker output as evidence to inspect, not proof to trust blindly. OpenCode is the supported execution harness in `1.4.0`; if you use `vscode-hive`, treat it as a review/sidebar companion. Read changed files yourself and run the shared verification commands on the main branch before claiming the batch is complete.
 
 \`hive_network_query\` is an optional lookup, not a default step. There is no startup lookup: first orient on the live request and live repo state. planning, orchestration, and review roles get network access first. live-file verification still required even when network results look relevant.
 
@@ -441,7 +441,7 @@ Override models for specific agents:
 
 ## Pair with VS Code
 
-For the full experience, install [vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive) to review plans inline with comments.
+For the full OpenCode-first workflow, install [vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive) as an optional review/sidebar companion for inline comments and approvals.
 
 ## License
 
