@@ -24,20 +24,33 @@ export function getMergeTools(workspaceRoot: string): ToolRegistration[] {
             description: 'Merge strategy (default: merge)',
           },
           message: { type: 'string', description: 'Optional merge commit message for merge/squash only. Empty uses default.' },
+          preserveConflicts: {
+            type: 'boolean',
+            description: 'Keep merge conflict state intact instead of auto-aborting (default: false).',
+          },
+          cleanup: {
+            type: 'string',
+            enum: ['none', 'worktree', 'worktree+branch'],
+            description: 'Cleanup mode after a successful merge (default: none).',
+          },
         },
         required: ['feature', 'task'],
       },
       invoke: async (input) => {
-        const { feature, task, strategy = 'merge', message } = input as {
+        const { feature, task, strategy = 'merge', message, preserveConflicts, cleanup } = input as {
           feature: string;
           task: string;
           strategy?: string;
           message?: string;
+          preserveConflicts?: boolean;
+          cleanup?: 'none' | 'worktree' | 'worktree+branch';
         };
-        const result = await worktreeService.merge(feature, task, strategy as any, message);
+        const result = await worktreeService.merge(feature, task, strategy as any, message, {
+          preserveConflicts,
+          cleanup,
+        });
         return JSON.stringify({
-          success: result.success,
-          strategy,
+          ...result,
           message: result.success
             ? 'Merge completed.'
             : result.error || 'Merge failed.',

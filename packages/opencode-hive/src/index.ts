@@ -1640,9 +1640,11 @@ Expand your Discovery section and try again.`;
           task: tool.schema.string().describe('Task folder name to merge'),
           strategy: tool.schema.enum(['merge', 'squash', 'rebase']).optional().describe('Merge strategy (default: merge)'),
           message: tool.schema.string().optional().describe('Optional merge message for merge/squash. Empty uses default.'),
+          preserveConflicts: tool.schema.boolean().optional().describe('Keep merge conflict state intact instead of auto-aborting (default: false).'),
+          cleanup: tool.schema.enum(['none', 'worktree', 'worktree+branch']).optional().describe('Cleanup mode after a successful merge (default: none).'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to active)'),
         },
-        async execute({ task, strategy = 'merge', message, feature: explicitFeature }) {
+        async execute({ task, strategy = 'merge', message, preserveConflicts, cleanup, feature: explicitFeature }) {
           const feature = resolveFeature(explicitFeature);
           if (!feature) return "Error: No feature specified. Create a feature or provide feature param.";
 
@@ -1650,16 +1652,19 @@ Expand your Discovery section and try again.`;
           if (!taskInfo) return `Error: Task "${task}" not found`;
           if (taskInfo.status !== 'done') return "Error: Task must be completed before merging. Use hive_worktree_commit first.";
 
-          const result = await worktreeService.merge(feature, task, strategy, message);
+          const result = await worktreeService.merge(feature, task, strategy, message, {
+            preserveConflicts,
+            cleanup,
+          });
 
-          if (!result.success) {
-            if (result.conflicts && result.conflicts.length > 0) {
-              return `Merge failed with conflicts in:\n${result.conflicts.map(f => `- ${f}`).join('\n')}\n\nResolve conflicts manually or try a different strategy.`;
-            }
-            return `Merge failed: ${result.error}`;
-          }
+          const responseMessage = result.success
+            ? `Task "${task}" merged successfully using ${strategy} strategy.`
+            : `Merge failed: ${result.error}`;
 
-          return `Task "${task}" merged successfully using ${strategy} strategy.\nCommit: ${result.sha}\nFiles changed: ${result.filesChanged?.length || 0}`;
+          return respond({
+            ...result,
+            message: responseMessage,
+          });
         },
       }),
 

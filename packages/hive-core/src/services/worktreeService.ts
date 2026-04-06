@@ -31,12 +31,24 @@ export interface CommitResult {
   message?: string;
 }
 
+export interface MergeOptions {
+  preserveConflicts?: boolean;
+  cleanup?: 'none' | 'worktree' | 'worktree+branch';
+}
+
 export interface MergeResult {
   success: boolean;
   merged: boolean;
+  strategy: 'merge' | 'squash' | 'rebase';
   sha?: string;
-  filesChanged?: string[];
-  conflicts?: string[];
+  filesChanged: string[];
+  conflicts: string[];
+  conflictState: 'none' | 'aborted' | 'preserved';
+  cleanup: {
+    worktreeRemoved: boolean;
+    branchDeleted: boolean;
+    pruned: boolean;
+  };
   error?: string;
 }
 
@@ -299,19 +311,29 @@ export class WorktreeService {
     }
   }
 
-  async remove(feature: string, step: string, deleteBranch = false): Promise<void> {
+  async remove(
+    feature: string,
+    step: string,
+    deleteBranch = false,
+  ): Promise<{ worktreeRemoved: boolean; branchDeleted: boolean; pruned: boolean }> {
     const worktreePath = this.getWorktreePath(feature, step);
     const branchName = this.getBranchName(feature, step);
     const git = this.getGit();
+    let worktreeRemoved = false;
+    let branchDeleted = false;
+    let pruned = false;
 
     try {
       await git.raw(["worktree", "remove", worktreePath, "--force"]);
+      worktreeRemoved = true;
     } catch {
       await fs.rm(worktreePath, { recursive: true, force: true });
+      worktreeRemoved = true;
     }
 
     try {
       await git.raw(["worktree", "prune"]);
+      pruned = true;
     } catch {
       /* intentional */
     }
@@ -319,10 +341,13 @@ export class WorktreeService {
     if (deleteBranch) {
       try {
         await git.deleteLocalBranch(branchName, true);
+        branchDeleted = true;
       } catch {
         /* intentional */
       }
     }
+
+    return { worktreeRemoved, branchDeleted, pruned };
   }
 
   async list(feature?: string): Promise<WorktreeInfo[]> {
@@ -502,28 +527,53 @@ export class WorktreeService {
     step: string,
     strategy: "merge" | "squash" | "rebase" = "merge",
     message?: string,
+    options: MergeOptions = {},
   ): Promise<MergeResult> {
     const branchName = this.getBranchName(feature, step);
     const git = this.getGit();
+    const cleanupMode = options.cleanup ?? 'none';
+    const preserveConflicts = options.preserveConflicts ?? false;
+
+    const emptyCleanup = {
+      worktreeRemoved: false,
+      branchDeleted: false,
+      pruned: false,
+    };
 
     if (strategy === "rebase" && message) {
       return {
         success: false,
         merged: false,
+        strategy,
+        filesChanged: [],
+        conflicts: [],
+        conflictState: 'none',
+        cleanup: emptyCleanup,
         error: "Custom merge message is not supported for rebase strategy",
       };
     }
 
+    let filesChanged: string[] = [];
+
     try {
       const branches = await git.branch();
       if (!branches.all.includes(branchName)) {
-        return { success: false, merged: false, error: `Branch ${branchName} not found` };
+        return {
+          success: false,
+          merged: false,
+          strategy,
+          filesChanged: [],
+          conflicts: [],
+          conflictState: 'none',
+          cleanup: emptyCleanup,
+          error: `Branch ${branchName} not found`,
+        };
       }
 
       const currentBranch = branches.current;
 
       const diffStat = await git.diff([`${currentBranch}...${branchName}`, "--stat"]);
-      const filesChanged = diffStat
+      filesChanged = diffStat
         .split("\n")
         .filter(l => l.trim() && l.includes("|"))
         .map(l => l.split("|")[0].trim());
@@ -532,11 +582,18 @@ export class WorktreeService {
         await git.raw(["merge", "--squash", branchName]);
         const squashMessage = message || `hive: merge ${step} (squashed)`;
         const result = await git.commit(squashMessage);
+        const cleanup = cleanupMode === 'none'
+          ? emptyCleanup
+          : await this.remove(feature, step, cleanupMode === 'worktree+branch');
         return {
           success: true,
           merged: true,
+          strategy,
           sha: result.commit,
           filesChanged,
+          conflicts: [],
+          conflictState: 'none',
+          cleanup,
         };
       } else if (strategy === "rebase") {
         const commits = await git.log([`${currentBranch}..${branchName}`]);
@@ -545,43 +602,70 @@ export class WorktreeService {
           await git.raw(["cherry-pick", commit.hash]);
         }
         const head = (await git.revparse(["HEAD"])).trim();
+        const cleanup = cleanupMode === 'none'
+          ? emptyCleanup
+          : await this.remove(feature, step, cleanupMode === 'worktree+branch');
         return {
           success: true,
           merged: true,
+          strategy,
           sha: head,
           filesChanged,
+          conflicts: [],
+          conflictState: 'none',
+          cleanup,
         };
       } else {
         const mergeMessage = message || `hive: merge ${step}`;
         const result = await git.merge([branchName, "--no-ff", "-m", mergeMessage]);
         const head = (await git.revparse(["HEAD"])).trim();
+        const cleanup = cleanupMode === 'none'
+          ? emptyCleanup
+          : await this.remove(feature, step, cleanupMode === 'worktree+branch');
         return {
           success: true,
           merged: !result.failed,
+          strategy,
           sha: head,
           filesChanged,
           conflicts: result.conflicts?.map(c => c.file || String(c)) || [],
+          conflictState: 'none',
+          cleanup,
         };
       }
     } catch (error: unknown) {
       const err = error as { message?: string };
       
       if (err.message?.includes("CONFLICT") || err.message?.includes("conflict")) {
-        await git.raw(["merge", "--abort"]).catch(() => {});
-        await git.raw(["rebase", "--abort"]).catch(() => {});
-        await git.raw(["cherry-pick", "--abort"]).catch(() => {});
+        const conflicts = await this.getActiveConflictFiles(git, err.message || '');
+        const conflictState = preserveConflicts ? 'preserved' : 'aborted';
+
+        if (!preserveConflicts) {
+          await git.raw(["merge", "--abort"]).catch(() => {});
+          await git.raw(["rebase", "--abort"]).catch(() => {});
+          await git.raw(["cherry-pick", "--abort"]).catch(() => {});
+        }
         
         return {
           success: false,
           merged: false,
+          strategy,
+          filesChanged,
+          conflicts,
+          conflictState,
+          cleanup: emptyCleanup,
           error: "Merge conflicts detected",
-          conflicts: this.parseConflictsFromError(err.message || ""),
         };
       }
 
       return {
         success: false,
         merged: false,
+        strategy,
+        filesChanged,
+        conflicts: [],
+        conflictState: 'none',
+        cleanup: emptyCleanup,
         error: err.message || "Merge failed",
       };
     }
@@ -613,6 +697,19 @@ export class WorktreeService {
       }
     }
     return conflicts;
+  }
+
+  private async getActiveConflictFiles(git: SimpleGit, errorMessage: string): Promise<string[]> {
+    try {
+      const status = await git.status();
+      if (status.conflicted.length > 0) {
+        return [...new Set(status.conflicted)];
+      }
+    } catch {
+      /* intentional */
+    }
+
+    return this.parseConflictsFromError(errorMessage);
   }
 }
 
