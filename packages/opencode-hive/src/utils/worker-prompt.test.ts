@@ -165,6 +165,14 @@ UNIQUE_MARKER_12345
     expect(prompt).toContain('result.nextAction');
   });
 
+  it('keeps ordinary workers merge-forbidden and delegation-forbidden', () => {
+    const params = createTestParams();
+    const prompt = buildWorkerPrompt(params);
+
+    expect(prompt).toContain('`hive_merge` - Only Hive/Swarm or delegated `hive-helper` merges');
+    expect(prompt).toContain('`task` - No recursive delegation; only Hive/Swarm may delegate `hive-helper`');
+  });
+
   it('includes worktree restriction warning', () => {
     const params = createTestParams();
     const prompt = buildWorkerPrompt(params);

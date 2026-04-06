@@ -70,6 +70,14 @@ describe('Hive (Hybrid) prompt', () => {
     it('tells hybrid planners to split broad research earlier', () => {
       expect(QUEEN_BEE_PROMPT).toContain('split broad research earlier');
     });
+
+    it('delegates batch merges to hive-helper and keeps post-batch verification with Hive', () => {
+      expect(QUEEN_BEE_PROMPT).toContain("task({ subagent_type: 'hive-helper'");
+      expect(QUEEN_BEE_PROMPT).toContain('delegate the merge batch');
+      expect(QUEEN_BEE_PROMPT).toContain('After the helper returns');
+      expect(QUEEN_BEE_PROMPT).toContain('bun run build');
+      expect(QUEEN_BEE_PROMPT).toContain('bun run test');
+    });
   });
 
   describe('turn termination and hard blocks', () => {
@@ -230,6 +238,14 @@ describe('Swarm (Orchestrator) prompt', () => {
 
     it('tells orchestrators to split broad research earlier', () => {
       expect(SWARM_BEE_PROMPT).toContain('split broad research earlier');
+    });
+
+    it('delegates batch merges to hive-helper and keeps post-batch verification with Swarm', () => {
+      expect(SWARM_BEE_PROMPT).toContain("task({ subagent_type: 'hive-helper'");
+      expect(SWARM_BEE_PROMPT).toContain('delegate the merge batch');
+      expect(SWARM_BEE_PROMPT).toContain('After the helper returns');
+      expect(SWARM_BEE_PROMPT).toContain('bun run build');
+      expect(SWARM_BEE_PROMPT).toContain('bun run test');
     });
   });
 

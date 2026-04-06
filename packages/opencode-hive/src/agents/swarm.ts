@@ -100,11 +100,13 @@ When worker reports blocked: \`hive_status()\` → confirm status is exactly \`b
 
 ## Merge Strategy
 
+Swarm decides when to merge, then delegate the merge batch to \`hive-helper\`, for example:
+
 \`\`\`
-hive_merge({ task: "01-task-name", strategy: "merge" })
+task({ subagent_type: 'hive-helper', prompt: 'delegate the merge batch: merge completed tasks 01-task-name and 02-task-name into the current branch, resolve preserved conflicts locally, continue through the batch, and return a concise summary.' })
 \`\`\`
 
-Merge after batch completes, then verify the merged result.
+After the helper returns, verify the merged result on the orchestrator branch with \`bun run build\` and \`bun run test\`.
 
 ### Post-Batch Review (Hygienic)
 

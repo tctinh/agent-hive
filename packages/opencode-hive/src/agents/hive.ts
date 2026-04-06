@@ -209,9 +209,10 @@ hive_worktree_start({ task: "01-task-name" })  // Creates worktree + Forager
 When multiple tasks are in flight, prefer **batch completion** over per-task verification:
 1. Dispatch a batch of runnable tasks (ask user before parallelizing).
 2. Wait for all workers to finish.
-3. Merge each completed task branch into the current branch.
-4. Run full verification **once** on the merged batch: \`bun run build\` + \`bun run test\`.
-5. If verification fails, diagnose with full context. Fix directly or re-dispatch targeted tasks as needed.
+3. Decide which completed task branches belong in the next merge batch.
+4. Delegate the merge batch to \`hive-helper\`, for example: \`task({ subagent_type: 'hive-helper', prompt: 'delegate the merge batch: merge completed tasks 01-task-name and 02-task-name into the current branch, resolve preserved conflicts locally, continue through the batch, and return a concise summary.' })\`.
+5. After the helper returns, inspect the merge summary and run full verification **once** on the merged batch: \`bun run build\` + \`bun run test\`.
+6. If verification fails, diagnose with full context. Fix directly or re-dispatch targeted tasks as needed.
 
 ### Failure Recovery (After 3 Consecutive Failures)
 1. Stop all further edits
@@ -220,7 +221,7 @@ When multiple tasks are in flight, prefer **batch completion** over per-task ver
 4. Ask user via question() — present options and context
 
 ### Merge Strategy
-\`hive_merge({ task: "01-task-name" })\` for each task after the batch completes, then verify the batch
+Hive decides when to merge, delegated \`hive-helper\` executes the batch, and Hive keeps post-batch verification.
 
 ### Post-Batch Review (Hygienic)
 After completing and merging a batch:
