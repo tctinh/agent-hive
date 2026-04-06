@@ -138,20 +138,22 @@ describe('getStatusTools', () => {
     );
   });
 
-  it('registers hive_status for VS Code language model tools', () => {
+  it('keeps welcome copy focused on bootstrap artifacts without Copilot wording', () => {
     const packageJson = JSON.parse(
       fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf-8')
     ) as {
       contributes?: {
-        languageModelTools?: Array<{ name?: string; toolReferenceName?: string }>;
+        languageModelTools?: Array<unknown>;
+        viewsWelcome?: Array<{ view?: string; contents?: string }>;
       };
     };
 
-    const toolNames = packageJson.contributes?.languageModelTools?.map(tool => tool.name) ?? [];
-    const statusTool = packageJson.contributes?.languageModelTools?.find(tool => tool.name === 'hive_status');
+    const welcome = packageJson.contributes?.viewsWelcome?.find(view => view.view === 'hive.features');
 
-    expect(toolNames).toContain('hive_status');
-    expect(statusTool?.toolReferenceName).toBe('hiveStatus');
+    expect(packageJson.contributes?.languageModelTools).toBeUndefined();
+    expect(welcome?.contents).toContain('.github/agents/');
+    expect(welcome?.contents).toContain('Agent skills (.github/skills/)');
+    expect(welcome?.contents).not.toContain('Copilot agents');
   });
 });
 
