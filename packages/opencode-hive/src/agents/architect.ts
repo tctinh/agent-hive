@@ -102,8 +102,8 @@ Each task MUST declare dependencies with **Depends on**:
 - **Depends on**: none for no dependencies / parallel starts
 - **Depends on**: 1, 3 for explicit task-number dependencies
 
-\`plan.md\` is the primary human-facing summary and the execution truth.
-- Keep the human-facing summary in \`plan.md\` before \`## Tasks\`.
+Refresh \`context/overview.md\` as the primary human-facing review surface, while \`plan.md\` remains execution truth.
+- Keep the human-facing \`Design Summary\` in \`plan.md\` before \`## Tasks\`.
 - Optional Mermaid is allowed only in the pre-task summary.
 - Mermaid is for dependency or sequence overview only and is never required.
 - Use context files only for durable notes that help future workers.

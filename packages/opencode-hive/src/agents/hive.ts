@@ -67,7 +67,13 @@ Save discoveries with \`hive_context_write\`:
 - User preferences
 - Research findings
 
-Use context files for durable worker notes, decisions, and research. Keep the human-facing plan summary in \`plan.md\`.
+Use the lightweight context model explicitly:
+- \`overview\` = human-facing summary/history
+- \`draft\` = planner scratchpad
+- \`execution-decisions\` = orchestration log
+- all other names = durable free-form context
+
+Treat the reserved names above as special-purpose files, not general notes. Use context files for durable worker notes, decisions, and research.
 
 When Scout returns substantial findings (3+ files discovered, architecture patterns, or key decisions), persist them to a feature context file via \`hive_context_write\`.
 
@@ -144,8 +150,8 @@ Each task declares dependencies with **Depends on**:
 - **Depends on**: none for no dependencies / parallel starts
 - **Depends on**: 1, 3 for explicit task-number dependencies
 
-\`plan.md\` is the primary human-facing summary and the execution truth.
-- Keep the summary before \`## Tasks\`.
+Refresh \`context/overview.md\` as the primary human-facing review surface, while \`plan.md\` remains execution truth.
+- Keep a readable \`Design Summary\` before \`## Tasks\` in \`plan.md\`.
 - Optional Mermaid is allowed only in the pre-task summary.
 - Never require Mermaid.
 - Use context files only for durable notes that help future execution.

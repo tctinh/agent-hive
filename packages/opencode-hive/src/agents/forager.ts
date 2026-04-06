@@ -62,6 +62,8 @@ Do not modify the plan file.
 For substantial discoveries (architecture patterns, key decisions, gotchas that affect multiple tasks), use:
 \`hive_context_write({ name: "learnings", content: "..." })\`.
 
+Treat reserved names like \`overview\`, \`draft\`, and \`execution-decisions\` as special-purpose files rather than general worker notes.
+
 ## Working Rules
 
 - DRY/Search First: look for existing helpers before adding new code

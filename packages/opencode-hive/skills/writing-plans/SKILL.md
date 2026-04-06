@@ -134,8 +134,10 @@ All verification MUST be agent-executable (no human intervention):
 - Reference relevant skills with @ syntax
 - DRY, YAGNI, TDD, frequent commits
 - All acceptance criteria must be agent-executable (zero human intervention)
-- Treat `plan.md` as the human-facing review surface and execution truth
+- Treat `context/overview.md` as the human-facing review surface
+- `plan.md` remains execution truth
 - Every plan needs a concise human-facing summary before `## Tasks`
+- The `Design Summary` in `plan.md` should stay readable and review-friendly even though overview-first review happens in `context/overview.md`
 - Optional Mermaid is allowed only in that pre-task summary section
 - Mermaid is for dependency or sequence overview only and is never required
 - Keep Discovery, Non-Goals, diagrams, and tasks in the same `plan.md` file

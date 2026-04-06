@@ -49,6 +49,17 @@ describe('generateAllAgents', () => {
     expect(hive).not.toContain('config hook');
   });
 
+  it('includes clarified context model in the hive agent', () => {
+    const hive = byFilename.get('hive.agent.md');
+
+    expect(hive).toContain('`overview` = human-facing summary/history');
+    expect(hive).toContain('`draft` = planner scratchpad');
+    expect(hive).toContain('`execution-decisions` = orchestration log');
+    expect(hive).toContain('all other names');
+    expect(hive).toContain('durable');
+    expect(hive).not.toContain('plan.md is the primary human-facing summary');
+  });
+
   it('uses the required tool allowlists for the subagents', () => {
     const scout = byFilename.get('scout.agent.md');
     const forager = byFilename.get('forager.agent.md');
