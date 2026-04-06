@@ -284,6 +284,31 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
     expect(cleared?.replayDirectivePending).toBe(false);
   });
 
+  test('hive-helper directive replay keeps helper role and never falls back to current role', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-helper-replay', {
+      agent: 'hive-helper',
+      sessionKind: 'subagent',
+      directivePrompt: 'Merge the completed branches, resolve preserved conflicts locally, and return only a concise summary.',
+      replayDirectivePending: false,
+    } as any);
+
+    await hooks.event?.({
+      event: {
+        type: 'session.compacted',
+        properties: { sessionID: 'sess-helper-replay' },
+      } as any,
+    });
+
+    const output = buildCompactionTransformOutput('sess-helper-replay', testRoot);
+    await hooks['experimental.chat.messages.transform']?.({}, output as any);
+
+    expect(output.messages).toHaveLength(3);
+    const replayText = (output.messages[2].parts[0] as any).text;
+    expect(replayText).toContain('You are still Hive Helper.');
+    expect(replayText).not.toContain('You are still current role.');
+  });
+
   test('primary/subagent compaction recovery transitions available -> consumed -> escalated', async () => {
     const sessionService = new SessionService(testRoot);
     sessionService.trackGlobal('sess-state-machine', {

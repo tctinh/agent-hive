@@ -12,6 +12,7 @@ import { ARCHITECT_BEE_PROMPT } from './agents/architect.js';
 import { SWARM_BEE_PROMPT } from './agents/swarm.js';
 import { SCOUT_BEE_PROMPT } from './agents/scout.js';
 import { FORAGER_BEE_PROMPT } from './agents/forager.js';
+import { HIVE_HELPER_PROMPT } from './agents/hive-helper.js';
 import { HYGIENIC_BEE_PROMPT } from './agents/hygienic.js';
 import { buildCustomSubagents } from './agents/custom-agents.js';
 import { createBuiltinMcps } from './mcp/index.js';
@@ -335,6 +336,8 @@ const plugin: Plugin = async (ctx) => {
     if (!session.directivePrompt) return null;
     const role = session.agent === 'scout-researcher' || session.baseAgent === 'scout-researcher'
       ? 'Scout'
+      : session.agent === 'hive-helper' || session.baseAgent === 'hive-helper'
+        ? 'Hive Helper'
       : session.agent === 'hygienic-reviewer' || session.baseAgent === 'hygienic-reviewer'
         ? 'Hygienic'
         : session.agent === 'architect-planner' || session.baseAgent === 'architect-planner'
@@ -2056,6 +2059,22 @@ Expand your Discovery section and try again.`;
         },
       };
 
+      const hiveHelperUserConfig = configService.getAgentConfig('hive-helper');
+      const hiveHelperConfig = {
+        model: hiveHelperUserConfig.model,
+        variant: hiveHelperUserConfig.variant,
+        temperature: hiveHelperUserConfig.temperature ?? 0.3,
+        mode: 'subagent' as const,
+        description: 'Hive Helper - Runtime-only merge recovery helper. Merges branches and resolves preserved conflicts in isolation.',
+        prompt: HIVE_HELPER_PROMPT,
+        tools: agentTools(['hive_merge', 'hive_status', 'hive_context_write', 'hive_skill']),
+        permission: {
+          task: 'deny',
+          delegate: 'deny',
+          skill: 'allow',
+        },
+      };
+
       const hygienicUserConfig = configService.getAgentConfig('hygienic-reviewer');
       const hygienicAutoLoadedSkills = await buildAutoLoadedSkillsContent('hygienic-reviewer', configService, directory);
       const hygienicConfig = {
@@ -2080,6 +2099,7 @@ Expand your Discovery section and try again.`;
         'swarm-orchestrator': swarmConfig,
         'scout-researcher': scoutConfig,
         'forager-worker': foragerConfig,
+        'hive-helper': hiveHelperConfig,
         'hygienic-reviewer': hygienicConfig,
       };
 
@@ -2117,12 +2137,14 @@ Expand your Discovery section and try again.`;
         allAgents['hive-master'] = builtInAgentConfigs['hive-master'];
         allAgents['scout-researcher'] = builtInAgentConfigs['scout-researcher'];
         allAgents['forager-worker'] = builtInAgentConfigs['forager-worker'];
+        allAgents['hive-helper'] = builtInAgentConfigs['hive-helper'];
         allAgents['hygienic-reviewer'] = builtInAgentConfigs['hygienic-reviewer'];
       } else {
         allAgents['architect-planner'] = builtInAgentConfigs['architect-planner'];
         allAgents['swarm-orchestrator'] = builtInAgentConfigs['swarm-orchestrator'];
         allAgents['scout-researcher'] = builtInAgentConfigs['scout-researcher'];
         allAgents['forager-worker'] = builtInAgentConfigs['forager-worker'];
+        allAgents['hive-helper'] = builtInAgentConfigs['hive-helper'];
         allAgents['hygienic-reviewer'] = builtInAgentConfigs['hygienic-reviewer'];
       }
 
@@ -2147,6 +2169,7 @@ Expand your Discovery section and try again.`;
         delete (configAgent as Record<string, unknown>)['swarm-orchestrator'];
         delete (configAgent as Record<string, unknown>)['scout-researcher'];
         delete (configAgent as Record<string, unknown>)['forager-worker'];
+        delete (configAgent as Record<string, unknown>)['hive-helper'];
         delete (configAgent as Record<string, unknown>)['hygienic-reviewer'];
         Object.assign(configAgent, allAgents);
       }

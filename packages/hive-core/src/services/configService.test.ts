@@ -34,6 +34,7 @@ describe("ConfigService defaults", () => {
     expect(Object.keys(config.agents ?? {}).sort()).toEqual([
       "architect-planner",
       "forager-worker",
+      "hive-helper",
       "hive-master",
       "hygienic-reviewer",
       "scout-researcher",
@@ -48,6 +49,11 @@ describe("ConfigService defaults", () => {
     expect(config.agents?.["swarm-orchestrator"]?.model).toBe(
       "github-copilot/claude-opus-4.5",
     );
+    expect(config.agents?.['hive-helper']).toEqual({
+      model: 'github-copilot/gpt-5.2-codex',
+      temperature: 0.3,
+      autoLoadSkills: [],
+    });
     expect(config.customAgents).toEqual({
       'forager-example-template': {
         baseAgent: 'forager-worker',
@@ -242,6 +248,30 @@ describe("ConfigService defaults", () => {
       "verification-before-completion",
       "custom-skill",
     ]);
+  });
+
+  it('keeps hive-helper autoLoadSkills empty even when user sets them', () => {
+    const service = new ConfigService();
+    const configPath = service.getPath();
+
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          agents: {
+            'hive-helper': {
+              autoLoadSkills: ['test-driven-development'],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const config = service.getAgentConfig('hive-helper');
+    expect(config.autoLoadSkills).toEqual([]);
   });
 
   it("removes autoLoadSkills via disableSkills", () => {
