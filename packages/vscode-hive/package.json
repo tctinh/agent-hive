@@ -390,6 +390,19 @@
             "message": {
               "type": "string",
               "description": "Optional merge commit message for merge/squash only. Empty uses default."
+            },
+            "preserveConflicts": {
+              "type": "boolean",
+              "description": "Keep merge conflict state intact instead of auto-aborting (default: false)."
+            },
+            "cleanup": {
+              "type": "string",
+              "enum": [
+                "none",
+                "worktree",
+                "worktree+branch"
+              ],
+              "description": "Cleanup mode after a successful merge (default: none)."
             }
           },
           "required": [
