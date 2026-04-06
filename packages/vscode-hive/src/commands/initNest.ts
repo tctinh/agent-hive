@@ -75,7 +75,7 @@ export async function initNest(projectRoot: string, deps?: InitNestDeps): Promis
       ensureDir(path.join(projectRoot, '.claude', 'skills'));
       ensureDir(path.join(projectRoot, '.opencode', 'skill'));
 
-      progress.report({ message: 'Generating Copilot agents...' });
+      progress.report({ message: 'Generating GitHub agent files...' });
 
       for (const agent of generateAgents()) {
         writeFile(path.join(projectRoot, '.github', 'agents', agent.filename), agent.content);
@@ -113,5 +113,5 @@ export async function initNest(projectRoot: string, deps?: InitNestDeps): Promis
     },
   );
 
-  await vscode.window.showInformationMessage('Hive Nest initialized! Created 4 agents, 11 skills, 2 hooks, 2 instructions.');
+  await vscode.window.showInformationMessage('Hive Nest initialized! Created bootstrap files for agents, skills, hooks, and instructions.');
 }

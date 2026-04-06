@@ -4,18 +4,6 @@ import * as path from 'path'
 import { FeatureService, PlanService, TaskService, WorktreeService } from 'hive-core'
 import { HiveWatcher, Launcher } from './services'
 import { HiveSidebarProvider, PlanCommentController } from './providers'
-import {
-  registerAllTools,
-  getFeatureTools,
-  getPlanTools,
-  getTaskTools,
-  getExecTools,
-  getMergeTools,
-  getContextTools,
-  getStatusTools,
-  getAgentsMdTools,
-  getSkillTools
-} from './tools'
 import { initNest } from './commands/initNest'
 import { regenerateAgents } from './commands/regenerateAgents'
 
@@ -101,18 +89,6 @@ class HiveExtension {
     this.commentController.registerCommands(this.context)
     vscode.commands.executeCommand('setContext', 'hive.hasHiveRoot', true)
 
-    registerAllTools(this.context, [
-      ...getFeatureTools(workspaceRoot),
-      ...getPlanTools(workspaceRoot),
-      ...getTaskTools(workspaceRoot),
-      ...getExecTools(workspaceRoot),
-      ...getMergeTools(workspaceRoot),
-      ...getContextTools(workspaceRoot),
-      ...getStatusTools(workspaceRoot),
-      ...getAgentsMdTools(workspaceRoot),
-      ...getSkillTools(workspaceRoot)
-    ])
-
     this.hiveWatcher = new HiveWatcher(workspaceRoot, () => {
       this.sidebarProvider?.refresh()
     })
@@ -164,7 +140,7 @@ class HiveExtension {
             this.workspaceRoot = newRoot
             this.initializeWithHive(newRoot)
           } else {
-            vscode.window.showWarningMessage('Hive: No .hive directory found. Use @Hive in Copilot Chat to create a feature.')
+            vscode.window.showWarningMessage('Hive: No .hive directory found. Initialize a Hive nest to start reviewing and planning features.')
             return
           }
         }
@@ -187,7 +163,7 @@ class HiveExtension {
           try {
             featureService.create(name)
             this.sidebarProvider?.refresh()
-            vscode.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`)
+            vscode.window.showInformationMessage(`Hive: Feature "${name}" created. Open the overview or plan from the sidebar to continue.`)
           } catch (error) {
             vscode.window.showErrorMessage(`Hive: Failed to create feature - ${error}`)
           }
@@ -200,7 +176,7 @@ class HiveExtension {
           const featureService = new FeatureService(workspaceFolder)
           featureService.create(name)
           this.sidebarProvider?.refresh()
-          vscode.window.showInformationMessage(`Hive: Feature "${name}" created. Use @Hive in Copilot Chat to write a plan.`)
+          vscode.window.showInformationMessage(`Hive: Feature "${name}" created. Open the overview or plan from the sidebar to continue.`)
         }
       }),
 
@@ -337,7 +313,6 @@ class HiveExtension {
         
         if (userInput === undefined) return
 
-        // Build feedback message for Copilot Chat
         let feedback: string
         if (hasComments) {
           const allComments = comments.map(c => `Line ${c.line}: ${c.body}`).join('\n')
@@ -350,14 +325,12 @@ class HiveExtension {
             : `${documentLabel} review feedback: ${userInput}`
         }
 
-        // Show the feedback and guide user to Copilot Chat
         vscode.window.showInformationMessage(
-          `Hive: ${hasComments ? 'Comments submitted' : 'Review submitted'}. Use @Hive in Copilot Chat to continue.`
+          `Hive: ${hasComments ? 'Comments submitted' : 'Review submitted'}. The review summary has been copied to your clipboard.`
         )
         
-        // Copy feedback to clipboard for easy pasting
-        await vscode.env.clipboard.writeText(`@Hive ${feedback}`)
-        vscode.window.showInformationMessage('Hive: Feedback copied to clipboard. Paste in Copilot Chat.')
+        await vscode.env.clipboard.writeText(feedback)
+        vscode.window.showInformationMessage('Hive: Feedback copied to clipboard for your next planning step.')
       })
     )
   }

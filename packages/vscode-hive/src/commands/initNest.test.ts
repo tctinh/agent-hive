@@ -65,14 +65,22 @@ afterEach(() => {
 });
 
 describe('initNest', () => {
-  it('creates the full Copilot scaffolding and backward-compatible hive skills', async () => {
+  it('creates the bootstrap scaffolding and backward-compatible hive skills', async () => {
     const projectRoot = createTempProject();
     const mock = createMockVscode();
 
     await initNest(projectRoot, { vscodeApi: mock.vscodeApi });
 
     assert.equal(mock.progressCalls.length, 1);
-    assert.equal(mock.infoMessages[0], 'Hive Nest initialized! Created 4 agents, 11 skills, 2 hooks, 2 instructions.');
+    assert.deepEqual(mock.progressCalls[0]?.reports, [
+      { message: 'Creating Hive directories...' },
+      { message: 'Generating GitHub agent files...' },
+      { message: 'Generating builtin skills...' },
+      { message: 'Generating hooks...' },
+      { message: 'Generating instructions...' },
+      { message: 'Generating plugin manifest...' },
+    ]);
+    assert.equal(mock.infoMessages[0], 'Hive Nest initialized! Created bootstrap files for agents, skills, hooks, and instructions.');
 
     assert.ok(fs.existsSync(path.join(projectRoot, '.hive', 'features')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.hive', 'skills')));

@@ -3,10 +3,6 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { getFeaturePath } from 'hive-core'
 
-/**
- * Launcher for Hive features - works with GitHub Copilot Chat
- * Replaces OpenCode-specific launcher
- */
 export class Launcher {
   constructor(private workspaceRoot: string) {}
 
@@ -32,7 +28,7 @@ export class Launcher {
       await vscode.workspace.openTextDocument(uri)
       await vscode.window.showTextDocument(uri)
       vscode.window.showInformationMessage(
-        `Hive: Opened ${feature} ${fs.existsSync(overviewPath) ? 'overview' : 'plan'}. Use @Hive in Copilot Chat to continue.`
+        `Hive: Opened ${feature} ${fs.existsSync(overviewPath) ? 'overview' : 'plan'}. Continue reviewing in the sidebar or editor.`
       )
     } catch (error: any) {
       vscode.window.showWarningMessage(`Hive: No overview or plan found for feature "${feature}" - ${error}`)
