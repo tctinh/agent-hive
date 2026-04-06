@@ -194,7 +194,7 @@ import {
   resolveFeatureDirectoryName,
   type WorktreeInfo,
 } from "hive-core";
-import { buildWorkerPrompt, type ContextFile, type CompletedTask } from "./utils/worker-prompt";
+import { buildWorkerPrompt, type ContextFile as WorkerPromptContextFile, type CompletedTask } from "./utils/worker-prompt";
 import { calculatePromptMeta, calculatePayloadMeta, checkWarnings } from "./utils/prompt-observability";
 import { applyTaskBudget, applyContextBudget, DEFAULT_BUDGET, type TruncationEvent } from "./utils/prompt-budgeting";
 import { writeWorkerPromptFile } from "./utils/prompt-file";
@@ -349,7 +349,7 @@ const plugin: Plugin = async (ctx) => {
       `Post-compaction recovery: You are still ${role}.`,
       'Resume the original assignment below. Do not replace it with a new goal.',
       'Do not broaden the scope or re-read the full codebase.',
-      'If you are no longer confident about the exact next step, return control to the parent/orchestrator instead of improvising.',
+      'If the exact next step is not explicit in the original assignment, return control to the parent/orchestrator immediately instead of improvising.',
       '',
       session.directivePrompt,
     ].join('\n');
@@ -522,7 +522,7 @@ To unblock: Remove .hive/features/${featureDir}/BLOCKED`;
     const taskBudgetResult = applyTaskBudget(rawPreviousTasks, { ...DEFAULT_BUDGET, feature });
     const contextBudgetResult = applyContextBudget(rawContextFiles, { ...DEFAULT_BUDGET, feature });
 
-    const contextFiles: ContextFile[] = contextBudgetResult.files.map(f => ({
+    const contextFiles: WorkerPromptContextFile[] = contextBudgetResult.files.map(f => ({
       name: f.name,
       content: f.content,
     }));
@@ -1727,7 +1727,7 @@ Expand your Discovery section and try again.`;
 
           const plan = planService.read(feature);
           const tasks = taskService.list(feature);
-          const contextFiles = contextService.list(feature);
+          const featureContextFiles = contextService.list(feature);
           const overview = contextService.getOverview(feature);
           const readThreads = (filePath: string): Array<unknown> | null => {
             if (!fs.existsSync(filePath)) {
@@ -1770,7 +1770,7 @@ Expand your Discovery section and try again.`;
             };
           }));
 
-          const contextSummary = contextFiles.map(c => ({
+          const contextSummary = featureContextFiles.map(c => ({
             name: c.name,
             chars: c.content.length,
             updatedAt: c.updatedAt,
@@ -1866,7 +1866,7 @@ Expand your Discovery section and try again.`;
               blockedBy,
             },
             context: {
-              fileCount: contextFiles.length,
+              fileCount: featureContextFiles.length,
               files: contextSummary,
             },
             nextAction: getNextAction(planStatus, tasksSummary, runnable, !!plan, !!overview),

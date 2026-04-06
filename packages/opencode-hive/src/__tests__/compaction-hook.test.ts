@@ -245,7 +245,7 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
     expect((replay.parts[0] as any).text).toContain('You are still Scout.');
     expect((replay.parts[0] as any).text).toContain('Resume the original assignment below. Do not replace it with a new goal.');
     expect((replay.parts[0] as any).text).toContain('Do not broaden the scope or re-read the full codebase.');
-    expect((replay.parts[0] as any).text).toContain('If you are no longer confident about the exact next step, return control to the parent/orchestrator instead of improvising.');
+    expect((replay.parts[0] as any).text).toContain('If the exact next step is not explicit in the original assignment, return control to the parent/orchestrator immediately instead of improvising.');
     expect((replay.parts[0] as any).text).toContain('Inspect the LSP errors in trading/pipeline.py and return findings only.');
 
     const cleared = sessionService.getGlobal('sess-replay');
@@ -276,7 +276,7 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
     expect(replayText).toContain('You are still Hive.');
     expect(replayText).toContain('Resume the original assignment below. Do not replace it with a new goal.');
     expect(replayText).toContain('Do not broaden the scope or re-read the full codebase.');
-    expect(replayText).toContain('If you are no longer confident about the exact next step, return control to the parent/orchestrator instead of improvising.');
+    expect(replayText).toContain('If the exact next step is not explicit in the original assignment, return control to the parent/orchestrator immediately instead of improvising.');
     expect(replayText).toContain('Finish task 04 and report only the regression coverage changes.');
 
     const cleared = sessionService.getGlobal('sess-primary-replay');
@@ -328,6 +328,9 @@ describe('experimental.session.compacting hook — session-aware re-anchoring', 
 
     session = sessionService.getGlobal('sess-state-machine');
     expect(secondReplayOutput.messages).toHaveLength(3);
+    const secondReplayText = (secondReplayOutput.messages[2].parts[0] as any).text;
+    expect(secondReplayText).toContain('If the exact next step is not explicit in the original assignment, return control to the parent/orchestrator immediately instead of improvising.');
+    expect(secondReplayText).not.toContain('If you are no longer confident about the exact next step');
     expect(session?.directiveRecoveryState).toBe('escalated');
     expect(session?.replayDirectivePending).toBe(false);
   });
