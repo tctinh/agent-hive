@@ -154,6 +154,7 @@ export interface ContextFile {
   role: ContextRole;
   includeInExecution: boolean;
   includeInAgentsMdSync: boolean;
+  includeInNetwork: boolean;
 }
 
 export type SessionKind = 'primary' | 'subagent' | 'task-worker' | 'unknown';

@@ -10,20 +10,23 @@ const DEFAULT_CONTEXT_CLASSIFICATION = {
   role: 'durable',
   includeInExecution: true,
   includeInAgentsMdSync: true,
+  includeInNetwork: true,
 } satisfies {
   role: ContextRole;
   includeInExecution: boolean;
   includeInAgentsMdSync: boolean;
+  includeInNetwork: boolean;
 };
 
 const SPECIAL_CONTEXTS = {
-  overview: { role: 'human', includeInExecution: false, includeInAgentsMdSync: false },
-  draft: { role: 'scratchpad', includeInExecution: false, includeInAgentsMdSync: false },
-  'execution-decisions': { role: 'operational', includeInExecution: false, includeInAgentsMdSync: false },
+  overview: { role: 'human', includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
+  draft: { role: 'scratchpad', includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
+  'execution-decisions': { role: 'operational', includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
 } as const satisfies Record<string, {
   role: ContextRole;
   includeInExecution: boolean;
   includeInAgentsMdSync: boolean;
+  includeInNetwork: boolean;
 }>;
 
 export class ContextService {
@@ -86,6 +89,10 @@ export class ContextService {
 
   listAgentsMdSyncContext(featureName: string): ContextFile[] {
     return this.list(featureName).filter(file => file.includeInAgentsMdSync);
+  }
+
+  listNetworkContext(featureName: string): ContextFile[] {
+    return this.list(featureName).filter(file => file.includeInNetwork);
   }
 
   delete(featureName: string, fileName: string): boolean {
@@ -151,7 +158,7 @@ export class ContextService {
     return `${normalized}.md`;
   }
 
-  private classifyContextName(name: string): Pick<ContextFile, 'role' | 'includeInExecution' | 'includeInAgentsMdSync'> {
+  private classifyContextName(name: string): Pick<ContextFile, 'role' | 'includeInExecution' | 'includeInAgentsMdSync' | 'includeInNetwork'> {
     return SPECIAL_CONTEXTS[name as keyof typeof SPECIAL_CONTEXTS] ?? DEFAULT_CONTEXT_CLASSIFICATION;
   }
 }
