@@ -36,7 +36,7 @@ The answer became this platform.
 |------|------|-------------|
 | **Beekeeper** | You | The human operator. Observes, steers, approves. Doesn't do the work — manages the hive. |
 | **Hive** | Platform | The Agent Hive platform itself. The structured workspace where agents operate. |
-| **Hive Bee** | Hybrid | Plans AND orchestrates. Phase-aware — detects whether to plan or execute. The default agent. |
+| **Hive Bee** | Hybrid | Plans AND orchestrates. Phase-aware — detects whether to plan or execute. The default OpenCode-side agent. |
 | **Architect Bee** | Planner | Plans features, interviews you, writes plan.md. May use optional read-only retrieval when prior feature evidence materially improves planning. |
 | **Swarm Bee** | Orchestrator | Coordinates execution, delegates to workers, merges results. The Hive Queen. |
 | **Scout Bee** | Researcher | Researches codebase and external docs in parallel. Uses MCP tools. |
@@ -46,7 +46,7 @@ The answer became this platform.
 | **Comb** | Task Structure | The organized grid of cells (tasks) within a nest. The work breakdown structure. |
 | **Cells** | Tasks | Individual tasks within a comb. Each cell is isolated (worktree) and produces one unit of work. |
 | **Royal Jelly** | Context | Context files that nourish workers — research, decisions, references. Without it, workers hallucinate. |
-| **Honey** | Artifacts | The human-facing sweetness of the work — led by `context/overview.md` for branch review, while `plan.md` and `spec.md` remain execution truth alongside `report.md`, optional context files, and code behind it. Hive Network retrieval is read-only retrieval, not authority over live files. |
+| **Honey** | Artifacts | The human-facing sweetness of the work — led by `context/overview.md` for branch review in VS Code or other editors, while `plan.md` and `spec.md` remain execution truth alongside `report.md`, optional context files, and code behind it. Hive Network retrieval is read-only retrieval, not authority over live files. |
 | **Propolis** | Verification | Best-effort worker checks + orchestrator batch testing that seal work as complete. |
 | **Wax Seal** | Sandbox | Docker container that isolates worker execution. Tests run inside, results flow out. |
 | **Waggle Dance** | Planning | The planning phase. Architect communicates, Beekeeper reviews, alignment before action. |
@@ -155,7 +155,7 @@ Two phases with a clear gate between them.
 | **Planning** | Dialogue | Shape, question, refine |
 | **Execution** | Trust | Agent runs, human monitors |
 
-Planning is collaborative. Execution is autonomous. Humans should usually review `context/overview.md` first for the branch summary/history, then inspect `plan.md` for the execution contract and supporting context files when needed. The approval gate is where trust is earned.
+Planning is collaborative. Execution is autonomous through the supported OpenCode harness. Humans should usually review `context/overview.md` first for the branch summary/history, then inspect `plan.md` for the execution contract and supporting context files when needed; `vscode-hive` remains a companion review surface, not the execution harness. The approval gate is where trust is earned.
 
 *Inspired by Boris's Tip 6: "Most sessions should start in Plan mode... A good plan makes all the difference."*
 

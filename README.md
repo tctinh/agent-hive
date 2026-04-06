@@ -65,25 +65,7 @@ See [PHILOSOPHY.md](PHILOSOPHY.md) for the full breakdown of what we learned fro
 
 ## Quick Start
 
-### Option A: GitHub Copilot
-
-1. Install the **Agent Hive** extension:
-   ```bash
-   code --install-extension tctinh.vscode-hive
-   ```
-
-2. Create `.github/agents/Hive.agent.md` in your repository (copy from this repo or see the [GitHub Copilot Guide](docs/GITHUB-COPILOT-GUIDE.md))
-
-3. In Copilot Chat, invoke your agent:
-   ```
-   I want to hive plan add user authentication
-   ```
-
-The extension provides Hive tools for plan-first development. The agent file teaches Copilot how to use them.
-
-See the full [GitHub Copilot Guide](docs/GITHUB-COPILOT-GUIDE.md) for creating and customizing your agent.
-
-### Option B: OpenCode
+### Option A: OpenCode
 
 Add `opencode-hive` to your `opencode.json`:
 
@@ -95,6 +77,16 @@ Add `opencode-hive` to your `opencode.json`:
 ```
 
 OpenCode handles the rest — no manual npm install needed.
+
+### Option B: VS Code companion (recommended with OpenCode)
+
+Install the **Agent Hive** extension for review, comments, and sidebar status:
+
+```bash
+code --install-extension tctinh.vscode-hive
+```
+
+Use the VS Code extension to review `context/overview.md`, comment on `plan.md`, approve work, and launch back into OpenCode when you want a visual companion. `vscode-hive` remains a review/sidebar surface in `1.4.0`; OpenCode is the supported execution harness.
 
 For local plugin testing:
 
@@ -568,8 +560,8 @@ The extension watches your `.hive/` directory and displays the current state. Al
 
 | Package | Platform | Description |
 |---------|----------|-------------|
-| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 7 specialized bee agents, 15 tools, 11 skills. `hive_network_query` is a read-only retrieval tool for planning, orchestration, and review roles first. |
-| **[vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive)** | VS Code | Visual management — review, comment, approve |
+| **[opencode-hive](https://www.npmjs.com/package/opencode-hive)** | npm | OpenCode plugin — 7 specialized bee agents, 18 tools, 11 skills. `hive_network_query` is a read-only retrieval tool for planning, orchestration, and review roles first. |
+| **[vscode-hive](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive)** | VS Code | Review/sidebar companion — inspect status, comment on plans, approve, launch OpenCode |
 
 **Agent Selection:** Use `hive`, `architect`, or `swarm` as your primary agent. Use `@scout`, `@forager`, or `@hygienic` to mention subagents directly.
 
@@ -645,15 +637,15 @@ Hive complements these excellent projects:
 
 | Platform | Setup | Status |
 |----------|-------|--------|
-| **GitHub Copilot** | Install extension + create agent file | Full support |
+| **GitHub Copilot** | Legacy generated `.github/*` artifacts may still exist for continuity | Not supported as an execution harness in `1.4.0` |
 | **OpenCode** | Add `opencode-hive` plugin | Full support |
-| **VS Code** | Extension for visual management | Full support |
+| **VS Code** | Install the extension for review/sidebar workflows | Full support as a companion |
 
 Designed to work seamlessly with:
 
-- **[GitHub Copilot](https://github.com/features/copilot)** — Use keyword `hive` in Copilot Chat
-- **[OpenCode](https://opencode.ai)** — The AI coding CLI
-- **VS Code** — Your editor for reviews
+- **[OpenCode](https://opencode.ai)** — The primary Hive runtime and supported execution harness
+- **VS Code** — Your editor for overview/plan review, comments, and approvals via `vscode-hive`
+- **Legacy `.github/*` bootstrap artifacts** — Still generated for continuity when teams choose to keep them, but no longer the supported primary path
 - **Git** — Worktrees for isolation
 
 ---
