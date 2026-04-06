@@ -149,7 +149,7 @@ Manual tasks follow the same DAG model as plan-backed tasks:
 - Structured manual-task fields such as `goal`, `description`, `acceptanceCriteria`, `files`, and `references` are turned into worker-facing `spec.md` content.
 - If review feedback changes downstream sequencing or scope, update `plan.md` and run `hive_tasks_sync({ refreshPending: true })` so pending plan tasks pick up the new `dependsOn` graph and regenerated specs.
 
-This recovery path applies to the built-in `forager-worker` and custom agents derived from it, because they are the sessions most likely to be compacted mid-implementation.
+This recovery path applies to the built-in `forager-worker`, the runtime-only `hive-helper` merge recovery subagent, and custom agents derived from `forager-worker`. `hive-helper` is intentionally OpenCode runtime-only in v1: it does not appear in `.github/agents/` or `packages/vscode-hive/src/generators/`.
 
 ## Prompt Budgeting & Observability
 
@@ -304,6 +304,7 @@ Skill IDs must be safe directory names (no `/`, `\`, `..`, or `.`). Missing or i
 |-------|------------------------|
 | `hive-master` | `parallel-exploration` |
 | `forager-worker` | `test-driven-development`, `verification-before-completion` |
+| `hive-helper` | (none) |
 | `scout-researcher` | (none) |
 | `architect-planner` | `parallel-exploration` |
 | `swarm-orchestrator` | (none) |
@@ -360,6 +361,8 @@ Define plugin-only custom subagents with `customAgents`. Freshly initialized `ag
 
 - `baseAgent`: one of `forager-worker` or `hygienic-reviewer`
 - `description`: delegation guidance injected into primary planner/orchestrator prompts
+
+`hive-helper` is not a custom base agent. In v1 it stays runtime-only for isolated merge recovery and does not appear in `.github/agents/` or does not appear in `packages/vscode-hive/src/generators/`.
 
 Published example (validated by `src/e2e/custom-agent-docs-example.test.ts`):
 
