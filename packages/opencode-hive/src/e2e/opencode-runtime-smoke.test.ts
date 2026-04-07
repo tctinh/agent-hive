@@ -9,6 +9,7 @@ import {
 } from "@opencode-ai/sdk";
 import plugin from "../index";
 import { buildCompactionPrompt } from "../utils/compaction-prompt.js";
+import { buildCheckpointRehydration } from "../utils/checkpoint-rehydration.js";
 import type { PluginInput } from "@opencode-ai/plugin";
 
 const EXPECTED_TOOLS = [
@@ -394,6 +395,35 @@ describe("e2e: Forager compaction loop mitigation (in-process)", () => {
     expect(compactionPrompt).toMatch(/worker-prompt\.md|task spec|spec file/i);
     expect(compactionPrompt).toContain("Next action: resume from where you left off.");
     expect(compactionPrompt).not.toMatch(/use hive_status to check feature state/i);
+  });
+
+  it("checkpoint rehydration points back to durable task files instead of prior chat", async () => {
+    const taskDir = path.join(testRoot, ".hive", "features", "runtime-feature", "tasks", "01-runtime-task");
+    fs.mkdirSync(taskDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(taskDir, "status.json"),
+      JSON.stringify({
+        status: "in_progress",
+        origin: "plan",
+        planTitle: "Runtime Task",
+        summary: "Resume from durable runtime checkpoint after compaction.",
+      }, null, 2),
+    );
+    fs.writeFileSync(path.join(taskDir, "spec.md"), "RAW_PROMPT_SHOULD_NOT_SURVIVE\nmessages: [runtime]\n");
+
+    const replayText = buildCheckpointRehydration({
+      projectRoot: testRoot,
+      featureName: "runtime-feature",
+      taskFolder: "01-runtime-task",
+      workerPromptPath: ".hive/features/runtime-feature/tasks/01-runtime-task/worker-prompt.md",
+    });
+
+    expect(replayText).not.toBeNull();
+    expect(replayText).toContain("worker-prompt.md");
+    expect(replayText).toContain("status.json");
+    expect(replayText).toContain("spec.md");
+    expect(replayText).not.toContain("RAW_PROMPT_SHOULD_NOT_SURVIVE");
+    expect(replayText).not.toContain("messages: [runtime]");
   });
 
   it("runtime contract excludes unsupported startup/compaction hooks", async () => {

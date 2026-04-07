@@ -136,6 +136,34 @@ function buildCompactionTransformOutput(sessionID: string, cwd: string) {
   };
 }
 
+function writeTaskCheckpointFixture(root: string, featureName: string, taskFolder: string) {
+  const taskDir = path.join(root, '.hive', 'features', featureName, 'tasks', taskFolder);
+  fs.mkdirSync(taskDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(taskDir, 'status.json'),
+    JSON.stringify({
+      status: 'in_progress',
+      origin: 'plan',
+      planTitle: 'Implement dashboard',
+      summary: 'Resume the dashboard task from durable state after compaction or idle return.',
+      workerSession: {
+        sessionId: 'sess-child',
+        mode: 'delegate',
+        attempt: 2,
+        messageCount: 17,
+      },
+    }, null, 2),
+  );
+  fs.writeFileSync(
+    path.join(taskDir, 'spec.md'),
+    '# Task\n\nRAW_PROMPT_SHOULD_NOT_SURVIVE\n\nmessages: [1, 2, 3]\n',
+  );
+  fs.writeFileSync(
+    path.join(taskDir, 'report.md'),
+    '# Task Report\n\nWHOLE_HISTORY_COPY_SHOULD_NOT_SURVIVE\n',
+  );
+}
+
 describe('compaction replay on supported hooks', () => {
   let testRoot: string;
   let originalHome: string | undefined;
@@ -240,6 +268,8 @@ describe('compaction replay on supported hooks', () => {
   });
 
   test('messages.transform appends bounded worker replay after compaction for task-worker sessions', async () => {
+    writeTaskCheckpointFixture(testRoot, 'my-feature', '05-implement-dashboard');
+
     const sessionService = new SessionService(testRoot);
     sessionService.trackGlobal('sess-tw-bounded', {
       agent: 'forager-worker',
@@ -255,13 +285,62 @@ describe('compaction replay on supported hooks', () => {
 
     expect(output.messages).toHaveLength(3);
     const replayText = (output.messages[2].parts[0] as any).text;
-    expect(replayText).toContain('Forager');
-    expect(replayText).toContain('my-feature');
+    expect(replayText).toContain('Task checkpoint rehydration');
     expect(replayText).toContain('05-implement-dashboard');
     expect(replayText).toContain('.hive/features/my-feature/tasks/05-implement-dashboard/worker-prompt.md');
+    expect(replayText).toContain('.hive/features/my-feature/tasks/05-implement-dashboard/status.json');
+    expect(replayText).toContain('.hive/features/my-feature/tasks/05-implement-dashboard/spec.md');
+    expect(replayText).not.toContain('RAW_PROMPT_SHOULD_NOT_SURVIVE');
+    expect(replayText).not.toContain('WHOLE_HISTORY_COPY_SHOULD_NOT_SURVIVE');
+    expect(replayText).not.toContain('messages: [1, 2, 3]');
 
     const cleared = sessionService.getGlobal('sess-tw-bounded');
     expect(cleared?.replayDirectivePending).toBe(false);
+  });
+
+  test('session.status idle marks replay pending for task-worker sessions', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-tw-idle', {
+      agent: 'forager-worker',
+      sessionKind: 'task-worker',
+      featureName: 'my-feature',
+      taskFolder: '01-task',
+      workerPromptPath: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
+      replayDirectivePending: false,
+    } as any);
+
+    await hooks.event?.({
+      event: {
+        type: 'session.status',
+        properties: {
+          sessionID: 'sess-tw-idle',
+          status: { type: 'idle' },
+        },
+      } as any,
+    });
+
+    const marked = sessionService.getGlobal('sess-tw-idle');
+    expect(marked?.replayDirectivePending).toBe(true);
+  });
+
+  test('tool.execute.after marks replay pending after task tool returns for task-worker sessions', async () => {
+    const sessionService = new SessionService(testRoot);
+    sessionService.trackGlobal('sess-task-after', {
+      agent: 'forager-worker',
+      sessionKind: 'task-worker',
+      featureName: 'my-feature',
+      taskFolder: '01-task',
+      workerPromptPath: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
+      replayDirectivePending: false,
+    } as any);
+
+    await hooks['tool.execute.after']?.(
+      { tool: 'task', sessionID: 'sess-task-after', callID: 'call-task-1' } as any,
+      { title: 'task', output: 'done', metadata: {} } as any,
+    );
+
+    const marked = sessionService.getGlobal('sess-task-after');
+    expect(marked?.replayDirectivePending).toBe(true);
   });
 
   test('messages.transform captures initial non-synthetic user directive for later recovery', async () => {
