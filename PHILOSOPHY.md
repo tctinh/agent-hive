@@ -693,9 +693,9 @@ The fix is a clean API split: `hive_worktree_start` for normal starts (pending/f
 
 PR #64 formalizes that recovery model. Hive now tracks session identity in global `.hive/sessions.json` and mirrors bound sessions into feature-local `sessions.json` files once a feature is known. That split solves two different needs at once: global recovery can find the right feature after compaction, while feature-local recovery keeps session history close to the work it belongs to.
 
-**Recovery by session kind:** Compacted sessions are classified as `primary`, `subagent`, `task-worker`, or `unknown`. Primary and subagent sessions recover by re-anchoring to their role and using directive replay to restore the stored user directive once after compaction. Task workers recover differently: they keep the same worker role, do not delegate, and are told to re-read `worker-prompt.md` so they resume from the original task contract instead of improvising a new one.
+**Recovery by session kind:** Compacted sessions are classified as `primary`, `subagent`, `task-worker`, or `unknown`. Primary and subagent sessions recover by re-anchoring to their role and using directive replay to restore the stored user directive once after compaction. Task workers recover differently: they keep the same worker role, do not delegate, and are told to re-read `worker-prompt.md` so they resume from the original task contract instead of improvising a new one. The task-level checkpoint here is semantic `.hive` state, not a raw transcript dump.
 
-**Design rationale:** Compaction is a memory-loss event, not a planning event. Recovery should restore the smallest durable contract that gets the agent safely moving again: role identity for orchestrators and subagents, plus `worker-prompt.md` for task workers. The system does not ask compacted sessions to rediscover state by re-reading the whole codebase or by re-running orchestration tools, because that invites drift exactly when the context window is already weakest.
+**Design rationale:** Compaction is a memory-loss event, not a planning event. Recovery should restore the smallest durable contract that gets the agent safely moving again: role identity for orchestrators and subagents, plus task-scoped `.hive` artifacts (`worker-prompt.md`, task identity, bound session metadata) for task workers. The system does not ask compacted sessions to rediscover state by re-reading the whole codebase or by re-running orchestration tools, because that invites drift exactly when the context window is already weakest.
 
 **Design insight:** Durable breadcrumbs beat speculative recovery. Persist the role, the feature binding, the directive, and the worker prompt path before compaction happens; then recovery can be narrow, deterministic, and safe.
 
@@ -731,6 +731,18 @@ The key operating rule is selective use. There is no startup lookup. Agents star
 That role boundary matters. Workers still execute from `spec.md`, live files, and direct verification. `hive-helper` is not a network consumer; it benefits only indirectly when upstream planning/orchestration/review choices are better grounded. Hygienic may use retrieved snippets as historical contrast with citations, but never as authority over live repository state.
 
 **Design insight:** File-based memory is useful when it narrows judgment, not when it replaces judgment. Hive Network works only if it stays read-only, selective, and subordinate to current code and command-backed verification.
+
+### v1.3.8 (OpenCode Runtime Alignment)
+
+**Theme:** Document the real runtime contract instead of hinting at upstream APIs that do not exist.
+
+The alignment in this branch is intentionally pragmatic. OpenCode still owns session lifecycle, compaction, and todo storage. Hive adds durable `.hive` state, role/session classification, bounded post-compaction replay, and primary-session prompt discipline so operators can recover grounded task state without pretending there is a first-class Hive runtime inside OpenCode.
+
+**Todo model:** OpenCode todos are session-scoped and replace-all. Hive therefore treats the visible OpenCode todo list as a primary-session-managed projection of Hive state, refreshed through built-in `todowrite` / `todoread` behavior at safe moments. That is why the docs must say both parts: Hive sync exists, but it is mediated by the primary session and must preserve non-Hive entries instead of acting like a hidden storage sync layer.
+
+**Checkpoint model:** The durable checkpoint is task-level semantic `.hive` state: task folder identity, `worker-prompt.md`, bound feature/task/session metadata, and bounded recovery text. This is intentionally different from raw prompt dumps. Recovery uses those artifacts to answer, “What task am I still executing?” rather than, “Can I replay the whole transcript?”
+
+**Boundary insight:** Honest contracts make systems easier to operate. Saying “primary-session-mediated todo projection plus bounded replay from `.hive` artifacts” is less glamorous than saying “native OpenCode sync,” but it matches the code and gives operators something real to trust.
 
 ---
 
