@@ -650,3 +650,42 @@ describe('AGENTS.md tool guidance', () => {
     });
   });
 });
+
+describe('OpenCode todo projection and checkpoint-grounded recovery prompts', () => {
+  it('teaches Hive to sync todoProjection without overwriting non-Hive todos', () => {
+    expect(QUEEN_BEE_PROMPT).toContain('OpenCode todos are the current-session projection of Hive work');
+    expect(QUEEN_BEE_PROMPT).toContain('todoread');
+    expect(QUEEN_BEE_PROMPT).toContain('todowrite');
+    expect(QUEEN_BEE_PROMPT).toContain('todoProjection');
+    expect(QUEEN_BEE_PROMPT).toContain('Preserve non-Hive todo items');
+    expect(QUEEN_BEE_PROMPT).toContain('replace only Hive-managed todo IDs');
+  });
+
+  it('teaches Hive to use task checkpoints for grounded recovery instead of memory', () => {
+    expect(QUEEN_BEE_PROMPT).toContain('task checkpoints');
+    expect(QUEEN_BEE_PROMPT).toContain('grounded recovery layer');
+    expect(QUEEN_BEE_PROMPT).toContain('compaction');
+    expect(QUEEN_BEE_PROMPT).toContain('child-session idle');
+    expect(QUEEN_BEE_PROMPT).toContain('explicit `hive_status()` reads');
+  });
+
+  it('teaches Architect to keep OpenCode todos aligned with Hive state', () => {
+    expect(ARCHITECT_BEE_PROMPT).toContain('current-session projection of Hive work');
+    expect(ARCHITECT_BEE_PROMPT).toContain('todoread');
+    expect(ARCHITECT_BEE_PROMPT).toContain('todowrite');
+    expect(ARCHITECT_BEE_PROMPT).toContain('todoProjection');
+    expect(ARCHITECT_BEE_PROMPT).toContain('Preserve non-Hive todo items');
+    expect(ARCHITECT_BEE_PROMPT).toContain('feature creation');
+    expect(ARCHITECT_BEE_PROMPT).toContain('plan write/approval');
+  });
+
+  it('teaches Swarm to refresh todo sync and checkpoints at execution state transitions', () => {
+    expect(SWARM_BEE_PROMPT).toContain('current-session projection of Hive work');
+    expect(SWARM_BEE_PROMPT).toContain('todoProjection');
+    expect(SWARM_BEE_PROMPT).toContain('runnable-set changes');
+    expect(SWARM_BEE_PROMPT).toContain('worker return/block');
+    expect(SWARM_BEE_PROMPT).toContain('merge/feature completion');
+    expect(SWARM_BEE_PROMPT).toContain('OpenCode disables todo tools in spawned `task()` sessions');
+    expect(SWARM_BEE_PROMPT).toContain('subagents/workers never own todo sync');
+  });
+});

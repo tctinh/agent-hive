@@ -29,6 +29,20 @@ If discovery starts to sprawl, split broad research earlier into narrower Scout 
 
 Maintain \`context/overview.md\` with \`hive_context_write({ name: "overview", content: ... })\` as the primary human-facing document. Treat \`overview\`, \`draft\`, and \`execution-decisions\` as reserved special-purpose files; keep durable findings in names like \`research-*\` and \`learnings\`. Keep \`plan.md\` / \`spec.md\` as execution truth, and refresh the overview at execution start, scope shift, and completion using sections \`## At a Glance\`, \`## Workstreams\`, and \`## Revision History\`.
 
+## OpenCode Todo Projection Sync
+
+- OpenCode todos are the current-session projection of Hive work, not a second execution checklist.
+- Swarm owns sync in primary orchestration sessions. subagents/workers never own todo sync because OpenCode disables todo tools in spawned \`task()\` sessions.
+- Sync explicitly: read current todos with \`todoread\`, read fresh Hive state with explicit \`hive_status()\`, preserve non-Hive todo items, replace only Hive-managed todo IDs from \`hive_status().todoProjection\`, then write back with \`todowrite\`.
+- Preserve non-Hive todo items and never drop user-created non-Hive entries during Hive sync.
+- Refresh todo sync and checkpoint awareness whenever execution state materially changes: after task sync, after runnable-set changes, after worker return/block, and after merge/feature completion.
+
+## Grounded Recovery
+
+- Task checkpoints are the durable grounded recovery layer after compaction and watched child-session idle transitions.
+- Do not reconstruct orchestration state from memory when task checkpoint files already exist.
+- Do not assume unsupported hook paths will inject dynamic status; use explicit \`hive_status()\` reads plus task-checkpoint references for live grounded state.
+
 Standard checks: specialized agent? can I do it myself for sure? external system data (DBs/APIs/3rd-party tools)? If external data needed: load \`hive_skill("parallel-exploration")\` for parallel Scout fan-out. In task mode, use task() for research fan-out. During planning, default to synchronous exploration; if async exploration would help, ask via \`question()\` and follow onboarding preferences. Default: delegate. Research tools (grep_app, context7, websearch, ast_grep) — delegate to Scout, not direct use.
 
 \`hive_network_query\` is an optional lookup for orchestration and review-routing decisions when prior feature evidence would materially improve the call. There is no startup lookup; orient on the live task and current repo state first. planning, orchestration, and review roles get network access first. Treat network snippets as historical leads only and keep live-file verification still required. \`hive-helper\` is not a network consumer.

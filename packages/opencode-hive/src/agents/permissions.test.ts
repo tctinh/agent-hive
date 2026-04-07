@@ -394,6 +394,34 @@ describe('Per-agent tool filtering', () => {
     expect(swarmTools!['hive_plan_approve']).toBeUndefined();
   });
 
+  it('allows todo read/write only for hive, architect, and swarm primary roles', async () => {
+    const unifiedAgents = await buildConfig('unified');
+    expect(unifiedAgents['hive-master']?.permission?.todoread).toBe('allow');
+    expect(unifiedAgents['hive-master']?.permission?.todowrite).toBe('allow');
+    expect(unifiedAgents['scout-researcher']?.permission?.todoread).toBeUndefined();
+    expect(unifiedAgents['scout-researcher']?.permission?.todowrite).toBeUndefined();
+    expect(unifiedAgents['forager-worker']?.permission?.todoread).toBeUndefined();
+    expect(unifiedAgents['forager-worker']?.permission?.todowrite).toBeUndefined();
+    expect(unifiedAgents['hive-helper']?.permission?.todoread).toBeUndefined();
+    expect(unifiedAgents['hive-helper']?.permission?.todowrite).toBeUndefined();
+    expect(unifiedAgents['hygienic-reviewer']?.permission?.todoread).toBeUndefined();
+    expect(unifiedAgents['hygienic-reviewer']?.permission?.todowrite).toBeUndefined();
+
+    const dedicatedAgents = await buildConfig('dedicated');
+    expect(dedicatedAgents['architect-planner']?.permission?.todoread).toBe('allow');
+    expect(dedicatedAgents['architect-planner']?.permission?.todowrite).toBe('allow');
+    expect(dedicatedAgents['swarm-orchestrator']?.permission?.todoread).toBe('allow');
+    expect(dedicatedAgents['swarm-orchestrator']?.permission?.todowrite).toBe('allow');
+    expect(dedicatedAgents['scout-researcher']?.permission?.todoread).toBeUndefined();
+    expect(dedicatedAgents['scout-researcher']?.permission?.todowrite).toBeUndefined();
+    expect(dedicatedAgents['forager-worker']?.permission?.todoread).toBeUndefined();
+    expect(dedicatedAgents['forager-worker']?.permission?.todowrite).toBeUndefined();
+    expect(dedicatedAgents['hive-helper']?.permission?.todoread).toBeUndefined();
+    expect(dedicatedAgents['hive-helper']?.permission?.todowrite).toBeUndefined();
+    expect(dedicatedAgents['hygienic-reviewer']?.permission?.todoread).toBeUndefined();
+    expect(dedicatedAgents['hygienic-reviewer']?.permission?.todowrite).toBeUndefined();
+  });
+
   it('limits hive_network_query to planning orchestration and review roles', async () => {
     const unifiedAgents = await buildConfig('unified');
     expect(unifiedAgents['hive-master']?.tools).toBeUndefined();

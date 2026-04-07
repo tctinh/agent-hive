@@ -86,6 +86,24 @@ Treat the reserved names above as special-purpose files, not general notes. Use 
 
 When Scout returns substantial findings (3+ files discovered, architecture patterns, or key decisions), persist them to a feature context file via \`hive_context_write\`.
 
+### OpenCode Todo Projection Sync
+- OpenCode todos are the current-session projection of Hive work, not a separate ad-hoc checklist.
+- Primary roles own sync (\`hive-master\`, \`architect-planner\`, \`swarm-orchestrator\`). Subagents/workers never own todo sync because OpenCode disables todo tools in spawned \`task()\` sessions.
+- Sync algorithm must stay explicit and deterministic:
+  1. Read current todos with \`todoread\`.
+  2. Read fresh Hive state with explicit \`hive_status()\`.
+  3. Preserve non-Hive todo items.
+  4. replace only Hive-managed todo IDs from \`hive_status().todoProjection\`.
+  5. Write the merged list back with \`todowrite\`.
+- Preserve non-Hive todo items. Never drop user-created non-Hive entries during Hive sync.
+- Refresh todo sync after feature creation, after plan write/approval, after task sync, after runnable-set changes, after worker return/block, and after merge/feature completion.
+
+### Grounded Recovery
+- task checkpoints are the durable grounded recovery layer after compaction and watched child-session idle transitions.
+- Do not reconstruct live state from memory when task checkpoint files already exist.
+- Do not rely on unsupported hook paths for dynamic status injection. Use explicit \`hive_status()\` reads and task-checkpoint references for live grounded state.
+- After compaction or child-session idle/return, recover from task checkpoints first, then confirm the live state with \`hive_status()\` before acting.
+
 ### Checkpoints
 Before major transitions, verify:
 - [ ] Objective clear?

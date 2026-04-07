@@ -5,6 +5,7 @@ import * as path from "path";
 import type { PluginInput } from "@opencode-ai/plugin";
 import { createOpencodeClient } from "@opencode-ai/sdk";
 import plugin from "../index";
+import { QUEEN_BEE_PROMPT } from "../agents/hive";
 import { BUILTIN_SKILLS } from "../skills/registry.generated.js";
 import { buildPluginManifest, HIVE_COMMANDS, HIVE_TOOL_NAMES, SUPPORTED_PLUGIN_HOOKS } from '../utils/plugin-manifest.js';
 
@@ -1635,6 +1636,58 @@ Do it
     expect(agents["forager-ui"]).toBeDefined();
     expect(agents["reviewer-security"]).toBeDefined();
     
+  });
+
+  it("system prompt hook teaches todoProjection sync and checkpoint-grounded recovery for primary roles only", async () => {
+    const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agentMode: "dedicated",
+        agents: {
+          "architect-planner": {},
+          "swarm-orchestrator": {},
+        },
+      }),
+    );
+
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const opencodeConfig: Record<string, unknown> = { agent: {} };
+    await hooks.config!(opencodeConfig);
+
+    const agents = opencodeConfig.agent as Record<string, { prompt?: string }>;
+    const hivePrompt = QUEEN_BEE_PROMPT;
+    const architectPrompt = agents["architect-planner"]?.prompt ?? "";
+    const swarmPrompt = agents["swarm-orchestrator"]?.prompt ?? "";
+    const foragerPrompt = agents["forager-worker"]?.prompt ?? "";
+
+    expect(hivePrompt).toContain("OpenCode todos are the current-session projection of Hive work");
+    expect(hivePrompt).toContain("Preserve non-Hive todo items");
+    expect(hivePrompt).toContain("replace only Hive-managed todo IDs");
+    expect(hivePrompt).toContain("task checkpoints are the durable grounded recovery layer");
+
+    expect(architectPrompt).toContain("OpenCode todos are the current-session projection of Hive work");
+    expect(architectPrompt).toContain("plan write/approval");
+    expect(architectPrompt).toContain("feature creation");
+
+    expect(swarmPrompt).toContain("OpenCode todos are the current-session projection of Hive work");
+    expect(swarmPrompt).toContain("runnable-set changes");
+    expect(swarmPrompt).toContain("worker return/block");
+    expect(swarmPrompt).toContain("merge/feature completion");
+    expect(swarmPrompt).toContain("OpenCode disables todo tools in spawned `task()` sessions");
+
+    expect(foragerPrompt).not.toContain("todowrite");
+    expect(foragerPrompt).not.toContain("todoProjection");
   });
 
   it("blocks hive_worktree_create when dependencies are not done", async () => {
