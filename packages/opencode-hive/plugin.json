@@ -1,10 +1,13 @@
 {
   "name": "hive",
-  "version": "1.0.1",
+  "version": "1.4.0",
   "description": "Context-Driven Development",
   "dataPath": "../../.hive",
   "commands": [
-    {"name": "/hive", "description": "Create feature"}
+    {
+      "name": "/hive",
+      "description": "Create a new feature: /hive <feature-name>"
+    }
   ],
   "tools": [
     "hive_feature_create",
@@ -15,10 +18,15 @@
     "hive_tasks_sync",
     "hive_task_create",
     "hive_task_update",
+    "hive_worktree_start",
     "hive_worktree_create",
     "hive_worktree_commit",
     "hive_worktree_discard",
+    "hive_merge",
     "hive_context_write",
-    "hive_status"
+    "hive_network_query",
+    "hive_status",
+    "hive_skill",
+    "hive_agents_md"
   ]
 }

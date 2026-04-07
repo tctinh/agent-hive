@@ -203,8 +203,7 @@ import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { formatRelativeTime } from "./utils/format";
 import { createVariantHook } from "./hooks/variant-hook.js";
 import { HIVE_SYSTEM_PROMPT, shouldExecuteHook } from "./hooks/system-hook.js";
-import { buildCompactionReanchor } from "./utils/compaction-anchor.js";
-import type { CompactionSessionContext } from "./utils/compaction-anchor.js";
+import { HIVE_COMMANDS, HIVE_TOOL_NAMES } from './utils/plugin-manifest.js';
 
 /**
  * Core plugin implementation.
@@ -959,73 +958,6 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       if (shouldUseWorkerReplay(existing)) {
         sessionService.trackGlobal(sessionID, { replayDirectivePending: true });
         return;
-      }
-    },
-
-    "experimental.chat.system.transform": async (
-      input: { agent?: string } | unknown,
-      output: { system: string[] },
-    ) => {
-      // Cadence gate: check if this hook should execute this turn
-      if (!shouldExecuteHook("experimental.chat.system.transform", configService, turnCounters)) {
-        return;
-      }
-
-      output.system.push(HIVE_SYSTEM_PROMPT);
-
-      // NOTE: autoLoadSkills injection is now done in the config hook (prompt field)
-      // to ensure skills are present from the first message. The system.transform hook
-      // may not receive the agent name at runtime, so we removed legacy auto-load here.
-
-      const activeFeature = resolveFeature();
-      if (activeFeature) {
-        const info = featureService.getInfo(activeFeature);
-        if (info) {
-          const featureInfo = info as typeof info & {
-            hasOverview?: boolean;
-            reviewCounts?: { plan: number; overview: number };
-          };
-          let statusHint = `\n### Current Hive Status\n`;
-          statusHint += `**Active Feature**: ${info.name} (${info.status})\n`;
-          statusHint += `**Progress**: ${info.tasks.filter(t => t.status === 'done').length}/${info.tasks.length} tasks\n`;
-
-          if (featureInfo.hasOverview) {
-            statusHint += `**Overview**: available at .hive/features/${resolveFeatureDirectoryName(directory, info.name)}/context/overview.md (primary human-facing doc)\n`;
-          } else if (info.hasPlan) {
-            statusHint += `**Overview**: missing - write it with hive_context_write({ name: "overview", content })\n`;
-          }
-
-          if (info.commentCount > 0) {
-            statusHint += `**Comments**: ${info.commentCount} unresolved (plan: ${featureInfo.reviewCounts?.plan ?? 0}, overview: ${featureInfo.reviewCounts?.overview ?? 0})\n`;
-          }
-
-          output.system.push(statusHint);
-        }
-      }
-    },
-
-    "experimental.session.compacting": async (
-      _input: { sessionID: string },
-      output: { context: string[]; prompt?: string },
-    ) => {
-      const session = sessionService.getGlobal(_input.sessionID);
-      if (session) {
-        const ctx: CompactionSessionContext = {
-          agent: session.agent,
-          baseAgent: session.baseAgent,
-          sessionKind: session.sessionKind,
-          featureName: session.featureName,
-          taskFolder: session.taskFolder,
-          workerPromptPath: session.workerPromptPath,
-          directivePrompt: session.directivePrompt,
-        };
-        const reanchor = buildCompactionReanchor(ctx);
-        output.prompt = reanchor.prompt;
-        output.context.push(...reanchor.context);
-      } else {
-        const reanchor = buildCompactionReanchor({});
-        output.prompt = reanchor.prompt;
-        output.context.push(...reanchor.context);
       }
     },
 
@@ -1966,8 +1898,8 @@ Expand your Discovery section and try again.`;
     },
 
     command: {
-      hive: {
-        description: "Create a new feature: /hive <feature-name>",
+      [HIVE_COMMANDS[0].key]: {
+        description: HIVE_COMMANDS[0].description,
         async run(args: string) {
           const name = args.trim();
           if (!name) return "Usage: /hive <feature-name>";
@@ -1979,15 +1911,8 @@ Expand your Discovery section and try again.`;
     // Config hook - merge agents into opencodeConfig.agent
     config: async (opencodeConfig: Record<string, unknown>) => {
       function agentTools(allowed: string[]): Record<string, boolean> {
-        const allHiveTools = [
-          'hive_feature_create', 'hive_feature_complete',
-          'hive_plan_write', 'hive_plan_read', 'hive_plan_approve',
-          'hive_tasks_sync', 'hive_task_create', 'hive_task_update',
-          'hive_worktree_start', 'hive_worktree_create', 'hive_worktree_commit', 'hive_worktree_discard',
-          'hive_merge', 'hive_context_write', 'hive_network_query', 'hive_status', 'hive_skill', 'hive_agents_md',
-        ];
         const result: Record<string, boolean> = {};
-        for (const tool of allHiveTools) {
+        for (const tool of HIVE_TOOL_NAMES) {
           if (!allowed.includes(tool)) {
             result[tool] = false;
           }
@@ -2015,7 +1940,7 @@ Expand your Discovery section and try again.`;
         variant: hiveUserConfig.variant,
         temperature: hiveUserConfig.temperature ?? 0.5,
         description: 'Hive (Hybrid) - Plans + orchestrates. Detects phase, loads skills on-demand.',
-        prompt: QUEEN_BEE_PROMPT + hiveAutoLoadedSkills + (agentMode === 'unified' ? customSubagentAppendix : ''),
+        prompt: QUEEN_BEE_PROMPT + HIVE_SYSTEM_PROMPT + hiveAutoLoadedSkills + (agentMode === 'unified' ? customSubagentAppendix : ''),
         permission: {
           question: "allow",
           skill: "allow",
@@ -2031,7 +1956,7 @@ Expand your Discovery section and try again.`;
         variant: architectUserConfig.variant,
         temperature: architectUserConfig.temperature ?? 0.7,
         description: 'Architect (Planner) - Plans features, interviews, writes plans. NEVER executes.',
-        prompt: ARCHITECT_BEE_PROMPT + architectAutoLoadedSkills + (agentMode === 'dedicated' ? customSubagentAppendix : ''),
+        prompt: ARCHITECT_BEE_PROMPT + HIVE_SYSTEM_PROMPT + architectAutoLoadedSkills + (agentMode === 'dedicated' ? customSubagentAppendix : ''),
         tools: agentTools(['hive_feature_create', 'hive_plan_write', 'hive_plan_read', 'hive_context_write', 'hive_network_query', 'hive_status', 'hive_skill']),
         permission: {
           edit: "deny",  // Planners don't edit code
@@ -2051,7 +1976,7 @@ Expand your Discovery section and try again.`;
         variant: swarmUserConfig.variant,
         temperature: swarmUserConfig.temperature ?? 0.5,
         description: 'Swarm (Orchestrator) - Orchestrates execution. Delegates, spawns workers, verifies, merges.',
-        prompt: SWARM_BEE_PROMPT + swarmAutoLoadedSkills + (agentMode === 'dedicated' ? customSubagentAppendix : ''),
+        prompt: SWARM_BEE_PROMPT + HIVE_SYSTEM_PROMPT + swarmAutoLoadedSkills + (agentMode === 'dedicated' ? customSubagentAppendix : ''),
         tools: agentTools([
           'hive_feature_create', 'hive_feature_complete', 'hive_plan_read', 'hive_plan_approve',
           'hive_tasks_sync', 'hive_task_create', 'hive_task_update',
@@ -2074,7 +1999,7 @@ Expand your Discovery section and try again.`;
         temperature: scoutUserConfig.temperature ?? 0.5,
         mode: 'subagent' as const,
         description: 'Scout (Explorer/Researcher/Retrieval) - Researches codebase + external docs/data.',
-        prompt: SCOUT_BEE_PROMPT + scoutAutoLoadedSkills,
+        prompt: SCOUT_BEE_PROMPT + HIVE_SYSTEM_PROMPT + scoutAutoLoadedSkills,
         tools: agentTools(['hive_plan_read', 'hive_context_write', 'hive_status', 'hive_skill']),
         permission: {
           edit: "deny",  // Researchers don't edit code
@@ -2093,7 +2018,7 @@ Expand your Discovery section and try again.`;
         temperature: foragerUserConfig.temperature ?? 0.3,
         mode: 'subagent' as const,
         description: 'Forager (Worker/Coder) - Executes tasks directly in isolated worktrees. Never delegates.',
-        prompt: FORAGER_BEE_PROMPT + foragerAutoLoadedSkills,
+        prompt: FORAGER_BEE_PROMPT + HIVE_SYSTEM_PROMPT + foragerAutoLoadedSkills,
         tools: agentTools(['hive_plan_read', 'hive_worktree_commit', 'hive_context_write', 'hive_skill']),
         permission: {
           task: "deny",
@@ -2109,7 +2034,7 @@ Expand your Discovery section and try again.`;
         temperature: hiveHelperUserConfig.temperature ?? 0.3,
         mode: 'subagent' as const,
         description: 'Hive Helper - Runtime-only merge recovery helper. Merges branches and resolves preserved conflicts in isolation.',
-        prompt: HIVE_HELPER_PROMPT,
+        prompt: HIVE_HELPER_PROMPT + HIVE_SYSTEM_PROMPT,
         tools: agentTools(['hive_merge', 'hive_status', 'hive_context_write', 'hive_skill']),
         permission: {
           task: 'deny',
@@ -2126,7 +2051,7 @@ Expand your Discovery section and try again.`;
         temperature: hygienicUserConfig.temperature ?? 0.3,
         mode: 'subagent' as const,
         description: 'Hygienic (Consultant/Reviewer/Debugger) - Reviews plan documentation quality. OKAY/REJECT verdict.',
-        prompt: HYGIENIC_BEE_PROMPT + hygienicAutoLoadedSkills,
+        prompt: HYGIENIC_BEE_PROMPT + HIVE_SYSTEM_PROMPT + hygienicAutoLoadedSkills,
         tools: agentTools(['hive_plan_read', 'hive_context_write', 'hive_network_query', 'hive_status', 'hive_skill']),
         permission: {
           edit: "deny",  // Reviewers don't edit

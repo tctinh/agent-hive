@@ -6,6 +6,7 @@ import type { PluginInput } from "@opencode-ai/plugin";
 import { createOpencodeClient } from "@opencode-ai/sdk";
 import plugin from "../index";
 import { BUILTIN_SKILLS } from "../skills/registry.generated.js";
+import { buildPluginManifest, HIVE_COMMANDS, HIVE_TOOL_NAMES, SUPPORTED_PLUGIN_HOOKS } from '../utils/plugin-manifest.js';
 
 const OPENCODE_CLIENT = createOpencodeClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
 type PluginHooks = Awaited<ReturnType<typeof plugin>>;
@@ -17,24 +18,13 @@ type ToolContext = {
   abort: AbortSignal;
 };
 
-const EXPECTED_TOOLS = [
-  "hive_feature_create",
-  "hive_feature_complete",
-  "hive_plan_write",
-  "hive_plan_read",
-  "hive_plan_approve",
-  "hive_tasks_sync",
-  "hive_task_create",
-  "hive_task_update",
-  "hive_worktree_start",
-  "hive_worktree_create",
-  "hive_worktree_commit",
-  "hive_worktree_discard",
-  "hive_merge",
-  "hive_context_write",
-  "hive_network_query",
-  "hive_status",
-  "hive_skill",
+const EXPECTED_TOOLS = [...HIVE_TOOL_NAMES];
+
+const EXPECTED_COMMANDS = HIVE_COMMANDS.map(({ name, description }) => ({ name, description }));
+
+const UNSUPPORTED_RUNTIME_HOOKS = [
+  "experimental.chat.system.transform",
+  "experimental.session.compacting",
 ] as const;
 
 const TEST_ROOT_BASE = "/tmp/hive-e2e-plugin";
@@ -208,6 +198,14 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
       expect(typeof hooks.tool?.[toolName].execute).toBe("function");
     }
 
+    for (const hookName of SUPPORTED_PLUGIN_HOOKS) {
+      expect(hooks[hookName as keyof typeof hooks]).toBeDefined();
+    }
+
+    for (const hookName of UNSUPPORTED_RUNTIME_HOOKS) {
+      expect(hooks[hookName as keyof typeof hooks]).toBeUndefined();
+    }
+
     const sessionID = "sess_plugin_smoke";
     const toolContext = createToolContext(sessionID);
 
@@ -326,6 +324,24 @@ Do it
       };
     };
     expect(status.tasks?.list?.[0]?.folder).toBe("01-first-task");
+  });
+
+  it("keeps checked-in plugin.json aligned with the runtime contract", async () => {
+    const packageJsonPath = path.resolve(import.meta.dir, '..', '..', 'package.json');
+    const pluginJsonPath = path.resolve(import.meta.dir, '..', '..', 'plugin.json');
+
+    const pluginJson = JSON.parse(fs.readFileSync(pluginJsonPath, 'utf-8')) as {
+      version: string;
+      commands: Array<{ name: string; description: string }>;
+      tools: string[];
+    };
+
+    const expectedManifest = buildPluginManifest();
+
+    expect(pluginJson.version).toBe(expectedManifest.version);
+    expect(pluginJson.commands).toEqual([...EXPECTED_COMMANDS]);
+    expect(pluginJson.tools).toEqual([...EXPECTED_TOOLS]);
+    expect(pluginJson).toEqual(expectedManifest);
   });
 
   it("writes logical active-feature names and status fallback prefers the shared pointer", async () => {
@@ -1404,24 +1420,17 @@ Do it
 
     await hooks.tool!.hive_feature_create.execute({ name: "active" }, createToolContext("sess"));
 
-    // system.transform should still inject HIVE_SYSTEM_PROMPT and status hint
-    const output = { system: [] as string[] };
-    await hooks["experimental.chat.system.transform"]?.({ agent: "hive-master" }, output);
-    output.system.push("## Base Agent Prompt");
+    expect(hooks["experimental.chat.system.transform" as keyof typeof hooks]).toBeUndefined();
 
-    const joined = output.system.join("\n");
-    expect(joined).toContain("## Hive — Active Session");
-    expect(joined).not.toContain("Use hive_status to check feature state before starting work");
-    expect(joined).not.toContain("Use hive_plan_read to see plan comments");
-    
-    // Auto-loaded skills are now injected via config hook (prompt field), NOT system.transform
-    // Verify by checking the agent's prompt field in config
     const opencodeConfig: Record<string, unknown> = { agent: {} };
     await hooks.config!(opencodeConfig);
     
     const agentConfig = (opencodeConfig.agent as Record<string, { prompt?: string }>)["hive-master"];
     expect(agentConfig).toBeDefined();
     expect(agentConfig.prompt).toBeDefined();
+    expect(agentConfig.prompt).toContain("## Hive — Active Session");
+    expect(agentConfig.prompt).not.toContain("Use hive_status to check feature state before starting work");
+    expect(agentConfig.prompt).not.toContain("Use hive_plan_read to see plan comments");
     
     const brainstormingSkill = BUILTIN_SKILLS.find((skill) => skill.name === "brainstorming");
     expect(brainstormingSkill).toBeDefined();
@@ -1438,8 +1447,6 @@ Do it
     expect(agents["forager-ui"]).toBeDefined();
     expect(agents["reviewer-security"]).toBeDefined();
     
-    // Verify status hint is in system.transform (this is still there)
-    expect(joined).toContain("### Current Hive Status");
   });
 
   it("blocks hive_worktree_create when dependencies are not done", async () => {

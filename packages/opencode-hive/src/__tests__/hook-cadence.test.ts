@@ -7,6 +7,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
+const PRIMARY_HOOK = 'chat.message';
+const SECONDARY_HOOK = 'experimental.chat.messages.transform';
+
 describe('Hook Cadence Logic', () => {
   let configService: ConfigService;
   let configPath: string;
@@ -55,9 +58,9 @@ describe('Hook Cadence Logic', () => {
 
   describe('Default behavior (no config)', () => {
     it('fires every turn when hook_cadence is not configured', () => {
-      const results = [];
+      const results: boolean[] = [];
       for (let i = 0; i < 10; i++) {
-        results.push(callShouldExecute('experimental.chat.system.transform'));
+        results.push(callShouldExecute(PRIMARY_HOOK));
       }
       expect(results).toEqual([true, true, true, true, true, true, true, true, true, true]);
     });
@@ -69,16 +72,16 @@ describe('Hook Cadence Logic', () => {
         configPath,
         JSON.stringify({
           hook_cadence: {
-            'experimental.chat.system.transform': 1,
+            [PRIMARY_HOOK]: 1,
           },
         })
       );
     });
 
     it('fires every turn', () => {
-      const results = [];
+      const results: boolean[] = [];
       for (let i = 0; i < 10; i++) {
-        results.push(callShouldExecute('experimental.chat.system.transform'));
+        results.push(callShouldExecute(PRIMARY_HOOK));
       }
       expect(results).toEqual([true, true, true, true, true, true, true, true, true, true]);
     });
@@ -90,16 +93,16 @@ describe('Hook Cadence Logic', () => {
         configPath,
         JSON.stringify({
           hook_cadence: {
-            'experimental.chat.system.transform': 3,
+            [PRIMARY_HOOK]: 3,
           },
         })
       );
     });
 
     it('fires on turns 1, 4, 7, 10', () => {
-      const results = [];
+      const results: boolean[] = [];
       for (let i = 0; i < 10; i++) {
-        results.push(callShouldExecute('experimental.chat.system.transform'));
+        results.push(callShouldExecute(PRIMARY_HOOK));
       }
       expect(results).toEqual([
         true,  // turn 1
@@ -122,16 +125,16 @@ describe('Hook Cadence Logic', () => {
         configPath,
         JSON.stringify({
           hook_cadence: {
-            'experimental.chat.system.transform': 5,
+            [PRIMARY_HOOK]: 5,
           },
         })
       );
     });
 
     it('fires on turns 1, 6, 11', () => {
-      const results = [];
+      const results: boolean[] = [];
       for (let i = 0; i < 12; i++) {
-        results.push(callShouldExecute('experimental.chat.system.transform'));
+        results.push(callShouldExecute(PRIMARY_HOOK));
       }
       expect(results).toEqual([
         true,  // turn 1
@@ -156,14 +159,14 @@ describe('Hook Cadence Logic', () => {
         configPath,
         JSON.stringify({
           hook_cadence: {
-            'experimental.chat.system.transform': 0,
+            [PRIMARY_HOOK]: 0,
           },
         })
       );
 
-      const results = [];
+      const results: boolean[] = [];
       for (let i = 0; i < 5; i++) {
-        results.push(callShouldExecute('experimental.chat.system.transform'));
+        results.push(callShouldExecute(PRIMARY_HOOK));
       }
       expect(results).toEqual([true, true, true, true, true]);
     });
@@ -173,14 +176,14 @@ describe('Hook Cadence Logic', () => {
         configPath,
         JSON.stringify({
           hook_cadence: {
-            'experimental.chat.system.transform': -3,
+            [PRIMARY_HOOK]: -3,
           },
         })
       );
 
-      const results = [];
+      const results: boolean[] = [];
       for (let i = 0; i < 5; i++) {
-        results.push(callShouldExecute('experimental.chat.system.transform'));
+        results.push(callShouldExecute(PRIMARY_HOOK));
       }
       expect(results).toEqual([true, true, true, true, true]);
     });
@@ -190,14 +193,14 @@ describe('Hook Cadence Logic', () => {
         configPath,
         JSON.stringify({
           hook_cadence: {
-            'experimental.chat.system.transform': 2.5,
+            [PRIMARY_HOOK]: 2.5,
           },
         })
       );
 
-      const results = [];
+      const results: boolean[] = [];
       for (let i = 0; i < 5; i++) {
-        results.push(callShouldExecute('experimental.chat.system.transform'));
+        results.push(callShouldExecute(PRIMARY_HOOK));
       }
       expect(results).toEqual([true, true, true, true, true]);
     });
@@ -216,7 +219,7 @@ describe('Hook Cadence Logic', () => {
     });
 
     it('enforces cadence=1 when safetyCritical flag is set', () => {
-      const results = [];
+      const results: boolean[] = [];
       for (let i = 0; i < 10; i++) {
         results.push(callShouldExecute('tool.execute.before', { safetyCritical: true }));
       }
@@ -230,33 +233,33 @@ describe('Hook Cadence Logic', () => {
         configPath,
         JSON.stringify({
           hook_cadence: {
-            'experimental.chat.system.transform': 3,
-            'chat.message': 2,
+            [PRIMARY_HOOK]: 3,
+            [SECONDARY_HOOK]: 2,
           },
         })
       );
     });
 
     it('maintains separate turn counters for each hook', () => {
-      const systemResults = [];
-      const messageResults = [];
+      const primaryResults: boolean[] = [];
+      const secondaryResults: boolean[] = [];
 
       for (let i = 0; i < 6; i++) {
-        systemResults.push(callShouldExecute('experimental.chat.system.transform'));
-        messageResults.push(callShouldExecute('chat.message'));
+        primaryResults.push(callShouldExecute(PRIMARY_HOOK));
+        secondaryResults.push(callShouldExecute(SECONDARY_HOOK));
       }
 
-      // experimental.chat.system.transform with cadence=3: fires on turns 1, 4
-      expect(systemResults).toEqual([true, false, false, true, false, false]);
+      // chat.message with cadence=3: fires on turns 1, 4
+      expect(primaryResults).toEqual([true, false, false, true, false, false]);
 
-      // chat.message with cadence=2: fires on turns 1, 3, 5
-      expect(messageResults).toEqual([true, false, true, false, true, false]);
+      // experimental.chat.messages.transform with cadence=2: fires on turns 1, 3, 5
+      expect(secondaryResults).toEqual([true, false, true, false, true, false]);
     });
   });
 
   describe('ConfigService.getHookCadence', () => {
     it('returns 1 when hook_cadence is not configured', () => {
-      expect(configService.getHookCadence('experimental.chat.system.transform')).toBe(1);
+      expect(configService.getHookCadence(PRIMARY_HOOK)).toBe(1);
     });
 
     it('returns configured cadence value', () => {
@@ -264,14 +267,14 @@ describe('Hook Cadence Logic', () => {
         configPath,
         JSON.stringify({
           hook_cadence: {
-            'experimental.chat.system.transform': 5,
+            [PRIMARY_HOOK]: 5,
           },
         })
       );
 
       // Need to create a new ConfigService to pick up the new config
       configService = new ConfigService();
-      expect(configService.getHookCadence('experimental.chat.system.transform')).toBe(5);
+      expect(configService.getHookCadence(PRIMARY_HOOK)).toBe(5);
     });
 
     it('returns 1 for unconfigured hooks even when hook_cadence exists', () => {
@@ -279,13 +282,13 @@ describe('Hook Cadence Logic', () => {
         configPath,
         JSON.stringify({
           hook_cadence: {
-            'experimental.chat.system.transform': 3,
+            [PRIMARY_HOOK]: 3,
           },
         })
       );
 
       configService = new ConfigService();
-      expect(configService.getHookCadence('chat.message')).toBe(1);
+      expect(configService.getHookCadence(SECONDARY_HOOK)).toBe(1);
     });
   });
 
@@ -295,13 +298,13 @@ describe('Hook Cadence Logic', () => {
 
       // ConfigService should fall back to defaults
       configService = new ConfigService();
-      expect(configService.getHookCadence('experimental.chat.system.transform')).toBe(1);
+      expect(configService.getHookCadence(PRIMARY_HOOK)).toBe(1);
     });
 
     it('handles missing config file gracefully', () => {
       // Don't create config file
       configService = new ConfigService();
-      expect(configService.getHookCadence('experimental.chat.system.transform')).toBe(1);
+      expect(configService.getHookCadence(PRIMARY_HOOK)).toBe(1);
     });
 
     it('handles config with null hook_cadence', () => {
@@ -313,21 +316,21 @@ describe('Hook Cadence Logic', () => {
       );
 
       configService = new ConfigService();
-      expect(configService.getHookCadence('experimental.chat.system.transform')).toBe(1);
+      expect(configService.getHookCadence(PRIMARY_HOOK)).toBe(1);
     });
 
     it('defaults to cadence=1 when config service is unavailable', () => {
-      const results = [];
+      const results: boolean[] = [];
       for (let i = 0; i < 5; i++) {
-        results.push(shouldExecuteHook('experimental.chat.system.transform', undefined, turnCounters));
+        results.push(shouldExecuteHook(PRIMARY_HOOK, undefined, turnCounters));
       }
       expect(results).toEqual([true, true, true, true, true]);
     });
 
     it('uses fallback counters when turn counters are unavailable', () => {
-      const results = [];
+      const results: boolean[] = [];
       for (let i = 0; i < 5; i++) {
-        results.push(shouldExecuteHook('experimental.chat.system.transform', configService, undefined));
+        results.push(shouldExecuteHook(PRIMARY_HOOK, configService, undefined));
       }
       expect(results).toEqual([true, true, true, true, true]);
     });
@@ -349,7 +352,7 @@ describe('Hook Cadence Logic', () => {
 
     it('maintains independent counters when hooks are called concurrently', () => {
       // Simulate multiple hooks being called in the same turn
-      const results = [];
+      const results: Array<{ turn: number; hookA: boolean; hookB: boolean; hookC: boolean }> = [];
       for (let turn = 0; turn < 10; turn++) {
         results.push({
           turn: turn + 1,
