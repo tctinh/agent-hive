@@ -396,7 +396,7 @@ describe("e2e: Forager compaction loop mitigation (in-process)", () => {
     expect(compactionPrompt).not.toMatch(/use hive_status to check feature state/i);
   });
 
-  it("system transform does not reintroduce broad startup instruction after compaction", async () => {
+  it("runtime contract excludes unsupported startup/compaction hooks", async () => {
     const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
     const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
 
@@ -410,12 +410,8 @@ describe("e2e: Forager compaction loop mitigation (in-process)", () => {
     };
     const hooks = await plugin(ctx);
 
-    const output = { system: [] as string[] };
-    await hooks["experimental.chat.system.transform"]?.({ agent: "forager-worker" }, output);
-
-    const joined = output.system.join("\n");
-    expect(joined).not.toMatch(/use hive_status to check feature state before starting work/i);
-    expect(joined).not.toMatch(/use hive_plan_read to see plan comments/i);
+    expect(hooks["experimental.chat.system.transform" as keyof typeof hooks]).toBeUndefined();
+    expect(hooks["experimental.session.compacting" as keyof typeof hooks]).toBeUndefined();
   });
 
   it("compacted forager flow reaches commit-capable step without hive_status stall", async () => {
@@ -485,58 +481,4 @@ Test compaction resume flow.
     expect(commitResult.status).toBe("completed");
   });
 
-  it("compaction hook output appended to session context does not contain hive_status", async () => {
-    const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
-    const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
-
-    const ctx: PluginInput = {
-      directory: testRoot,
-      worktree: testRoot,
-      serverUrl: new URL("http://localhost:1"),
-      project: { id: "test", worktree: testRoot, time: { created: Date.now() } },
-      client: OPENCODE_CLIENT,
-      $: createStubShellForLoop(),
-    };
-    const hooks = await plugin(ctx);
-
-    const compactionOutput = { context: [] as string[], prompt: undefined as string | undefined };
-    await hooks["experimental.session.compacting"]?.({ sessionID: "sess_compaction" }, compactionOutput);
-
-    expect(compactionOutput.prompt).toBeDefined();
-    expect(compactionOutput.prompt).toContain("Compaction recovery");
-    expect(compactionOutput.prompt).not.toMatch(/hive_status/);
-    const joined = compactionOutput.context.join("\n");
-    expect(joined).not.toMatch(/hive_status/);
-  });
-
-  it("compaction hook sets both prompt and context for known forager session", async () => {
-    const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
-    const { SessionService } = await import("hive-core");
-    const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
-
-    const ctx: PluginInput = {
-      directory: testRoot,
-      worktree: testRoot,
-      serverUrl: new URL("http://localhost:1"),
-      project: { id: "test", worktree: testRoot, time: { created: Date.now() } },
-      client: OPENCODE_CLIENT,
-      $: createStubShellForLoop(),
-    };
-    const hooks = await plugin(ctx);
-
-    const sessionService = new SessionService(testRoot);
-    sessionService.trackGlobal("sess_forager_e2e", {
-      agent: "forager-worker",
-      sessionKind: "task-worker",
-      workerPromptPath: ".hive/features/test-feature/tasks/01-task/worker-prompt.md",
-    } as any);
-
-    const compactionOutput = { context: [] as string[], prompt: undefined as string | undefined };
-    await hooks["experimental.session.compacting"]?.({ sessionID: "sess_forager_e2e" }, compactionOutput);
-
-    expect(compactionOutput.prompt).toBeDefined();
-    expect(compactionOutput.prompt).toContain("Compaction recovery");
-    expect(compactionOutput.prompt).toContain("Role: Forager");
-    expect(compactionOutput.context.join("\n")).toContain("worker-prompt.md");
-  });
 });
