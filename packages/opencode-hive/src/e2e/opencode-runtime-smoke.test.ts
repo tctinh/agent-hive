@@ -414,6 +414,46 @@ describe("e2e: Forager compaction loop mitigation (in-process)", () => {
     expect(hooks["experimental.session.compacting" as keyof typeof hooks]).toBeUndefined();
   });
 
+  it("exposes OpenCode-only todoProjection in hive_status for primary-session sync", async () => {
+    const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
+    const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
+
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: { id: "test", worktree: testRoot, time: { created: Date.now() } },
+      client: OPENCODE_CLIENT,
+      $: createStubShellForLoop(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = { sessionID: "sess_todo_projection_runtime", messageID: "msg_test", agent: "hive-master", abort: new AbortController().signal };
+
+    await hooks.tool!.hive_feature_create.execute({ name: "runtime-todo-feature" }, toolContext);
+
+    const statusRaw = await hooks.tool!.hive_status.execute(
+      { feature: "runtime-todo-feature" },
+      toolContext,
+    );
+    const status = JSON.parse(statusRaw as string) as {
+      todoProjection?: {
+        managedBy?: string;
+        items?: Array<{ id: string; content: string; status: string; priority: string }>;
+      };
+    };
+
+    expect(status.todoProjection).toMatchObject({
+      managedBy: "opencode-hive",
+    });
+    expect(status.todoProjection?.items).toContainEqual({
+      id: "hive:runtime-todo-feature:feature",
+      content: "Finish the plan for runtime-todo-feature",
+      status: "pending",
+      priority: "high",
+    });
+  });
+
   it("compacted forager flow reaches commit-capable step without hive_status stall", async () => {
     const { execSync } = await import("child_process");
     const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
