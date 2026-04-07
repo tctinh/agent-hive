@@ -207,6 +207,7 @@ import { createVariantHook } from "./hooks/variant-hook.js";
 import { HIVE_SYSTEM_PROMPT, shouldExecuteHook } from "./hooks/system-hook.js";
 import { HIVE_COMMANDS, HIVE_TOOL_NAMES } from './utils/plugin-manifest.js';
 import { buildCheckpointRehydration } from './utils/checkpoint-rehydration.js';
+import { buildTodoProjection } from './utils/todo-projection.js';
 
 /**
  * Core plugin implementation.
@@ -541,6 +542,14 @@ To unblock: Remove .hive/features/${featureDir}/BLOCKED`;
   };
 
   const respond = (payload: Record<string, unknown>) => JSON.stringify(payload, null, 2);
+  const TODO_SYNC_REFRESH_HINT = 'Refresh hive_status() before syncing OpenCode todos.';
+  const appendTodoSyncHint = (message: string): string => `${message}\n\n${TODO_SYNC_REFRESH_HINT}`;
+  const buildTodoSyncState = (reason: string) => ({
+    stale: true,
+    reason,
+    refreshHint: TODO_SYNC_REFRESH_HINT,
+    projectionField: 'todoProjection',
+  });
 
   const buildWorktreeLaunchResponse = async ({
     feature,
@@ -745,6 +754,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         description: `Hive: ${task}`,
         prompt: taskToolPrompt,
       },
+      todoSync: buildTodoSyncState(continueFrom === 'blocked' ? 'task_resumed' : 'task_started'),
       instructions: taskToolInstructions,
     };
 
@@ -1251,7 +1261,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         },
         async execute({ name, ticket }) {
           const feature = featureService.create(name, ticket);
-          return `Feature "${name}" created.
+          return appendTodoSyncHint(`Feature "${name}" created.
 
 ## Discovery Phase Required
 
@@ -1284,7 +1294,7 @@ When writing your plan, include:
 
 These prevent scope creep and re-proposing rejected solutions.
 
-NEXT: Ask your first clarifying question about this feature.`;
+NEXT: Ask your first clarifying question about this feature.`);
         },
       }),
 
@@ -1295,7 +1305,7 @@ NEXT: Ask your first clarifying question about this feature.`;
           const feature = resolveFeature(name);
           if (!feature) return "Error: No feature specified. Create a feature or provide name.";
           featureService.complete(feature);
-          return `Feature "${feature}" marked as completed`;
+          return appendTodoSyncHint(`Feature "${feature}" marked as completed`);
         },
       }),
 
@@ -1342,7 +1352,7 @@ Expand your Discovery section and try again.`;
 
           captureSession(feature, toolContext);
           const planPath = planService.write(feature, content);
-          return `Plan written to ${planPath}. Comments cleared for fresh review. Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History. Review context/overview.md first; plan.md remains execution truth.`;
+          return appendTodoSyncHint(`Plan written to ${planPath}. Comments cleared for fresh review. Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History. Review context/overview.md first; plan.md remains execution truth.`);
         },
       }),
 
@@ -1383,7 +1393,7 @@ Expand your Discovery section and try again.`;
             return `Error: Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`;
           }
           planService.approve(feature);
-          return 'Plan approved. Run hive_tasks_sync to generate tasks. Refresh the overview if approval changed the plan narrative, workstreams, or milestones; context/overview.md is the primary human-facing surface and plan.md remains execution truth.';
+          return appendTodoSyncHint('Plan approved. Run hive_tasks_sync to generate tasks. Refresh the overview if approval changed the plan narrative, workstreams, or milestones; context/overview.md is the primary human-facing surface and plan.md remains execution truth.');
         },
       }),
 
@@ -1404,7 +1414,7 @@ Expand your Discovery section and try again.`;
           if (featureData.status === 'approved') {
             featureService.updateStatus(feature, 'executing');
           }
-          return `Tasks synced: ${result.created.length} created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`;
+          return appendTodoSyncHint(`Tasks synced: ${result.created.length} created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`);
         },
       }),
 
@@ -1436,7 +1446,7 @@ Expand your Discovery section and try again.`;
           if (reason) metadata.reason = reason;
           if (source) metadata.source = source;
           const folder = taskService.create(feature, name, order, Object.keys(metadata).length > 0 ? metadata as any : undefined);
-          return `Manual task created: ${folder}\nDependencies: [${(dependsOn ?? []).join(', ')}]\nReminder: start work with hive_worktree_start to use its worktree, and ensure any subagents work in that worktree too.`;
+          return appendTodoSyncHint(`Manual task created: ${folder}\nDependencies: [${(dependsOn ?? []).join(', ')}]\nReminder: start work with hive_worktree_start to use its worktree, and ensure any subagents work in that worktree too.`);
         },
       }),
 
@@ -1455,7 +1465,7 @@ Expand your Discovery section and try again.`;
             status: status as any,
             summary,
           });
-          return `Task "${task}" updated: status=${updated.status}`;
+          return appendTodoSyncHint(`Task "${task}" updated: status=${updated.status}`);
         },
       }),
 
@@ -1587,6 +1597,7 @@ Expand your Discovery section and try again.`;
               blocker,
               worktreePath: worktree?.path,
               branch: worktree?.branch,
+              todoSync: buildTodoSyncState('task_blocked'),
               message: 'Task blocked. Hive Master will ask user and resume with hive_worktree_create(continueFrom: "blocked", decision: answer)',
               nextAction: 'Wait for orchestrator to collect user decision and resume with continueFrom: "blocked".',
             });
@@ -1687,6 +1698,7 @@ Expand your Discovery section and try again.`;
             worktreePath: worktree?.path,
             branch: worktree?.branch,
             reportPath,
+            todoSync: buildTodoSyncState(status === 'completed' ? 'task_completed' : `task_${status}`),
             message: `Task "${task}" ${status}.`,
             nextAction: 'Use hive_merge to integrate changes. Worktree is preserved for review.',
           });
@@ -1706,7 +1718,7 @@ Expand your Discovery section and try again.`;
           await worktreeService.remove(feature, task);
           taskService.update(feature, task, { status: 'pending' });
 
-          return `Task "${task}" aborted. Status reset to pending.`;
+          return appendTodoSyncHint(`Task "${task}" aborted. Status reset to pending.`);
         },
       }),
 
@@ -1756,6 +1768,7 @@ Expand your Discovery section and try again.`;
 
           return respond({
             ...result,
+            ...(result.success ? { todoSync: buildTodoSyncState('task_merged') } : {}),
             message: responseMessage,
           });
         },
@@ -1954,6 +1967,26 @@ Expand your Discovery section and try again.`;
           const planStatus = featureData.status === 'planning' ? 'draft' :
             featureData.status === 'approved' ? 'approved' :
               featureData.status === 'executing' ? 'locked' : 'none';
+          const todoProjection = buildTodoProjection({
+            feature: {
+              name: feature,
+              status: featureData.status,
+            },
+            plan: {
+              exists: !!plan,
+              status: planStatus,
+              approved: planStatus === 'approved' || planStatus === 'locked',
+            },
+            tasks: {
+              total: tasks.length,
+              pending: pendingTasks.length,
+              inProgress: inProgressTasks.length,
+              done: doneTasks.length,
+              list: tasksSummary,
+              runnable,
+              blockedBy,
+            },
+          });
 
           return respond({
             feature: {
@@ -1992,6 +2025,7 @@ Expand your Discovery section and try again.`;
               fileCount: featureContextFiles.length,
               files: contextSummary,
             },
+            todoProjection,
             nextAction: getNextAction(planStatus, tasksSummary, runnable, !!plan, !!overview),
           });
         },
