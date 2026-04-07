@@ -481,4 +481,23 @@ Test compaction resume flow.
     expect(commitResult.status).toBe("completed");
   });
 
+  it('plugin exposes tool execute after hook for task child-session binding', async () => {
+    const { createOpencodeClient: mkClient } = await import('@opencode-ai/sdk');
+    const OPENCODE_CLIENT = mkClient({ baseUrl: 'http://localhost:1' }) as unknown as PluginInput['client'];
+
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL('http://localhost:1'),
+      project: { id: 'test', worktree: testRoot, time: { created: Date.now() } },
+      client: OPENCODE_CLIENT,
+      $: createStubShellForLoop(),
+    };
+
+    const hooks = await plugin(ctx);
+
+    expect(hooks['tool.execute.after']).toBeDefined();
+    expect(typeof hooks['tool.execute.after']).toBe('function');
+  });
+
 });

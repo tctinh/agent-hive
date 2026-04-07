@@ -2505,4 +2505,142 @@ Do the first thing.
     expect(workerSession.taskFolder).toBe(FIRST_TASK);
     expect(workerSession.workerPromptPath).toContain("worker-prompt.md");
   });
+
+  it('tool.execute.after binds child task-worker session provenance and writes a bounded checkpoint', async () => {
+    const { hooks, toolContext } = await createSingleTaskWorktree(
+      testRoot,
+      'sess_checkpoint_binding',
+      'checkpoint-binding-feature',
+      'Checkpoint Binding Feature',
+      'Yes, this regression test validates that task-worker child session metadata is captured from structured task() output and persisted into the task checkpoint.',
+    );
+
+    await hooks['tool.execute.before']?.(
+      {
+        tool: 'task',
+        sessionID: 'sess_checkpoint_binding',
+        callID: 'call_1',
+      } as any,
+      {
+        args: {
+          subagent_type: 'forager-worker',
+          description: 'Hive: 01-first-task',
+          prompt: 'Follow instructions in @.hive/features/01_checkpoint-binding-feature/tasks/01-first-task/worker-prompt.md',
+        },
+      } as any,
+    );
+
+    await hooks['tool.execute.after']?.(
+      {
+        tool: 'task',
+        sessionID: 'sess_checkpoint_binding',
+        callID: 'call_1',
+      } as any,
+      {
+        metadata: {
+          sessionId: 'sess_child_worker_checkpoint',
+        },
+        output: 'Worker launched.',
+      } as any,
+    );
+
+    const sessionsPath = path.join(testRoot, '.hive', 'sessions.json');
+    const sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf-8'));
+    const childSession = sessions.sessions.find(
+      (s: { sessionId: string }) => s.sessionId === 'sess_child_worker_checkpoint',
+    );
+    expect(childSession).toBeDefined();
+    expect(childSession.featureName).toBe('checkpoint-binding-feature');
+    expect(childSession.taskFolder).toBe(FIRST_TASK);
+    expect(childSession.parentSessionId).toBe('sess_checkpoint_binding');
+    expect(childSession.delegatedAgent).toBe('forager-worker');
+    expect(childSession.childSessionSource).toBe('opencode-task-tool');
+
+    const checkpointPath = path.join(
+      testRoot,
+      '.hive',
+      'features',
+      '01_checkpoint-binding-feature',
+      'tasks',
+      FIRST_TASK,
+      'checkpoint.json',
+    );
+    expect(fs.existsSync(checkpointPath)).toBe(true);
+    const checkpointRaw = fs.readFileSync(checkpointPath, 'utf-8');
+    const checkpoint = JSON.parse(checkpointRaw) as {
+      childSession?: { sessionId?: string; parentSessionId?: string; delegatedAgent?: string };
+      taskFolder?: string;
+    };
+    expect(checkpoint.taskFolder).toBe(FIRST_TASK);
+    expect(checkpoint.childSession?.sessionId).toBe('sess_child_worker_checkpoint');
+    expect(checkpoint.childSession?.parentSessionId).toBe('sess_checkpoint_binding');
+    expect(checkpoint.childSession?.delegatedAgent).toBe('forager-worker');
+    expect(checkpointRaw).not.toContain('Follow instructions in @');
+    expect(checkpointRaw).not.toContain('messageID');
+    expect(checkpointRaw).not.toContain('parts');
+  });
+
+  it('tool.execute.after binds general subagent child sessions without creating task checkpoints', async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL('http://localhost:1'),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+
+    await hooks['tool.execute.before']?.(
+      {
+        tool: 'task',
+        sessionID: 'sess_scout_parent',
+        callID: 'call_scout',
+      } as any,
+      {
+        args: {
+          subagent_type: 'scout-researcher',
+          description: 'Research mismatch',
+          prompt: 'Inspect the runtime mismatch and report back.',
+        },
+      } as any,
+    );
+
+    await hooks['tool.execute.after']?.(
+      {
+        tool: 'task',
+        sessionID: 'sess_scout_parent',
+        callID: 'call_scout',
+      } as any,
+      {
+        metadata: {
+          sessionId: 'sess_child_scout',
+        },
+        output: 'Scout launched.',
+      } as any,
+    );
+
+    const sessionsPath = path.join(testRoot, '.hive', 'sessions.json');
+    const sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf-8'));
+    const childSession = sessions.sessions.find(
+      (s: { sessionId: string }) => s.sessionId === 'sess_child_scout',
+    );
+    expect(childSession).toBeDefined();
+    expect(childSession.parentSessionId).toBe('sess_scout_parent');
+    expect(childSession.delegatedAgent).toBe('scout-researcher');
+    expect(childSession.childSessionKind).toBe('subagent');
+    expect(childSession.taskFolder).toBeUndefined();
+
+    const featureCheckpoint = path.join(
+      testRoot,
+      '.hive',
+      'features',
+      '01_checkpoint-binding-feature',
+      'tasks',
+      FIRST_TASK,
+      'checkpoint.json',
+    );
+    expect(fs.existsSync(featureCheckpoint)).toBe(false);
+  });
 });

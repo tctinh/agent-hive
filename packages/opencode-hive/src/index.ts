@@ -201,6 +201,8 @@ import { calculatePromptMeta, calculatePayloadMeta, checkWarnings } from "./util
 import { applyTaskBudget, applyContextBudget, DEFAULT_BUDGET, type TruncationEvent } from "./utils/prompt-budgeting";
 import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { formatRelativeTime } from "./utils/format";
+import { finalizeTaskCheckpoint, readTaskCheckpoint, updateTaskCheckpoint } from './utils/task-checkpoint.js';
+import { classifyTaskToolLaunch, extractTaskToolChildSessionId, toChildSessionPatch, type TaskToolLaunchState } from './utils/task-session-binding.js';
 import { createVariantHook } from "./hooks/variant-hook.js";
 import { HIVE_SYSTEM_PROMPT, shouldExecuteHook } from "./hooks/system-hook.js";
 import { HIVE_COMMANDS, HIVE_TOOL_NAMES } from './utils/plugin-manifest.js';
@@ -238,6 +240,7 @@ const plugin: Plugin = async (ctx) => {
     baseDir: directory,
     hiveDir: path.join(directory, '.hive'),
   });
+  let pendingTaskToolLaunch: TaskToolLaunchState | undefined;
 
   const customAgentConfigsForClassification = getCustomAgentConfigsCompat(configService);
   const runtimeContext = detectContext(worktree || directory);
@@ -291,6 +294,44 @@ const plugin: Plugin = async (ctx) => {
     const ctx = toolContext as ToolContext;
     if (!ctx?.sessionID) return;
     sessionService.bindFeature(ctx.sessionID, feature, patch as any);
+  };
+
+  const refreshTaskCheckpoint = (
+    feature: string,
+    taskFolder: string,
+    patch: {
+      stateSummary: string;
+      verificationState: string;
+      currentObjective?: string;
+      importantDecisions?: string[];
+      filesInPlay?: string[];
+      nextAction?: string;
+      blocker?: string;
+      childSession?: {
+        sessionId: string;
+        parentSessionId: string;
+        delegatedAgent: string;
+        source: 'opencode-task-tool';
+        kind: 'task-worker' | 'subagent';
+      };
+    },
+  ) => {
+    const current = taskService.getRawStatus(feature, taskFolder);
+    const currentObjective = patch.currentObjective ?? current?.planTitle ?? taskFolder;
+    const existingCheckpoint = readTaskCheckpoint(directory, feature, taskFolder);
+
+    return updateTaskCheckpoint(directory, {
+      featureName: feature,
+      taskFolder,
+      currentObjective,
+      stateSummary: patch.stateSummary,
+      importantDecisions: patch.importantDecisions ?? existingCheckpoint?.importantDecisions ?? [],
+      filesInPlay: patch.filesInPlay ?? existingCheckpoint?.filesInPlay ?? [],
+      verificationState: patch.verificationState,
+      nextAction: patch.nextAction ?? existingCheckpoint?.nextAction,
+      blocker: patch.blocker ?? existingCheckpoint?.blocker,
+      childSession: patch.childSession ?? existingCheckpoint?.childSession,
+    });
   };
 
   type ReplayMessageInfo = {
@@ -638,6 +679,19 @@ To unblock: Remove .hive/features/${featureDir}/BLOCKED`;
       : workerPrompt;
 
     const taskToolPrompt = `Follow instructions in @${relativePromptPath}`;
+
+    refreshTaskCheckpoint(feature, task, {
+      currentObjective: taskInfo.planTitle ?? taskInfo.name,
+      stateSummary: continueFrom === 'blocked'
+        ? 'Task resumed in existing worktree and awaiting child worker session binding.'
+        : 'Task launched and awaiting child worker session binding.',
+      importantDecisions: [
+        'Use the generated worker-prompt attachment as the durable task contract.',
+      ],
+      filesInPlay: [relativePromptPath, '.hive/features/' + resolveFeatureDirectoryName(directory, feature) + `/tasks/${task}/spec.md`],
+      verificationState: 'Not run in parent session.',
+      nextAction: 'Wait for the built-in task() tool to return structured child session metadata.',
+    });
 
     const taskToolInstructions = `## Delegation Required
 
@@ -1075,6 +1129,13 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
     },
 
     "tool.execute.before": async (input, output) => {
+      pendingTaskToolLaunch = classifyTaskToolLaunch({
+        tool: input.tool,
+        sessionID: input.sessionID,
+        args: output.args as any,
+        previous: pendingTaskToolLaunch,
+      });
+
       // Cadence gate: check if this hook should execute this turn
       // SAFETY-CRITICAL: This hook wraps commands for Docker sandbox isolation.
       // Setting cadence > 1 could allow unsafe commands through.
@@ -1110,6 +1171,54 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       const wrapped = DockerSandboxService.wrapCommand(workdir, command, sandboxConfig);
       output.args.command = wrapped;
       output.args.workdir = undefined; // docker command runs on host
+    },
+
+    "tool.execute.after": async (input, output) => {
+      if (input.tool !== 'task') {
+        pendingTaskToolLaunch = undefined;
+        return;
+      }
+
+      const launch = pendingTaskToolLaunch;
+      pendingTaskToolLaunch = undefined;
+      if (!launch) {
+        return;
+      }
+
+      const childSessionId = extractTaskToolChildSessionId(output);
+      if (!childSessionId) {
+        return;
+      }
+
+      const sessionPatch = toChildSessionPatch(launch, childSessionId);
+      if (sessionPatch.featureName) {
+        sessionService.bindFeature(childSessionId, sessionPatch.featureName, sessionPatch as any);
+      } else {
+        sessionService.trackGlobal(childSessionId, sessionPatch as any);
+      }
+
+      if (launch.kind === 'task-worker' && launch.featureName && launch.taskFolder) {
+        taskService.patchBackgroundFields(launch.featureName, launch.taskFolder, {
+          workerSession: {
+            sessionId: childSessionId,
+            agent: launch.delegatedAgent,
+            mode: 'delegate',
+          },
+        });
+
+        refreshTaskCheckpoint(launch.featureName, launch.taskFolder, {
+          stateSummary: `Bound child ${launch.kind} session ${childSessionId}.`,
+          verificationState: 'Awaiting child worker verification.',
+          nextAction: 'Let the child worker continue and finalize the checkpoint on completion or block.',
+          childSession: {
+            sessionId: childSessionId,
+            parentSessionId: launch.parentSessionId,
+            delegatedAgent: launch.delegatedAgent,
+            source: 'opencode-task-tool',
+            kind: launch.kind,
+          },
+        });
+      }
     },
 
     mcp: builtinMcps,
@@ -1434,6 +1543,14 @@ Expand your Discovery section and try again.`;
 
           // Handle blocked status - don't commit, just update status
           if (status === 'blocked') {
+            finalizeTaskCheckpoint(directory, feature, task, {
+              status: 'blocked',
+              stateSummary: summary,
+              verificationState: 'Blocked before final verification.',
+              nextAction: blocker?.recommendation,
+              blocker: blocker?.reason,
+            });
+
             taskService.update(feature, task, {
               status: 'blocked',
               summary,
@@ -1528,6 +1645,12 @@ Expand your Discovery section and try again.`;
 
           const finalStatus = status === 'completed' ? 'done' : status;
           taskService.update(feature, task, { status: finalStatus as any, summary });
+          finalizeTaskCheckpoint(directory, feature, task, {
+            status: status,
+            stateSummary: summary,
+            verificationState: verificationNote ?? 'Verification evidence recorded in task summary.',
+            nextAction: status === 'completed' ? 'Await merge.' : undefined,
+          });
 
           const worktree = await worktreeService.get(feature, task);
           return respond({
