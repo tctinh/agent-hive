@@ -114,26 +114,38 @@ When using Dynamic Context Pruning (DCP), use a Hive-safe config in `~/.config/o
 
 For local plugin testing, keep OpenCode plugin entry as `"opencode-hive"` (not `"opencode-hive@latest"`).
 
-#### Compaction recovery and session re-anchoring
+#### OpenCode alignment: todos, recovery, and bounded worker replay
 
-OpenCode can compact long sessions. When that happens mid-orchestration or mid-task, Hive needs the session to recover its role and task boundaries without re-reading the whole repository.
+Agent Hive aligns to the OpenCode surfaces that exist today. It does **not** depend on a first-class upstream Hive orchestration API, a native checkpoint API, or a writable subagent todo surface.
 
-The plugin now persists durable session metadata and uses it during `experimental.session.compacting` to rebuild a compact re-anchor prompt.
+At the current plugin/runtime layer, Hive relies on these supported hooks:
 
-At the plugin/runtime layer:
+- `event`
+- `config`
+- `chat.message`
+- `experimental.chat.messages.transform`
+- `tool.execute.before`
 
-- custom Scout-derived agents are treated like other subagents for recovery semantics.
-- the compaction-time handoff stays intentionally small and role-preserving.
-- there is no first-class near-compaction hook to warn Hive before OpenCode actually compacts the session.
+That contract matters because some older wording implied deeper integration than OpenCode currently exposes. The recovery path in this branch is hook-timed and file-backed, not storage-level magic.
 
-Where:
+Todo alignment is also intentionally modest:
+
+- OpenCode todos remain **session-scoped** and **replace-all**.
+- Hive does not add a new upstream todo API.
+- Hive / Architect / Swarm can use OpenCode's built-in `todowrite` / `todoread` tools from the **primary session**.
+- Worker and subagent sessions still follow normal OpenCode limits; they should not be described as independently syncing Hive task state.
+- Operators should treat the OpenCode todo list as a Hive-managed projection refreshed by the primary session at tool boundaries, while preserving unrelated OpenCode todos when syncing.
+
+Compaction recovery uses durable Hive artifacts instead of transcript dumps:
 
 - Global session state is written to `.hive/sessions.json`.
 - Feature-local mirrors are written to `.hive/features/<feature>/sessions.json`.
 - Session classification distinguishes `primary`, `subagent`, `task-worker`, and `unknown`.
-- Primary and subagent recovery can replay the stored user directive once after compaction.
-- Task-worker recovery uses the strict re-anchor plus one bounded worker-specific synthetic replay after compaction.
-- The task-worker replay can reference `.hive/features/<feature>/tasks/<task>/worker-prompt.md`.
+- Primary and subagent recovery can replay the stored user directive once after compaction, with `directiveRecoveryState` enforcing the one-replay-then-escalate contract.
+- Task-worker recovery does **not** replay the whole user directive. It uses task-scoped durable metadata plus one bounded worker replay.
+- The worker replay points back to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` through stored `workerPromptPath` / `taskFolder` metadata.
+
+In practice, the durable task-level checkpoint is the semantic `.hive` artifact set for that task: the task folder, `worker-prompt.md`, bound feature/task/session metadata, and the bounded recovery text that tells the worker exactly how to continue. Hive does **not** persist raw transcript dumps as its recovery contract.
 
 Task-worker recovery is intentionally strict:
 
@@ -147,7 +159,7 @@ Task-worker recovery is intentionally strict:
 - do not use orchestration tools unless the worker prompt explicitly says so
 - continue from the last known point
 
-This split is deliberate: primary and subagent sessions replay the stored user directive once after compaction, while task-workers also receive one worker-specific synthetic replay after compaction that restates the active task identity and worker boundaries.
+This split is deliberate: primary and subagent sessions replay the stored user directive once after compaction, while task-workers get a worker-specific replay that re-binds the exact task boundary instead of improvising a fresh goal.
 
 Manual tasks follow the same DAG model as plan-backed tasks:
 

@@ -78,6 +78,13 @@ Add `opencode-hive` to your `opencode.json`:
 
 OpenCode handles the rest — no manual npm install needed.
 
+Today, the supported execution contract is still OpenCode-native:
+
+- OpenCode owns sessions, compaction, and todo storage.
+- Hive layers plan/task/worktree state into `.hive/` files and primary-session prompts.
+- Hive / Architect / Swarm can align OpenCode's built-in todo list from the primary session, but Hive does **not** add a new upstream todo write API.
+- Subagents and task workers should not be described as independently writing Hive task todos back into OpenCode.
+
 ### Option B: VS Code companion (recommended with OpenCode)
 
 Install the **Agent Hive** extension for review, comments, and sidebar status:
@@ -290,7 +297,7 @@ Also keep OpenCode plugin config as `"opencode-hive"` (not `"opencode-hive@lates
 
 #### Compaction recovery for Hive sessions
 
-OpenCode session compaction can strip away role and task framing at exactly the point Hive depends on it. Hive now persists enough session metadata to rebuild that framing after compaction.
+OpenCode session compaction can strip away role and task framing at exactly the point Hive depends on it. Hive therefore persists enough semantic `.hive` state to rebuild that framing after compaction without pretending that raw chat history is durable.
 
 Recovery state is stored in two places:
 
@@ -302,12 +309,13 @@ Where:
 - Primary sessions are re-anchored to their current Hive role.
 - Scout and Hygienic subagents are re-anchored as subagents.
 - Forager workers and forager-derived custom agents are re-anchored as task workers.
-- Primary and subagent sessions replay the stored user directive once after compaction.
+- Primary and subagent sessions replay the stored user directive once after compaction, then escalate on later compactions if no new real directive arrived.
 - Task workers are told to re-read `worker-prompt.md` instead of rediscovering the assignment from scratch.
+- The task-scoped recovery contract is semantic and file-backed: task folder identity, `workerPromptPath`, and bounded recovery text are the durable checkpoint surface.
 
 The recovery prompt is intentionally narrow. It reminds the session that compaction happened, restores the expected role, replays the directive only for primary/subagent sessions, points task workers back to `worker-prompt.md`, and tells the agent to continue from where it left off without re-reading the full codebase.
 
-To make it simple: if a long-running Hive session or worker is compacted mid-task, Hive now has a durable breadcrumb trail in `.hive/sessions.json`, feature-local `sessions.json` files, and task `worker-prompt.md` files so the session can resume with the right constraints instead of improvising a new role.
+To make it simple: if a long-running Hive session or worker is compacted mid-task, Hive now has a durable breadcrumb trail in `.hive/sessions.json`, feature-local `sessions.json` files, and task `worker-prompt.md` files so the session can resume with the right constraints instead of improvising a new role. This is a grounded recovery aid, not an upstream OpenCode checkpoint API.
 
 ---
 
@@ -364,8 +372,16 @@ Recovery involves the following:
 
 1. The plugin records durable session metadata as the session runs.
 2. Feature-aware tool boundaries attach feature, task, and worker-prompt metadata when that metadata becomes known.
-3. When OpenCode compacts a session, the compaction hook rebuilds a minimal re-anchor prompt from that durable state.
-4. Task workers get their `worker-prompt.md` path added back into context so they can recover the exact assignment without broad rediscovery.
+3. Child-session provenance is captured through the current OpenCode task/subagent lifecycle that Hive can observe, so status/recovery can point back to the right task worker instead of guessing.
+4. When OpenCode emits `session.compacted`, Hive rebuilds a minimal re-anchor prompt from that durable state and replays it through `experimental.chat.messages.transform`.
+5. Task workers get their `worker-prompt.md` path added back into context so they can recover the exact assignment without broad rediscovery.
+
+Todo alignment follows a similarly grounded contract:
+
+- OpenCode todos are session-scoped and replace-all.
+- Hive sync is primary-session mediated through OpenCode's built-in todo tools.
+- Hive's prompts tell primary agents to preserve non-Hive todo entries during sync rather than replacing the whole list blindly.
+- No upstream change in this feature gives subagents first-class todo write access.
 
 This recovery model has a strict ownership boundary:
 
@@ -381,6 +397,7 @@ Some notes:
 - Custom subagents derived from `hygienic-reviewer` are treated as subagents.
 - One-recovery-attempt escalation means a primary or subagent session gets one normal directive replay cycle after compaction, then must escalate back to the parent/orchestrator instead of looping through repeated compact-and-replay retries.
 - The recovery prompt avoids telling agents to call broad status tools or re-scan the repository because that tends to recreate drift after compaction.
+- OpenCode still does not expose a public Hive-specific todo write API or a first-class native checkpoint API; the durable truth remains Hive's `.hive` artifacts plus bounded hook-timed refresh.
 
 ---
 
@@ -539,7 +556,7 @@ Visual management without leaving your editor:
 2. **opencode-hive plugin** — Installed in your OpenCode configuration
 3. **vscode-hive extension** — For visual management in VS Code
 
-The extension watches your `.hive/` directory and displays the current state. All planning and execution happens through OpenCode.
+The extension watches your `.hive/` directory and displays the current state. All planning and execution happens through OpenCode. In this feature, todo alignment and compaction recovery still come from the OpenCode runtime plus `.hive` artifacts; the extension is only a review/status surface.
 
 ### Using the Extension
 

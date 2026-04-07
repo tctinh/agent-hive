@@ -103,6 +103,8 @@ Tracked metadata can include:
 - `directivePrompt`
 - replay flags and activity metadata
 
+This metadata is also the current child-session provenance surface that Hive can rely on inside OpenCode today. Hive observes the current task/subagent lifecycle, records which role/session/task was active, and uses that provenance during recovery and status reporting. It does not rely on a first-class upstream child-session ownership API because OpenCode does not expose one.
+
 ### Session kinds
 
 Hive distinguishes `primary`, `subagent`, `task-worker`, and `unknown` sessions.
@@ -120,12 +122,24 @@ When OpenCode emits a compaction event, Hive rebuilds a minimal re-anchor prompt
 - Primary and subagent sessions can restore the last real user directive through post-compaction replay, with `directiveRecoveryState` tracking whether recovery is still available for the current directive.
 - For primary/subagent sessions the state machine is `available -> consumed -> escalated`, so one normal replay attempt is allowed before later compactions switch the session into escalation-only behavior.
 - A new real directive resets the state so the next real assignment can use one fresh recovery cycle instead of inheriting the old session's terminal state.
-- Task-worker sessions do not restore the full user directive. They recover from durable worktree metadata, re-read `worker-prompt.md`, and receive one bounded worker-specific synthetic replay that restates the active task identity and worker boundaries.
+- Task-worker sessions do not restore the full user directive. They recover from durable task-scoped metadata, re-read `worker-prompt.md`, and receive one bounded worker-specific synthetic replay that restates the active task identity and worker boundaries.
 - If `workerPromptPath` was stored explicitly, Hive uses it. Otherwise it reconstructs the expected `.hive/features/<feature>/tasks/<task>/worker-prompt.md` path from `featureName` and `taskFolder`.
 - Recovery prompts tell sessions not to switch roles, not to rediscover state through status tools, and not to re-read the full codebase.
 - Worker recovery stays intentionally narrow: keep the same role, finish only the current assignment, re-read `worker-prompt.md`, do not merge, and do not start the next task.
 
-This keeps recovery narrow and deterministic: orchestrators recover their role and directive, while workers recover their exact task contract without drifting into orchestration.
+This keeps recovery narrow and deterministic: orchestrators recover their role and directive, while workers recover their exact task contract without drifting into orchestration. In operator terms, the durable checkpoint is task-level semantic `.hive` state, not transcript replay.
+
+## Todo Alignment
+
+Hive's OpenCode todo alignment is intentionally scoped to the primary session contract that exists today:
+
+- OpenCode todo state is session-scoped.
+- OpenCode todo writes replace the session's todo list rather than patching individual items.
+- Hive / Architect / Swarm can manage that list through OpenCode's built-in todo tools.
+- Subagents and task workers should not be modeled as first-class todo writers.
+- Hive therefore treats the visible OpenCode todo list as a primary-session projection of Hive state and refreshes it at safe orchestration boundaries.
+
+This feature does not introduce a new upstream OpenCode todo API. The source of truth for task state remains `.hive`, while the OpenCode todo list is the session-facing projection.
 
 ## Task Lifecycle
 
