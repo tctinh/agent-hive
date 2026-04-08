@@ -125,6 +125,7 @@ At the current plugin/runtime layer, Hive relies on these supported hooks:
 - `chat.message`
 - `experimental.chat.messages.transform`
 - `tool.execute.before`
+- `tool.execute.after`
 
 That contract matters because some older wording implied deeper integration than OpenCode currently exposes. The recovery path in this branch is hook-timed and file-backed, not storage-level magic.
 
@@ -142,10 +143,11 @@ Compaction recovery uses durable Hive artifacts instead of transcript dumps:
 - Feature-local mirrors are written to `.hive/features/<feature>/sessions.json`.
 - Session classification distinguishes `primary`, `subagent`, `task-worker`, and `unknown`.
 - Primary and subagent recovery can replay the stored user directive once after compaction, with `directiveRecoveryState` enforcing the one-replay-then-escalate contract.
-- Task-worker recovery does **not** replay the whole user directive. It uses task-scoped durable metadata plus one bounded worker replay.
-- The worker replay points back to `.hive/features/<feature>/tasks/<task>/worker-prompt.md` through stored `workerPromptPath` / `taskFolder` metadata.
+- Task-worker recovery does **not** replay the whole user directive. Hive marks the parent/orchestrator session for replay after child idle transitions and after `task()` returns.
+- The selected replay prefers `.hive/features/<feature>/tasks/<task>/checkpoint.json` as the primary semantic recovery artifact, then points back to `worker-prompt.md`, `status.json`, `spec.md`, and `report.md` as bounded support files.
+- The replay text is injected into the parent/orchestrator session through `experimental.chat.messages.transform`, using stored `workerPromptPath` / `taskFolder` metadata instead of raw child transcript dumps.
 
-In practice, the durable task-level checkpoint is the semantic `.hive` artifact set for that task: the task folder, `worker-prompt.md`, bound feature/task/session metadata, and the bounded recovery text that tells the worker exactly how to continue. Hive does **not** persist raw transcript dumps as its recovery contract.
+In practice, the durable task-level checkpoint is the semantic `.hive` artifact set for that task, with `checkpoint.json` as the primary recovery artifact and `worker-prompt.md` plus bound feature/task/session metadata as the re-entry surface. Hive does **not** persist raw transcript dumps as its recovery contract.
 
 Task-worker recovery is intentionally strict:
 
@@ -159,7 +161,7 @@ Task-worker recovery is intentionally strict:
 - do not use orchestration tools unless the worker prompt explicitly says so
 - continue from the last known point
 
-This split is deliberate: primary and subagent sessions replay the stored user directive once after compaction, while task-workers get a worker-specific replay that re-binds the exact task boundary instead of improvising a fresh goal.
+This split is deliberate: primary and subagent sessions replay the stored user directive once after compaction, while task-worker progress is replayed into the parent/orchestrator session from the selected task checkpoint so the next turn resumes the exact task boundary instead of improvising a fresh goal.
 
 Manual tasks follow the same DAG model as plan-backed tasks:
 

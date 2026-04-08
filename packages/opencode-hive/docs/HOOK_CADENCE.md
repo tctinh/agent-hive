@@ -4,6 +4,8 @@
 
 The hook cadence system lets you control how often selected OpenCode plugin hooks fire. In the current runtime contract, cadence applies to supported hooks such as `chat.message` and `experimental.chat.messages.transform`; it does not imply access to unsupported startup or pre-compaction hooks.
 
+The plugin's declared supported runtime surface in this branch is broader than the cadence-tuned subset: `event`, `config`, `chat.message`, `experimental.chat.messages.transform`, `tool.execute.before`, and `tool.execute.after` are all supported hooks. Cadence is only documented here for the hooks where turn gating is an intentional operator control.
+
 ## Motivation
 
 Some supported hooks can be useful on every turn, but not all of them need to run at the same cadence. Cadence gives operators a bounded way to trade refresh frequency against token cost without claiming deeper runtime coordination than OpenCode currently exposes.
@@ -37,6 +39,8 @@ Add a `hook_cadence` field to your `~/.config/opencode/agent_hive.json`:
 | `chat.message` | Applies configured agent variant metadata | 1 | 1 |
 | `experimental.chat.messages.transform` | Replays bounded post-compaction recovery context when needed | 1 | 1-2 |
 | `tool.execute.before` | Docker sandbox command wrapping | 1 | **1 (SAFETY-CRITICAL)** |
+
+`tool.execute.after` is also part of the supported hook surface and is used to bind child session provenance plus parent-session replay selection after `task()` returns, but it is not currently exposed as a cadence-tuned operator knob in this document.
 
 ## Behavior
 
@@ -170,8 +174,9 @@ bun test src/__tests__/hook-cadence.test.ts
 If local docs or prompts still mention unsupported hooks such as `experimental.chat.system.transform` or `experimental.session.compacting`, treat that wording as stale. The supported recovery path in this branch is:
 
 - `session.compacted` event observation
+- `session.status` idle observation and `tool.execute.after` task-return handling to mark replay on the parent/orchestrator session when task workers hand control back
 - bounded replay through `experimental.chat.messages.transform`
-- durable `.hive` session/task artifacts such as `worker-prompt.md`
+- durable `.hive` task artifacts, with `checkpoint.json` as the primary semantic recovery artifact and `worker-prompt.md` as the re-entry prompt path
 
 ### Safety-critical hook warning
 
