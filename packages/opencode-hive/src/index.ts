@@ -1283,17 +1283,17 @@ Expand your Discovery section and try again.`;
       }),
 
       hive_task_create: tool({
-        description: 'Create manual task (not from plan). Manual tasks always have explicit dependsOn (default: []). Provide structured metadata for useful spec.md and worker prompt.',
+        description: 'Create append-only manual task (not from plan). Omit order to use the next slot. Explicit dependsOn defaults to [] and is only allowed when every dependency already exists and is done. Provide structured metadata for useful spec.md and worker prompt.',
         args: {
           name: tool.schema.string().describe('Task name'),
-          order: tool.schema.number().optional().describe('Task order'),
+          order: tool.schema.number().optional().describe('Task order. Omit to use the next append-only slot; explicit order must equal that next slot.'),
           feature: tool.schema.string().optional().describe('Feature name (defaults to detection or single feature)'),
           description: tool.schema.string().optional().describe('What the worker needs to achieve'),
           goal: tool.schema.string().optional().describe('Why this task exists and what done means'),
           acceptanceCriteria: tool.schema.array(tool.schema.string()).optional().describe('Specific observable outcomes'),
           references: tool.schema.array(tool.schema.string()).optional().describe('File paths or line ranges relevant to this task'),
           files: tool.schema.array(tool.schema.string()).optional().describe('Files likely to be modified'),
-          dependsOn: tool.schema.array(tool.schema.string()).optional().describe('Task folder names this task depends on (default: [] for no dependencies)'),
+          dependsOn: tool.schema.array(tool.schema.string()).optional().describe('Task folder names this task depends on (default: [] for no dependencies). Explicit dependsOn is allowed only when every dependency already exists and is done; review-sourced tasks must omit it.'),
           reason: tool.schema.string().optional().describe('Why this task was created'),
           source: tool.schema.string().optional().describe('Origin: review, operator, or ad_hoc'),
         },

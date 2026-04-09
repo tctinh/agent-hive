@@ -133,8 +133,15 @@ export class TaskService {
    * Index ensures alphabetical sort = chronological order.
    */
   create(featureName: string, name: string, order?: number, metadata?: ManualTaskMetadata): string {
-    const tasksPath = getTasksPath(this.projectRoot, featureName);
     const existingFolders = this.listFolders(featureName);
+    const nextOrder = this.getNextOrder(existingFolders);
+
+    if (order !== undefined && order !== nextOrder) {
+      throw new Error(
+        `Manual tasks are append-only: requested order ${order} does not match the next available order ${nextOrder}. ` +
+        `Intermediate insertion requires plan amendment.`
+      );
+    }
     
     if (metadata?.source === 'review' && metadata.dependsOn && metadata.dependsOn.length > 0) {
       throw new Error(
@@ -144,24 +151,25 @@ export class TaskService {
       );
     }
 
-    const nextOrder = order ?? this.getNextOrder(existingFolders);
-    const folder = `${String(nextOrder).padStart(2, '0')}-${name}`;
+    const dependsOn = metadata?.dependsOn ?? [];
+    this.validateManualTaskDependsOn(featureName, dependsOn);
+
+    const resolvedOrder = order ?? nextOrder;
+    const folder = `${String(resolvedOrder).padStart(2, '0')}-${name}`;
 
     const collision = existingFolders.find(f => {
       const match = f.match(/^(\d+)-/);
-      return match && parseInt(match[1], 10) === nextOrder;
+      return match && parseInt(match[1], 10) === resolvedOrder;
     });
     if (collision) {
       throw new Error(
-        `Task folder collision: order ${nextOrder} already exists as "${collision}". ` +
+        `Task folder collision: order ${resolvedOrder} already exists as "${collision}". ` +
         `Choose a different order number or omit to auto-increment.`
       );
     }
 
     const taskPath = getTaskPath(this.projectRoot, featureName, folder);
     ensureDir(taskPath);
-
-    const dependsOn = metadata?.dependsOn ?? [];
 
     const status: TaskStatus = {
       status: 'pending',
@@ -640,6 +648,26 @@ export class TaskService {
       .filter(n => !isNaN(n));
     
     return Math.max(...orders, 0) + 1;
+  }
+
+  private validateManualTaskDependsOn(featureName: string, dependsOn: string[]): void {
+    for (const dependency of dependsOn) {
+      const dependencyStatus = this.getRawStatus(featureName, dependency);
+
+      if (!dependencyStatus) {
+        throw new Error(
+          `Manual tasks are append-only: dependency "${dependency}" does not exist. ` +
+          `Dependencies on unfinished work require plan amendment.`
+        );
+      }
+
+      if (dependencyStatus.status !== 'done') {
+        throw new Error(
+          `Manual tasks are append-only: dependency "${dependency}" is ${dependencyStatus.status}, not done. ` +
+          `Dependencies on unfinished work require plan amendment.`
+        );
+      }
+    }
   }
 
   private parseTasksFromPlan(content: string): ParsedTask[] {

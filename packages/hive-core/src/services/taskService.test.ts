@@ -1369,12 +1369,67 @@ Align documentation wording.
       expect(status?.dependsOn).toEqual(["01-setup"]);
     });
 
-    it("rejects order collision with existing task folder", () => {
+    it("accepts explicit order when it matches the next append-only slot", () => {
+      const featureName = "test-feature";
+      setupFeature(featureName);
+      setupTask(featureName, "01-existing-task", { status: "done", origin: "plan", dependsOn: [] });
+
+      const folder = service.create(featureName, "next-task", 2);
+
+      expect(folder).toBe("02-next-task");
+    });
+
+    it("rejects explicit order lower than the next append-only slot", () => {
+      const featureName = "test-feature";
+      setupFeature(featureName);
+      setupTask(featureName, "01-existing-task", { status: "done", origin: "plan", dependsOn: [] });
+
+      expect(() => service.create(featureName, "inserted-task", 1)).toThrow(
+        /append-only|intermediate insertion requires plan amendment|plan amendment/i
+      );
+    });
+
+    it("rejects explicit order higher than the next append-only slot", () => {
+      const featureName = "test-feature";
+      setupFeature(featureName);
+      setupTask(featureName, "01-existing-task", { status: "done", origin: "plan", dependsOn: [] });
+
+      expect(() => service.create(featureName, "far-future-task", 99)).toThrow(
+        /append-only|intermediate insertion requires plan amendment|plan amendment/i
+      );
+    });
+
+    it("rejects explicit dependsOn when the target task is missing", () => {
+      const featureName = "test-feature";
+      setupFeature(featureName);
+
+      expect(() =>
+        service.create(featureName, "follow-up", undefined, {
+          dependsOn: ["01-missing-task"],
+        })
+      ).toThrow(/append-only|dependencies on unfinished work require plan amendment|plan amendment/i);
+    });
+
+    it("rejects explicit dependsOn when the target task is not done", () => {
+      const featureName = "test-feature";
+      setupFeature(featureName);
+      setupTask(featureName, "01-setup", { status: "pending", origin: "plan", dependsOn: [] });
+
+      expect(() =>
+        service.create(featureName, "follow-up", undefined, {
+          dependsOn: ["01-setup"],
+        })
+      ).toThrow(/dependencies on unfinished work require plan amendment|plan amendment/i);
+    });
+
+    it("rejects explicit order that reuses an occupied non-append slot", () => {
       const featureName = "test-feature";
       setupFeature(featureName);
       setupTask(featureName, "05-existing-task", { status: "pending", origin: "plan", dependsOn: [] });
 
-      expect(() => service.create(featureName, "new-task", 5)).toThrow(/collision|already exists/i);
+      expect(() => service.create(featureName, "new-task", 5)).toThrow(
+        /append-only|intermediate insertion requires plan amendment|plan amendment/i
+      );
     });
 
     it("rejects review-sourced manual tasks with explicit dependsOn", () => {

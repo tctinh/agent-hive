@@ -2739,6 +2739,62 @@ Also wait for task one.
         "multiple_runnable_tasks",
       ],
     });
+  it("rejects manual-task insertion outside the next append-only slot", async () => {
+    const { hooks, toolContext } = await createHooksForTest(testRoot, 'sess_manual_task_order_guard');
+
+    await hooks.tool!.hive_feature_create.execute({ name: 'manual-order-feature' }, toolContext);
+    await hooks.tool!.hive_plan_write.execute(
+      {
+        content: createSingleTaskPlan(
+          'Manual Order Feature',
+          'Yes, this regression test validates that manual tasks can only be appended at the next deterministic order.'
+        ),
+        feature: 'manual-order-feature',
+      },
+      toolContext,
+    );
+    await hooks.tool!.hive_plan_approve.execute({ feature: 'manual-order-feature' }, toolContext);
+    await hooks.tool!.hive_tasks_sync.execute({ feature: 'manual-order-feature' }, toolContext);
+
+    await expect(
+      hooks.tool!.hive_task_create.execute(
+        {
+          name: 'manual-insert',
+          order: 99,
+          feature: 'manual-order-feature',
+        },
+        toolContext,
+      ),
+    ).rejects.toThrow(/append-only|intermediate insertion requires plan amendment|plan amendment/i);
+  });
+
+  it("rejects manual-task dependencies on unfinished work", async () => {
+    const { hooks, toolContext } = await createHooksForTest(testRoot, 'sess_manual_task_dep_guard');
+
+    await hooks.tool!.hive_feature_create.execute({ name: 'manual-dependency-feature' }, toolContext);
+    await hooks.tool!.hive_plan_write.execute(
+      {
+        content: createSingleTaskPlan(
+          'Manual Dependency Feature',
+          'Yes, this regression test validates that manual tasks reject dependencies on unfinished work.'
+        ),
+        feature: 'manual-dependency-feature',
+      },
+      toolContext,
+    );
+    await hooks.tool!.hive_plan_approve.execute({ feature: 'manual-dependency-feature' }, toolContext);
+    await hooks.tool!.hive_tasks_sync.execute({ feature: 'manual-dependency-feature' }, toolContext);
+
+    await expect(
+      hooks.tool!.hive_task_create.execute(
+        {
+          name: 'manual-follow-up',
+          feature: 'manual-dependency-feature',
+          dependsOn: ['01-first-task'],
+        },
+        toolContext,
+      ),
+    ).rejects.toThrow(/dependencies on unfinished work require plan amendment|plan amendment/i);
   });
 
   it("worker chat.message in task worktree binds featureName, taskFolder, and workerPromptPath before commit", async () => {

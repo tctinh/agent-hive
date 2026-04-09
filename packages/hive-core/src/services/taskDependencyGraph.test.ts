@@ -198,4 +198,18 @@ describe('computeRunnableAndBlocked', () => {
     expect(result.runnable).toEqual(['05-manual-fix']);
     expect(result.blocked).toEqual({});
   });
+
+  it('manual append-only task with explicit dependsOn stays authoritative over numeric fallback', () => {
+    const tasks: TaskWithDeps[] = [
+      { folder: '01-task-a', status: 'pending', dependsOn: undefined },
+      { folder: '02-task-b', status: 'pending', dependsOn: undefined },
+      { folder: '03-manual-fix', status: 'pending', dependsOn: [] },
+    ];
+
+    const result = computeRunnableAndBlocked(tasks);
+
+    expect(result.runnable).toContain('01-task-a');
+    expect(result.runnable).toContain('03-manual-fix');
+    expect(result.blocked['02-task-b']).toEqual(['01-task-a']);
+  });
 });
