@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "fs";
 import * as path from "path";
+import { spawnSync } from 'node:child_process';
 import { createServer } from "net";
 import * as http from 'http';
 import {
@@ -54,6 +55,14 @@ async function getFreePort(): Promise<number> {
 
 function safeRm(dir: string) {
   fs.rmSync(dir, { recursive: true, force: true });
+}
+
+function hasOpencodeRuntime(): boolean {
+  const result = spawnSync('opencode', ['--version'], {
+    stdio: 'ignore',
+  });
+
+  return !result.error && result.status === 0;
 }
 
 function pickHivePluginEntry(): string {
@@ -261,17 +270,17 @@ async function startStubProviderServer(): Promise<StubProviderServer> {
 }
 
 describe("e2e: OpenCode runtime loads opencode-hive", () => {
-  it("exposes hive tools via /experimental/tool/ids", async () => {
+  it.skipIf(!hasOpencodeRuntime())("exposes hive tools via /experimental/tool/ids", async () => {
     const tmpBase = "/tmp/hive-e2e-runtime";
     safeRm(tmpBase);
     fs.mkdirSync(tmpBase, { recursive: true });
 
     const projectDir = fs.mkdtempSync(path.join(tmpBase, "project-"));
-    fs.mkdirSync(path.join(projectDir, ".opencode", "plugins"), { recursive: true });
+    fs.mkdirSync(path.join(projectDir, ".opencode", "plugin"), { recursive: true });
 
     const hivePluginEntry = pickHivePluginEntry();
 
-    const pluginFile = path.join(projectDir, ".opencode", "plugins", "hive.ts");
+    const pluginFile = path.join(projectDir, ".opencode", "plugin", "hive.ts");
     const pluginSource = `import hive from ${JSON.stringify(hivePluginEntry)}\nexport const HivePlugin = hive\n`;
     fs.writeFileSync(pluginFile, pluginSource);
 
