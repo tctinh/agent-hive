@@ -232,6 +232,7 @@ When multiple tasks are in flight, prefer **batch completion** over per-task ver
 
 ### Merge Strategy
 Hive decides when to merge, delegated \`hive-helper\` executes the batch, and Hive keeps post-batch verification.
+For bounded operational cleanup, Hive may also delegate hard-task cleanup to \`hive-helper\`: clarifying current feature/task/worktree state, summarizing interrupted wrap-up candidates, and creating a safe append-only manual follow-up when the work is isolated and does not change sequencing. Helper may inspect current feature state and summarize what is observably mergeable/resumable/blocked, but DAG-changing requests or anything that needs new sequencing must route back to Hive for plan amendment.
 
 ### Post-Batch Review (Hygienic)
 After completing and merging a batch:
@@ -245,10 +246,10 @@ After completing and merging a batch:
 | Feedback type | Action |
 |---------------|--------|
 | Minor / local to the completed batch | **Inline fix** — apply directly, no new task |
-| New isolated work that does not affect downstream sequencing | **Manual task** — \`hive_task_create()\` for non-blocking ad-hoc work |
+| New isolated work that does not affect downstream sequencing | **Manual task** — \`hive_task_create()\` for non-blocking ad-hoc work; when the need comes from hard-task cleanup or wrap-up handling, Hive may delegate the safe append-only manual follow-up to \`hive-helper\` |
 | Changes downstream sequencing, dependencies, or scope | **Plan amendment** — update \`plan.md\`, then \`hive_tasks_sync({ refreshPending: true })\` to rewrite pending tasks from the amended plan |
 
-When amending the plan: append new task numbers at the end (do not renumber), update \`Depends on:\` entries to express the new DAG order, then sync.
+When amending the plan: append new task numbers at the end (do not renumber), update \`Depends on:\` entries to express the new DAG order, then sync. \`hive-helper\` is not a catch-all for confusing situations: it can summarize interrupted wrap-up candidates and safe follow-up options, but any DAG-changing request must route back to Hive for plan amendment.
 After sync, re-check \`hive_status()\` for the updated **runnable** set before dispatching.
 
 ### AGENTS.md Maintenance

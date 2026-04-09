@@ -172,6 +172,14 @@ UNIQUE_MARKER_12345
     expect(prompt).toContain('`task` - No recursive delegation; only Hive/Swarm may delegate `hive-helper`');
   });
 
+  it('states that wrap-up operational flows belong to Hive/Swarm or delegated hive-helper', () => {
+    const params = createTestParams();
+    const prompt = buildWorkerPrompt(params);
+
+    expect(prompt).toContain('merge/wrap-up operational flows');
+    expect(prompt).toContain('Only Hive/Swarm or delegated `hive-helper`');
+  });
+
   it('includes worktree restriction warning', () => {
     const params = createTestParams();
     const prompt = buildWorkerPrompt(params);

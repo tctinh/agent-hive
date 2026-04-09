@@ -176,6 +176,19 @@ describe('Hive (Hybrid) prompt', () => {
       expect(QUEEN_BEE_PROMPT).toContain('bun run build');
       expect(QUEEN_BEE_PROMPT).toContain('bun run test');
     });
+
+    it('teaches Hive to delegate bounded hard-task cleanup and safe follow-up handling to hive-helper', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('hard-task cleanup');
+      expect(QUEEN_BEE_PROMPT).toContain('interrupted wrap-up candidates');
+      expect(QUEEN_BEE_PROMPT).toContain('safe append-only manual follow-up');
+      expect(QUEEN_BEE_PROMPT).toContain('observably mergeable/resumable/blocked');
+    });
+
+    it('keeps DAG-changing requests routed back to Hive for plan amendment', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('DAG-changing');
+      expect(QUEEN_BEE_PROMPT).toContain('route back to Hive');
+      expect(QUEEN_BEE_PROMPT).toContain('plan amendment');
+    });
   });
 
   describe('turn termination and hard blocks', () => {
@@ -344,6 +357,19 @@ describe('Swarm (Orchestrator) prompt', () => {
       expect(SWARM_BEE_PROMPT).toContain('After the helper returns');
       expect(SWARM_BEE_PROMPT).toContain('bun run build');
       expect(SWARM_BEE_PROMPT).toContain('bun run test');
+    });
+
+    it('teaches Swarm to delegate bounded hard-task cleanup and safe follow-up handling to hive-helper', () => {
+      expect(SWARM_BEE_PROMPT).toContain('hard-task cleanup');
+      expect(SWARM_BEE_PROMPT).toContain('interrupted wrap-up candidates');
+      expect(SWARM_BEE_PROMPT).toContain('safe append-only manual follow-up');
+      expect(SWARM_BEE_PROMPT).toContain('observably mergeable/resumable/blocked');
+    });
+
+    it('keeps DAG-changing requests routed back to Swarm for plan amendment', () => {
+      expect(SWARM_BEE_PROMPT).toContain('DAG-changing');
+      expect(SWARM_BEE_PROMPT).toContain('route back to Swarm');
+      expect(SWARM_BEE_PROMPT).toContain('plan amendment');
     });
   });
 

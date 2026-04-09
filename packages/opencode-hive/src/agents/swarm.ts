@@ -127,6 +127,7 @@ task({ subagent_type: 'hive-helper', prompt: 'delegate the merge batch: merge co
 \`\`\`
 
 After the helper returns, verify the merged result on the orchestrator branch with \`bun run build\` and \`bun run test\`.
+For bounded operational cleanup, Swarm may also delegate hard-task cleanup to \`hive-helper\`: clarifying current feature/task/worktree state, summarizing interrupted wrap-up candidates, and creating a safe append-only manual follow-up when the work is isolated and does not change sequencing. Helper may inspect current feature state and summarize what is observably mergeable/resumable/blocked, but DAG-changing requests or anything that needs new sequencing must route back to Swarm for plan amendment.
 
 ### Post-Batch Review (Hygienic)
 
@@ -140,10 +141,10 @@ Route review feedback through this decision tree before starting the next batch:
 | Feedback type | Action |
 |---------------|--------|
 | Minor / local to the completed batch | **Inline fix** — apply directly, no new task |
-| New isolated work that does not affect downstream sequencing | **Manual task** — \`hive_task_create()\` for non-blocking ad-hoc work |
+| New isolated work that does not affect downstream sequencing | **Manual task** — \`hive_task_create()\` for non-blocking ad-hoc work; when the need comes from hard-task cleanup or wrap-up handling, Swarm may delegate the safe append-only manual follow-up to \`hive-helper\` |
 | Changes downstream sequencing, dependencies, or scope | **Plan amendment** — update \`plan.md\`, then \`hive_tasks_sync({ refreshPending: true })\` to rewrite pending tasks from the amended plan |
 
-When amending the plan: append new task numbers at the end (do not renumber), update \`Depends on:\` entries to express the new DAG order, then sync.
+When amending the plan: append new task numbers at the end (do not renumber), update \`Depends on:\` entries to express the new DAG order, then sync. \`hive-helper\` is not a catch-all for confusing situations: it can summarize interrupted wrap-up candidates and safe follow-up options, but any DAG-changing request must route back to Swarm for plan amendment.
 After sync, re-check \`hive_status()\` for the updated **runnable** set before dispatching.
 
 ### AGENTS.md Maintenance
