@@ -164,10 +164,13 @@ This split is deliberate: primary and subagent sessions replay the stored user d
 Manual tasks follow the same DAG model as plan-backed tasks:
 
 - `hive_task_create()` stores manual tasks with explicit `dependsOn` metadata instead of inferring sequential order.
+- manual tasks are append-only.
+- intermediate insertion requires plan amendment.
+- dependencies on unfinished work require plan amendment.
 - Structured manual-task fields such as `goal`, `description`, `acceptanceCriteria`, `files`, and `references` are turned into worker-facing `spec.md` content.
 - If review feedback changes downstream sequencing or scope, update `plan.md` and run `hive_tasks_sync({ refreshPending: true })` so pending plan tasks pick up the new `dependsOn` graph and regenerated specs.
 
-This recovery path applies to the built-in `forager-worker`, the runtime-only `hive-helper` bounded hard-task operational assistant, and custom agents derived from `forager-worker`. `hive-helper` handles merge recovery, state clarification, and safe manual-follow-up assistance while staying inside the current approved DAG boundary. It may summarize observable state and create safe append-only manual tasks, but it may never update plan-backed task state and must escalate DAG-changing requests for plan amendment. `hive-helper` is intentionally OpenCode runtime-only in v1: it does not appear in `.github/agents/` or `packages/vscode-hive/src/generators/`.
+This recovery path applies to the built-in `forager-worker`, the runtime-only `hive-helper` bounded hard-task operational assistant, and custom agents derived from `forager-worker`. `hive-helper` handles merge recovery, state clarification, interrupted-state wrap-up, and safe manual-follow-up assistance while staying inside the current approved DAG boundary. It may summarize observable state, including `helperStatus`, and create safe append-only manual tasks, but it may never update plan-backed task state and must escalate DAG-changing requests for plan amendment. For the issue-72 style "task 3 is locally testable but task 4 has not started" situation, ask Helper to clarify the locally testable state and wrap-up surface first; ask it to create a safe manual follow-up only when the work can append after the current DAG; if you think you need `3b` / `3c` inserted before later plan-backed work, amend `plan.md` instead. `hive-helper` is intentionally OpenCode runtime-only in v1, not a custom base agent, and it does not appear in `.github/agents/` or `packages/vscode-hive/src/generators/`.
 
 `hive-helper` also remains not a network consumer. It benefits indirectly from better upstream planning/orchestration/review decisions, but it does not call `hive_network_query` itself.
 

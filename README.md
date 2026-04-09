@@ -361,7 +361,7 @@ You: Clear visibility into everything ✅
 | **Swarm (Orchestrator)** 🐝 | Orchestrates execution, delegates to workers |
 | **Scout (Explorer/Researcher/Retrieval)** 🔍 | Explores codebase + external docs/data |
 | **Forager (Worker/Coder)** 🍯 | Executes tasks in isolated worktrees |
-| **Hive Helper** 🛠️ | Runtime-only bounded hard-task operational assistant for merge recovery, state clarification, and safe manual-follow-up assistance; not a network consumer |
+| **Hive Helper** 🛠️ | Runtime-only bounded hard-task operational assistant for merge recovery, state clarification, interrupted-state wrap-up, and safe manual-follow-up assistance; not a network consumer |
 | **Hygienic (Consultant/Reviewer/Debugger)** 🧹 | Reviews plan quality, OKAY/REJECT verdict |
 
 ### Compaction-safe recovery path
@@ -390,8 +390,10 @@ This recovery model has a strict ownership boundary:
 Some notes:
 
 - Custom subagents derived from `forager-worker` are treated as task workers for compaction recovery.
-- `hive-helper` is treated as a runtime-only bounded hard-task operational assistant for merge recovery, state clarification, and safe manual-follow-up assistance; it may summarize observable state and create safe append-only manual tasks, but it does not appear in generated `.github/agents/` docs and does not appear in `packages/vscode-hive/src/generators/` in v1.
+- `hive-helper` is treated as a runtime-only bounded hard-task operational assistant for merge recovery, state clarification, interrupted-state wrap-up, and safe manual-follow-up assistance; it may summarize observable state, including `helperStatus`, and create safe append-only manual tasks, but it does not appear in generated `.github/agents/` docs, does not appear in `packages/vscode-hive/src/generators/` in v1, and is not a custom base agent.
 - `hive-helper` is not a network consumer; it benefits indirectly from better upstream planning/orchestration/review decisions.
+- manual tasks are append-only. If you need `3b` / `3c` inserted between existing plan tasks, intermediate insertion requires plan amendment.
+- For an issue-72 style interruption, first ask for a locally testable state and observable wrap-up summary. Only request a manual follow-up when it can append after the approved DAG; dependencies on unfinished work require plan amendment.
 - Custom subagents derived from `hygienic-reviewer` are treated as subagents.
 - One-recovery-attempt escalation means a primary or subagent session gets one normal directive replay cycle after compaction, then must escalate back to the parent/orchestrator instead of looping through repeated compact-and-replay retries.
 - The recovery prompt avoids telling agents to call broad status tools or re-scan the repository because that tends to recreate drift after compaction.
