@@ -4,7 +4,7 @@
 
 The hook cadence system lets you control how often selected OpenCode plugin hooks fire. In the current runtime contract, cadence applies to supported hooks such as `chat.message` and `experimental.chat.messages.transform`; it does not imply access to unsupported startup or pre-compaction hooks.
 
-The plugin's declared supported runtime surface in this branch is broader than the cadence-tuned subset: `event`, `config`, `chat.message`, `experimental.chat.messages.transform`, `tool.execute.before`, and `tool.execute.after` are all supported hooks. Cadence is only documented here for the hooks where turn gating is an intentional operator control.
+The plugin's declared supported runtime surface in this branch is broader than the cadence-tuned subset: `event`, `config`, `chat.message`, `experimental.chat.messages.transform`, and `tool.execute.before` are supported hooks. Cadence is only documented here for the hooks where turn gating is an intentional operator control.
 
 ## Motivation
 
@@ -39,8 +39,6 @@ Add a `hook_cadence` field to your `~/.config/opencode/agent_hive.json`:
 | `chat.message` | Applies configured agent variant metadata | 1 | 1 |
 | `experimental.chat.messages.transform` | Replays bounded post-compaction recovery context when needed | 1 | 1-2 |
 | `tool.execute.before` | Docker sandbox command wrapping | 1 | **1 (SAFETY-CRITICAL)** |
-
-`tool.execute.after` is also part of the supported hook surface and is used to bind child session provenance plus parent-session replay selection after `task()` returns, but it is not currently exposed as a cadence-tuned operator knob in this document.
 
 ## Behavior
 
@@ -95,7 +93,7 @@ If you attempt to set `cadence > 1` for this hook, you'll see a warning:
 
 ## Token Savings Estimation
 
-Savings depend on which supported hooks you gate and how often they would otherwise run. Treat cadence as a small operator knob, not as a replacement for durable `.hive` state or for primary-session todo/checkpoint refresh.
+Savings depend on which supported hooks you gate and how often they would otherwise run. Treat cadence as a small operator knob, not as a replacement for durable `.hive` state or bounded recovery design.
 
 ## Backward Compatibility
 
@@ -171,12 +169,11 @@ bun test src/__tests__/hook-cadence.test.ts
 
 ### Recovery wording seems stale
 
-If local docs or prompts still mention unsupported hooks such as `experimental.chat.system.transform` or `experimental.session.compacting`, treat that wording as stale. The supported recovery path in this branch is:
+If local docs or prompts still mention unsupported hooks such as `experimental.chat.system.transform`, `experimental.session.compacting`, `session.status` idle replay, or legacy post-tool completion hooks, treat that wording as stale. The supported recovery path in this branch is:
 
 - `session.compacted` event observation
-- `session.status` idle observation and `tool.execute.after` task-return handling to mark replay on the parent/orchestrator session when task workers hand control back
 - bounded replay through `experimental.chat.messages.transform`
-- durable `.hive` task artifacts, with `checkpoint.json` as the primary semantic recovery artifact and `worker-prompt.md` as the re-entry prompt path
+- durable `.hive` session metadata plus `worker-prompt.md` for task-worker re-entry
 
 ### Safety-critical hook warning
 

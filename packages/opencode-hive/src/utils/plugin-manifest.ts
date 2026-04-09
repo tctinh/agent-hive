@@ -56,7 +56,6 @@ export const SUPPORTED_PLUGIN_HOOKS = [
   'chat.message',
   'experimental.chat.messages.transform',
   'tool.execute.before',
-  'tool.execute.after',
 ] as const;
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');

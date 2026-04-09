@@ -26,7 +26,12 @@ const EXPECTED_COMMANDS = HIVE_COMMANDS.map(({ name, description }) => ({ name, 
 const UNSUPPORTED_RUNTIME_HOOKS = [
   "experimental.chat.system.transform",
   "experimental.session.compacting",
+  'tool.execute' + '.after',
 ] as const;
+
+const REMOVED_PROJECTED_TODO_FIELD = ['todo', 'Projection'].join('');
+const REMOVED_TODO_REFRESH_HINT = ['Refresh hive_status() before syncing OpenCode ', 'todos.'].join('');
+const LEGACY_IDLE_CHILD_REPLAY = ['child-session', ' idle'].join('');
 
 const TEST_ROOT_BASE = "/tmp/hive-e2e-plugin";
 const FIRST_TASK = "01-first-task";
@@ -1157,7 +1162,7 @@ Do it
     );
   });
 
-  it("projects Hive state into todoProjection and marks state-changing responses as stale", async () => {
+  it("omits the removed projected-todo field and stale todo-sync hints from the trimmed runtime contract", async () => {
     const ctx: PluginInput = {
       directory: testRoot,
       worktree: testRoot,
@@ -1168,120 +1173,52 @@ Do it
     };
 
     const hooks = await plugin(ctx);
-    const toolContext = createToolContext("sess_todo_projection");
+    const toolContext = createToolContext("sess_trimmed_runtime_contract");
 
     const createOutput = await hooks.tool!.hive_feature_create.execute(
-      { name: "todo-projection-feature" },
+      { name: "trimmed-runtime-feature" },
       toolContext
     );
-    expect(createOutput).toContain("Refresh hive_status() before syncing OpenCode todos.");
+    expect(createOutput).not.toContain(REMOVED_TODO_REFRESH_HINT);
 
-    const planningStatusRaw = await hooks.tool!.hive_status.execute(
-      { feature: "todo-projection-feature" },
-      toolContext
+    const planningStatusRaw = await hooks.tool!.hive_status.execute({ feature: "trimmed-runtime-feature" }, toolContext);
+    const planningStatus = JSON.parse(planningStatusRaw as string) as Record<string, unknown>;
+    expect(planningStatus).not.toHaveProperty(REMOVED_PROJECTED_TODO_FIELD);
+
+    const plan = createSingleTaskPlan(
+      'Trimmed Runtime Feature',
+      'Yes, this regression test validates that the trimmed OpenCode runtime no longer exposes the removed projected-todo field or stale todo-sync hints.'
     );
-    const planningStatus = JSON.parse(planningStatusRaw as string) as {
-      todoProjection?: {
-        managedBy?: string;
-        sync?: { preserveNonHiveTodos?: boolean; requiresTodoRead?: boolean };
-        items?: Array<{ id: string; content: string; status: string; priority: string }>;
-      };
-    };
-
-    expect(planningStatus.todoProjection).toMatchObject({
-      managedBy: "opencode-hive",
-      sync: {
-        preserveNonHiveTodos: true,
-        requiresTodoRead: true,
-      },
-    });
-    expect(planningStatus.todoProjection?.items).toContainEqual({
-      id: "hive:todo-projection-feature:feature",
-      content: "Finish the plan for todo-projection-feature",
-      status: "pending",
-      priority: "high",
-    });
-
-    const plan = `# Todo Projection Feature
-
-## Discovery
-
-**Q: Is this a test?**
-A: Yes, this regression test validates the OpenCode-only todoProjection contract and stale refresh hints for Hive-managed todo sync.
-
-## Tasks
-
-### 1. Build Projection
-Do it
-`;
 
     const planOutput = await hooks.tool!.hive_plan_write.execute(
-      { content: plan, feature: "todo-projection-feature" },
+      { content: plan, feature: "trimmed-runtime-feature" },
       toolContext
     );
-    expect(planOutput).toContain("Refresh hive_status() before syncing OpenCode todos.");
+    expect(planOutput).not.toContain(REMOVED_TODO_REFRESH_HINT);
 
     const approveOutput = await hooks.tool!.hive_plan_approve.execute(
-      { feature: "todo-projection-feature" },
+      { feature: "trimmed-runtime-feature" },
       toolContext
     );
-    expect(approveOutput).toContain("Refresh hive_status() before syncing OpenCode todos.");
-
-    const approvedStatusRaw = await hooks.tool!.hive_status.execute(
-      { feature: "todo-projection-feature" },
-      toolContext
-    );
-    const approvedStatus = JSON.parse(approvedStatusRaw as string) as {
-      todoProjection?: {
-        items?: Array<{ id: string; content: string; status: string; priority: string }>;
-      };
-    };
-    expect(approvedStatus.todoProjection?.items).toContainEqual({
-      id: "hive:todo-projection-feature:feature",
-      content: "Generate the task list for todo-projection-feature",
-      status: "pending",
-      priority: "high",
-    });
+    expect(approveOutput).not.toContain(REMOVED_TODO_REFRESH_HINT);
 
     const syncOutput = await hooks.tool!.hive_tasks_sync.execute(
-      { feature: "todo-projection-feature" },
+      { feature: "trimmed-runtime-feature" },
       toolContext
     );
-    expect(syncOutput).toContain("Refresh hive_status() before syncing OpenCode todos.");
-
-    const runnableStatusRaw = await hooks.tool!.hive_status.execute(
-      { feature: "todo-projection-feature" },
-      toolContext
-    );
-    const runnableStatus = JSON.parse(runnableStatusRaw as string) as {
-      todoProjection?: {
-        items?: Array<{ id: string; content: string; status: string; priority: string }>;
-      };
-    };
-    expect(runnableStatus.todoProjection?.items).toContainEqual({
-      id: "hive:todo-projection-feature:task:01-build-projection",
-      content: "Start Build Projection",
-      status: "pending",
-      priority: "high",
-    });
+    expect(syncOutput).not.toContain(REMOVED_TODO_REFRESH_HINT);
 
     const startRaw = await hooks.tool!.hive_worktree_start.execute(
-      { feature: "todo-projection-feature", task: "01-build-projection" },
+      { feature: "trimmed-runtime-feature", task: FIRST_TASK },
       toolContext
     );
-    const startResult = JSON.parse(startRaw as string) as {
-      todoSync?: { stale?: boolean; reason?: string; refreshHint?: string };
-    };
-    expect(startResult.todoSync).toMatchObject({
-      stale: true,
-      reason: "task_started",
-      refreshHint: "Refresh hive_status() before syncing OpenCode todos.",
-    });
+    const startResult = JSON.parse(startRaw as string) as Record<string, unknown>;
+    expect(startResult).not.toHaveProperty('todoSync');
 
     const blockedCommitRaw = await hooks.tool!.hive_worktree_commit.execute(
       {
-        feature: "todo-projection-feature",
-        task: "01-build-projection",
+        feature: "trimmed-runtime-feature",
+        task: FIRST_TASK,
         status: "blocked",
         summary: "Blocked waiting for a design decision.",
         blocker: {
@@ -1291,58 +1228,8 @@ Do it
       },
       toolContext
     );
-    const blockedCommit = JSON.parse(blockedCommitRaw as string) as {
-      todoSync?: { stale?: boolean; reason?: string; refreshHint?: string };
-    };
-    expect(blockedCommit.todoSync).toMatchObject({
-      stale: true,
-      reason: "task_blocked",
-      refreshHint: "Refresh hive_status() before syncing OpenCode todos.",
-    });
-
-    const blockedStatusRaw = await hooks.tool!.hive_status.execute(
-      { feature: "todo-projection-feature" },
-      toolContext
-    );
-    const blockedStatus = JSON.parse(blockedStatusRaw as string) as {
-      todoProjection?: {
-        items?: Array<{ id: string; content: string; status: string; priority: string }>;
-      };
-    };
-    expect(blockedStatus.todoProjection?.items).toContainEqual({
-      id: "hive:todo-projection-feature:task:01-build-projection",
-      content: "Resolve blocker for Build Projection",
-      status: "pending",
-      priority: "medium",
-    });
-
-    const taskUpdateOutput = await hooks.tool!.hive_task_update.execute(
-      { feature: "todo-projection-feature", task: "01-build-projection", status: "done" },
-      toolContext
-    );
-    expect(taskUpdateOutput).toContain("Refresh hive_status() before syncing OpenCode todos.");
-
-    const completeOutput = await hooks.tool!.hive_feature_complete.execute(
-      { name: "todo-projection-feature" },
-      toolContext
-    );
-    expect(completeOutput).toContain("Refresh hive_status() before syncing OpenCode todos.");
-
-    const completedStatusRaw = await hooks.tool!.hive_status.execute(
-      { feature: "todo-projection-feature" },
-      toolContext
-    );
-    const completedStatus = JSON.parse(completedStatusRaw as string) as {
-      todoProjection?: {
-        items?: Array<{ id: string; content: string; status: string; priority: string }>;
-      };
-    };
-    expect(completedStatus.todoProjection?.items).toContainEqual({
-      id: "hive:todo-projection-feature:feature",
-      content: "todo-projection-feature is complete",
-      status: "completed",
-      priority: "low",
-    });
+    const blockedCommit = JSON.parse(blockedCommitRaw as string) as Record<string, unknown>;
+    expect(blockedCommit).not.toHaveProperty('todoSync');
   });
 
   it("keeps plan tool messaging overview-first while plan.md remains execution truth", async () => {
@@ -1638,7 +1525,7 @@ Do it
     
   });
 
-  it("system prompt hook teaches todoProjection sync and checkpoint-grounded recovery for primary roles only", async () => {
+  it("system prompt hook omits trimmed projected-todo and checkpoint rituals for primary roles", async () => {
     const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(
@@ -1671,23 +1558,24 @@ Do it
     const swarmPrompt = agents["swarm-orchestrator"]?.prompt ?? "";
     const foragerPrompt = agents["forager-worker"]?.prompt ?? "";
 
-    expect(hivePrompt).toContain("OpenCode todos are the current-session projection of Hive work");
-    expect(hivePrompt).toContain("Preserve non-Hive todo items");
-    expect(hivePrompt).toContain("replace only Hive-managed todo IDs");
-    expect(hivePrompt).toContain("task checkpoints are the durable grounded recovery layer");
+    expect(hivePrompt).not.toContain(REMOVED_PROJECTED_TODO_FIELD);
+    expect(hivePrompt).not.toContain("todoread");
+    expect(hivePrompt).not.toContain("todowrite");
+    expect(hivePrompt).not.toContain("task checkpoints");
+    expect(hivePrompt).not.toContain(LEGACY_IDLE_CHILD_REPLAY);
 
-    expect(architectPrompt).toContain("OpenCode todos are the current-session projection of Hive work");
-    expect(architectPrompt).toContain("plan write/approval");
-    expect(architectPrompt).toContain("feature creation");
+    expect(architectPrompt).not.toContain(REMOVED_PROJECTED_TODO_FIELD);
+    expect(architectPrompt).not.toContain("todoread");
+    expect(architectPrompt).not.toContain("todowrite");
+    expect(architectPrompt).not.toContain("task checkpoints");
 
-    expect(swarmPrompt).toContain("OpenCode todos are the current-session projection of Hive work");
-    expect(swarmPrompt).toContain("runnable-set changes");
-    expect(swarmPrompt).toContain("worker return/block");
-    expect(swarmPrompt).toContain("merge/feature completion");
-    expect(swarmPrompt).toContain("OpenCode disables todo tools in spawned `task()` sessions");
+    expect(swarmPrompt).not.toContain(REMOVED_PROJECTED_TODO_FIELD);
+    expect(swarmPrompt).not.toContain("todoread");
+    expect(swarmPrompt).not.toContain("todowrite");
+    expect(swarmPrompt).not.toContain("task checkpoints");
 
     expect(foragerPrompt).not.toContain("todowrite");
-    expect(foragerPrompt).not.toContain("todoProjection");
+    expect(foragerPrompt).not.toContain(REMOVED_PROJECTED_TODO_FIELD);
   });
 
   it("blocks hive_worktree_create when dependencies are not done", async () => {
@@ -2747,221 +2635,13 @@ Do the first thing.
     expect(workerSession.workerPromptPath).toContain("worker-prompt.md");
   });
 
-  it('tool.execute.after binds child task-worker session provenance and writes a bounded checkpoint', async () => {
-    const { hooks, toolContext } = await createSingleTaskWorktree(
-      testRoot,
-      'sess_checkpoint_binding',
-      'checkpoint-binding-feature',
-      'Checkpoint Binding Feature',
-      'Yes, this regression test validates that task-worker child session metadata is captured from structured task() output and persisted into the task checkpoint.',
-    );
-
-    await hooks['tool.execute.before']?.(
-      {
-        tool: 'task',
-        sessionID: 'sess_checkpoint_binding',
-        callID: 'call_1',
-      } as any,
-      {
-        args: {
-          subagent_type: 'forager-worker',
-          description: 'Hive: 01-first-task',
-          prompt: 'Follow instructions in @.hive/features/01_checkpoint-binding-feature/tasks/01-first-task/worker-prompt.md',
-        },
-      } as any,
-    );
-
-    await hooks['tool.execute.after']?.(
-      {
-        tool: 'task',
-        sessionID: 'sess_checkpoint_binding',
-        callID: 'call_1',
-      } as any,
-      {
-        metadata: {
-          sessionId: 'sess_child_worker_checkpoint',
-        },
-        output: 'Worker launched.',
-      } as any,
-    );
-
-    const sessionsPath = path.join(testRoot, '.hive', 'sessions.json');
-    const sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf-8'));
-    const childSession = sessions.sessions.find(
-      (s: { sessionId: string }) => s.sessionId === 'sess_child_worker_checkpoint',
-    );
-    expect(childSession).toBeDefined();
-    expect(childSession.featureName).toBe('checkpoint-binding-feature');
-    expect(childSession.taskFolder).toBe(FIRST_TASK);
-    expect(childSession.parentSessionId).toBe('sess_checkpoint_binding');
-    expect(childSession.delegatedAgent).toBe('forager-worker');
-    expect(childSession.childSessionSource).toBe('opencode-task-tool');
-
-    const checkpointPath = path.join(
-      testRoot,
-      '.hive',
-      'features',
-      '01_checkpoint-binding-feature',
-      'tasks',
-      FIRST_TASK,
-      'checkpoint.json',
-    );
-    expect(fs.existsSync(checkpointPath)).toBe(true);
-    const checkpointRaw = fs.readFileSync(checkpointPath, 'utf-8');
-    const checkpoint = JSON.parse(checkpointRaw) as {
-      childSession?: { sessionId?: string; parentSessionId?: string; delegatedAgent?: string };
-      taskFolder?: string;
-    };
-    expect(checkpoint.taskFolder).toBe(FIRST_TASK);
-    expect(checkpoint.childSession?.sessionId).toBe('sess_child_worker_checkpoint');
-    expect(checkpoint.childSession?.parentSessionId).toBe('sess_checkpoint_binding');
-    expect(checkpoint.childSession?.delegatedAgent).toBe('forager-worker');
-    expect(checkpointRaw).not.toContain('Follow instructions in @');
-    expect(checkpointRaw).not.toContain('messageID');
-    expect(checkpointRaw).not.toContain('parts');
-  });
-
-  it('tool.execute.after binds general subagent child sessions without creating task checkpoints', async () => {
-    const ctx: PluginInput = {
-      directory: testRoot,
-      worktree: testRoot,
-      serverUrl: new URL('http://localhost:1'),
-      project: createProject(testRoot),
-      client: OPENCODE_CLIENT,
-      $: createStubShell(),
-    };
-
-    const hooks = await plugin(ctx);
-
-    await hooks['tool.execute.before']?.(
-      {
-        tool: 'task',
-        sessionID: 'sess_scout_parent',
-        callID: 'call_scout',
-      } as any,
-      {
-        args: {
-          subagent_type: 'scout-researcher',
-          description: 'Research mismatch',
-          prompt: 'Inspect the runtime mismatch and report back.',
-        },
-      } as any,
-    );
-
-    await hooks['tool.execute.after']?.(
-      {
-        tool: 'task',
-        sessionID: 'sess_scout_parent',
-        callID: 'call_scout',
-      } as any,
-      {
-        metadata: {
-          sessionId: 'sess_child_scout',
-        },
-        output: 'Scout launched.',
-      } as any,
-    );
-
-    const sessionsPath = path.join(testRoot, '.hive', 'sessions.json');
-    const sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf-8'));
-    const childSession = sessions.sessions.find(
-      (s: { sessionId: string }) => s.sessionId === 'sess_child_scout',
-    );
-    expect(childSession).toBeDefined();
-    expect(childSession.parentSessionId).toBe('sess_scout_parent');
-    expect(childSession.delegatedAgent).toBe('scout-researcher');
-    expect(childSession.childSessionKind).toBe('subagent');
-    expect(childSession.taskFolder).toBeUndefined();
-
-    const featureCheckpoint = path.join(
-      testRoot,
-      '.hive',
-      'features',
-      '01_checkpoint-binding-feature',
-      'tasks',
-      FIRST_TASK,
-      'checkpoint.json',
-    );
-    expect(fs.existsSync(featureCheckpoint)).toBe(false);
-  });
-
-  it('binds interleaved task() launches by sessionID and callID without crossing child sessions', async () => {
-    const { hooks, toolContext } = await createSingleTaskWorktree(
-      testRoot,
-      'sess_interleave_parent_a',
-      'interleave-feature-a',
-      'Interleave Feature A',
-      'Yes, this regression test validates that concurrent task() launches bind child sessions by sessionID plus callID instead of a single global slot.',
-    );
-
-    await hooks.tool!.hive_feature_create.execute({ name: 'interleave-feature-b' }, createToolContext('sess_interleave_parent_b'));
-    await hooks.tool!.hive_plan_write.execute(
-      {
-        content: createSingleTaskPlan(
-          'Interleave Feature B',
-          'Yes, this regression test creates a second in-flight task() launch to prove bindings stay isolated per parent session and call.'
-        ),
-        feature: 'interleave-feature-b',
-      },
-      createToolContext('sess_interleave_parent_b'),
-    );
-    await hooks.tool!.hive_plan_approve.execute({ feature: 'interleave-feature-b' }, createToolContext('sess_interleave_parent_b'));
-    await hooks.tool!.hive_tasks_sync.execute({ feature: 'interleave-feature-b' }, createToolContext('sess_interleave_parent_b'));
-    await hooks.tool!.hive_worktree_start.execute(
-      { feature: 'interleave-feature-b', task: FIRST_TASK },
-      createToolContext('sess_interleave_parent_b'),
-    );
-
-    await hooks['tool.execute.before']?.(
-      { tool: 'task', sessionID: 'sess_interleave_parent_a', callID: 'call-a' } as any,
-      {
-        args: {
-          subagent_type: 'forager-worker',
-          description: 'Hive: 01-first-task',
-          prompt: 'Follow instructions in @.hive/features/01_interleave-feature-a/tasks/01-first-task/worker-prompt.md',
-        },
-      } as any,
-    );
-    await hooks['tool.execute.before']?.(
-      { tool: 'task', sessionID: 'sess_interleave_parent_b', callID: 'call-b' } as any,
-      {
-        args: {
-          subagent_type: 'forager-worker',
-          description: 'Hive: 01-first-task',
-          prompt: 'Follow instructions in @.hive/features/02_interleave-feature-b/tasks/01-first-task/worker-prompt.md',
-        },
-      } as any,
-    );
-
-    await hooks['tool.execute.after']?.(
-      { tool: 'task', sessionID: 'sess_interleave_parent_a', callID: 'call-a' } as any,
-      { metadata: { sessionId: 'sess_child_a' }, output: 'Worker A launched.' } as any,
-    );
-    await hooks['tool.execute.after']?.(
-      { tool: 'task', sessionID: 'sess_interleave_parent_b', callID: 'call-b' } as any,
-      { metadata: { sessionId: 'sess_child_b' }, output: 'Worker B launched.' } as any,
-    );
-
-    const sessionsPath = path.join(testRoot, '.hive', 'sessions.json');
-    const sessions = JSON.parse(fs.readFileSync(sessionsPath, 'utf-8'));
-    const childA = sessions.sessions.find((s: { sessionId: string }) => s.sessionId === 'sess_child_a');
-    const childB = sessions.sessions.find((s: { sessionId: string }) => s.sessionId === 'sess_child_b');
-
-    expect(childA).toMatchObject({
-      sessionId: 'sess_child_a',
-      parentSessionId: 'sess_interleave_parent_a',
-      featureName: 'interleave-feature-a',
-      taskFolder: FIRST_TASK,
-    });
-    expect(childB).toMatchObject({
-      sessionId: 'sess_child_b',
-      parentSessionId: 'sess_interleave_parent_b',
-      featureName: 'interleave-feature-b',
-      taskFolder: FIRST_TASK,
-    });
-  });
-
-  it('declares tool.execute.after in the supported hook source of truth', () => {
-    expect([...SUPPORTED_PLUGIN_HOOKS]).toContain('tool.execute.after');
+  it('does not declare the removed post-tool hook in the supported hook source of truth', () => {
+    expect([...SUPPORTED_PLUGIN_HOOKS]).toEqual([
+      'event',
+      'config',
+      'chat.message',
+      'experimental.chat.messages.transform',
+      'tool.execute.before',
+    ]);
   });
 });

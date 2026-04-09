@@ -114,9 +114,9 @@ When using Dynamic Context Pruning (DCP), use a Hive-safe config in `~/.config/o
 
 For local plugin testing, keep OpenCode plugin entry as `"opencode-hive"` (not `"opencode-hive@latest"`).
 
-#### OpenCode alignment: todos, recovery, and bounded worker replay
+#### OpenCode alignment: honest hook contract and bounded recovery
 
-Agent Hive aligns to the OpenCode surfaces that exist today. It does **not** depend on a first-class upstream Hive orchestration API, a native checkpoint API, or a writable subagent todo surface.
+Agent Hive aligns to the OpenCode surfaces that exist today. It does **not** depend on a first-class upstream Hive orchestration API, a native checkpoint API, or a hidden todo-sync surface.
 
 At the current plugin/runtime layer, Hive relies on these supported hooks:
 
@@ -125,17 +125,16 @@ At the current plugin/runtime layer, Hive relies on these supported hooks:
 - `chat.message`
 - `experimental.chat.messages.transform`
 - `tool.execute.before`
-- `tool.execute.after`
 
 That contract matters because some older wording implied deeper integration than OpenCode currently exposes. The recovery path in this branch is hook-timed and file-backed, not storage-level magic.
 
-Todo alignment is also intentionally modest:
+Todo ownership is intentionally modest:
 
 - OpenCode todos remain **session-scoped** and **replace-all**.
 - Hive does not add a new upstream todo API.
-- Hive / Architect / Swarm can use OpenCode's built-in `todowrite` / `todoread` tools from the **primary session**.
+- This plugin does not expose a derived projected-todo field or stale refresh hints as part of its runtime contract.
 - Worker and subagent sessions still follow normal OpenCode limits; they should not be described as independently syncing Hive task state.
-- Operators should treat the OpenCode todo list as a Hive-managed projection refreshed by the primary session at tool boundaries, while preserving unrelated OpenCode todos when syncing.
+- `.hive` remains the durable source of truth for plan/task/worktree state.
 
 Compaction recovery uses durable Hive artifacts instead of transcript dumps:
 
@@ -143,11 +142,10 @@ Compaction recovery uses durable Hive artifacts instead of transcript dumps:
 - Feature-local mirrors are written to `.hive/features/<feature>/sessions.json`.
 - Session classification distinguishes `primary`, `subagent`, `task-worker`, and `unknown`.
 - Primary and subagent recovery can replay the stored user directive once after compaction, with `directiveRecoveryState` enforcing the one-replay-then-escalate contract.
-- Task-worker recovery does **not** replay the whole user directive. Hive marks the parent/orchestrator session for replay after child idle transitions and after `task()` returns.
-- The selected replay prefers `.hive/features/<feature>/tasks/<task>/checkpoint.json` as the primary semantic recovery artifact, then points back to `worker-prompt.md`, `status.json`, `spec.md`, and `report.md` as bounded support files.
-- The replay text is injected into the parent/orchestrator session through `experimental.chat.messages.transform`, using stored `workerPromptPath` / `taskFolder` metadata instead of raw child transcript dumps.
+- Task-worker recovery does **not** replay the whole user directive. Workers re-read `worker-prompt.md` and continue the current task from the existing worktree state.
+- Recovery uses durable session metadata plus `worker-prompt.md` instead of an extra checkpoint artifact, idle child-session replay, or parent-scoped task rehydration.
 
-In practice, the durable task-level checkpoint is the semantic `.hive` artifact set for that task, with `checkpoint.json` as the primary recovery artifact and `worker-prompt.md` plus bound feature/task/session metadata as the re-entry surface. Hive does **not** persist raw transcript dumps as its recovery contract.
+In practice, the durable task-level recovery surface is the semantic `.hive` artifact set for that task, with `worker-prompt.md` plus bound feature/task/session metadata as the re-entry surface. Hive does **not** persist raw transcript dumps as its recovery contract.
 
 Task-worker recovery is intentionally strict:
 
@@ -161,7 +159,7 @@ Task-worker recovery is intentionally strict:
 - do not use orchestration tools unless the worker prompt explicitly says so
 - continue from the last known point
 
-This split is deliberate: primary and subagent sessions replay the stored user directive once after compaction, while task-worker progress is replayed into the parent/orchestrator session from the selected task checkpoint so the next turn resumes the exact task boundary instead of improvising a fresh goal.
+This split is deliberate: primary and subagent sessions replay the stored user directive once after compaction, while task workers recover from their own bounded task contract instead of relying on parent-session replay.
 
 Manual tasks follow the same DAG model as plan-backed tasks:
 

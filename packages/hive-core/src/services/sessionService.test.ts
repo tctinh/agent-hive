@@ -195,33 +195,6 @@ describe('SessionService', () => {
       expect(featureSession?.directivePrompt).toBe('Investigate the current issue.');
     });
 
-    it('persists child-session provenance through bindFeature mirroring', () => {
-      service.trackGlobal('sess-parent', {
-        agent: 'hive-master',
-        sessionKind: 'primary',
-      });
-      setupFeature('feature-provenance');
-
-      const session = service.bindFeature('sess-child', 'feature-provenance', {
-        sessionKind: 'subagent',
-        agent: 'scout-researcher',
-        parentSessionId: 'sess-parent',
-        delegatedAgent: 'scout-researcher',
-        childSessionSource: 'opencode-task-tool',
-        childSessionKind: 'subagent',
-      } as any);
-
-      expect((session as any).parentSessionId).toBe('sess-parent');
-      expect((session as any).delegatedAgent).toBe('scout-researcher');
-      expect((session as any).childSessionSource).toBe('opencode-task-tool');
-      expect((session as any).childSessionKind).toBe('subagent');
-
-      const featureSession = service.get('feature-provenance', 'sess-child');
-      expect((featureSession as any)?.parentSessionId).toBe('sess-parent');
-      expect((featureSession as any)?.delegatedAgent).toBe('scout-researcher');
-      expect((featureSession as any)?.childSessionSource).toBe('opencode-task-tool');
-      expect((featureSession as any)?.childSessionKind).toBe('subagent');
-    });
   });
 
   describe('findFeatureBySession', () => {

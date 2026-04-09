@@ -136,49 +136,6 @@ function buildCompactionTransformOutput(sessionID: string, cwd: string) {
   };
 }
 
-function writeTaskCheckpointFixture(root: string, featureName: string, taskFolder: string) {
-  const taskDir = path.join(root, '.hive', 'features', featureName, 'tasks', taskFolder);
-  fs.mkdirSync(taskDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(taskDir, 'checkpoint.json'),
-    JSON.stringify({
-      schemaVersion: 1,
-      taskFolder,
-      currentObjective: 'Finish dashboard implementation',
-      stateSummary: 'Parent orchestrator should resume from the semantic checkpoint.',
-      importantDecisions: ['Use checkpoint.json first.'],
-      filesInPlay: [`.hive/features/${featureName}/tasks/${taskFolder}/checkpoint.json`],
-      verificationState: 'Targeted tests pending.',
-      nextAction: 'Resume from durable task artifacts only.',
-      status: 'active',
-      updatedAt: '2026-04-08T00:00:00.000Z',
-    }, null, 2),
-  );
-  fs.writeFileSync(
-    path.join(taskDir, 'status.json'),
-    JSON.stringify({
-      status: 'in_progress',
-      origin: 'plan',
-      planTitle: 'Implement dashboard',
-      summary: 'Resume the dashboard task from durable state after compaction or idle return.',
-      workerSession: {
-        sessionId: 'sess-child',
-        mode: 'delegate',
-        attempt: 2,
-        messageCount: 17,
-      },
-    }, null, 2),
-  );
-  fs.writeFileSync(
-    path.join(taskDir, 'spec.md'),
-    '# Task\n\nRAW_PROMPT_SHOULD_NOT_SURVIVE\n\nmessages: [1, 2, 3]\n',
-  );
-  fs.writeFileSync(
-    path.join(taskDir, 'report.md'),
-    '# Task Report\n\nWHOLE_HISTORY_COPY_SHOULD_NOT_SURVIVE\n',
-  );
-}
-
 describe('compaction replay on supported hooks', () => {
   let testRoot: string;
   let originalHome: string | undefined;
@@ -282,16 +239,14 @@ describe('compaction replay on supported hooks', () => {
     expect(marked?.replayDirectivePending).toBe(true);
   });
 
-  test('messages.transform appends bounded worker replay after compaction for task-worker sessions', async () => {
-    writeTaskCheckpointFixture(testRoot, 'my-feature', '05-implement-dashboard');
-
+  test('messages.transform appends worker replay after compaction for task-worker sessions', async () => {
     const sessionService = new SessionService(testRoot);
     sessionService.trackGlobal('sess-tw-bounded', {
       agent: 'forager-worker',
       sessionKind: 'task-worker',
       featureName: 'my-feature',
-      taskFolder: '05-implement-dashboard',
-      workerPromptPath: '.hive/features/my-feature/tasks/05-implement-dashboard/worker-prompt.md',
+      taskFolder: '01-task',
+      workerPromptPath: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
       replayDirectivePending: true,
     } as any);
 
@@ -300,134 +255,17 @@ describe('compaction replay on supported hooks', () => {
 
     expect(output.messages).toHaveLength(3);
     const replayText = (output.messages[2].parts[0] as any).text;
-    expect(replayText).toContain('Task checkpoint rehydration');
-    expect(replayText).toContain('05-implement-dashboard');
-    expect(replayText).toContain('.hive/features/my-feature/tasks/05-implement-dashboard/worker-prompt.md');
-    expect(replayText).toContain('.hive/features/my-feature/tasks/05-implement-dashboard/status.json');
-    expect(replayText).toContain('.hive/features/my-feature/tasks/05-implement-dashboard/spec.md');
-    expect(replayText).not.toContain('RAW_PROMPT_SHOULD_NOT_SURVIVE');
-    expect(replayText).not.toContain('WHOLE_HISTORY_COPY_SHOULD_NOT_SURVIVE');
-    expect(replayText).not.toContain('messages: [1, 2, 3]');
+    expect(replayText).toContain('Post-compaction recovery');
+    expect(replayText).toContain('01-task');
+    expect(replayText).toContain('@.hive/features/my-feature/tasks/01-task/worker-prompt.md');
+    expect(replayText).not.toContain(['checkpoint', '.json'].join(''));
+    expect(replayText).not.toContain('status.json');
+    expect(replayText).not.toContain('spec.md');
 
     const cleared = sessionService.getGlobal('sess-tw-bounded');
     expect(cleared?.replayDirectivePending).toBe(false);
   });
 
-  test('session.status idle marks replay pending on the parent session for task-worker children', async () => {
-    const sessionService = new SessionService(testRoot);
-    sessionService.trackGlobal('sess-parent-orchestrator', {
-      agent: 'hive-master',
-      sessionKind: 'primary',
-      replayDirectivePending: false,
-    } as any);
-    sessionService.trackGlobal('sess-tw-idle', {
-      agent: 'forager-worker',
-      sessionKind: 'task-worker',
-      featureName: 'my-feature',
-      taskFolder: '01-task',
-      workerPromptPath: '.hive/features/my-feature/tasks/01-task/worker-prompt.md',
-      parentSessionId: 'sess-parent-orchestrator',
-      replayDirectivePending: false,
-    } as any);
-
-    await hooks.event?.({
-      event: {
-        type: 'session.status',
-        properties: {
-          sessionID: 'sess-tw-idle',
-          status: { type: 'idle' },
-        },
-      } as any,
-    });
-
-    const child = sessionService.getGlobal('sess-tw-idle');
-    const parent = sessionService.getGlobal('sess-parent-orchestrator');
-    expect(child?.replayDirectivePending).toBe(false);
-    expect(parent?.replayDirectivePending).toBe(true);
-    expect(parent?.replayTaskFeatureName).toBe('my-feature');
-    expect(parent?.replayTaskFolder).toBe('01-task');
-    expect(parent?.replayWorkerPromptPath).toBe('.hive/features/my-feature/tasks/01-task/worker-prompt.md');
-  });
-
-  test('tool.execute.after marks replay pending on the parent session after task-worker launch returns', async () => {
-    const sessionService = new SessionService(testRoot);
-    sessionService.trackGlobal('sess-task-after', {
-      agent: 'hive-master',
-      sessionKind: 'primary',
-      replayDirectivePending: false,
-    } as any);
-
-    await hooks['tool.execute.before']?.(
-      { tool: 'task', sessionID: 'sess-task-after', callID: 'call-task-1' } as any,
-      {
-        args: {
-          subagent_type: 'forager-worker',
-          description: 'Hive: 01-task',
-          prompt: 'Follow instructions in @.hive/features/my-feature/tasks/01-task/worker-prompt.md',
-        },
-      } as any,
-    );
-
-    await hooks['tool.execute.after']?.(
-      { tool: 'task', sessionID: 'sess-task-after', callID: 'call-task-1' } as any,
-      { title: 'task', output: 'done', metadata: { sessionId: 'sess-child-worker' } } as any,
-    );
-
-    const marked = sessionService.getGlobal('sess-task-after');
-    expect(marked?.replayDirectivePending).toBe(true);
-    expect(marked?.replayTaskFeatureName).toBe('my-feature');
-    expect(marked?.replayTaskFolder).toBe('01-task');
-    expect(marked?.replayWorkerPromptPath).toBe('.hive/features/my-feature/tasks/01-task/worker-prompt.md');
-  });
-
-  test('messages.transform replays the selected checkpoint into the parent session after child idle', async () => {
-    writeTaskCheckpointFixture(testRoot, 'my-feature', '05-implement-dashboard');
-
-    const sessionService = new SessionService(testRoot);
-    sessionService.trackGlobal('sess-parent-resume', {
-      agent: 'hive-master',
-      sessionKind: 'primary',
-      replayDirectivePending: true,
-      replayTaskFeatureName: 'my-feature',
-      replayTaskFolder: '05-implement-dashboard',
-      replayWorkerPromptPath: '.hive/features/my-feature/tasks/05-implement-dashboard/worker-prompt.md',
-    } as any);
-
-    const output = buildCompactionTransformOutput('sess-parent-resume', testRoot);
-    await hooks['experimental.chat.messages.transform']?.({}, output as any);
-
-    expect(output.messages).toHaveLength(3);
-    const replayText = (output.messages[2].parts[0] as any).text;
-    expect(replayText).toContain('Task checkpoint rehydration');
-    expect(replayText).toContain('.hive/features/my-feature/tasks/05-implement-dashboard/checkpoint.json');
-    expect(replayText).toContain('Parent orchestrator should resume from the semantic checkpoint.');
-    expect(replayText).not.toContain('RAW_PROMPT_SHOULD_NOT_SURVIVE');
-
-    const cleared = sessionService.getGlobal('sess-parent-resume');
-    expect(cleared?.replayDirectivePending).toBe(false);
-  });
-
-  test('messages.transform advertises indexed feature attachment paths for parent replay', async () => {
-    writeTaskCheckpointFixture(testRoot, '01_my-feature', '05-implement-dashboard');
-
-    const sessionService = new SessionService(testRoot);
-    sessionService.trackGlobal('sess-parent-indexed', {
-      agent: 'hive-master',
-      sessionKind: 'primary',
-      replayDirectivePending: true,
-      replayTaskFeatureName: 'my-feature',
-      replayTaskFolder: '05-implement-dashboard',
-      replayWorkerPromptPath: '.hive/features/01_my-feature/tasks/05-implement-dashboard/worker-prompt.md',
-    } as any);
-
-    const output = buildCompactionTransformOutput('sess-parent-indexed', testRoot);
-    await hooks['experimental.chat.messages.transform']?.({}, output as any);
-
-    expect(output.messages).toHaveLength(3);
-    const replayText = (output.messages[2].parts[0] as any).text;
-    expect(replayText).toContain('.hive/features/01_my-feature/tasks/05-implement-dashboard/checkpoint.json');
-    expect(replayText).not.toContain('.hive/features/my-feature/tasks/05-implement-dashboard/checkpoint.json');
-  });
 
   test('messages.transform captures initial non-synthetic user directive for later recovery', async () => {
     const output = {

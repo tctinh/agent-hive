@@ -10,7 +10,6 @@ import {
 } from "@opencode-ai/sdk";
 import plugin from "../index";
 import { buildCompactionPrompt } from "../utils/compaction-prompt.js";
-import { buildCheckpointRehydration } from "../utils/checkpoint-rehydration.js";
 import type { PluginInput } from "@opencode-ai/plugin";
 
 const EXPECTED_TOOLS = [
@@ -550,35 +549,6 @@ describe("e2e: Forager compaction loop mitigation (in-process)", () => {
     expect(compactionPrompt).not.toMatch(/use hive_status to check feature state/i);
   });
 
-  it("checkpoint rehydration points back to durable task files instead of prior chat", async () => {
-    const taskDir = path.join(testRoot, ".hive", "features", "runtime-feature", "tasks", "01-runtime-task");
-    fs.mkdirSync(taskDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(taskDir, "status.json"),
-      JSON.stringify({
-        status: "in_progress",
-        origin: "plan",
-        planTitle: "Runtime Task",
-        summary: "Resume from durable runtime checkpoint after compaction.",
-      }, null, 2),
-    );
-    fs.writeFileSync(path.join(taskDir, "spec.md"), "RAW_PROMPT_SHOULD_NOT_SURVIVE\nmessages: [runtime]\n");
-
-    const replayText = buildCheckpointRehydration({
-      projectRoot: testRoot,
-      featureName: "runtime-feature",
-      taskFolder: "01-runtime-task",
-      workerPromptPath: ".hive/features/runtime-feature/tasks/01-runtime-task/worker-prompt.md",
-    });
-
-    expect(replayText).not.toBeNull();
-    expect(replayText).toContain("worker-prompt.md");
-    expect(replayText).toContain("status.json");
-    expect(replayText).toContain("spec.md");
-    expect(replayText).not.toContain("RAW_PROMPT_SHOULD_NOT_SURVIVE");
-    expect(replayText).not.toContain("messages: [runtime]");
-  });
-
   it("runtime contract excludes unsupported startup/compaction hooks", async () => {
     const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
     const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
@@ -597,7 +567,7 @@ describe("e2e: Forager compaction loop mitigation (in-process)", () => {
     expect(hooks["experimental.session.compacting" as keyof typeof hooks]).toBeUndefined();
   });
 
-  it("exposes OpenCode-only todoProjection in hive_status for primary-session sync", async () => {
+  it("does not expose the removed projected-todo field in hive_status", async () => {
     const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
     const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
 
@@ -619,22 +589,9 @@ describe("e2e: Forager compaction loop mitigation (in-process)", () => {
       { feature: "runtime-todo-feature" },
       toolContext,
     );
-    const status = JSON.parse(statusRaw as string) as {
-      todoProjection?: {
-        managedBy?: string;
-        items?: Array<{ id: string; content: string; status: string; priority: string }>;
-      };
-    };
+    const status = JSON.parse(statusRaw as string) as Record<string, unknown>;
 
-    expect(status.todoProjection).toMatchObject({
-      managedBy: "opencode-hive",
-    });
-    expect(status.todoProjection?.items).toContainEqual({
-      id: "hive:runtime-todo-feature:feature",
-      content: "Finish the plan for runtime-todo-feature",
-      status: "pending",
-      priority: "high",
-    });
+    expect(status).not.toHaveProperty(['todo', 'Projection'].join(''));
   });
 
   it("compacted forager flow reaches commit-capable step without hive_status stall", async () => {
@@ -704,7 +661,7 @@ Test compaction resume flow.
     expect(commitResult.status).toBe("completed");
   });
 
-  it('plugin exposes tool execute after hook for task child-session binding', async () => {
+  it('plugin does not expose the removed post-tool hook', async () => {
     const { createOpencodeClient: mkClient } = await import('@opencode-ai/sdk');
     const OPENCODE_CLIENT = mkClient({ baseUrl: 'http://localhost:1' }) as unknown as PluginInput['client'];
 
@@ -719,8 +676,8 @@ Test compaction resume flow.
 
     const hooks = await plugin(ctx);
 
-    expect(hooks['tool.execute.after']).toBeDefined();
-    expect(typeof hooks['tool.execute.after']).toBe('function');
+    const removedPostToolHook = 'tool.execute' + '.after';
+    expect(hooks[removedPostToolHook as keyof typeof hooks]).toBeUndefined();
   });
 
 });

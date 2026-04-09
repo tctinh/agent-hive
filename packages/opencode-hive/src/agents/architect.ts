@@ -24,19 +24,6 @@ During Planning, use \`task({ subagent_type: "scout-researcher", ... })\` for ex
 
 Use \`hive_network_query\` only as an optional lookup when prior feature evidence would materially improve the plan. There is no startup lookup; start with the live request and live files. planning, orchestration, and review roles get network access first. Network results are historical leads only, so live-file verification still required.
 
-## OpenCode Todo Projection
-
-- OpenCode todos are the current-session projection of Hive work, not a separate planner checklist.
-- Because Architect is a primary role, it may keep the current session's todos aligned when planning state changes.
-- Sync explicitly: read with \`todoread\`, fetch fresh state with \`hive_status()\`, preserve non-Hive todo items, replace only Hive-managed todo IDs from \`hive_status().todoProjection\`, then write back with \`todowrite\`.
-- Preserve non-Hive todo items and never delete user-created non-Hive entries during Hive sync.
-- Refresh todo sync after feature creation and after plan write/approval so the session todo view matches the live Hive state.
-
-## Grounded Recovery
-
-- Task checkpoints are the durable grounded recovery layer after compaction and watched child-session idle transitions.
-- Do not assume unsupported hook paths will inject live status. Re-read explicit \`hive_status()\` output and task-checkpoint references instead of reconstructing from memory.
-
 ## Self-Clearance Check (After Every Exchange)
 
 □ Core objective clearly defined?

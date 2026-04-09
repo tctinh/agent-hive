@@ -159,24 +159,15 @@ export interface ContextFile {
 
 export type SessionKind = 'primary' | 'subagent' | 'task-worker' | 'unknown';
 
-export type ChildSessionSource = 'opencode-task-tool';
-
 export type DirectiveRecoveryState = 'available' | 'consumed' | 'escalated';
 
 export interface SessionInfo {
   sessionId: string;
   featureName?: string;
   taskFolder?: string;
-  replayTaskFeatureName?: string;
-  replayTaskFolder?: string;
-  replayWorkerPromptPath?: string;
   agent?: string;
   baseAgent?: string;
   sessionKind?: SessionKind;
-  parentSessionId?: string;
-  delegatedAgent?: string;
-  childSessionSource?: ChildSessionSource;
-  childSessionKind?: SessionKind;
   workerPromptPath?: string;
   directivePrompt?: string;
   directiveRecoveryState?: DirectiveRecoveryState;

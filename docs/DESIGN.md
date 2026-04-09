@@ -103,7 +103,7 @@ Tracked metadata can include:
 - `directivePrompt`
 - replay flags and activity metadata
 
-This metadata is also the current child-session provenance surface that Hive can rely on inside OpenCode today. Hive observes the current task/subagent lifecycle, records which role/session/task was active, and uses that provenance during recovery and status reporting. It does not rely on a first-class upstream child-session ownership API because OpenCode does not expose one.
+This metadata is the recovery surface Hive can rely on inside OpenCode today. It records the role, feature binding, and task identity needed for bounded replay without depending on a first-class upstream child-session ownership API.
 
 ### Session kinds
 
@@ -127,19 +127,18 @@ When OpenCode emits a compaction event, Hive rebuilds a minimal re-anchor prompt
 - Recovery prompts tell sessions not to switch roles, not to rediscover state through status tools, and not to re-read the full codebase.
 - Worker recovery stays intentionally narrow: keep the same role, finish only the current assignment, re-read `worker-prompt.md`, do not merge, and do not start the next task.
 
-This keeps recovery narrow and deterministic: orchestrators recover their role and directive, while workers recover their exact task contract without drifting into orchestration. In operator terms, the durable checkpoint is task-level semantic `.hive` state, not transcript replay.
+This keeps recovery narrow and deterministic: orchestrators recover their role and directive, while workers recover their exact task contract without drifting into orchestration. In operator terms, the durable recovery surface is task-level semantic `.hive` state, not transcript replay.
 
 ## Todo Alignment
 
-Hive's OpenCode todo alignment is intentionally scoped to the primary session contract that exists today:
+OpenCode todo behavior remains intentionally simple in this design:
 
 - OpenCode todo state is session-scoped.
 - OpenCode todo writes replace the session's todo list rather than patching individual items.
-- Hive / Architect / Swarm can manage that list through OpenCode's built-in todo tools.
+- Hive does not create a derived projected-todo field or another projected todo contract.
 - Subagents and task workers should not be modeled as first-class todo writers.
-- Hive therefore treats the visible OpenCode todo list as a primary-session projection of Hive state and refreshes it at safe orchestration boundaries.
 
-This feature does not introduce a new upstream OpenCode todo API. The source of truth for task state remains `.hive`, while the OpenCode todo list is the session-facing projection.
+This feature does not introduce a new upstream OpenCode todo API. The source of truth for task state remains `.hive`, while any OpenCode todo usage stays an explicit session-level behavior.
 
 ## Task Lifecycle
 

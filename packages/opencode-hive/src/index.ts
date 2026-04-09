@@ -201,13 +201,9 @@ import { calculatePromptMeta, calculatePayloadMeta, checkWarnings } from "./util
 import { applyTaskBudget, applyContextBudget, DEFAULT_BUDGET, type TruncationEvent } from "./utils/prompt-budgeting";
 import { writeWorkerPromptFile } from "./utils/prompt-file";
 import { formatRelativeTime } from "./utils/format";
-import { finalizeTaskCheckpoint, readTaskCheckpoint, updateTaskCheckpoint } from './utils/task-checkpoint.js';
-import { consumeTaskToolLaunch, extractTaskToolChildSessionId, recordTaskToolLaunch, toChildSessionPatch, type PendingTaskToolLaunches } from './utils/task-session-binding.js';
 import { createVariantHook } from "./hooks/variant-hook.js";
 import { HIVE_SYSTEM_PROMPT, shouldExecuteHook } from "./hooks/system-hook.js";
 import { HIVE_COMMANDS, HIVE_TOOL_NAMES } from './utils/plugin-manifest.js';
-import { buildCheckpointRehydration } from './utils/checkpoint-rehydration.js';
-import { buildTodoProjection } from './utils/todo-projection.js';
 
 /**
  * Core plugin implementation.
@@ -242,7 +238,6 @@ const plugin: Plugin = async (ctx) => {
     baseDir: directory,
     hiveDir: path.join(directory, '.hive'),
   });
-  let pendingTaskToolLaunches: PendingTaskToolLaunches = {};
 
   const customAgentConfigsForClassification = getCustomAgentConfigsCompat(configService);
   const runtimeContext = detectContext(worktree || directory);
@@ -296,44 +291,6 @@ const plugin: Plugin = async (ctx) => {
     const ctx = toolContext as ToolContext;
     if (!ctx?.sessionID) return;
     sessionService.bindFeature(ctx.sessionID, feature, patch as any);
-  };
-
-  const refreshTaskCheckpoint = (
-    feature: string,
-    taskFolder: string,
-    patch: {
-      stateSummary: string;
-      verificationState: string;
-      currentObjective?: string;
-      importantDecisions?: string[];
-      filesInPlay?: string[];
-      nextAction?: string;
-      blocker?: string;
-      childSession?: {
-        sessionId: string;
-        parentSessionId: string;
-        delegatedAgent: string;
-        source: 'opencode-task-tool';
-        kind: 'task-worker' | 'subagent';
-      };
-    },
-  ) => {
-    const current = taskService.getRawStatus(feature, taskFolder);
-    const currentObjective = patch.currentObjective ?? current?.planTitle ?? taskFolder;
-    const existingCheckpoint = readTaskCheckpoint(directory, feature, taskFolder);
-
-    return updateTaskCheckpoint(directory, {
-      featureName: feature,
-      taskFolder,
-      currentObjective,
-      stateSummary: patch.stateSummary,
-      importantDecisions: patch.importantDecisions ?? existingCheckpoint?.importantDecisions ?? [],
-      filesInPlay: patch.filesInPlay ?? existingCheckpoint?.filesInPlay ?? [],
-      verificationState: patch.verificationState,
-      nextAction: patch.nextAction ?? existingCheckpoint?.nextAction,
-      blocker: patch.blocker ?? existingCheckpoint?.blocker,
-      childSession: patch.childSession ?? existingCheckpoint?.childSession,
-    });
   };
 
   type ReplayMessageInfo = {
@@ -437,93 +394,13 @@ const plugin: Plugin = async (ctx) => {
 
   const buildWorkerReplayText = (session: { agent?: string; baseAgent?: string; featureName?: string; taskFolder?: string; workerPromptPath?: string }): string | null => {
     if (!session.featureName || !session.taskFolder || !session.workerPromptPath) return null;
-    return buildCheckpointRehydration({
-      projectRoot: directory,
-      featureName: session.featureName,
-      taskFolder: session.taskFolder,
-      workerPromptPath: session.workerPromptPath,
-    });
-  };
-
-  const getReplaySelection = (session?: {
-    sessionKind?: string;
-    featureName?: string;
-    taskFolder?: string;
-    workerPromptPath?: string;
-    replayTaskFeatureName?: string;
-    replayTaskFolder?: string;
-    replayWorkerPromptPath?: string;
-  }): { featureName: string; taskFolder: string; workerPromptPath: string } | undefined => {
-    if (session?.replayTaskFeatureName && session?.replayTaskFolder && session?.replayWorkerPromptPath) {
-      return {
-        featureName: session.replayTaskFeatureName,
-        taskFolder: session.replayTaskFolder,
-        workerPromptPath: session.replayWorkerPromptPath,
-      };
-    }
-
-    if (shouldUseWorkerReplay(session)) {
-      return {
-        featureName: session.featureName!,
-        taskFolder: session.taskFolder!,
-        workerPromptPath: session.workerPromptPath!,
-      };
-    }
-
-    return undefined;
-  };
-
-  const getReplayTargetSession = (sessionID: string, session?: {
-    sessionKind?: string;
-    parentSessionId?: string;
-    replayTaskFeatureName?: string;
-    replayTaskFolder?: string;
-    replayWorkerPromptPath?: string;
-    featureName?: string;
-    taskFolder?: string;
-    workerPromptPath?: string;
-  }) => {
-    if (session?.parentSessionId && shouldUseWorkerReplay(session)) {
-      return {
-        sessionID: session.parentSessionId,
-        patch: {
-          replayDirectivePending: true,
-          replayTaskFeatureName: session.featureName,
-          replayTaskFolder: session.taskFolder,
-          replayWorkerPromptPath: session.workerPromptPath,
-        },
-      };
-    }
-
-    if (session?.replayTaskFeatureName && session?.replayTaskFolder && session?.replayWorkerPromptPath) {
-      return {
-        sessionID,
-        patch: {
-          replayDirectivePending: true,
-          replayTaskFeatureName: session.replayTaskFeatureName,
-          replayTaskFolder: session.replayTaskFolder,
-          replayWorkerPromptPath: session.replayWorkerPromptPath,
-        },
-      };
-    }
-
-    return {
-      sessionID,
-      patch: { replayDirectivePending: true },
-    };
-  };
-
-  const markReplayPendingIfNeeded = (sessionID: string, session?: { directivePrompt?: string; directiveRecoveryState?: 'available' | 'consumed' | 'escalated'; sessionKind?: string; parentSessionId?: string; replayTaskFeatureName?: string; replayTaskFolder?: string; replayWorkerPromptPath?: string; featureName?: string; taskFolder?: string; workerPromptPath?: string }) => {
-    const directiveReplayPatch = getDirectiveReplayCompactionPatch(session);
-    if (directiveReplayPatch) {
-      sessionService.trackGlobal(sessionID, directiveReplayPatch);
-      return;
-    }
-
-    if (shouldUseWorkerReplay(session)) {
-      const replayTarget = getReplayTargetSession(sessionID, session);
-      sessionService.trackGlobal(replayTarget.sessionID, replayTarget.patch as any);
-    }
+    const role = 'Forager';
+    return [
+      `Post-compaction recovery: You are still the ${role} worker for task ${session.taskFolder}.`,
+      `Resume only this task. Do not merge, do not start the next task, and do not replace this assignment with a new goal.`,
+      `Do not call orchestration tools unless the worker prompt explicitly says so.`,
+      `Re-read @${session.workerPromptPath} and continue from the existing worktree state.`,
+    ].join('\n');
   };
 
   /**
@@ -611,14 +488,6 @@ To unblock: Remove .hive/features/${featureDir}/BLOCKED`;
   };
 
   const respond = (payload: Record<string, unknown>) => JSON.stringify(payload, null, 2);
-  const TODO_SYNC_REFRESH_HINT = 'Refresh hive_status() before syncing OpenCode todos.';
-  const appendTodoSyncHint = (message: string): string => `${message}\n\n${TODO_SYNC_REFRESH_HINT}`;
-  const buildTodoSyncState = (reason: string) => ({
-    stale: true,
-    reason,
-    refreshHint: TODO_SYNC_REFRESH_HINT,
-    projectionField: 'todoProjection',
-  });
 
   const buildWorktreeLaunchResponse = async ({
     feature,
@@ -770,19 +639,6 @@ To unblock: Remove .hive/features/${featureDir}/BLOCKED`;
 
     const taskToolPrompt = `Follow instructions in @${relativePromptPath}`;
 
-    refreshTaskCheckpoint(feature, task, {
-      currentObjective: taskInfo.planTitle ?? taskInfo.name,
-      stateSummary: continueFrom === 'blocked'
-        ? 'Task resumed in existing worktree and awaiting child worker session binding.'
-        : 'Task launched and awaiting child worker session binding.',
-      importantDecisions: [
-        'Use the generated worker-prompt attachment as the durable task contract.',
-      ],
-      filesInPlay: [relativePromptPath, '.hive/features/' + resolveFeatureDirectoryName(directory, feature) + `/tasks/${task}/spec.md`],
-      verificationState: 'Not run in parent session.',
-      nextAction: 'Wait for the built-in task() tool to return structured child session metadata.',
-    });
-
     const taskToolInstructions = `## Delegation Required
 
 Choose one of the eligible forager-derived agents below.
@@ -823,7 +679,6 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         description: `Hive: ${task}`,
         prompt: taskToolPrompt,
       },
-      todoSync: buildTodoSyncState(continueFrom === 'blocked' ? 'task_resumed' : 'task_started'),
       instructions: taskToolInstructions,
     };
 
@@ -1089,17 +944,19 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
 
   return {
     event: async (input) => {
-      if (input.event.type === 'session.compacted') {
-        const sessionID = input.event.properties.sessionID;
-        const existing = sessionService.getGlobal(sessionID);
-        markReplayPendingIfNeeded(sessionID, existing);
+      if (input.event.type !== 'session.compacted') {
         return;
       }
 
-      if (input.event.type === 'session.status' && input.event.properties.status?.type === 'idle') {
-        const sessionID = input.event.properties.sessionID;
-        const existing = sessionService.getGlobal(sessionID);
-        markReplayPendingIfNeeded(sessionID, existing);
+      const sessionID = input.event.properties.sessionID;
+      const existing = sessionService.getGlobal(sessionID);
+      const directiveReplayPatch = getDirectiveReplayCompactionPatch(existing);
+      if (directiveReplayPatch) {
+        sessionService.trackGlobal(sessionID, directiveReplayPatch);
+        return;
+      }
+      if (shouldUseWorkerReplay(existing)) {
+        sessionService.trackGlobal(sessionID, { replayDirectivePending: true });
         return;
       }
     },
@@ -1147,17 +1004,10 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         return;
       }
 
-      const replaySelection = getReplaySelection(refreshed);
-
-      if (replaySelection) {
-        const workerText = buildWorkerReplayText(replaySelection);
+      if (shouldUseWorkerReplay(refreshed)) {
+        const workerText = buildWorkerReplayText(refreshed);
         if (!workerText) {
-          sessionService.trackGlobal(sessionID, {
-            replayDirectivePending: false,
-            replayTaskFeatureName: undefined,
-            replayTaskFolder: undefined,
-            replayWorkerPromptPath: undefined,
-          });
+          sessionService.trackGlobal(sessionID, { replayDirectivePending: false });
           return;
         }
 
@@ -1181,12 +1031,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
           ],
         });
 
-        sessionService.trackGlobal(sessionID, {
-          replayDirectivePending: false,
-          replayTaskFeatureName: undefined,
-          replayTaskFolder: undefined,
-          replayWorkerPromptPath: undefined,
-        });
+        sessionService.trackGlobal(sessionID, { replayDirectivePending: false });
         return;
       }
 
@@ -1230,14 +1075,6 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
     },
 
     "tool.execute.before": async (input, output) => {
-      pendingTaskToolLaunches = recordTaskToolLaunch({
-        pending: pendingTaskToolLaunches,
-        tool: input.tool,
-        sessionID: input.sessionID,
-        callID: (input as { callID?: string }).callID,
-        args: output.args as any,
-      });
-
       // Cadence gate: check if this hook should execute this turn
       // SAFETY-CRITICAL: This hook wraps commands for Docker sandbox isolation.
       // Setting cadence > 1 could allow unsafe commands through.
@@ -1275,66 +1112,6 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       output.args.workdir = undefined; // docker command runs on host
     },
 
-    "tool.execute.after": async (input, output) => {
-      if (input.tool !== 'task') {
-        return;
-      }
-
-      const consumed = consumeTaskToolLaunch({
-        pending: pendingTaskToolLaunches,
-        sessionID: input.sessionID,
-        callID: (input as { callID?: string }).callID,
-        tool: input.tool,
-      });
-      pendingTaskToolLaunches = consumed.pending;
-      const launch = consumed.launch;
-      if (!launch) {
-        return;
-      }
-
-      const childSessionId = extractTaskToolChildSessionId(output);
-      if (!childSessionId) {
-        return;
-      }
-
-      const sessionPatch = toChildSessionPatch(launch, childSessionId);
-      if (sessionPatch.featureName) {
-        sessionService.bindFeature(childSessionId, sessionPatch.featureName, sessionPatch as any);
-      } else {
-        sessionService.trackGlobal(childSessionId, sessionPatch as any);
-      }
-
-      if (launch.kind === 'task-worker' && launch.featureName && launch.taskFolder) {
-        sessionService.trackGlobal(launch.parentSessionId, {
-          replayDirectivePending: true,
-          replayTaskFeatureName: sessionPatch.featureName,
-          replayTaskFolder: launch.taskFolder,
-          replayWorkerPromptPath: launch.workerPromptPath,
-        } as any);
-
-        taskService.patchBackgroundFields(launch.featureName, launch.taskFolder, {
-          workerSession: {
-            sessionId: childSessionId,
-            agent: launch.delegatedAgent,
-            mode: 'delegate',
-          },
-        });
-
-        refreshTaskCheckpoint(launch.featureName, launch.taskFolder, {
-          stateSummary: `Bound child ${launch.kind} session ${childSessionId}.`,
-          verificationState: 'Awaiting child worker verification.',
-          nextAction: 'Let the child worker continue and finalize the checkpoint on completion or block.',
-          childSession: {
-            sessionId: childSessionId,
-            parentSessionId: launch.parentSessionId,
-            delegatedAgent: launch.delegatedAgent,
-            source: 'opencode-task-tool',
-            kind: launch.kind,
-          },
-        });
-      }
-    },
-
     mcp: builtinMcps,
 
     tool: {
@@ -1348,7 +1125,7 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
         },
         async execute({ name, ticket }) {
           const feature = featureService.create(name, ticket);
-          return appendTodoSyncHint(`Feature "${name}" created.
+          return `Feature "${name}" created.
 
 ## Discovery Phase Required
 
@@ -1381,7 +1158,7 @@ When writing your plan, include:
 
 These prevent scope creep and re-proposing rejected solutions.
 
-NEXT: Ask your first clarifying question about this feature.`);
+NEXT: Ask your first clarifying question about this feature.`;
         },
       }),
 
@@ -1392,7 +1169,7 @@ NEXT: Ask your first clarifying question about this feature.`);
           const feature = resolveFeature(name);
           if (!feature) return "Error: No feature specified. Create a feature or provide name.";
           featureService.complete(feature);
-          return appendTodoSyncHint(`Feature "${feature}" marked as completed`);
+          return `Feature "${feature}" marked as completed`;
         },
       }),
 
@@ -1439,7 +1216,7 @@ Expand your Discovery section and try again.`;
 
           captureSession(feature, toolContext);
           const planPath = planService.write(feature, content);
-          return appendTodoSyncHint(`Plan written to ${planPath}. Comments cleared for fresh review. Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History. Review context/overview.md first; plan.md remains execution truth.`);
+          return `Plan written to ${planPath}. Comments cleared for fresh review. Refresh the primary human-facing overview with hive_context_write({ name: "overview", content }) using ## At a Glance, ## Workstreams, and ## Revision History. Review context/overview.md first; plan.md remains execution truth.`;
         },
       }),
 
@@ -1480,7 +1257,7 @@ Expand your Discovery section and try again.`;
             return `Error: Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`;
           }
           planService.approve(feature);
-          return appendTodoSyncHint('Plan approved. Run hive_tasks_sync to generate tasks. Refresh the overview if approval changed the plan narrative, workstreams, or milestones; context/overview.md is the primary human-facing surface and plan.md remains execution truth.');
+          return 'Plan approved. Run hive_tasks_sync to generate tasks. Refresh the overview if approval changed the plan narrative, workstreams, or milestones; context/overview.md is the primary human-facing surface and plan.md remains execution truth.';
         },
       }),
 
@@ -1501,7 +1278,7 @@ Expand your Discovery section and try again.`;
           if (featureData.status === 'approved') {
             featureService.updateStatus(feature, 'executing');
           }
-          return appendTodoSyncHint(`Tasks synced: ${result.created.length} created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`);
+          return `Tasks synced: ${result.created.length} created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`;
         },
       }),
 
@@ -1533,7 +1310,7 @@ Expand your Discovery section and try again.`;
           if (reason) metadata.reason = reason;
           if (source) metadata.source = source;
           const folder = taskService.create(feature, name, order, Object.keys(metadata).length > 0 ? metadata as any : undefined);
-          return appendTodoSyncHint(`Manual task created: ${folder}\nDependencies: [${(dependsOn ?? []).join(', ')}]\nReminder: start work with hive_worktree_start to use its worktree, and ensure any subagents work in that worktree too.`);
+          return `Manual task created: ${folder}\nDependencies: [${(dependsOn ?? []).join(', ')}]\nReminder: start work with hive_worktree_start to use its worktree, and ensure any subagents work in that worktree too.`;
         },
       }),
 
@@ -1552,7 +1329,7 @@ Expand your Discovery section and try again.`;
             status: status as any,
             summary,
           });
-          return appendTodoSyncHint(`Task "${task}" updated: status=${updated.status}`);
+          return `Task "${task}" updated: status=${updated.status}`;
         },
       }),
 
@@ -1657,14 +1434,6 @@ Expand your Discovery section and try again.`;
 
           // Handle blocked status - don't commit, just update status
           if (status === 'blocked') {
-            finalizeTaskCheckpoint(directory, feature, task, {
-              status: 'blocked',
-              stateSummary: summary,
-              verificationState: 'Blocked before final verification.',
-              nextAction: blocker?.recommendation,
-              blocker: blocker?.reason,
-            });
-
             taskService.update(feature, task, {
               status: 'blocked',
               summary,
@@ -1684,7 +1453,6 @@ Expand your Discovery section and try again.`;
               blocker,
               worktreePath: worktree?.path,
               branch: worktree?.branch,
-              todoSync: buildTodoSyncState('task_blocked'),
               message: 'Task blocked. Hive Master will ask user and resume with hive_worktree_create(continueFrom: "blocked", decision: answer)',
               nextAction: 'Wait for orchestrator to collect user decision and resume with continueFrom: "blocked".',
             });
@@ -1760,12 +1528,6 @@ Expand your Discovery section and try again.`;
 
           const finalStatus = status === 'completed' ? 'done' : status;
           taskService.update(feature, task, { status: finalStatus as any, summary });
-          finalizeTaskCheckpoint(directory, feature, task, {
-            status: status,
-            stateSummary: summary,
-            verificationState: verificationNote ?? 'Verification evidence recorded in task summary.',
-            nextAction: status === 'completed' ? 'Await merge.' : undefined,
-          });
 
           const worktree = await worktreeService.get(feature, task);
           return respond({
@@ -1785,7 +1547,6 @@ Expand your Discovery section and try again.`;
             worktreePath: worktree?.path,
             branch: worktree?.branch,
             reportPath,
-            todoSync: buildTodoSyncState(status === 'completed' ? 'task_completed' : `task_${status}`),
             message: `Task "${task}" ${status}.`,
             nextAction: 'Use hive_merge to integrate changes. Worktree is preserved for review.',
           });
@@ -1805,7 +1566,7 @@ Expand your Discovery section and try again.`;
           await worktreeService.remove(feature, task);
           taskService.update(feature, task, { status: 'pending' });
 
-          return appendTodoSyncHint(`Task "${task}" aborted. Status reset to pending.`);
+          return `Task "${task}" aborted. Status reset to pending.`;
         },
       }),
 
@@ -1855,7 +1616,6 @@ Expand your Discovery section and try again.`;
 
           return respond({
             ...result,
-            ...(result.success ? { todoSync: buildTodoSyncState('task_merged') } : {}),
             message: responseMessage,
           });
         },
@@ -2054,26 +1814,6 @@ Expand your Discovery section and try again.`;
           const planStatus = featureData.status === 'planning' ? 'draft' :
             featureData.status === 'approved' ? 'approved' :
               featureData.status === 'executing' ? 'locked' : 'none';
-          const todoProjection = buildTodoProjection({
-            feature: {
-              name: feature,
-              status: featureData.status,
-            },
-            plan: {
-              exists: !!plan,
-              status: planStatus,
-              approved: planStatus === 'approved' || planStatus === 'locked',
-            },
-            tasks: {
-              total: tasks.length,
-              pending: pendingTasks.length,
-              inProgress: inProgressTasks.length,
-              done: doneTasks.length,
-              list: tasksSummary,
-              runnable,
-              blockedBy,
-            },
-          });
 
           return respond({
             feature: {
@@ -2112,7 +1852,6 @@ Expand your Discovery section and try again.`;
               fileCount: featureContextFiles.length,
               files: contextSummary,
             },
-            todoProjection,
             nextAction: getNextAction(planStatus, tasksSummary, runnable, !!plan, !!overview),
           });
         },

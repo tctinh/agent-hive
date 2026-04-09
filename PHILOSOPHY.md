@@ -736,13 +736,13 @@ That role boundary matters. Workers still execute from `spec.md`, live files, an
 
 **Theme:** Document the real runtime contract instead of hinting at upstream APIs that do not exist.
 
-The alignment in this branch is intentionally pragmatic. OpenCode still owns session lifecycle, compaction, and todo storage. Hive adds durable `.hive` state, role/session classification, bounded post-compaction replay, and primary-session prompt discipline so operators can recover grounded task state without pretending there is a first-class Hive runtime inside OpenCode.
+The alignment in this branch is intentionally pragmatic. OpenCode still owns session lifecycle, compaction, and todo storage. Hive adds durable `.hive` state, role/session classification, and bounded post-compaction replay so operators can recover grounded task state without pretending there is a first-class Hive runtime inside OpenCode.
 
-**Todo model:** OpenCode todos are session-scoped and replace-all. Hive therefore treats the visible OpenCode todo list as a primary-session-managed projection of Hive state, refreshed through built-in `todowrite` / `todoread` behavior at safe moments. That is why the docs must say both parts: Hive sync exists, but it is mediated by the primary session and must preserve non-Hive entries instead of acting like a hidden storage sync layer.
+**Todo model:** OpenCode todos are session-scoped and replace-all. Hive does not expose a derived projected-todo field, stale refresh hints, or a hidden sync layer in this contract. `.hive` remains the durable source of truth, and any todo usage stays an explicit OpenCode behavior rather than a Hive-managed projection surface.
 
-**Checkpoint model:** The durable checkpoint is task-level semantic `.hive` state: task folder identity, `worker-prompt.md`, bound feature/task/session metadata, and bounded recovery text. This is intentionally different from raw prompt dumps. Recovery uses those artifacts to answer, “What task am I still executing?” rather than, “Can I replay the whole transcript?”
+**Recovery model:** The durable recovery surface is task-level semantic `.hive` state: task folder identity, `worker-prompt.md`, bound feature/task/session metadata, and bounded recovery text. This is intentionally different from raw prompt dumps or extra checkpoint artifacts. Recovery uses those artifacts to answer, “What task am I still executing?” rather than, “Can I replay the whole transcript?”
 
-**Boundary insight:** Honest contracts make systems easier to operate. Saying “primary-session-mediated todo projection plus bounded replay from `.hive` artifacts” is less glamorous than saying “native OpenCode sync,” but it matches the code and gives operators something real to trust.
+**Boundary insight:** Honest contracts make systems easier to operate. Saying “OpenCode-owned todos plus bounded replay from `.hive` artifacts” is less glamorous than saying “native OpenCode sync,” but it matches the code and gives operators something real to trust.
 
 ---
 
