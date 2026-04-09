@@ -2741,6 +2741,265 @@ Also wait for task one.
     });
   });
 
+  it("covers the issue-72 3b/3c interruption with explicit helperStatus, unsafe insertion rejection, and safe append-only follow-up", async () => {
+    const { hooks, toolContext } = await createHooksForTest(testRoot, 'sess_issue_72_followup');
+
+    await hooks.tool!.hive_feature_create.execute({ name: 'issue-72-followup-feature' }, toolContext);
+
+    const plan = `# Issue 72 Follow-up Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this integrated regression models the exact issue-72 interruption where task 3 is locally tested and marked done, task 4 is not started yet, and a follow-up 3b/3c request must route through append-only manual-task guardrails.
+
+## Tasks
+
+### 1. First Task
+
+**Depends on**: none
+
+Complete the first planned step.
+
+### 2. Second Task
+
+**Depends on**: 1
+
+Complete the second planned step.
+
+### 3. Third Task
+
+**Depends on**: 2
+
+Locally test and wrap up the third planned step.
+
+### 4. Fourth Task
+
+**Depends on**: 3
+
+Original plan task four content must stay isolated from any append-only manual follow-up.
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: 'issue-72-followup-feature' },
+      toolContext,
+    );
+    await hooks.tool!.hive_plan_approve.execute({ feature: 'issue-72-followup-feature' }, toolContext);
+    await hooks.tool!.hive_tasks_sync.execute({ feature: 'issue-72-followup-feature' }, toolContext);
+
+    await hooks.tool!.hive_task_update.execute(
+      {
+        feature: 'issue-72-followup-feature',
+        task: '01-first-task',
+        status: 'done',
+        summary: 'Setup only: mark task 1 complete so later plan tasks can run without a live worktree.',
+      },
+      toolContext,
+    );
+    await hooks.tool!.hive_task_update.execute(
+      {
+        feature: 'issue-72-followup-feature',
+        task: '02-second-task',
+        status: 'done',
+        summary: 'Setup only: mark task 2 complete so task 3 can model the interrupted wrap-up state.',
+      },
+      toolContext,
+    );
+
+    const startRaw = await hooks.tool!.hive_worktree_start.execute(
+      { feature: 'issue-72-followup-feature', task: '03-third-task' },
+      toolContext,
+    );
+    const startResult = JSON.parse(startRaw as string) as {
+      success?: boolean;
+      worktreePath?: string;
+    };
+
+    expect(startResult.success).toBe(true);
+    expect(startResult.worktreePath).toBeDefined();
+
+    fs.writeFileSync(
+      path.join(startResult.worktreePath!, '03-third-task.txt'),
+      '03-third-task completed during issue-72 regression setup\n',
+    );
+
+    const commitRaw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        feature: 'issue-72-followup-feature',
+        task: '03-third-task',
+        status: 'completed',
+        summary: 'Completed 03-third-task. Targeted issue-72 regression setup test recorded local wrap-up state.',
+      },
+      createToolContext('sess_issue_72_worker_03-third-task'),
+    );
+    const commitResult = JSON.parse(commitRaw as string) as {
+      ok?: boolean;
+      taskState?: string;
+      worktreePath?: string;
+    };
+
+    expect(commitResult.ok).toBe(true);
+    expect(commitResult.taskState).toBe('done');
+    expect(commitResult.worktreePath).toBe(startResult.worktreePath);
+
+    const thirdTaskWorktree = path.join(
+      testRoot,
+      '.hive',
+      '.worktrees',
+      'issue-72-followup-feature',
+      '03-third-task',
+    );
+    fs.writeFileSync(
+      path.join(thirdTaskWorktree, 'post-commit-dirty.txt'),
+      'task 3 still has observable wrap-up state after completion\n',
+    );
+
+    const statusRaw = await hooks.tool!.hive_status.execute(
+      { feature: 'issue-72-followup-feature' },
+      toolContext,
+    );
+    const status = JSON.parse(statusRaw as string) as {
+      tasks?: {
+        pending?: number;
+        runnable?: string[];
+      };
+      helperStatus?: {
+        doneTasksWithLiveWorktrees: string[];
+        dirtyWorktrees: string[];
+        nonInProgressTasksWithWorktrees: string[];
+        manualTaskPolicy: {
+          order: {
+            omitted: string;
+            explicitNextOrder: string;
+            explicitOtherOrder: string;
+          };
+          dependsOn: {
+            omitted: string;
+            explicitDoneTargetsOnly: string;
+            explicitMissingTarget: string;
+            explicitNotDoneTarget: string;
+            reviewSourceWithExplicitDependsOn: string;
+          };
+        };
+        ambiguityFlags: string[];
+      };
+    };
+
+    expect(status.tasks?.pending).toBe(1);
+    expect(status.tasks?.runnable).toEqual(['04-fourth-task']);
+    expect(status.helperStatus).toEqual({
+      doneTasksWithLiveWorktrees: ['03-third-task'],
+      dirtyWorktrees: ['03-third-task'],
+      nonInProgressTasksWithWorktrees: ['03-third-task'],
+      manualTaskPolicy: {
+        order: {
+          omitted: 'append_next_order',
+          explicitNextOrder: 'append_next_order',
+          explicitOtherOrder: 'plan_amendment_required',
+        },
+        dependsOn: {
+          omitted: 'store_empty_array',
+          explicitDoneTargetsOnly: 'allowed',
+          explicitMissingTarget: 'plan_amendment_required',
+          explicitNotDoneTarget: 'plan_amendment_required',
+          reviewSourceWithExplicitDependsOn: 'plan_amendment_required',
+        },
+      },
+      ambiguityFlags: [
+        'done_task_has_live_worktree',
+        'dirty_non_in_progress_worktree',
+      ],
+    });
+
+    let unsafeInsertionError: unknown;
+    try {
+      await hooks.tool!.hive_task_create.execute(
+        {
+          feature: 'issue-72-followup-feature',
+          name: 'issue-72-3b-followup',
+          order: 4,
+          description: 'Unsafe 3b insertion that should be rejected.',
+          goal: 'Confirm append-only ordering rejects intermediate insertion.',
+          acceptanceCriteria: ['Tool rejects non-next order'],
+          reason: 'Reproduce issue-72 3b/3c unsafe insertion attempt',
+          source: 'operator',
+        },
+        toolContext,
+      );
+    } catch (error) {
+      unsafeInsertionError = error;
+    }
+
+    expect(unsafeInsertionError).toBeInstanceOf(Error);
+    expect((unsafeInsertionError as Error).message).toBe(
+      'Manual tasks are append-only: requested order 4 does not match the next available order 5. Intermediate insertion requires plan amendment.',
+    );
+    expect((unsafeInsertionError as Error).message.toLowerCase()).toContain('manual tasks are append-only');
+    expect((unsafeInsertionError as Error).message.toLowerCase()).toContain('plan amendment');
+
+    const safeCreateResult = await hooks.tool!.hive_task_create.execute(
+      {
+        feature: 'issue-72-followup-feature',
+        name: 'issue-72-safe-followup',
+        description: 'Add the safe append-only follow-up that Hive Helper can create after the interruption.',
+        goal: 'Capture the manual follow-up without rewriting the plan-backed task sequence.',
+        acceptanceCriteria: [
+          'Follow-up lands at the append-only next order',
+          'Spec stays isolated from task four plan content',
+        ],
+        references: ['packages/opencode-hive/src/e2e/plugin-smoke.test.ts'],
+        files: ['packages/opencode-hive/src/e2e/plugin-smoke.test.ts'],
+        reason: 'Issue-72 safe append-only follow-up after task 3 wrap-up',
+        source: 'operator',
+      },
+      toolContext,
+    );
+
+    expect(safeCreateResult).toContain('Manual task created: 05-issue-72-safe-followup');
+
+    const [featureDir] = fs.readdirSync(path.join(testRoot, '.hive', 'features'));
+    const safeTaskDir = path.join(
+      testRoot,
+      '.hive',
+      'features',
+      featureDir,
+      'tasks',
+      '05-issue-72-safe-followup',
+    );
+    const safeTaskStatus = JSON.parse(
+      fs.readFileSync(path.join(safeTaskDir, 'status.json'), 'utf-8'),
+    ) as {
+      status: string;
+      origin: string;
+      dependsOn: string[];
+      planTitle: string;
+      metadata?: {
+        description?: string;
+        goal?: string;
+        acceptanceCriteria?: string[];
+      };
+    };
+    const safeTaskSpec = fs.readFileSync(path.join(safeTaskDir, 'spec.md'), 'utf-8');
+
+    expect(safeTaskStatus).toMatchObject({
+      status: 'pending',
+      origin: 'manual',
+      dependsOn: [],
+      planTitle: 'issue-72-safe-followup',
+      metadata: {
+        description: 'Add the safe append-only follow-up that Hive Helper can create after the interruption.',
+        goal: 'Capture the manual follow-up without rewriting the plan-backed task sequence.',
+        acceptanceCriteria: [
+          'Follow-up lands at the append-only next order',
+          'Spec stays isolated from task four plan content',
+        ],
+      },
+    });
+    expect(safeTaskSpec).toContain('Add the safe append-only follow-up that Hive Helper can create after the interruption.');
+    expect(safeTaskSpec).toContain('Capture the manual follow-up without rewriting the plan-backed task sequence.');
+    expect(safeTaskSpec).not.toContain('Original plan task four content must stay isolated from any append-only manual follow-up.');
+  });
+
   it("rejects manual-task insertion outside the next append-only slot", async () => {
     const { hooks, toolContext } = await createHooksForTest(testRoot, 'sess_manual_task_order_guard');
 
