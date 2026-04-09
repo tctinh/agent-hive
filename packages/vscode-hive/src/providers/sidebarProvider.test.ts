@@ -206,6 +206,38 @@ describe('HiveSidebarProvider', () => {
     expect((children[1] as any).contextValue).toBe('overview-file');
     expect((children[2] as any).description).toBe('1 file(s)');
   });
+
+  it('shows workspace artifacts with prompts and copilot steering when .github exists', async () => {
+    fs.mkdirSync(path.join(testRoot, '.github', 'agents'), { recursive: true });
+    fs.mkdirSync(path.join(testRoot, '.github', 'skills', 'executing-plans'), { recursive: true });
+    fs.mkdirSync(path.join(testRoot, '.github', 'hooks'), { recursive: true });
+    fs.mkdirSync(path.join(testRoot, '.github', 'instructions'), { recursive: true });
+    fs.mkdirSync(path.join(testRoot, '.github', 'prompts'), { recursive: true });
+    fs.writeFileSync(path.join(testRoot, '.github', 'agents', 'hive.agent.md'), '# agent');
+    fs.writeFileSync(path.join(testRoot, '.github', 'skills', 'executing-plans', 'SKILL.md'), '# skill');
+    fs.writeFileSync(path.join(testRoot, '.github', 'hooks', 'hive-plan-enforcement.json'), '{}');
+    fs.writeFileSync(path.join(testRoot, '.github', 'instructions', 'hive.instructions.md'), '# instruction');
+    fs.writeFileSync(path.join(testRoot, '.github', 'prompts', 'plan-feature.prompt.md'), '# prompt');
+    fs.writeFileSync(path.join(testRoot, '.github', 'copilot-instructions.md'), '# steering');
+    fs.writeFileSync(path.join(testRoot, 'plugin.json'), '{"name":"hive"}');
+
+    const provider = new HiveSidebarProvider(testRoot);
+    const rootItems = await provider.getChildren();
+
+    expect(rootItems.map(item => item.label)).toEqual(['Init Skills', 'Workspace Artifacts']);
+
+    const artifactItems = await provider.getChildren(rootItems[1] as any);
+
+    expect(artifactItems.map(item => item.label)).toEqual([
+      'Agents',
+      'Skills',
+      'Hooks',
+      'Instructions',
+      'Prompts',
+      'copilot-instructions.md',
+      'Plugin Manifest',
+    ]);
+  });
 });
 
 function setFeatureStatus(featurePath: string, status: 'planning' | 'executing' | 'completed'): void {

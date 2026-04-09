@@ -1,4 +1,4 @@
-import { afterEach, describe, test } from 'node:test';
+import { afterEach, describe, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -49,6 +49,8 @@ function createWorkspace(): string {
   createFile(path.join(workspaceRoot, '.github', 'skills', 'executing-plans', 'SKILL.md'), '# skill');
   createFile(path.join(workspaceRoot, '.github', 'hooks', 'hive-plan-enforcement.json'), '{}');
   createFile(path.join(workspaceRoot, '.github', 'instructions', 'hive.instructions.md'), '# instruction');
+  createFile(path.join(workspaceRoot, '.github', 'prompts', 'plan-feature.prompt.md'), '# prompt');
+  createFile(path.join(workspaceRoot, '.github', 'copilot-instructions.md'), '# steering');
   createFile(path.join(workspaceRoot, 'plugin.json'), '{"name":"hive"}');
   return workspaceRoot;
 }
@@ -62,7 +64,7 @@ afterEach(() => {
 });
 
 describe('copilot artifacts sidebar integration', () => {
-  test('shows copilot artifacts and exposes artifact classes', async () => {
+  test('shows workspace artifacts and exposes prompt plus copilot steering files', async () => {
     const workspaceRoot = createWorkspace();
     const sidebarModule = await bundleModule('src/test/sidebarProvider.bundle.ts', 'sidebar-provider');
     const provider = new sidebarModule.HiveSidebarProvider(workspaceRoot);
@@ -72,24 +74,27 @@ describe('copilot artifacts sidebar integration', () => {
     assert.equal(typeof sidebarModule.ArtifactFileItem, 'function');
 
     const rootItems = await provider.getChildren();
-    assert.deepEqual(rootItems.map((item: { label: string }) => item.label), ['Init Skills', 'Copilot Artifacts']);
+    assert.deepEqual(rootItems.map((item: { label: string }) => item.label), ['Init Skills', 'Workspace Artifacts']);
 
     const artifactsGroup = rootItems[1];
     const artifactItems = await provider.getChildren(artifactsGroup);
     assert.deepEqual(
       artifactItems.map((item: { label: string }) => item.label),
-      ['Agents', 'Skills', 'Hooks', 'Instructions', 'Plugin Manifest']
+      ['Agents', 'Skills', 'Hooks', 'Instructions', 'Prompts', 'copilot-instructions.md', 'Plugin Manifest']
     );
 
     assert.equal(artifactItems[0].description, '1');
     assert.equal(artifactItems[1].description, '1');
     assert.equal(artifactItems[2].description, '1');
     assert.equal(artifactItems[3].description, '1');
+    assert.equal(artifactItems[4].description, '1');
     assert.equal(artifactItems[0].iconPath.id, 'person');
     assert.equal(artifactItems[1].iconPath.id, 'book');
     assert.equal(artifactItems[2].iconPath.id, 'zap');
     assert.equal(artifactItems[3].iconPath.id, 'note');
-    assert.equal(artifactItems[4].iconPath.id, 'package');
+    assert.equal(artifactItems[4].iconPath.id, 'comment-discussion');
+    assert.equal(artifactItems[5].iconPath.id, 'note');
+    assert.equal(artifactItems[6].iconPath.id, 'package');
 
     const agentFiles = await provider.getChildren(artifactItems[0]);
     assert.equal(agentFiles.length, 1);
@@ -97,8 +102,15 @@ describe('copilot artifacts sidebar integration', () => {
     assert.equal(agentFiles[0].command.command, 'vscode.open');
     assert.equal(agentFiles[0].command.arguments[0].fsPath, path.join(workspaceRoot, '.github', 'agents', 'hive.agent.md'));
 
-    assert.equal(artifactItems[4].command.command, 'vscode.open');
-    assert.equal(artifactItems[4].command.arguments[0].fsPath, path.join(workspaceRoot, 'plugin.json'));
+    const promptFiles = await provider.getChildren(artifactItems[4]);
+    assert.equal(promptFiles.length, 1);
+    assert.equal(promptFiles[0].label, 'plan-feature.prompt.md');
+    assert.equal(promptFiles[0].command.arguments[0].fsPath, path.join(workspaceRoot, '.github', 'prompts', 'plan-feature.prompt.md'));
+
+    assert.equal(artifactItems[5].command.command, 'vscode.open');
+    assert.equal(artifactItems[5].command.arguments[0].fsPath, path.join(workspaceRoot, '.github', 'copilot-instructions.md'));
+    assert.equal(artifactItems[6].command.command, 'vscode.open');
+    assert.equal(artifactItems[6].command.arguments[0].fsPath, path.join(workspaceRoot, 'plugin.json'));
   });
 
   test('watches hive, github, and plugin artifacts', async () => {

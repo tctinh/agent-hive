@@ -58,7 +58,7 @@
     "viewsWelcome": [
       {
         "view": "hive.features",
-        "contents": "No Hive nest found in this workspace.\n\n[Init Hive Nest](command:hive.initNest)\n\nThis will create:\n- GitHub agent files (.github/agents/)\n- Agent skills (.github/skills/)\n- Workflow hooks (.github/hooks/)\n- Instructions (.github/instructions/)\n- Plugin manifest (plugin.json)\n- Claude skills (.claude/skills/)\n- OpenCode skills (.opencode/skill/)",
+        "contents": "No Hive nest found in this workspace.\n\n[Init Hive Nest](command:hive.initNest)\n\nThis will create:\n- GitHub agent files (.github/agents/)\n- Prompt files (.github/prompts/)\n- Copilot steering (.github/copilot-instructions.md)\n- Agent skills (.github/skills/)\n- Workflow hooks (.github/hooks/)\n- Instructions (.github/instructions/)\n- Plugin manifest (plugin.json)\n- Claude skills (.claude/skills/)\n- OpenCode skills (.opencode/skill/)",
         "when": "!hive.hasHiveRoot"
       }
     ],

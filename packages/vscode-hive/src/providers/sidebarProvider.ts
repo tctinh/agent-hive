@@ -208,8 +208,8 @@ class TaskFileItem extends vscode.TreeItem {
 
 export class CopilotArtifactsGroupItem extends vscode.TreeItem {
   constructor(public readonly workspaceRoot: string) {
-    super('Copilot Artifacts', vscode.TreeItemCollapsibleState.Collapsed)
-    this.contextValue = 'copilot-artifacts'
+    super('Workspace Artifacts', vscode.TreeItemCollapsibleState.Collapsed)
+    this.contextValue = 'workspace-artifacts'
     this.iconPath = new vscode.ThemeIcon('github')
   }
 }
@@ -402,6 +402,8 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
     const skillsDir = path.join(githubRoot, 'skills')
     const hooksDir = path.join(githubRoot, 'hooks')
     const instructionsDir = path.join(githubRoot, 'instructions')
+    const promptsDir = path.join(githubRoot, 'prompts')
+    const copilotInstructionsPath = path.join(githubRoot, 'copilot-instructions.md')
     const pluginPath = path.join(workspaceRoot, 'plugin.json')
 
     const categories: SidebarItem[] = [
@@ -424,8 +426,17 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
         'Instructions',
         this.getArtifactFiles(instructionsDir, file => file.endsWith('.instructions.md'), 'note'),
         'note'
+      ),
+      new ArtifactCategoryItem(
+        'Prompts',
+        this.getArtifactFiles(promptsDir, file => file.endsWith('.prompt.md'), 'comment-discussion'),
+        'comment-discussion'
       )
     ]
+
+    if (fs.existsSync(copilotInstructionsPath)) {
+      categories.push(new ArtifactFileItem('copilot-instructions.md', copilotInstructionsPath, 'note'))
+    }
 
     if (fs.existsSync(pluginPath)) {
       categories.push(new ArtifactFileItem('Plugin Manifest', pluginPath, 'package'))

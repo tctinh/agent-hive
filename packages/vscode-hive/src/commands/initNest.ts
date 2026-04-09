@@ -126,5 +126,7 @@ export async function initNest(projectRoot: string, deps?: InitNestDeps): Promis
     },
   );
 
-  await vscode.window.showInformationMessage('Hive Nest initialized! Created bootstrap files for agents, skills, hooks, and instructions.');
+  await vscode.window.showInformationMessage(
+    'Hive Nest initialized! Created GitHub agents, prompts, instructions, Copilot steering, hooks, plugin manifest, and compatibility skills.'
+  );
 }

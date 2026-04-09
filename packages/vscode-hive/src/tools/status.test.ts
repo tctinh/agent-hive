@@ -138,7 +138,7 @@ describe('getStatusTools', () => {
     );
   });
 
-  it('contributes prompt-visible LM tool metadata alongside the existing welcome copy', () => {
+  it('contributes prompt-visible LM tool metadata alongside the expanded welcome copy', () => {
     const packageJson = JSON.parse(
       fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf-8')
     ) as {
@@ -170,6 +170,8 @@ describe('getStatusTools', () => {
       canBeReferencedInPrompt: true,
     });
     expect(welcome?.contents).toContain('.github/agents/');
+    expect(welcome?.contents).toContain('Prompt files (.github/prompts/)');
+    expect(welcome?.contents).toContain('Copilot steering (.github/copilot-instructions.md)');
     expect(welcome?.contents).toContain('Agent skills (.github/skills/)');
     expect(welcome?.contents).not.toContain('Copilot agents');
   });

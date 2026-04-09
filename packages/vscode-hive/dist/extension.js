@@ -8139,9 +8139,9 @@ var TaskFileItem = class extends vscode3.TreeItem {
 };
 var CopilotArtifactsGroupItem = class extends vscode3.TreeItem {
   constructor(workspaceRoot) {
-    super("Copilot Artifacts", vscode3.TreeItemCollapsibleState.Collapsed);
+    super("Workspace Artifacts", vscode3.TreeItemCollapsibleState.Collapsed);
     this.workspaceRoot = workspaceRoot;
-    this.contextValue = "copilot-artifacts";
+    this.contextValue = "workspace-artifacts";
     this.iconPath = new vscode3.ThemeIcon("github");
   }
 };
@@ -8288,6 +8288,8 @@ var HiveSidebarProvider = class {
     const skillsDir = path6.join(githubRoot, "skills");
     const hooksDir = path6.join(githubRoot, "hooks");
     const instructionsDir = path6.join(githubRoot, "instructions");
+    const promptsDir = path6.join(githubRoot, "prompts");
+    const copilotInstructionsPath = path6.join(githubRoot, "copilot-instructions.md");
     const pluginPath = path6.join(workspaceRoot, "plugin.json");
     const categories = [
       new ArtifactCategoryItem(
@@ -8309,8 +8311,16 @@ var HiveSidebarProvider = class {
         "Instructions",
         this.getArtifactFiles(instructionsDir, (file) => file.endsWith(".instructions.md"), "note"),
         "note"
+      ),
+      new ArtifactCategoryItem(
+        "Prompts",
+        this.getArtifactFiles(promptsDir, (file) => file.endsWith(".prompt.md"), "comment-discussion"),
+        "comment-discussion"
       )
     ];
+    if (fs6.existsSync(copilotInstructionsPath)) {
+      categories.push(new ArtifactFileItem("copilot-instructions.md", copilotInstructionsPath, "note"));
+    }
     if (fs6.existsSync(pluginPath)) {
       categories.push(new ArtifactFileItem("Plugin Manifest", pluginPath, "package"));
     }
@@ -11515,7 +11525,9 @@ async function initNest(projectRoot, deps) {
       writeFile2(path8.join(projectRoot, ".opencode", "skill", "hive", "SKILL.md"), BACKWARD_COMPAT_SKILL);
     }
   );
-  await vscode6.window.showInformationMessage("Hive Nest initialized! Created bootstrap files for agents, skills, hooks, and instructions.");
+  await vscode6.window.showInformationMessage(
+    "Hive Nest initialized! Created GitHub agents, prompts, instructions, Copilot steering, hooks, plugin manifest, and compatibility skills."
+  );
 }
 
 // src/commands/regenerateAgents.ts
