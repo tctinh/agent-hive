@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-04-10
+
 ### Changed
 - Release prep and recovery guidance now document version-agnostic `vX.Y.Z` release steps, required npm / VS Code credential preflights, recovery of the missed `1.4.0` publish from the tagged commit, and the hardening/package-contract prep expected before tagging `1.4.1`.
+
+### Fixed
+- `opencode-hive` npm package now correctly includes `templates/` directory in the published artifact (`files` whitelist in `package.json`).
+- `release-artifacts.test.mjs` is now version-aware (reads version dynamically from root `package.json`) and includes tarball assertions for `dist/index.js`, `skills/`, and `templates/`.
+- GitHub Actions release workflow now runs `npm whoami` + `npm access list collaborators` preflight before `npm publish`, and `npx @vscode/vsce verify-pat` before VS Code publish, to catch expired credentials before attempting the upload.
 
 ## [1.4.0] - 2026-04-07
 

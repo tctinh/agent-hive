@@ -3135,7 +3135,7 @@ var init_argument_filters = __esm2({
       return typeof input === "number";
     };
     filterString = (input) => {
-      return typeof input === "string";
+      return typeof input === "string" || isPathSpec(input);
     };
     filterStringOrStringArray = (input) => {
       return filterString(input) || Array.isArray(input) && input.every(filterString);
@@ -5276,15 +5276,15 @@ function parser3(indexX, indexY, handler) {
   return [`${indexX}${indexY}`, handler];
 }
 function conflicts(indexX, ...indexY) {
-  return indexY.map((y) => parser3(indexX, y, (result, file) => append(result.conflicted, file)));
+  return indexY.map((y) => parser3(indexX, y, (result, file) => result.conflicted.push(file)));
 }
 function splitLine(result, lineStr) {
   const trimmed2 = lineStr.trim();
   switch (" ") {
     case trimmed2.charAt(2):
-      return data(trimmed2.charAt(0), trimmed2.charAt(1), trimmed2.substr(3));
+      return data(trimmed2.charAt(0), trimmed2.charAt(1), trimmed2.slice(3));
     case trimmed2.charAt(1):
-      return data(" ", trimmed2.charAt(0), trimmed2.substr(2));
+      return data(" ", trimmed2.charAt(0), trimmed2.slice(2));
     default:
       return;
   }
@@ -5328,26 +5328,42 @@ var init_StatusSummary = __esm2({
       }
     };
     parsers6 = new Map([
-      parser3(" ", "A", (result, file) => append(result.created, file)),
-      parser3(" ", "D", (result, file) => append(result.deleted, file)),
-      parser3(" ", "M", (result, file) => append(result.modified, file)),
-      parser3("A", " ", (result, file) => append(result.created, file) && append(result.staged, file)),
-      parser3("A", "M", (result, file) => append(result.created, file) && append(result.staged, file) && append(result.modified, file)),
-      parser3("D", " ", (result, file) => append(result.deleted, file) && append(result.staged, file)),
-      parser3("M", " ", (result, file) => append(result.modified, file) && append(result.staged, file)),
-      parser3("M", "M", (result, file) => append(result.modified, file) && append(result.staged, file)),
+      parser3(" ", "A", (result, file) => result.created.push(file)),
+      parser3(" ", "D", (result, file) => result.deleted.push(file)),
+      parser3(" ", "M", (result, file) => result.modified.push(file)),
+      parser3("A", " ", (result, file) => {
+        result.created.push(file);
+        result.staged.push(file);
+      }),
+      parser3("A", "M", (result, file) => {
+        result.created.push(file);
+        result.staged.push(file);
+        result.modified.push(file);
+      }),
+      parser3("D", " ", (result, file) => {
+        result.deleted.push(file);
+        result.staged.push(file);
+      }),
+      parser3("M", " ", (result, file) => {
+        result.modified.push(file);
+        result.staged.push(file);
+      }),
+      parser3("M", "M", (result, file) => {
+        result.modified.push(file);
+        result.staged.push(file);
+      }),
       parser3("R", " ", (result, file) => {
-        append(result.renamed, renamedFile(file));
+        result.renamed.push(renamedFile(file));
       }),
       parser3("R", "M", (result, file) => {
         const renamed = renamedFile(file);
-        append(result.renamed, renamed);
-        append(result.modified, renamed.to);
+        result.renamed.push(renamed);
+        result.modified.push(renamed.to);
       }),
       parser3("!", "!", (_result, _file) => {
-        append(_result.ignored = _result.ignored || [], _file);
+        (_result.ignored = _result.ignored || []).push(_file);
       }),
-      parser3("?", "?", (result, file) => append(result.not_added, file)),
+      parser3("?", "?", (result, file) => result.not_added.push(file)),
       ...conflicts("A", "A", "U"),
       ...conflicts("D", "D", "U"),
       ...conflicts("U", "A", "D", "U"),
@@ -5473,6 +5489,41 @@ var init_version = __esm2({
     ];
   }
 });
+function createCloneTask(api, task, repoPath, ...args) {
+  if (!filterString(repoPath)) {
+    return configurationErrorTask(`git.${api}() requires a string 'repoPath'`);
+  }
+  return task(repoPath, filterType(args[0], filterString), getTrailingOptions(arguments));
+}
+function clone_default() {
+  return {
+    clone(repo, ...rest) {
+      return this._runTask(createCloneTask("clone", cloneTask, filterType(repo, filterString), ...rest), trailingFunctionArgument(arguments));
+    },
+    mirror(repo, ...rest) {
+      return this._runTask(createCloneTask("mirror", cloneMirrorTask, filterType(repo, filterString), ...rest), trailingFunctionArgument(arguments));
+    }
+  };
+}
+var cloneTask;
+var cloneMirrorTask;
+var init_clone = __esm2({
+  "src/lib/tasks/clone.ts"() {
+    init_task();
+    init_utils();
+    init_pathspec();
+    cloneTask = (repo, directory, customArgs) => {
+      const commands4 = ["clone", ...customArgs];
+      filterString(repo) && commands4.push(pathspec(repo));
+      filterString(directory) && commands4.push(pathspec(directory));
+      return straightThroughStringTask(commands4);
+    };
+    cloneMirrorTask = (repo, directory, customArgs) => {
+      append(customArgs, "--mirror");
+      return cloneTask(repo, directory, customArgs);
+    };
+  }
+});
 var simple_git_api_exports = {};
 __export2(simple_git_api_exports, {
   SimpleGitApi: () => SimpleGitApi
@@ -5498,6 +5549,7 @@ var init_simple_git_api = __esm2({
     init_task();
     init_version();
     init_utils();
+    init_clone();
     SimpleGitApi = class {
       constructor(_executor) {
         this._executor = _executor;
@@ -5560,7 +5612,7 @@ var init_simple_git_api = __esm2({
         return this._runTask(statusTask(getTrailingOptions(arguments)), trailingFunctionArgument(arguments));
       }
     };
-    Object.assign(SimpleGitApi.prototype, checkout_default(), commit_default(), config_default(), count_objects_default(), first_commit_default(), grep_default(), log_default(), show_default(), version_default());
+    Object.assign(SimpleGitApi.prototype, checkout_default(), clone_default(), commit_default(), config_default(), count_objects_default(), first_commit_default(), grep_default(), log_default(), show_default(), version_default());
   }
 });
 var scheduler_exports = {};
@@ -5848,34 +5900,6 @@ var init_check_ignore = __esm2({
     init_CheckIgnore();
   }
 });
-var clone_exports = {};
-__export2(clone_exports, {
-  cloneMirrorTask: () => cloneMirrorTask,
-  cloneTask: () => cloneTask
-});
-function disallowedCommand(command) {
-  return /^--upload-pack(=|$)/.test(command);
-}
-function cloneTask(repo, directory, customArgs) {
-  const commands4 = ["clone", ...customArgs];
-  filterString(repo) && commands4.push(repo);
-  filterString(directory) && commands4.push(directory);
-  const banned = commands4.find(disallowedCommand);
-  if (banned) {
-    return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
-  }
-  return straightThroughStringTask(commands4);
-}
-function cloneMirrorTask(repo, directory, customArgs) {
-  append(customArgs, "--mirror");
-  return cloneTask(repo, directory, customArgs);
-}
-var init_clone = __esm2({
-  "src/lib/tasks/clone.ts"() {
-    init_task();
-    init_utils();
-  }
-});
 function parseFetchResult(stdOut, stdErr) {
   const result = {
     raw: stdOut,
@@ -5927,7 +5951,7 @@ var fetch_exports = {};
 __export2(fetch_exports, {
   fetchTask: () => fetchTask
 });
-function disallowedCommand2(command) {
+function disallowedCommand(command) {
   return /^--upload-pack(=|$)/.test(command);
 }
 function fetchTask(remote, branch, customArgs) {
@@ -5935,7 +5959,7 @@ function fetchTask(remote, branch, customArgs) {
   if (remote && branch) {
     commands4.push(remote, branch);
   }
-  const banned = commands4.find(disallowedCommand2);
+  const banned = commands4.find(disallowedCommand);
   if (banned) {
     return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
   }
@@ -6234,7 +6258,7 @@ var require_git = __commonJS2({
     var { GitExecutor: GitExecutor2 } = (init_git_executor(), __toCommonJS2(git_executor_exports));
     var { SimpleGitApi: SimpleGitApi2 } = (init_simple_git_api(), __toCommonJS2(simple_git_api_exports));
     var { Scheduler: Scheduler2 } = (init_scheduler(), __toCommonJS2(scheduler_exports));
-    var { configurationErrorTask: configurationErrorTask2 } = (init_task(), __toCommonJS2(task_exports));
+    var { adhocExecTask: adhocExecTask2, configurationErrorTask: configurationErrorTask2 } = (init_task(), __toCommonJS2(task_exports));
     var {
       asArray: asArray2,
       filterArray: filterArray2,
@@ -6255,7 +6279,6 @@ var require_git = __commonJS2({
     } = (init_branch(), __toCommonJS2(branch_exports));
     var { checkIgnoreTask: checkIgnoreTask2 } = (init_check_ignore(), __toCommonJS2(check_ignore_exports));
     var { checkIsRepoTask: checkIsRepoTask2 } = (init_check_is_repo(), __toCommonJS2(check_is_repo_exports));
-    var { cloneTask: cloneTask2, cloneMirrorTask: cloneMirrorTask2 } = (init_clone(), __toCommonJS2(clone_exports));
     var { cleanWithOptionsTask: cleanWithOptionsTask2, isCleanOptionsArray: isCleanOptionsArray2 } = (init_clean(), __toCommonJS2(clean_exports));
     var { diffSummaryTask: diffSummaryTask2 } = (init_diff(), __toCommonJS2(diff_exports));
     var { fetchTask: fetchTask2 } = (init_fetch(), __toCommonJS2(fetch_exports));
@@ -6300,18 +6323,6 @@ var require_git = __commonJS2({
     Git2.prototype.stashList = function(options) {
       return this._runTask(stashListTask2(trailingOptionsArgument2(arguments) || {}, filterArray2(options) && options || []), trailingFunctionArgument2(arguments));
     };
-    function createCloneTask(api, task, repoPath, localPath) {
-      if (typeof repoPath !== "string") {
-        return configurationErrorTask2(`git.${api}() requires a string 'repoPath'`);
-      }
-      return task(repoPath, filterType2(localPath, filterString2), getTrailingOptions2(arguments));
-    }
-    Git2.prototype.clone = function() {
-      return this._runTask(createCloneTask("clone", cloneTask2, ...arguments), trailingFunctionArgument2(arguments));
-    };
-    Git2.prototype.mirror = function() {
-      return this._runTask(createCloneTask("mirror", cloneMirrorTask2, ...arguments), trailingFunctionArgument2(arguments));
-    };
     Git2.prototype.mv = function(from, to) {
       return this._runTask(moveTask2(from, to), trailingFunctionArgument2(arguments));
     };
@@ -6330,8 +6341,7 @@ var require_git = __commonJS2({
       return this._runTask(fetchTask2(filterType2(remote, filterString2), filterType2(branch, filterString2), getTrailingOptions2(arguments)), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.silent = function(silence) {
-      console.warn("simple-git deprecation notice: git.silent: logging should be configured using the `debug` library / `DEBUG` environment variable, this will be an error in version 3");
-      return this;
+      return this._runTask(adhocExecTask2(() => console.warn("simple-git deprecation notice: git.silent: logging should be configured using the `debug` library / `DEBUG` environment variable, this method will be removed.")));
     };
     Git2.prototype.tags = function(options, then) {
       return this._runTask(tagListTask2(getTrailingOptions2(arguments)), trailingFunctionArgument2(arguments));
@@ -6484,7 +6494,7 @@ var require_git = __commonJS2({
       return this._runTask(task);
     };
     Git2.prototype.clearQueue = function() {
-      return this;
+      return this._runTask(adhocExecTask2(() => console.warn("simple-git deprecation notice: clearQueue() is deprecated and will be removed, switch to using the abortPlugin instead.")));
     };
     Git2.prototype.checkIgnore = function(pathnames, then) {
       return this._runTask(checkIgnoreTask2(asArray2(filterType2(pathnames, filterStringOrStringArray2, []))), trailingFunctionArgument2(arguments));
@@ -6548,20 +6558,33 @@ function abortPlugin(signal) {
 function isConfigSwitch(arg) {
   return typeof arg === "string" && arg.trim().toLowerCase() === "-c";
 }
-function preventProtocolOverride(arg, next) {
-  if (!isConfigSwitch(arg)) {
-    return;
+function isCloneUploadPackSwitch(char, arg) {
+  if (typeof arg !== "string" || !arg.includes(char)) {
+    return false;
   }
-  if (!/^\s*protocol(.[a-z]+)?.allow/.test(next)) {
-    return;
-  }
-  throw new GitPluginError(void 0, "unsafe", "Configuring protocol.allow is not permitted without enabling allowUnsafeExtProtocol");
+  const cleaned = arg.trim().replace(/\0/g, "");
+  return /^(--no)?-{1,2}[\dlsqvnobucj]+(\s|$)/.test(cleaned);
 }
+function preventConfigBuilder(config, setting, message = String(config)) {
+  const regex = typeof config === "string" ? new RegExp(`\\s*${config}`, "i") : config;
+  return function preventCommand(options, arg, next) {
+    if (options[setting] !== true && isConfigSwitch(arg) && regex.test(next)) {
+      throw new GitPluginError(void 0, "unsafe", `Configuring ${message} is not permitted without enabling ${setting}`);
+    }
+  };
+}
+var preventUnsafeConfig = [
+  preventConfigBuilder(/^\s*protocol(.[a-z]+)?.allow/i, "allowUnsafeProtocolOverride", "protocol.allow"),
+  preventConfigBuilder("core.sshCommand", "allowUnsafeSshCommand"),
+  preventConfigBuilder("core.gitProxy", "allowUnsafeGitProxy"),
+  preventConfigBuilder("core.hooksPath", "allowUnsafeHooksPath"),
+  preventConfigBuilder("diff.external", "allowUnsafeDiffExternal")
+];
 function preventUploadPack(arg, method) {
   if (/^\s*--(upload|receive)-pack/.test(arg)) {
     throw new GitPluginError(void 0, "unsafe", `Use of --upload-pack or --receive-pack is not permitted without enabling allowUnsafePack`);
   }
-  if (method === "clone" && /^\s*-u\b/.test(arg)) {
+  if (method === "clone" && isCloneUploadPackSwitch("u", arg)) {
     throw new GitPluginError(void 0, "unsafe", `Use of clone with option -u is not permitted without enabling allowUnsafePack`);
   }
   if (method === "push" && /^\s*--exec\b/.test(arg)) {
@@ -6569,16 +6592,16 @@ function preventUploadPack(arg, method) {
   }
 }
 function blockUnsafeOperationsPlugin({
-  allowUnsafeProtocolOverride = false,
-  allowUnsafePack = false
+  allowUnsafePack = false,
+  ...options
 } = {}) {
   return {
     type: "spawn.args",
     action(args, context) {
       args.forEach((current, index) => {
         const next = index < args.length ? args[index + 1] : "";
-        allowUnsafeProtocolOverride || preventProtocolOverride(current, next);
         allowUnsafePack || preventUploadPack(current, context.method);
+        preventUnsafeConfig.forEach((helper) => helper(options, current, next));
       });
       return args;
     }
@@ -6662,7 +6685,7 @@ init_utils();
 var WRONG_NUMBER_ERR = `Invalid value supplied for custom binary, requires a single string or an array containing either one or two strings`;
 var WRONG_CHARS_ERR = `Invalid value supplied for custom binary, restricted characters must be removed or supply the unsafe.allowUnsafeCustomBinary option`;
 function isBadArgument(arg) {
-  return !arg || !/^([a-z]:)?([a-z0-9/.\\_-]+)$/i.test(arg);
+  return !arg || !/^([a-z]:)?([a-z0-9/.\\_~-]+)$/i.test(arg);
 }
 function toBinaryConfig(input, allowUnsafe) {
   if (input.length < 1 || input.length > 2) {
@@ -6882,12 +6905,12 @@ function gitInstanceFactory(baseDir, options) {
     plugins.add(commandConfigPrefixingPlugin(config.config));
   }
   plugins.add(blockUnsafeOperationsPlugin(config.unsafe));
-  plugins.add(suffixPathsPlugin());
   plugins.add(completionDetectionPlugin(config.completion));
   config.abort && plugins.add(abortPlugin(config.abort));
   config.progress && plugins.add(progressMonitorPlugin(config.progress));
   config.timeout && plugins.add(timeoutPlugin(config.timeout));
   config.spawnOptions && plugins.add(spawnOptionsPlugin(config.spawnOptions));
+  plugins.add(suffixPathsPlugin());
   plugins.add(errorDetectionPlugin(errorDetectionHandler(true)));
   config.errors && plugins.add(errorDetectionPlugin(config.errors));
   customBinaryPlugin(plugins, config.binary, config.unsafe?.allowUnsafeCustomBinary);
