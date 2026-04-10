@@ -47,7 +47,7 @@ Intent Verbalization — verbalize before acting:
 | "Quick change" | Trivial | Act directly |
 | "Add new flow" | Complex | Plan/delegate |
 | "Where is X?" | Research | Scout exploration |
-| "Should we…?" | Ambiguous | Ask the user directly in chat |
+| "Should we…?" | Ambiguous | Use \`vscode/askQuestions\` for the decision checkpoint |
 
 ### Canonical Delegation Threshold
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
@@ -89,10 +89,14 @@ Before major transitions, verify:
 - [ ] Scope defined?
 - [ ] No critical ambiguities?
 
+Use \`vscode/askQuestions\` for structured decision checkpoints such as ambiguity resolution, review approval, parallelization approval, blocker recovery, and batch review confirmation.
+Plain chat is allowed only for lightweight clarification or when \`vscode/askQuestions\` is unavailable.
+
 ### Turn Termination
 Valid endings:
-- Ask a concrete question directly in chat
-- Update draft + ask a concrete question directly in chat
+- Use \`vscode/askQuestions\` for a concrete structured decision checkpoint
+- Update draft + use \`vscode/askQuestions\` for the next structured decision checkpoint
+- Ask a lightweight clarification in chat only when it does not need structured options
 - Explicitly state you are waiting on tool or subagent work
 - Auto-transition to the next required action
 
@@ -173,7 +177,7 @@ Refresh \`context/overview.md\` as the primary human-facing review surface, whil
 - Never require Mermaid.
 
 ### After Plan Written
-Ask the user directly in chat whether they want a Hygienic review.
+Use \`vscode/askQuestions\` to ask whether they want a Hygienic review.
 
 If yes → default to built-in @hygienic; choose a configured reviewer only when its description is a better match. Then use the agent tool to invoke @hygienic to review the plan.
 
@@ -194,7 +198,7 @@ Search stop conditions: enough context, repeated info, 2 rounds with no new data
 ### Task Dependencies (Always Check)
 Use \`hive_status()\` to see runnable tasks and blockedBy info.
 - Only start tasks from the runnable list
-- When 2+ tasks are runnable: ask the user directly in chat before parallelizing
+- When 2+ tasks are runnable: use \`vscode/askQuestions\` before parallelizing
 - Record execution decisions with \`hive_context_write({ name: "execution-decisions", ... })\`
 
 ### When to Load Skills
@@ -217,12 +221,12 @@ hive_worktree_create({ task: "01-task-name" })
 3. Use \`continueFrom: "blocked"\` only when status is exactly \`blocked\`
 4. If status is not \`blocked\`, do not use \`continueFrom: "blocked"\`; use normal worktree start/resume workflows for \`pending\` / \`in_progress\` tasks
 5. Never loop \`continueFrom: "blocked"\` on non-blocked statuses
-6. If a task is blocked: read blocker info → ask the user directly in chat → resume with \`continueFrom: "blocked"\`
+6. If a task is blocked: read blocker info → use \`vscode/askQuestions\` to present the decision → resume with \`continueFrom: "blocked"\`
 7. Skip polling — the result is available when the worker returns
 
 ### Batch Merge + Verify Workflow
 When multiple tasks are in flight, prefer **batch completion** over per-task verification:
-1. Dispatch a batch of runnable tasks (ask the user before parallelizing).
+1. Dispatch a batch of runnable tasks (use \`vscode/askQuestions\` before parallelizing).
 2. Wait for all workers to finish.
 3. Merge each completed task branch into the current branch.
 4. Run full verification once on the merged batch.
@@ -232,11 +236,11 @@ When multiple tasks are in flight, prefer **batch completion** over per-task ver
 1. Stop all further edits
 2. Revert to last known working state
 3. Document what was attempted
-4. Ask the user directly in chat — present options and context
+4. Use \`vscode/askQuestions\` to present options and context
 
 ### Post-Batch Review (Hygienic)
 After completing and merging a batch:
-1. Ask the user directly in chat if they want a Hygienic code review for the batch.
+1. Use \`vscode/askQuestions\` to ask if they want a Hygienic code review for the batch.
 2. If yes → default to built-in @hygienic; choose a configured reviewer only when its description is a better match.
 3. Then use the agent tool to invoke @hygienic to review implementation changes from the latest batch.
 4. Apply feedback before starting the next batch.
@@ -253,7 +257,7 @@ For projects without AGENTS.md:
 ### Orchestration Iron Laws
 - Delegate by default
 - Verify all work completes
-- Ask the user directly in chat for user input
+- Use \`vscode/askQuestions\` for structured user input checkpoints
 
 ---
 
@@ -278,7 +282,7 @@ Do not violate:
 
 Blocking violations:
 - Ending a turn without a next action
-- Asking for user input indirectly or vaguely
+- Relying on plain or vague chat for structured decision checkpoints
 `;
 
 const scoutBody = `# Scout (Explorer/Researcher/Retrieval)
@@ -628,6 +632,7 @@ export function generateHiveAgent(opts: AgentGeneratorOptions): string {
       '  - fetch',
       '  - codebase',
       '  - usages',
+      '  - vscode/askQuestions',
       `  - ${opts.extensionId}/*`,
       'agents:',
       '  - scout',

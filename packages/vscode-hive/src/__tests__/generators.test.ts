@@ -72,7 +72,19 @@ describe('Agent Generators', () => {
     const hive = generateHiveAgent(opts);
     const frontmatter = extractFrontmatter(hive);
     expect(frontmatter).toContain('- agent');
+    expect(frontmatter).toContain('- vscode/askQuestions');
     expect(frontmatter).toContain('agents:');
+  });
+
+  test('hive agent uses askQuestions-first wording without leaking question()', () => {
+    const hive = generateHiveAgent(opts);
+    const body = getBody(hive);
+
+    expect(body).toContain('Use `vscode/askQuestions` for structured decision checkpoints');
+    expect(body).toContain('Plain chat is allowed only for lightweight clarification or when `vscode/askQuestions` is unavailable');
+    expect(body).not.toContain('Ask the user directly in chat');
+    expect(body).not.toContain('ask the user directly in chat');
+    expect(body).not.toContain('question()');
   });
 
   test('individual agent generators return content', () => {

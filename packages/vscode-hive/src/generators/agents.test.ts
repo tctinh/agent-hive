@@ -29,21 +29,26 @@ describe('generateAllAgents', () => {
 
   it('maps tool names and removes opencode-specific references from the hive agent', () => {
     const hive = byFilename.get('hive.agent.md');
+    const body = getBody(hive ?? '');
 
     expect(hive).toContain("- tctinh.vscode-hive/*");
+    expect(hive).toContain('- vscode/askQuestions');
     expect(hive).toContain('use the agent tool to invoke @scout');
     expect(hive).toContain('refer to the skill at .github/skills/parallel-exploration/');
-    expect(hive).toContain('ask the user directly in chat');
     expect(hive).toContain('.github/prompts/');
     expect(hive).toContain('.github/copilot-instructions.md');
     expect(hive).toContain('AGENTS.md');
     expect(hive).toContain('vscode/askQuestions');
     expect(hive).toContain('Playwright MCP');
     expect(hive).toContain('browser tools');
+    expect(body).toContain('Use `vscode/askQuestions` for structured decision checkpoints');
+    expect(body).toContain('Plain chat is allowed only for lightweight clarification or when `vscode/askQuestions` is unavailable');
 
     expect(hive).not.toContain('question()');
     expect(hive).not.toContain('task({ subagent_type: "scout-researcher" })');
     expect(hive).not.toContain('hive_skill(');
+    expect(body).not.toContain('Ask the user directly in chat');
+    expect(body).not.toContain('ask the user directly in chat');
     // Check OpenCode-specific tool names as tool references (backticked), not as English prose
     expect(hive).not.toContain('`Bash`');
     expect(hive).not.toContain('`Read`');
