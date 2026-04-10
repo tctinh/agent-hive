@@ -312,7 +312,11 @@ The previous worker's progress is preserved. Include the user's decision in the 
 
 **Docker sandbox** provides isolated test environments for workers:
 
-- **Config location**: `~/.config/opencode/agent_hive.json`
+- **Config read precedence**:
+  1. `<project>/.hive/agent-hive.json` (preferred)
+  2. `<project>/.opencode/agent_hive.json` (legacy fallback during migration)
+  3. `~/.config/opencode/agent_hive.json` (fallback)
+- **Invalid project config behavior**: Falls back to global config and surfaces a runtime warning.
 - **Fields**:
   - `sandbox: 'none' | 'docker'` — Isolation mode (default: 'none')
   - `dockerImage?: string` — Custom Docker image (optional, auto-detects if omitted)

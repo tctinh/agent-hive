@@ -218,16 +218,48 @@ type ToolContext = {
 const plugin: Plugin = async (ctx) => {
   const { directory, client, worktree } = ctx;
 
+  const emitConfigWarning = (message: string): void => {
+    const prefixedMessage = `[hive:config] ${message}`;
+    const maybeClient = client as unknown as {
+      notify?: (payload: { type?: string; level?: string; title?: string; message: string }) => unknown;
+      notification?: {
+        create?: (payload: { type?: string; level?: string; title?: string; message: string }) => unknown;
+      };
+    };
+
+    const notified =
+      (typeof maybeClient.notify === 'function' && maybeClient.notify({
+        type: 'warning',
+        level: 'warning',
+        title: 'Agent Hive Config Warning',
+        message: prefixedMessage,
+      })) ||
+      (typeof maybeClient.notification?.create === 'function' && maybeClient.notification.create({
+        type: 'warning',
+        level: 'warning',
+        title: 'Agent Hive Config Warning',
+        message: prefixedMessage,
+      }));
+
+    if (!notified) {
+      console.warn(prefixedMessage);
+    }
+  };
+
   const featureService = new FeatureService(directory);
   const planService = new PlanService(directory);
   const taskService = new TaskService(directory);
   const contextService = new ContextService(directory);
   const networkService = new NetworkService(directory);
   const agentsMdService = new AgentsMdService(directory, contextService);
-  const configService = new ConfigService(); // User config at ~/.config/opencode/agent_hive.json
+  const configService = new ConfigService(directory);
   const sessionService = new SessionService(directory);
   const disabledMcps = configService.getDisabledMcps();
   const disabledSkills = configService.getDisabledSkills();
+  const configFallbackWarning = configService.getLastFallbackWarning()?.message ?? null;
+  if (configFallbackWarning) {
+    emitConfigWarning(configFallbackWarning);
+  }
   const builtinMcps = createBuiltinMcps(disabledMcps);
   
   // Get filtered skills (globally disabled skills removed)
@@ -258,7 +290,10 @@ const plugin: Plugin = async (ctx) => {
 
   /**
    * Check if OMO-Slim delegation is enabled via user config.
-   * Users enable this in ~/.config/opencode/agent_hive.json
+   * Config read precedence:
+   * 1. <project>/.hive/agent-hive.json
+   * 2. <project>/.opencode/agent_hive.json
+   * 3. ~/.config/opencode/agent_hive.json
    */
   const isOmoSlimEnabled = (): boolean => {
     return configService.isOmoSlimEnabled();
@@ -909,9 +944,13 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
       return respond({
         success: false,
         terminal: true,
+        reason: 'task_not_blocked',
+        canRetry: false,
+        retryReason: `Task is in ${taskInfo.status} state. Run hive_status() and follow the current status flow instead of blocked resume.`,
         error: `continueFrom: 'blocked' was specified but task "${task}" is not in blocked state (current status: ${taskInfo.status}).`,
         currentStatus: taskInfo.status,
         hints: [
+          'This blocked-resume call cannot be retried with the same parameters.',
           'Use hive_worktree_start({ feature, task }) for normal starts or re-dispatch.',
           'Use hive_status to verify the current task status before retrying.',
         ],
@@ -1898,6 +1937,7 @@ Expand your Discovery section and try again.`;
               fileCount: featureContextFiles.length,
               files: contextSummary,
             },
+            warning: configFallbackWarning ?? undefined,
             nextAction: getNextAction(planStatus, tasksSummary, runnable, !!plan, !!overview),
           });
         },

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
   "title": "Agent Hive Configuration",
-  "description": "Configuration schema for ~/.config/opencode/agent_hive.json",
+  "description": "Configuration schema for Agent Hive config files. Read precedence: <project>/.hive/agent-hive.json (preferred), legacy <project>/.opencode/agent_hive.json during migration, then ~/.config/opencode/agent_hive.json (fallback), then defaults. If the project config is invalid, Hive surfaces a runtime warning.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

@@ -80,8 +80,10 @@ Delegation guidance:
 - \`task()\` is BLOCKING — returns when the worker is done
 - After \`task()\` returns, call \`hive_status()\` immediately to check new state and find next runnable tasks before any resume attempt
 - Use \`continueFrom: "blocked"\` only when status is exactly \`blocked\`
+- Before every blocked resume, call \`hive_status()\` immediately beforehand and verify the task is still exactly \`blocked\`
 - If status is not \`blocked\`, do not use \`continueFrom: "blocked"\`; use \`hive_worktree_start({ feature, task })\` only for normal starts (\`pending\` / \`in_progress\`)
 - Never loop \`continueFrom: "blocked"\` on non-blocked statuses
+- If any Hive tool response has \`terminal: true\`, treat it as final for that call and do not retry the same parameters
 - For parallel fan-out, issue multiple \`task()\` calls in the same message
 
 ## After Delegation - VERIFY
@@ -109,7 +111,7 @@ After completing and merging a batch, run full verification on the main branch: 
 
 ## Blocker Handling
 
-When worker reports blocked: \`hive_status()\` → confirm status is exactly \`blocked\` → read blocker info; \`question()\` → ask user (no plain text); \`hive_worktree_create({ task, continueFrom: "blocked", decision })\`. If status is not \`blocked\`, do not use blocked resume; only use \`hive_worktree_start({ feature, task })\` for normal starts (\`pending\` / \`in_progress\`).
+When worker reports blocked: \`hive_status()\` → confirm status is exactly \`blocked\` → read blocker info; \`question()\` → ask user (no plain text); call \`hive_status()\` again immediately before resume; only then \`hive_worktree_create({ task, continueFrom: "blocked", decision })\`. If status is not \`blocked\`, do not use blocked resume; only use \`hive_worktree_start({ feature, task })\` for normal starts (\`pending\` / \`in_progress\`).
 
 ## Failure Recovery (After 3 Consecutive Failures)
 

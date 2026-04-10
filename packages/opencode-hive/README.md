@@ -49,6 +49,11 @@ For execution work, treat worker output as evidence to inspect, not proof to tru
 
 \`hive_network_query\` is an optional lookup, not a default step. There is no startup lookup: first orient on the live request and live repo state. planning, orchestration, and review roles get network access first. live-file verification still required even when network results look relevant.
 
+### Local skill and model use cases
+
+- **Local skill experiments:** keep a skill in `<project>/.opencode/skills/<id>/SKILL.md` or `<project>/.claude/skills/<id>/SKILL.md` and add it to `skills` or `autoLoadSkills` for that repo only.
+- **Local model tuning:** set per-agent models or variants in `<project>/.hive/agent-hive.json` when you want a repository-specific routing setup without changing your global OpenCode defaults.
+
 #### Canonical Delegation Threshold
 
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
@@ -112,7 +117,7 @@ When using Dynamic Context Pruning (DCP), use a Hive-safe config in `~/.config/o
   - `strategies.supersedeWrites.enabled: false`
   - `strategies.purgeErrors.enabled: false`
 
-For local plugin testing, keep OpenCode plugin entry as `"opencode-hive"` (not `"opencode-hive@latest"`).
+For normal usage, set the OpenCode plugin entry to `"opencode-hive@latest"`. Keep `"opencode-hive"` only for local contributor testing with a symlinked checkout.
 
 #### OpenCode alignment: honest hook contract and bounded recovery
 
@@ -223,7 +228,27 @@ Description.
 
 ## Configuration
 
-Hive uses a config file at `~/.config/opencode/agent_hive.json`. You can customize agent models, variants, disable skills, and disable MCP servers.
+Hive reads config from these locations, in order:
+
+1. `<project>/.hive/agent-hive.json` (preferred)
+2. `<project>/.opencode/agent_hive.json` (legacy fallback, used only when the new file is missing)
+3. `~/.config/opencode/agent_hive.json` (global fallback)
+
+If `.hive/agent-hive.json` exists but is invalid JSON or an invalid shape, Hive warns, skips the legacy project file, and falls back to the global config and defaults.
+
+You can customize agent models, variants, disable skills, and disable MCP servers.
+
+### Project-local config example
+
+Create `.hive/agent-hive.json`:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
+  "agentMode": "unified",
+  "disableSkills": []
+}
+```
 
 ### Disable Skills or MCPs
 

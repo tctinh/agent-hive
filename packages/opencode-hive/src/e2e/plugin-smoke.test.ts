@@ -1730,12 +1730,19 @@ Do it
     const invalidRetry = JSON.parse(invalidRetryRaw as string) as {
       success?: boolean;
       terminal?: boolean;
+      reason?: string;
+      canRetry?: boolean;
+      retryReason?: string;
       currentStatus?: string;
       hints?: string[];
     };
 
     expect(invalidRetry.success).toBe(false);
     expect(invalidRetry.terminal).toBe(true);
+    expect(invalidRetry.reason).toBe("task_not_blocked");
+    expect(invalidRetry.canRetry).toBe(false);
+    expect(typeof invalidRetry.retryReason).toBe("string");
+    expect(invalidRetry.retryReason?.length).toBeGreaterThan(0);
     expect(invalidRetry.currentStatus).toBe("in_progress");
     expect(Array.isArray(invalidRetry.hints)).toBe(true);
     expect(invalidRetry.hints?.length).toBeGreaterThan(0);

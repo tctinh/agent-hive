@@ -112,7 +112,6 @@ class HiveExtension {
       if (newRoot && !this.initialized) {
         this.workspaceRoot = newRoot
         this.initializeWithHive(newRoot)
-        vscode.window.showInformationMessage('Hive: .hive directory detected, extension activated')
       }
     }
 

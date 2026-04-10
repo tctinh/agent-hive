@@ -72,7 +72,7 @@ Add `opencode-hive` to your `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-hive"]
+  "plugin": ["opencode-hive@latest"]
 }
 ```
 
@@ -97,13 +97,30 @@ Use the VS Code extension to review `context/overview.md`, comment on `plan.md`,
 
 For local plugin testing:
 
-1. Keep `plugin: ["opencode-hive"]` in `opencode.json` (not `opencode-hive@latest`).
+1. Keep `plugin: ["opencode-hive"]` in `opencode.json` as a temporary contributor-only override.
 2. Build `packages/hive-core` first, then `packages/opencode-hive`.
 3. Symlink `~/.cache/opencode/node_modules/opencode-hive` to your local `packages/opencode-hive` checkout.
 
 ### Configuration
 
-Run Agent Hive once to auto-generate a default configuration at `~/.config/opencode/agent_hive.json`. Review it to ensure it matches your local setup.
+Agent Hive reads configuration from the following locations (in order):
+
+1. `<project>/.hive/agent-hive.json` (preferred)
+2. `<project>/.opencode/agent_hive.json` (legacy fallback, used only when the new file is missing)
+3. `~/.config/opencode/agent_hive.json` (global fallback)
+
+If `.hive/agent-hive.json` exists but is invalid JSON or an invalid shape, Agent Hive warns, skips the legacy project file, and falls back to the global config and defaults.
+
+Create a project-local config at `.hive/agent-hive.json`:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
+  "agentMode": "unified"
+}
+```
+
+Run Agent Hive once to auto-generate a default global configuration at `~/.config/opencode/agent_hive.json`. Review it to ensure it matches your local setup.
 
 ```json
 {
@@ -127,6 +144,11 @@ Run Agent Hive once to auto-generate a default configuration at `~/.config/openc
 | `agentMode` | `unified` (default), `dedicated` | `unified`: Single `hive-master` agent handles planning + orchestration. `dedicated`: Separate `architect-planner` and `swarm-orchestrator` agents. |
 | `disableSkills` | `string[]` | Globally disable specific skills (won't appear in `hive_skill` tool). |
 | `disableMcps` | `string[]` | Globally disable MCP servers. Options: `websearch`, `context7`, `grep_app`, `ast_grep`. |
+
+#### Local use cases
+
+- **Local skill experiments:** keep a repo-specific skill in `<project>/.opencode/skills/<id>/SKILL.md` or `<project>/.claude/skills/<id>/SKILL.md`, then add that ID to `skills` or `autoLoadSkills` without publishing anything globally.
+- **Local model routing:** pin a repo to different models per agent in `<project>/.hive/agent-hive.json`, such as a faster `forager-worker` model for one codebase while leaving your global defaults unchanged.
 
 #### Agent Models
 
@@ -293,7 +315,7 @@ Recommended baseline:
 }
 ```
 
-Also keep OpenCode plugin config as `"opencode-hive"` (not `"opencode-hive@latest"`) during local testing.
+Also keep OpenCode plugin config as `"opencode-hive"` during local testing only; the normal install should use `"opencode-hive@latest"`.
 
 #### Compaction recovery for Hive sessions
 
@@ -623,7 +645,7 @@ Clean git history (worktree merges), full documentation (generated as you work),
 
 ## Philosophy
 
-Hive is built on 7 core principles:
+Hive is built on 8 core principles:
 
 1. **Context Persists** — Calibration survives sessions. The "3 months later" problem solved.
 2. **Plan → Approve → Execute** — Dialogue until approved, then trust. Two phases with a clear gate.
@@ -632,6 +654,7 @@ Hive is built on 7 core principles:
 5. **Batched Parallelism** — Parallel tasks in batches. Sequential batches share context.
 6. **Tests Define Done** — Workers do best-effort checks; orchestrator runs full suite after batch merge.
 7. **Iron Laws + Hard Gates** — Non-negotiable constraints enforced by tools, not guidelines.
+8. **Cross-Model Prompts** — Prompts must work across supported LLM providers using conditional, portable guidance.
 
 See [PHILOSOPHY.md](PHILOSOPHY.md) for the full framework.
 

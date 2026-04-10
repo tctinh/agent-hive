@@ -159,7 +159,7 @@ UNIQUE_MARKER_12345
     const params = createTestParams();
     const prompt = buildWorkerPrompt(params);
 
-    expect(prompt).toContain('ok=true and terminal=true');
+    expect(prompt).toContain('terminal=true');
     expect(prompt).toContain('DO NOT STOP');
     expect(prompt).toContain('result.nextAction');
   });

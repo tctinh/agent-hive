@@ -12,7 +12,7 @@ Some supported hooks can be useful on every turn, but not all of them need to ru
 
 ## Configuration
 
-Add a `hook_cadence` field to your `~/.config/opencode/agent_hive.json`:
+Add a `hook_cadence` field to config. Hive reads from `<project>/.hive/agent-hive.json` first, then legacy `<project>/.opencode/agent_hive.json` if the new file is missing, then falls back to `~/.config/opencode/agent_hive.json`:
 
 ```json
 {
@@ -162,10 +162,11 @@ bun test src/__tests__/hook-cadence.test.ts
 
 ### Hook not firing as expected
 
-1. Check your config file syntax: `cat ~/.config/opencode/agent_hive.json`
-2. Verify the hook name is spelled correctly (case-sensitive)
-3. Check console logs for validation warnings: `[hive:cadence]`
-4. Ensure cadence value is an integer >= 1
+1. Check project config file syntax first: `cat .hive/agent-hive.json`
+2. If project config is missing/invalid, check global fallback: `cat ~/.config/opencode/agent_hive.json`
+3. Verify the hook name is spelled correctly (case-sensitive)
+4. Check console logs for validation warnings: `[hive:cadence]`
+5. Ensure cadence value is an integer >= 1
 
 ### Recovery wording seems stale
 
