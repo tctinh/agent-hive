@@ -65,7 +65,7 @@ export function generateCopilotInstructions(): string {
 
 Use .github/instructions/ for path-specific coding and workflow guidance, and .github/prompts/ for reusable entry points such as plan creation, plan review, execution, review handoff, and completion verification.
 
-Prefer GitHub Copilot's built-in clarification flow in chat. Use vscode/askQuestions inside prompt files only when extra structured input materially improves the result.
+Use vscode/askQuestions for practical structured decision checkpoints wherever Copilot supports it. Use plain chat only as a fallback when the tool is unavailable or a truly lightweight clarification is better.
 
 When web research, browser inspection, or end-to-end verification is needed, prefer built-in browser tools and MCP integrations such as Playwright MCP over extension-specific substitutes.`,
   );
