@@ -90,7 +90,10 @@
 - Only status `done` satisfies a dependency.
 - `plan.md` is the graph source of truth for plan-backed dependencies.
 - Manual tasks always write explicit dependency metadata. Omitting `dependsOn` at creation time means `[]`, not "infer the previous task".
-- Explicit manual dependencies are for isolated ad-hoc/operator work only.
+- manual tasks are append-only.
+- If `order` is omitted, Hive stores the next order automatically; explicit `order` is accepted only when it equals that next order, so intermediate insertion requires plan amendment.
+- Explicit manual dependencies are for isolated ad-hoc/operator work only, and only when every target task is already `done`.
+- dependencies on unfinished work require plan amendment.
 - Review-sourced manual tasks cannot declare explicit dependencies. If review feedback changes downstream sequencing, dependencies, or scope, amend `plan.md` instead.
 - If `dependsOn` is omitted by a legacy task record, Hive applies implicit sequential ordering based on the numeric task prefix (N depends on N-1).
 
@@ -129,6 +132,8 @@ hive_tasks_sync({ refreshPending: true })
 - Preserves manual tasks and any task with execution history (`in_progress`, `done`, `blocked`, `failed`, `partial`)
 
 To make it simple: use manual tasks for isolated ad-hoc work, but route sequencing or scope changes back through `plan.md`, then refresh pending tasks from that graph.
+
+For the issue-72 `3b` / `3c` scenario, treat `helperStatus` and live worktree/task state as the bounded truth surface: ask for a locally testable state or interrupted-state wrap-up summary first, create a safe manual follow-up only when it can append after the approved DAG, and amend `plan.md` instead of inventing intermediate numbering.
 
 ## Status Values
 

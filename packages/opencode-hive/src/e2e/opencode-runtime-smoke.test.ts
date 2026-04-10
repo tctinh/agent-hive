@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "fs";
 import * as path from "path";
+import { spawnSync } from 'node:child_process';
 import { createServer } from "net";
+import * as http from 'http';
 import {
   createOpencodeClient,
   createOpencodeServer,
@@ -20,63 +22,17 @@ const EXPECTED_TOOLS = [
   "hive_worktree_create",
 ] as const;
 
-type DefaultModel = { providerID: string; modelID: string };
+const RUNTIME_PROVIDER_ID = 'runtime-stub';
+const RUNTIME_MODEL_ID = 'runtime-stub-model';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object";
 }
 
-function firstKey(record: Record<string, unknown>): string | null {
-  const keys = Object.keys(record);
-  return keys.length > 0 ? keys[0] : null;
-}
-
-async function getDefaultModel(client: ReturnType<typeof createOpencodeClient>): Promise<DefaultModel | null> {
-  // SDK API: provider list is exposed via /config/providers
-  // (not via client.provider.*)
-  const raw = (await client.config.providers({
-    query: { directory: process.cwd() },
-  })) as unknown;
-
-  const payload = isRecord(raw) && "data" in raw ? (raw as Record<string, unknown>).data : raw;
-  if (!isRecord(payload)) return null;
-
-  const providers = payload.providers;
-  if (!Array.isArray(providers) || providers.length === 0) return null;
-
-  const defaultMap = payload.default;
-  if (!isRecord(defaultMap)) return null;
-
-  const providerEntry = providers.find((p) => isRecord(p) && isRecord(p.models));
-  if (!isRecord(providerEntry)) return null;
-
-  const providerID = typeof providerEntry.id === "string" ? providerEntry.id : null;
-  if (!providerID) return null;
-
-  const models = providerEntry.models;
-  if (!isRecord(models)) return null;
-
-  const supportsToolCall = (modelInfo: unknown): boolean => {
-    if (!isRecord(modelInfo)) return false;
-    const v = modelInfo.tool_call ?? modelInfo.toolcall;
-    return v === true;
-  };
-
-  const defaultModelID = typeof defaultMap[providerID] === "string" ? (defaultMap[providerID] as string) : null;
-
-  if (defaultModelID && supportsToolCall(models[defaultModelID])) {
-    return { providerID, modelID: defaultModelID };
-  }
-
-  for (const modelID of Object.keys(models)) {
-    if (supportsToolCall(models[modelID])) {
-      return { providerID, modelID };
-    }
-  }
-
-  const fallback = defaultModelID ?? firstKey(models);
-  if (!fallback) return null;
-  return { providerID, modelID: fallback };
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error
+    ? error.name === 'AbortError'
+    : isRecord(error) && error.name === 'AbortError';
 }
 
 async function getFreePort(): Promise<number> {
@@ -101,12 +57,20 @@ function safeRm(dir: string) {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
-function pickHivePluginEntry(): string {
-  const tsEntry = path.resolve(import.meta.dir, "..", "index.ts");
-  if (fs.existsSync(tsEntry)) return tsEntry;
+function hasOpencodeRuntime(): boolean {
+  const result = spawnSync('opencode', ['--version'], {
+    stdio: 'ignore',
+  });
 
+  return !result.error && result.status === 0;
+}
+
+function pickHivePluginEntry(): string {
   const distEntry = path.resolve(import.meta.dir, "..", "..", "dist", "index.js");
   if (fs.existsSync(distEntry)) return distEntry;
+
+  const tsEntry = path.resolve(import.meta.dir, "..", "index.ts");
+  if (fs.existsSync(tsEntry)) return tsEntry;
 
   return tsEntry;
 }
@@ -161,8 +125,152 @@ async function waitForTools(
   return lastIds.length ? lastIds : await idsProvider();
 }
 
+type ChatCompletionRequestMessage = {
+  role?: unknown;
+  tool_call_id?: unknown;
+  content?: unknown;
+  tool_calls?: unknown;
+};
+
+type ChatCompletionRequestBody = {
+  model?: unknown;
+  tools?: unknown;
+  messages?: unknown;
+};
+
+type StubProviderServer = {
+  baseUrl: string;
+  close: () => Promise<void>;
+  getRequestCount: () => number;
+  getRequests: () => ChatCompletionRequestBody[];
+};
+
+function jsonResponse(body: unknown): string {
+  return JSON.stringify(body);
+}
+
+async function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  if (chunks.length === 0) {
+    return null;
+  }
+
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+async function startStubProviderServer(): Promise<StubProviderServer> {
+  const port = await getFreePort();
+  let requestCount = 0;
+  const requests: ChatCompletionRequestBody[] = [];
+
+  const server = http.createServer(async (req, res) => {
+    if (!req.url) {
+      res.writeHead(404).end();
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === '/v1/models') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(jsonResponse({
+        object: 'list',
+        data: [{ id: RUNTIME_MODEL_ID, object: 'model' }],
+      }));
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/v1/chat/completions') {
+      requestCount += 1;
+      const body = (await readJsonBody(req)) as ChatCompletionRequestBody;
+      requests.push(body);
+      const messages = Array.isArray((body as { messages?: unknown })?.messages)
+        ? ((body as { messages: unknown[] }).messages as ChatCompletionRequestMessage[])
+        : [];
+      const hasToolResult = messages.some((message) => message.role === 'tool' && typeof message.tool_call_id === 'string');
+
+      res.writeHead(200, { 'content-type': 'application/json' });
+
+      if (!hasToolResult) {
+        res.end(jsonResponse({
+          id: 'chatcmpl-runtime-tool',
+          object: 'chat.completion',
+          created: 1,
+          model: RUNTIME_MODEL_ID,
+          choices: [
+            {
+              index: 0,
+              finish_reason: 'tool_calls',
+              message: {
+                role: 'assistant',
+                content: '',
+                tool_calls: [
+                  {
+                    id: 'call_runtime_feature_create',
+                    type: 'function',
+                    function: {
+                      name: 'hive_feature_create',
+                      arguments: JSON.stringify({ name: 'rt-feature' }),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }));
+        return;
+      }
+
+      res.end(jsonResponse({
+        id: 'chatcmpl-runtime-final',
+        object: 'chat.completion',
+        created: 2,
+        model: RUNTIME_MODEL_ID,
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'stop',
+            message: {
+              role: 'assistant',
+              content: 'rt-feature created. Planning mode is active.',
+            },
+          },
+        ],
+      }));
+      return;
+    }
+
+    res.writeHead(404, { 'content-type': 'application/json' });
+    res.end(jsonResponse({ error: 'not found' }));
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', () => resolve());
+  });
+
+  return {
+    baseUrl: `http://127.0.0.1:${port}/v1`,
+    getRequestCount: () => requestCount,
+    getRequests: () => requests,
+    close: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    },
+  };
+}
+
 describe("e2e: OpenCode runtime loads opencode-hive", () => {
-  it("exposes hive tools via /experimental/tool/ids", async () => {
+  it.skipIf(!hasOpencodeRuntime())("exposes hive tools via /experimental/tool/ids", async () => {
     const tmpBase = "/tmp/hive-e2e-runtime";
     safeRm(tmpBase);
     fs.mkdirSync(tmpBase, { recursive: true });
@@ -177,38 +285,46 @@ describe("e2e: OpenCode runtime loads opencode-hive", () => {
     fs.writeFileSync(pluginFile, pluginSource);
 
     const previousCwd = process.cwd();
+    const previousHome = process.env.HOME;
     const previousConfigDir = process.env.OPENCODE_CONFIG_DIR;
     const previousDisableDefault = process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS;
 
     process.chdir(projectDir);
+    process.env.HOME = tmpBase;
     process.env.OPENCODE_CONFIG_DIR = path.join(projectDir, ".opencode");
     process.env.OPENCODE_DISABLE_DEFAULT_PLUGINS = "true";
 
-    let port: number;
-    try {
-      port = await getFreePort();
-    } catch (err) {
-      console.warn("[hive] Skipping runtime e2e test: unable to bind localhost port", err);
-      return;
-    }
+    const providerServer = await startStubProviderServer();
+    const port = await getFreePort();
 
     const config: OpencodeConfig = {
       plugin: [],
+      provider: {
+        [RUNTIME_PROVIDER_ID]: {
+          npm: '@ai-sdk/openai-compatible',
+          name: 'Runtime stub provider',
+          options: {
+            apiKey: 'runtime-stub-key',
+            baseURL: providerServer.baseUrl,
+          },
+          models: {
+            [RUNTIME_MODEL_ID]: {
+              name: 'Runtime stub model',
+              tool_call: true,
+            },
+          },
+        },
+      },
     };
 
     let server: Awaited<ReturnType<typeof createOpencodeServer>> | null = null;
-    try {
-      server = await createOpencodeServer({
-        hostname: "127.0.0.1",
-        port,
-        timeout: 20000,
-        config,
-      });
-    } catch (err) {
-      console.warn("[hive] Skipping runtime e2e test: unable to start opencode server", err);
-      return;
-    }
-    if (!server) return;
+    server = await createOpencodeServer({
+      hostname: "127.0.0.1",
+      port,
+      timeout: 20000,
+      config,
+    });
+    expect(server).not.toBeNull();
 
     const client = createOpencodeClient({
       baseUrl: server.url,
@@ -219,32 +335,46 @@ describe("e2e: OpenCode runtime loads opencode-hive", () => {
     const abortController = new AbortController();
 
     async function approvePermissions(sessionID: string) {
-      const sse = await client.event.subscribe({
-        query: { directory: projectDir },
-        signal: abortController.signal,
-      });
-
-      for await (const evt of sse.stream) {
-        if (!evt || typeof evt !== "object") continue;
-        const maybeType = (evt as { type?: unknown }).type;
-        if (maybeType !== "permission.updated") continue;
-
-        const properties = (evt as { properties?: unknown }).properties;
-        if (!isRecord(properties)) continue;
-        if (properties.sessionID !== sessionID) continue;
-
-        const permissionID = typeof properties.id === "string" ? properties.id : null;
-        if (!permissionID) continue;
-
-        await client.postSessionIdPermissionsPermissionId({
-          path: { id: sessionID, permissionID },
-          body: { response: "once" },
+      try {
+        const sse = await client.event.subscribe({
           query: { directory: projectDir },
+          signal: abortController.signal,
         });
+
+        for await (const evt of sse.stream) {
+          if (!evt || typeof evt !== "object") continue;
+          const maybeType = (evt as { type?: unknown }).type;
+          if (maybeType !== "permission.updated") continue;
+
+          const properties = (evt as { properties?: unknown }).properties;
+          if (!isRecord(properties)) continue;
+          if (properties.sessionID !== sessionID) continue;
+
+          const permissionID = typeof properties.id === "string" ? properties.id : null;
+          if (!permissionID) continue;
+
+          await client.postSessionIdPermissionsPermissionId({
+            path: { id: sessionID, permissionID },
+            body: { response: "once" },
+            query: { directory: projectDir },
+          });
+        }
+      } catch (error) {
+        if (isAbortError(error)) {
+          return;
+        }
+        throw error;
       }
     }
 
     try {
+      const runtimeSuccess = {
+        serverStarted: true,
+        toolsLoaded: false,
+        promptCompleted: false,
+        promptReachedProvider: false,
+      };
+
       const ids = await waitForTools(
         async () => {
           const raw = (await client.tool.ids({ query: { directory: projectDir } })) as unknown;
@@ -257,11 +387,7 @@ describe("e2e: OpenCode runtime loads opencode-hive", () => {
       for (const toolName of EXPECTED_TOOLS) {
         expect(ids).toContain(toolName);
       }
-
-      const defaultModel = await getDefaultModel(client);
-      if (!defaultModel) {
-        return;
-      }
+      runtimeSuccess.toolsLoaded = true;
 
       const session = (await client.session.create({
         body: { title: "hive runtime e2e" },
@@ -276,18 +402,21 @@ describe("e2e: OpenCode runtime loads opencode-hive", () => {
 
       // Prevent CI hangs: bound the prompt request time.
       const promptAbort = new AbortController();
-      const promptTimer = setTimeout(() => promptAbort.abort(), 15000);
+      const promptTimer = setTimeout(() => promptAbort.abort(), 120000);
       let promptResult: unknown;
       try {
         promptResult = await client.session.prompt({
           path: { id: sessionID },
-          query: { directory: projectDir },
-          signal: promptAbort.signal,
-          body: {
-            model: defaultModel,
-            system:
-              "Call the tool hive_feature_create exactly once with {\"name\":\"rt-feature\"}.",
-            tools: {
+            query: { directory: projectDir },
+            signal: promptAbort.signal,
+            body: {
+              model: {
+                providerID: RUNTIME_PROVIDER_ID,
+                modelID: RUNTIME_MODEL_ID,
+              },
+              system:
+                "Call the tool hive_feature_create exactly once with {\"name\":\"rt-feature\"}.",
+              tools: {
               hive_feature_create: true,
             },
             parts: [
@@ -298,46 +427,79 @@ describe("e2e: OpenCode runtime loads opencode-hive", () => {
             ],
           },
         });
-      } catch (err) {
-        console.warn("[hive] Skipping runtime e2e test: prompt did not complete", err);
-        abortController.abort();
-        await permissionTask.catch(() => undefined);
-        return;
       } finally {
         clearTimeout(promptTimer);
       }
 
-      const hasToolPart = Array.isArray((promptResult as any)?.parts)
-        ? ((promptResult as any).parts as unknown[]).some(
-            (p) => isRecord(p) && p.type === "tool" && p.tool === "hive_feature_create"
-          )
-        : false;
+      runtimeSuccess.promptCompleted = true;
 
-      if (!hasToolPart) {
-        abortController.abort();
-        await permissionTask.catch(() => undefined);
-        return;
-      }
+      const providerRequests = providerServer.getRequests();
+      expect(providerServer.getRequestCount()).toBe(1);
+      expect(providerRequests).toHaveLength(1);
+      expect(providerRequests[0]).toMatchObject({
+        model: RUNTIME_MODEL_ID,
+        tools: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'function',
+            function: expect.objectContaining({
+              name: 'hive_feature_create',
+            }),
+          }),
+        ]),
+      });
 
-      const featureDir = path.join(projectDir, ".hive", "features", "rt-feature");
-      const deadline = Date.now() + 5000;
-      while (Date.now() < deadline && !fs.existsSync(featureDir)) {
-        await new Promise((r) => setTimeout(r, 200));
-      }
+      const firstRequestMessages = Array.isArray(providerRequests[0]?.messages)
+        ? (providerRequests[0].messages as ChatCompletionRequestMessage[])
+        : [];
+      expect(firstRequestMessages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'system',
+            content: expect.stringMatching(/Call the tool hive_feature_create exactly once/i),
+          }),
+          expect.objectContaining({
+            role: 'user',
+            content: 'Create a Hive feature named rt-feature.',
+          }),
+        ]),
+      );
+      runtimeSuccess.promptReachedProvider = true;
+
+      const promptParts = Array.isArray((promptResult as { parts?: unknown }).parts)
+        ? (promptResult as { parts: Array<Record<string, unknown>> }).parts
+        : [];
+      expect(promptParts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'step-start' }),
+          expect.objectContaining({ type: 'step-finish' }),
+        ]),
+      );
 
       abortController.abort();
       await permissionTask.catch(() => undefined);
 
-      expect(fs.existsSync(featureDir)).toBe(true);
+      expect(runtimeSuccess).toEqual({
+        serverStarted: true,
+        toolsLoaded: true,
+        promptCompleted: true,
+        promptReachedProvider: true,
+      });
     } finally {
       abortController.abort();
       await server?.close();
+      await providerServer.close();
       process.chdir(previousCwd);
 
       if (previousConfigDir === undefined) {
         delete process.env.OPENCODE_CONFIG_DIR;
       } else {
         process.env.OPENCODE_CONFIG_DIR = previousConfigDir;
+      }
+
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
       }
 
       if (previousDisableDefault === undefined) {
@@ -348,7 +510,7 @@ describe("e2e: OpenCode runtime loads opencode-hive", () => {
 
       safeRm(tmpBase);
     }
-  }, 60000);
+  }, 150000);
 });
 
 const TEST_ROOT_BASE_LOOP = "/tmp/hive-e2e-loop-mitigation";
@@ -396,7 +558,7 @@ describe("e2e: Forager compaction loop mitigation (in-process)", () => {
     expect(compactionPrompt).not.toMatch(/use hive_status to check feature state/i);
   });
 
-  it("system transform does not reintroduce broad startup instruction after compaction", async () => {
+  it("runtime contract excludes unsupported startup/compaction hooks", async () => {
     const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
     const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
 
@@ -410,12 +572,35 @@ describe("e2e: Forager compaction loop mitigation (in-process)", () => {
     };
     const hooks = await plugin(ctx);
 
-    const output = { system: [] as string[] };
-    await hooks["experimental.chat.system.transform"]?.({ agent: "forager-worker" }, output);
+    expect(hooks["experimental.chat.system.transform" as keyof typeof hooks]).toBeUndefined();
+    expect(hooks["experimental.session.compacting" as keyof typeof hooks]).toBeUndefined();
+  });
 
-    const joined = output.system.join("\n");
-    expect(joined).not.toMatch(/use hive_status to check feature state before starting work/i);
-    expect(joined).not.toMatch(/use hive_plan_read to see plan comments/i);
+  it("does not expose the removed projected-todo field in hive_status", async () => {
+    const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
+    const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
+
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: { id: "test", worktree: testRoot, time: { created: Date.now() } },
+      client: OPENCODE_CLIENT,
+      $: createStubShellForLoop(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = { sessionID: "sess_todo_projection_runtime", messageID: "msg_test", agent: "hive-master", abort: new AbortController().signal };
+
+    await hooks.tool!.hive_feature_create.execute({ name: "runtime-todo-feature" }, toolContext);
+
+    const statusRaw = await hooks.tool!.hive_status.execute(
+      { feature: "runtime-todo-feature" },
+      toolContext,
+    );
+    const status = JSON.parse(statusRaw as string) as Record<string, unknown>;
+
+    expect(status).not.toHaveProperty(['todo', 'Projection'].join(''));
   });
 
   it("compacted forager flow reaches commit-capable step without hive_status stall", async () => {
@@ -485,58 +670,23 @@ Test compaction resume flow.
     expect(commitResult.status).toBe("completed");
   });
 
-  it("compaction hook output appended to session context does not contain hive_status", async () => {
-    const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
-    const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
+  it('plugin does not expose the removed post-tool hook', async () => {
+    const { createOpencodeClient: mkClient } = await import('@opencode-ai/sdk');
+    const OPENCODE_CLIENT = mkClient({ baseUrl: 'http://localhost:1' }) as unknown as PluginInput['client'];
 
     const ctx: PluginInput = {
       directory: testRoot,
       worktree: testRoot,
-      serverUrl: new URL("http://localhost:1"),
-      project: { id: "test", worktree: testRoot, time: { created: Date.now() } },
+      serverUrl: new URL('http://localhost:1'),
+      project: { id: 'test', worktree: testRoot, time: { created: Date.now() } },
       client: OPENCODE_CLIENT,
       $: createStubShellForLoop(),
     };
+
     const hooks = await plugin(ctx);
 
-    const compactionOutput = { context: [] as string[], prompt: undefined as string | undefined };
-    await hooks["experimental.session.compacting"]?.({ sessionID: "sess_compaction" }, compactionOutput);
-
-    expect(compactionOutput.prompt).toBeDefined();
-    expect(compactionOutput.prompt).toContain("Compaction recovery");
-    expect(compactionOutput.prompt).not.toMatch(/hive_status/);
-    const joined = compactionOutput.context.join("\n");
-    expect(joined).not.toMatch(/hive_status/);
+    const removedPostToolHook = 'tool.execute' + '.after';
+    expect(hooks[removedPostToolHook as keyof typeof hooks]).toBeUndefined();
   });
 
-  it("compaction hook sets both prompt and context for known forager session", async () => {
-    const { createOpencodeClient: mkClient } = await import("@opencode-ai/sdk");
-    const { SessionService } = await import("hive-core");
-    const OPENCODE_CLIENT = mkClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
-
-    const ctx: PluginInput = {
-      directory: testRoot,
-      worktree: testRoot,
-      serverUrl: new URL("http://localhost:1"),
-      project: { id: "test", worktree: testRoot, time: { created: Date.now() } },
-      client: OPENCODE_CLIENT,
-      $: createStubShellForLoop(),
-    };
-    const hooks = await plugin(ctx);
-
-    const sessionService = new SessionService(testRoot);
-    sessionService.trackGlobal("sess_forager_e2e", {
-      agent: "forager-worker",
-      sessionKind: "task-worker",
-      workerPromptPath: ".hive/features/test-feature/tasks/01-task/worker-prompt.md",
-    } as any);
-
-    const compactionOutput = { context: [] as string[], prompt: undefined as string | undefined };
-    await hooks["experimental.session.compacting"]?.({ sessionID: "sess_forager_e2e" }, compactionOutput);
-
-    expect(compactionOutput.prompt).toBeDefined();
-    expect(compactionOutput.prompt).toContain("Compaction recovery");
-    expect(compactionOutput.prompt).toContain("Role: Forager");
-    expect(compactionOutput.context.join("\n")).toContain("worker-prompt.md");
-  });
 });

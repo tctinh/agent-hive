@@ -114,26 +114,38 @@ When using Dynamic Context Pruning (DCP), use a Hive-safe config in `~/.config/o
 
 For local plugin testing, keep OpenCode plugin entry as `"opencode-hive"` (not `"opencode-hive@latest"`).
 
-#### Compaction recovery and session re-anchoring
+#### OpenCode alignment: honest hook contract and bounded recovery
 
-OpenCode can compact long sessions. When that happens mid-orchestration or mid-task, Hive needs the session to recover its role and task boundaries without re-reading the whole repository.
+Agent Hive aligns to the OpenCode surfaces that exist today. It does **not** depend on a first-class upstream Hive orchestration API, a native checkpoint API, or a hidden todo-sync surface.
 
-The plugin now persists durable session metadata and uses it during `experimental.session.compacting` to rebuild a compact re-anchor prompt.
+At the current plugin/runtime layer, Hive relies on these supported hooks:
 
-At the plugin/runtime layer:
+- `event`
+- `config`
+- `chat.message`
+- `experimental.chat.messages.transform`
+- `tool.execute.before`
 
-- custom Scout-derived agents are treated like other subagents for recovery semantics.
-- the compaction-time handoff stays intentionally small and role-preserving.
-- there is no first-class near-compaction hook to warn Hive before OpenCode actually compacts the session.
+That contract matters because some older wording implied deeper integration than OpenCode currently exposes. The recovery path in this branch is hook-timed and file-backed, not storage-level magic.
 
-Where:
+Todo ownership is intentionally modest:
+
+- OpenCode todos remain **session-scoped** and **replace-all**.
+- Hive does not add a new upstream todo API.
+- This plugin does not expose a derived projected-todo field or stale refresh hints as part of its runtime contract.
+- Worker and subagent sessions still follow normal OpenCode limits; they should not be described as independently syncing Hive task state.
+- `.hive` remains the durable source of truth for plan/task/worktree state.
+
+Compaction recovery uses durable Hive artifacts instead of transcript dumps:
 
 - Global session state is written to `.hive/sessions.json`.
 - Feature-local mirrors are written to `.hive/features/<feature>/sessions.json`.
 - Session classification distinguishes `primary`, `subagent`, `task-worker`, and `unknown`.
-- Primary and subagent recovery can replay the stored user directive once after compaction.
-- Task-worker recovery uses the strict re-anchor plus one bounded worker-specific synthetic replay after compaction.
-- The task-worker replay can reference `.hive/features/<feature>/tasks/<task>/worker-prompt.md`.
+- Primary and subagent recovery can replay the stored user directive once after compaction, with `directiveRecoveryState` enforcing the one-replay-then-escalate contract.
+- Task-worker recovery does **not** replay the whole user directive. Workers re-read `worker-prompt.md` and continue the current task from the existing worktree state.
+- Recovery uses durable session metadata plus `worker-prompt.md` instead of an extra checkpoint artifact, idle child-session replay, or parent-scoped task rehydration.
+
+In practice, the durable task-level recovery surface is the semantic `.hive` artifact set for that task, with `worker-prompt.md` plus bound feature/task/session metadata as the re-entry surface. Hive does **not** persist raw transcript dumps as its recovery contract.
 
 Task-worker recovery is intentionally strict:
 
@@ -147,15 +159,18 @@ Task-worker recovery is intentionally strict:
 - do not use orchestration tools unless the worker prompt explicitly says so
 - continue from the last known point
 
-This split is deliberate: primary and subagent sessions replay the stored user directive once after compaction, while task-workers also receive one worker-specific synthetic replay after compaction that restates the active task identity and worker boundaries.
+This split is deliberate: primary and subagent sessions replay the stored user directive once after compaction, while task workers recover from their own bounded task contract instead of relying on parent-session replay.
 
 Manual tasks follow the same DAG model as plan-backed tasks:
 
 - `hive_task_create()` stores manual tasks with explicit `dependsOn` metadata instead of inferring sequential order.
+- manual tasks are append-only.
+- intermediate insertion requires plan amendment.
+- dependencies on unfinished work require plan amendment.
 - Structured manual-task fields such as `goal`, `description`, `acceptanceCriteria`, `files`, and `references` are turned into worker-facing `spec.md` content.
 - If review feedback changes downstream sequencing or scope, update `plan.md` and run `hive_tasks_sync({ refreshPending: true })` so pending plan tasks pick up the new `dependsOn` graph and regenerated specs.
 
-This recovery path applies to the built-in `forager-worker`, the runtime-only `hive-helper` merge recovery subagent, and custom agents derived from `forager-worker`. `hive-helper` is intentionally OpenCode runtime-only in v1: it does not appear in `.github/agents/` or `packages/vscode-hive/src/generators/`.
+This recovery path applies to the built-in `forager-worker`, the runtime-only `hive-helper` bounded hard-task operational assistant, and custom agents derived from `forager-worker`. `hive-helper` handles merge recovery, state clarification, interrupted-state wrap-up, and safe manual-follow-up assistance while staying inside the current approved DAG boundary. It may summarize observable state, including `helperStatus`, and create safe append-only manual tasks, but it may never update plan-backed task state and must escalate DAG-changing requests for plan amendment. For the issue-72 style "task 3 is locally testable but task 4 has not started" situation, ask Helper to clarify the locally testable state and wrap-up surface first; ask it to create a safe manual follow-up only when the work can append after the current DAG; if you think you need `3b` / `3c` inserted before later plan-backed work, amend `plan.md` instead. `hive-helper` is intentionally OpenCode runtime-only in v1, not a custom base agent, and it does not appear in `.github/agents/` or `packages/vscode-hive/src/generators/`.
 
 `hive-helper` also remains not a network consumer. It benefits indirectly from better upstream planning/orchestration/review decisions, but it does not call `hive_network_query` itself.
 

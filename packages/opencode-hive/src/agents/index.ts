@@ -60,7 +60,7 @@ export const hiveAgents = {
   },
   'hive-helper': {
     name: 'Hive Helper',
-    description: 'Runtime-only merge recovery helper. Merges branches and resolves preserved conflicts in isolation.',
+    description: 'Runtime-only bounded hard-task operational assistant for merge recovery, state clarification, and safe manual follow-up assistance.',
     mode: 'subagent' as const,
   },
   hygienic: {

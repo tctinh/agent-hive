@@ -5,7 +5,9 @@ import * as path from "path";
 import type { PluginInput } from "@opencode-ai/plugin";
 import { createOpencodeClient } from "@opencode-ai/sdk";
 import plugin from "../index";
+import { QUEEN_BEE_PROMPT } from "../agents/hive";
 import { BUILTIN_SKILLS } from "../skills/registry.generated.js";
+import { buildPluginManifest, HIVE_COMMANDS, HIVE_TOOL_NAMES, SUPPORTED_PLUGIN_HOOKS } from '../utils/plugin-manifest.js';
 
 const OPENCODE_CLIENT = createOpencodeClient({ baseUrl: "http://localhost:1" }) as unknown as PluginInput["client"];
 type PluginHooks = Awaited<ReturnType<typeof plugin>>;
@@ -17,27 +19,22 @@ type ToolContext = {
   abort: AbortSignal;
 };
 
-const EXPECTED_TOOLS = [
-  "hive_feature_create",
-  "hive_feature_complete",
-  "hive_plan_write",
-  "hive_plan_read",
-  "hive_plan_approve",
-  "hive_tasks_sync",
-  "hive_task_create",
-  "hive_task_update",
-  "hive_worktree_start",
-  "hive_worktree_create",
-  "hive_worktree_commit",
-  "hive_worktree_discard",
-  "hive_merge",
-  "hive_context_write",
-  "hive_network_query",
-  "hive_status",
-  "hive_skill",
+const EXPECTED_TOOLS = [...HIVE_TOOL_NAMES];
+
+const EXPECTED_COMMANDS = HIVE_COMMANDS.map(({ name, description }) => ({ name, description }));
+
+const UNSUPPORTED_RUNTIME_HOOKS = [
+  "experimental.chat.system.transform",
+  "experimental.session.compacting",
+  'tool.execute' + '.after',
 ] as const;
 
+const REMOVED_PROJECTED_TODO_FIELD = ['todo', 'Projection'].join('');
+const REMOVED_TODO_REFRESH_HINT = ['Refresh hive_status() before syncing OpenCode ', 'todos.'].join('');
+const LEGACY_IDLE_CHILD_REPLAY = ['child-session', ' idle'].join('');
+
 const TEST_ROOT_BASE = "/tmp/hive-e2e-plugin";
+const TEST_PROCESS_CWD = process.cwd();
 const FIRST_TASK = "01-first-task";
 
 function createStubShell(): PluginInput["$"] {
@@ -166,6 +163,7 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
   let originalHome: string | undefined;
 
   beforeEach(() => {
+    process.chdir(TEST_PROCESS_CWD);
     originalHome = process.env.HOME;
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
     fs.mkdirSync(TEST_ROOT_BASE, { recursive: true });
@@ -181,6 +179,7 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
   });
 
   afterEach(() => {
+    process.chdir(TEST_PROCESS_CWD);
     fs.rmSync(TEST_ROOT_BASE, { recursive: true, force: true });
     if (originalHome === undefined) {
       delete process.env.HOME;
@@ -206,6 +205,14 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
     for (const toolName of EXPECTED_TOOLS) {
       expect(hooks.tool?.[toolName]).toBeDefined();
       expect(typeof hooks.tool?.[toolName].execute).toBe("function");
+    }
+
+    for (const hookName of SUPPORTED_PLUGIN_HOOKS) {
+      expect(hooks[hookName as keyof typeof hooks]).toBeDefined();
+    }
+
+    for (const hookName of UNSUPPORTED_RUNTIME_HOOKS) {
+      expect(hooks[hookName as keyof typeof hooks]).toBeUndefined();
     }
 
     const sessionID = "sess_plugin_smoke";
@@ -326,6 +333,24 @@ Do it
       };
     };
     expect(status.tasks?.list?.[0]?.folder).toBe("01-first-task");
+  });
+
+  it("keeps checked-in plugin.json aligned with the runtime contract", async () => {
+    const packageJsonPath = path.resolve(import.meta.dir, '..', '..', 'package.json');
+    const pluginJsonPath = path.resolve(import.meta.dir, '..', '..', 'plugin.json');
+
+    const pluginJson = JSON.parse(fs.readFileSync(pluginJsonPath, 'utf-8')) as {
+      version: string;
+      commands: Array<{ name: string; description: string }>;
+      tools: string[];
+    };
+
+    const expectedManifest = buildPluginManifest();
+
+    expect(pluginJson.version).toBe(expectedManifest.version);
+    expect(pluginJson.commands).toEqual([...EXPECTED_COMMANDS]);
+    expect(pluginJson.tools).toEqual([...EXPECTED_TOOLS]);
+    expect(pluginJson).toEqual(expectedManifest);
   });
 
   it("writes logical active-feature names and status fallback prefers the shared pointer", async () => {
@@ -1140,6 +1165,76 @@ Do it
     );
   });
 
+  it("omits the removed projected-todo field and stale todo-sync hints from the trimmed runtime contract", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_trimmed_runtime_contract");
+
+    const createOutput = await hooks.tool!.hive_feature_create.execute(
+      { name: "trimmed-runtime-feature" },
+      toolContext
+    );
+    expect(createOutput).not.toContain(REMOVED_TODO_REFRESH_HINT);
+
+    const planningStatusRaw = await hooks.tool!.hive_status.execute({ feature: "trimmed-runtime-feature" }, toolContext);
+    const planningStatus = JSON.parse(planningStatusRaw as string) as Record<string, unknown>;
+    expect(planningStatus).not.toHaveProperty(REMOVED_PROJECTED_TODO_FIELD);
+
+    const plan = createSingleTaskPlan(
+      'Trimmed Runtime Feature',
+      'Yes, this regression test validates that the trimmed OpenCode runtime no longer exposes the removed projected-todo field or stale todo-sync hints.'
+    );
+
+    const planOutput = await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "trimmed-runtime-feature" },
+      toolContext
+    );
+    expect(planOutput).not.toContain(REMOVED_TODO_REFRESH_HINT);
+
+    const approveOutput = await hooks.tool!.hive_plan_approve.execute(
+      { feature: "trimmed-runtime-feature" },
+      toolContext
+    );
+    expect(approveOutput).not.toContain(REMOVED_TODO_REFRESH_HINT);
+
+    const syncOutput = await hooks.tool!.hive_tasks_sync.execute(
+      { feature: "trimmed-runtime-feature" },
+      toolContext
+    );
+    expect(syncOutput).not.toContain(REMOVED_TODO_REFRESH_HINT);
+
+    const startRaw = await hooks.tool!.hive_worktree_start.execute(
+      { feature: "trimmed-runtime-feature", task: FIRST_TASK },
+      toolContext
+    );
+    const startResult = JSON.parse(startRaw as string) as Record<string, unknown>;
+    expect(startResult).not.toHaveProperty('todoSync');
+
+    const blockedCommitRaw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        feature: "trimmed-runtime-feature",
+        task: FIRST_TASK,
+        status: "blocked",
+        summary: "Blocked waiting for a design decision.",
+        blocker: {
+          reason: "Need a design decision",
+          options: ["Option A", "Option B"],
+        },
+      },
+      toolContext
+    );
+    const blockedCommit = JSON.parse(blockedCommitRaw as string) as Record<string, unknown>;
+    expect(blockedCommit).not.toHaveProperty('todoSync');
+  });
+
   it("keeps plan tool messaging overview-first while plan.md remains execution truth", async () => {
     const { hooks, toolContext } = await createHooksForTest(
       testRoot,
@@ -1404,24 +1499,17 @@ Do it
 
     await hooks.tool!.hive_feature_create.execute({ name: "active" }, createToolContext("sess"));
 
-    // system.transform should still inject HIVE_SYSTEM_PROMPT and status hint
-    const output = { system: [] as string[] };
-    await hooks["experimental.chat.system.transform"]?.({ agent: "hive-master" }, output);
-    output.system.push("## Base Agent Prompt");
+    expect(hooks["experimental.chat.system.transform" as keyof typeof hooks]).toBeUndefined();
 
-    const joined = output.system.join("\n");
-    expect(joined).toContain("## Hive — Active Session");
-    expect(joined).not.toContain("Use hive_status to check feature state before starting work");
-    expect(joined).not.toContain("Use hive_plan_read to see plan comments");
-    
-    // Auto-loaded skills are now injected via config hook (prompt field), NOT system.transform
-    // Verify by checking the agent's prompt field in config
     const opencodeConfig: Record<string, unknown> = { agent: {} };
     await hooks.config!(opencodeConfig);
     
     const agentConfig = (opencodeConfig.agent as Record<string, { prompt?: string }>)["hive-master"];
     expect(agentConfig).toBeDefined();
     expect(agentConfig.prompt).toBeDefined();
+    expect(agentConfig.prompt).toContain("## Hive — Active Session");
+    expect(agentConfig.prompt).not.toContain("Use hive_status to check feature state before starting work");
+    expect(agentConfig.prompt).not.toContain("Use hive_plan_read to see plan comments");
     
     const brainstormingSkill = BUILTIN_SKILLS.find((skill) => skill.name === "brainstorming");
     expect(brainstormingSkill).toBeDefined();
@@ -1438,8 +1526,59 @@ Do it
     expect(agents["forager-ui"]).toBeDefined();
     expect(agents["reviewer-security"]).toBeDefined();
     
-    // Verify status hint is in system.transform (this is still there)
-    expect(joined).toContain("### Current Hive Status");
+  });
+
+  it("system prompt hook omits trimmed projected-todo and checkpoint rituals for primary roles", async () => {
+    const configPath = path.join(process.env.HOME || "", ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agentMode: "dedicated",
+        agents: {
+          "architect-planner": {},
+          "swarm-orchestrator": {},
+        },
+      }),
+    );
+
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const opencodeConfig: Record<string, unknown> = { agent: {} };
+    await hooks.config!(opencodeConfig);
+
+    const agents = opencodeConfig.agent as Record<string, { prompt?: string }>;
+    const hivePrompt = QUEEN_BEE_PROMPT;
+    const architectPrompt = agents["architect-planner"]?.prompt ?? "";
+    const swarmPrompt = agents["swarm-orchestrator"]?.prompt ?? "";
+    const foragerPrompt = agents["forager-worker"]?.prompt ?? "";
+
+    expect(hivePrompt).not.toContain(REMOVED_PROJECTED_TODO_FIELD);
+    expect(hivePrompt).not.toContain("todoread");
+    expect(hivePrompt).not.toContain("todowrite");
+    expect(hivePrompt).not.toContain("task checkpoints");
+    expect(hivePrompt).not.toContain(LEGACY_IDLE_CHILD_REPLAY);
+
+    expect(architectPrompt).not.toContain(REMOVED_PROJECTED_TODO_FIELD);
+    expect(architectPrompt).not.toContain("todoread");
+    expect(architectPrompt).not.toContain("todowrite");
+    expect(architectPrompt).not.toContain("task checkpoints");
+
+    expect(swarmPrompt).not.toContain(REMOVED_PROJECTED_TODO_FIELD);
+    expect(swarmPrompt).not.toContain("todoread");
+    expect(swarmPrompt).not.toContain("todowrite");
+    expect(swarmPrompt).not.toContain("task checkpoints");
+
+    expect(foragerPrompt).not.toContain("todowrite");
+    expect(foragerPrompt).not.toContain(REMOVED_PROJECTED_TODO_FIELD);
   });
 
   it("blocks hive_worktree_create when dependencies are not done", async () => {
@@ -2430,6 +2569,495 @@ Do the first thing.
     expect(specAfter).not.toContain("_No plan section available._");
   });
 
+  it("reports deterministic helperStatus that distinguishes done tasks from live wrap-up state", async () => {
+    const ctx: PluginInput = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+      $: createStubShell(),
+    };
+
+    const hooks = await plugin(ctx);
+    const toolContext = createToolContext("sess_helper_status_contract");
+
+    await hooks.tool!.hive_feature_create.execute(
+      { name: "helper-status-feature" },
+      toolContext
+    );
+
+    const plan = `# Helper Status Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this regression test validates that OpenCode hive_status exposes deterministic helperStatus fields showing observable task/worktree wrap-up state without inventing merge truth.
+
+## Tasks
+
+### 1. First Task
+
+**Depends on**: none
+
+Finish the first task.
+
+### 2. Second Task
+
+**Depends on**: 1
+
+Wait for task one.
+
+### 3. Third Task
+
+**Depends on**: 1
+
+Also wait for task one.
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: "helper-status-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_plan_approve.execute(
+      { feature: "helper-status-feature" },
+      toolContext
+    );
+    await hooks.tool!.hive_tasks_sync.execute(
+      { feature: "helper-status-feature" },
+      toolContext
+    );
+
+    await hooks.tool!.hive_task_create.execute(
+      {
+        feature: "helper-status-feature",
+        name: "operator-followup",
+        source: "operator",
+      },
+      toolContext
+    );
+
+    const startRaw = await hooks.tool!.hive_worktree_start.execute(
+      { feature: "helper-status-feature", task: FIRST_TASK },
+      toolContext
+    );
+    const startResult = JSON.parse(startRaw as string) as {
+      success?: boolean;
+      worktreePath?: string;
+    };
+
+    expect(startResult.success).toBe(true);
+    expect(startResult.worktreePath).toBeDefined();
+
+    fs.writeFileSync(
+      path.join(startResult.worktreePath!, "wrapup.txt"),
+      "observable wrap-up state\n"
+    );
+
+    const commitRaw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        feature: "helper-status-feature",
+        task: FIRST_TASK,
+        status: "completed",
+        summary: "Finished the first task. Regression test recorded wrap-up state.",
+      },
+      createToolContext("sess_helper_status_worker")
+    );
+    const commitResult = JSON.parse(commitRaw as string) as {
+      ok?: boolean;
+      taskState?: string;
+      worktreePath?: string;
+    };
+
+    expect(commitResult.ok).toBe(true);
+    expect(commitResult.taskState).toBe("done");
+    expect(commitResult.worktreePath).toBe(startResult.worktreePath);
+
+    fs.writeFileSync(
+      path.join(startResult.worktreePath!, "post-commit-dirty.txt"),
+      "still dirty after task marked done\n"
+    );
+
+    const statusRaw = await hooks.tool!.hive_status.execute(
+      { feature: "helper-status-feature" },
+      toolContext
+    );
+    const status = JSON.parse(statusRaw as string) as {
+      tasks?: {
+        pending?: number;
+        runnable?: string[];
+      };
+      helperStatus?: {
+        doneTasksWithLiveWorktrees: string[];
+        dirtyWorktrees: string[];
+        nonInProgressTasksWithWorktrees: string[];
+        manualTaskPolicy: {
+          order: {
+            omitted: string;
+            explicitNextOrder: string;
+            explicitOtherOrder: string;
+          };
+          dependsOn: {
+            omitted: string;
+            explicitDoneTargetsOnly: string;
+            explicitMissingTarget: string;
+            explicitNotDoneTarget: string;
+            reviewSourceWithExplicitDependsOn: string;
+          };
+        };
+        ambiguityFlags: string[];
+      };
+    };
+
+    expect(status.tasks?.pending).toBe(3);
+    expect(status.tasks?.runnable).toEqual([
+      "02-second-task",
+      "03-third-task",
+      "04-operator-followup",
+    ]);
+    expect(status.helperStatus).toEqual({
+      doneTasksWithLiveWorktrees: ["01-first-task"],
+      dirtyWorktrees: ["01-first-task"],
+      nonInProgressTasksWithWorktrees: ["01-first-task"],
+      manualTaskPolicy: {
+        order: {
+          omitted: "append_next_order",
+          explicitNextOrder: "append_next_order",
+          explicitOtherOrder: "plan_amendment_required",
+        },
+        dependsOn: {
+          omitted: "store_empty_array",
+          explicitDoneTargetsOnly: "allowed",
+          explicitMissingTarget: "plan_amendment_required",
+          explicitNotDoneTarget: "plan_amendment_required",
+          reviewSourceWithExplicitDependsOn: "plan_amendment_required",
+        },
+      },
+      ambiguityFlags: [
+        "done_task_has_live_worktree",
+        "dirty_non_in_progress_worktree",
+        "multiple_runnable_tasks",
+      ],
+    });
+  });
+
+  it("covers the issue-72 3b/3c interruption with explicit helperStatus, unsafe insertion rejection, and safe append-only follow-up", async () => {
+    const { hooks, toolContext } = await createHooksForTest(testRoot, 'sess_issue_72_followup');
+
+    await hooks.tool!.hive_feature_create.execute({ name: 'issue-72-followup-feature' }, toolContext);
+
+    const plan = `# Issue 72 Follow-up Feature
+
+## Discovery
+
+**Q: Is this a test?**
+A: Yes, this integrated regression models the exact issue-72 interruption where task 3 is locally tested and marked done, task 4 is not started yet, and a follow-up 3b/3c request must route through append-only manual-task guardrails.
+
+## Tasks
+
+### 1. First Task
+
+**Depends on**: none
+
+Complete the first planned step.
+
+### 2. Second Task
+
+**Depends on**: 1
+
+Complete the second planned step.
+
+### 3. Third Task
+
+**Depends on**: 2
+
+Locally test and wrap up the third planned step.
+
+### 4. Fourth Task
+
+**Depends on**: 3
+
+Original plan task four content must stay isolated from any append-only manual follow-up.
+`;
+
+    await hooks.tool!.hive_plan_write.execute(
+      { content: plan, feature: 'issue-72-followup-feature' },
+      toolContext,
+    );
+    await hooks.tool!.hive_plan_approve.execute({ feature: 'issue-72-followup-feature' }, toolContext);
+    await hooks.tool!.hive_tasks_sync.execute({ feature: 'issue-72-followup-feature' }, toolContext);
+
+    await hooks.tool!.hive_task_update.execute(
+      {
+        feature: 'issue-72-followup-feature',
+        task: '01-first-task',
+        status: 'done',
+        summary: 'Setup only: mark task 1 complete so later plan tasks can run without a live worktree.',
+      },
+      toolContext,
+    );
+    await hooks.tool!.hive_task_update.execute(
+      {
+        feature: 'issue-72-followup-feature',
+        task: '02-second-task',
+        status: 'done',
+        summary: 'Setup only: mark task 2 complete so task 3 can model the interrupted wrap-up state.',
+      },
+      toolContext,
+    );
+
+    const startRaw = await hooks.tool!.hive_worktree_start.execute(
+      { feature: 'issue-72-followup-feature', task: '03-third-task' },
+      toolContext,
+    );
+    const startResult = JSON.parse(startRaw as string) as {
+      success?: boolean;
+      worktreePath?: string;
+    };
+
+    expect(startResult.success).toBe(true);
+    expect(startResult.worktreePath).toBeDefined();
+
+    fs.writeFileSync(
+      path.join(startResult.worktreePath!, '03-third-task.txt'),
+      '03-third-task completed during issue-72 regression setup\n',
+    );
+
+    const commitRaw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        feature: 'issue-72-followup-feature',
+        task: '03-third-task',
+        status: 'completed',
+        summary: 'Completed 03-third-task. Targeted issue-72 regression setup test recorded local wrap-up state.',
+      },
+      createToolContext('sess_issue_72_worker_03-third-task'),
+    );
+    const commitResult = JSON.parse(commitRaw as string) as {
+      ok?: boolean;
+      taskState?: string;
+      worktreePath?: string;
+    };
+
+    expect(commitResult.ok).toBe(true);
+    expect(commitResult.taskState).toBe('done');
+    expect(commitResult.worktreePath).toBe(startResult.worktreePath);
+
+    const thirdTaskWorktree = path.join(
+      testRoot,
+      '.hive',
+      '.worktrees',
+      'issue-72-followup-feature',
+      '03-third-task',
+    );
+    fs.writeFileSync(
+      path.join(thirdTaskWorktree, 'post-commit-dirty.txt'),
+      'task 3 still has observable wrap-up state after completion\n',
+    );
+
+    const statusRaw = await hooks.tool!.hive_status.execute(
+      { feature: 'issue-72-followup-feature' },
+      toolContext,
+    );
+    const status = JSON.parse(statusRaw as string) as {
+      tasks?: {
+        pending?: number;
+        runnable?: string[];
+      };
+      helperStatus?: {
+        doneTasksWithLiveWorktrees: string[];
+        dirtyWorktrees: string[];
+        nonInProgressTasksWithWorktrees: string[];
+        manualTaskPolicy: {
+          order: {
+            omitted: string;
+            explicitNextOrder: string;
+            explicitOtherOrder: string;
+          };
+          dependsOn: {
+            omitted: string;
+            explicitDoneTargetsOnly: string;
+            explicitMissingTarget: string;
+            explicitNotDoneTarget: string;
+            reviewSourceWithExplicitDependsOn: string;
+          };
+        };
+        ambiguityFlags: string[];
+      };
+    };
+
+    expect(status.tasks?.pending).toBe(1);
+    expect(status.tasks?.runnable).toEqual(['04-fourth-task']);
+    expect(status.helperStatus).toEqual({
+      doneTasksWithLiveWorktrees: ['03-third-task'],
+      dirtyWorktrees: ['03-third-task'],
+      nonInProgressTasksWithWorktrees: ['03-third-task'],
+      manualTaskPolicy: {
+        order: {
+          omitted: 'append_next_order',
+          explicitNextOrder: 'append_next_order',
+          explicitOtherOrder: 'plan_amendment_required',
+        },
+        dependsOn: {
+          omitted: 'store_empty_array',
+          explicitDoneTargetsOnly: 'allowed',
+          explicitMissingTarget: 'plan_amendment_required',
+          explicitNotDoneTarget: 'plan_amendment_required',
+          reviewSourceWithExplicitDependsOn: 'plan_amendment_required',
+        },
+      },
+      ambiguityFlags: [
+        'done_task_has_live_worktree',
+        'dirty_non_in_progress_worktree',
+      ],
+    });
+
+    let unsafeInsertionError: unknown;
+    try {
+      await hooks.tool!.hive_task_create.execute(
+        {
+          feature: 'issue-72-followup-feature',
+          name: 'issue-72-3b-followup',
+          order: 4,
+          description: 'Unsafe 3b insertion that should be rejected.',
+          goal: 'Confirm append-only ordering rejects intermediate insertion.',
+          acceptanceCriteria: ['Tool rejects non-next order'],
+          reason: 'Reproduce issue-72 3b/3c unsafe insertion attempt',
+          source: 'operator',
+        },
+        toolContext,
+      );
+    } catch (error) {
+      unsafeInsertionError = error;
+    }
+
+    expect(unsafeInsertionError).toBeInstanceOf(Error);
+    expect((unsafeInsertionError as Error).message).toBe(
+      'Manual tasks are append-only: requested order 4 does not match the next available order 5. Intermediate insertion requires plan amendment.',
+    );
+    expect((unsafeInsertionError as Error).message.toLowerCase()).toContain('manual tasks are append-only');
+    expect((unsafeInsertionError as Error).message.toLowerCase()).toContain('plan amendment');
+
+    const safeCreateResult = await hooks.tool!.hive_task_create.execute(
+      {
+        feature: 'issue-72-followup-feature',
+        name: 'issue-72-safe-followup',
+        description: 'Add the safe append-only follow-up that Hive Helper can create after the interruption.',
+        goal: 'Capture the manual follow-up without rewriting the plan-backed task sequence.',
+        acceptanceCriteria: [
+          'Follow-up lands at the append-only next order',
+          'Spec stays isolated from task four plan content',
+        ],
+        references: ['packages/opencode-hive/src/e2e/plugin-smoke.test.ts'],
+        files: ['packages/opencode-hive/src/e2e/plugin-smoke.test.ts'],
+        reason: 'Issue-72 safe append-only follow-up after task 3 wrap-up',
+        source: 'operator',
+      },
+      toolContext,
+    );
+
+    expect(safeCreateResult).toContain('Manual task created: 05-issue-72-safe-followup');
+
+    const [featureDir] = fs.readdirSync(path.join(testRoot, '.hive', 'features'));
+    const safeTaskDir = path.join(
+      testRoot,
+      '.hive',
+      'features',
+      featureDir,
+      'tasks',
+      '05-issue-72-safe-followup',
+    );
+    const safeTaskStatus = JSON.parse(
+      fs.readFileSync(path.join(safeTaskDir, 'status.json'), 'utf-8'),
+    ) as {
+      status: string;
+      origin: string;
+      dependsOn: string[];
+      planTitle: string;
+      metadata?: {
+        description?: string;
+        goal?: string;
+        acceptanceCriteria?: string[];
+      };
+    };
+    const safeTaskSpec = fs.readFileSync(path.join(safeTaskDir, 'spec.md'), 'utf-8');
+
+    expect(safeTaskStatus).toMatchObject({
+      status: 'pending',
+      origin: 'manual',
+      dependsOn: [],
+      planTitle: 'issue-72-safe-followup',
+      metadata: {
+        description: 'Add the safe append-only follow-up that Hive Helper can create after the interruption.',
+        goal: 'Capture the manual follow-up without rewriting the plan-backed task sequence.',
+        acceptanceCriteria: [
+          'Follow-up lands at the append-only next order',
+          'Spec stays isolated from task four plan content',
+        ],
+      },
+    });
+    expect(safeTaskSpec).toContain('Add the safe append-only follow-up that Hive Helper can create after the interruption.');
+    expect(safeTaskSpec).toContain('Capture the manual follow-up without rewriting the plan-backed task sequence.');
+    expect(safeTaskSpec).not.toContain('Original plan task four content must stay isolated from any append-only manual follow-up.');
+  });
+
+  it("rejects manual-task insertion outside the next append-only slot", async () => {
+    const { hooks, toolContext } = await createHooksForTest(testRoot, 'sess_manual_task_order_guard');
+
+    await hooks.tool!.hive_feature_create.execute({ name: 'manual-order-feature' }, toolContext);
+    await hooks.tool!.hive_plan_write.execute(
+      {
+        content: createSingleTaskPlan(
+          'Manual Order Feature',
+          'Yes, this regression test validates that manual tasks can only be appended at the next deterministic order.'
+        ),
+        feature: 'manual-order-feature',
+      },
+      toolContext,
+    );
+    await hooks.tool!.hive_plan_approve.execute({ feature: 'manual-order-feature' }, toolContext);
+    await hooks.tool!.hive_tasks_sync.execute({ feature: 'manual-order-feature' }, toolContext);
+
+    await expect(
+      hooks.tool!.hive_task_create.execute(
+        {
+          name: 'manual-insert',
+          order: 99,
+          feature: 'manual-order-feature',
+        },
+        toolContext,
+      ),
+    ).rejects.toThrow(/append-only|intermediate insertion requires plan amendment|plan amendment/i);
+  });
+
+  it("rejects manual-task dependencies on unfinished work", async () => {
+    const { hooks, toolContext } = await createHooksForTest(testRoot, 'sess_manual_task_dep_guard');
+
+    await hooks.tool!.hive_feature_create.execute({ name: 'manual-dependency-feature' }, toolContext);
+    await hooks.tool!.hive_plan_write.execute(
+      {
+        content: createSingleTaskPlan(
+          'Manual Dependency Feature',
+          'Yes, this regression test validates that manual tasks reject dependencies on unfinished work.'
+        ),
+        feature: 'manual-dependency-feature',
+      },
+      toolContext,
+    );
+    await hooks.tool!.hive_plan_approve.execute({ feature: 'manual-dependency-feature' }, toolContext);
+    await hooks.tool!.hive_tasks_sync.execute({ feature: 'manual-dependency-feature' }, toolContext);
+
+    await expect(
+      hooks.tool!.hive_task_create.execute(
+        {
+          name: 'manual-follow-up',
+          feature: 'manual-dependency-feature',
+          dependsOn: ['01-first-task'],
+        },
+        toolContext,
+      ),
+    ).rejects.toThrow(/dependencies on unfinished work require plan amendment|plan amendment/i);
+  });
+
   it("worker chat.message in task worktree binds featureName, taskFolder, and workerPromptPath before commit", async () => {
     const ctx: PluginInput = {
       directory: testRoot,
@@ -2497,5 +3125,15 @@ Do the first thing.
     expect(workerSession.featureName).toBe("start-bind-feature");
     expect(workerSession.taskFolder).toBe(FIRST_TASK);
     expect(workerSession.workerPromptPath).toContain("worker-prompt.md");
+  });
+
+  it('does not declare the removed post-tool hook in the supported hook source of truth', () => {
+    expect([...SUPPORTED_PLUGIN_HOOKS]).toEqual([
+      'event',
+      'config',
+      'chat.message',
+      'experimental.chat.messages.transform',
+      'tool.execute.before',
+    ]);
   });
 });

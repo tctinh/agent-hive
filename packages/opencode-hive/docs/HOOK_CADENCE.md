@@ -2,13 +2,13 @@
 
 ## Overview
 
-The hook cadence system allows you to control how frequently OpenCode plugin hooks fire, reducing token consumption by allowing hooks to execute every N turns instead of every turn.
+The hook cadence system lets you control how often selected OpenCode plugin hooks fire. In the current runtime contract, cadence applies to supported hooks such as `chat.message` and `experimental.chat.messages.transform`; it does not imply access to unsupported startup or pre-compaction hooks.
+
+The plugin's declared supported runtime surface in this branch is broader than the cadence-tuned subset: `event`, `config`, `chat.message`, `experimental.chat.messages.transform`, and `tool.execute.before` are supported hooks. Cadence is only documented here for the hooks where turn gating is an intentional operator control.
 
 ## Motivation
 
-The `experimental.chat.system.transform` hook injects the large `HIVE_SYSTEM_PROMPT` (~80 lines of markdown, ~2KB) into the system prompt on **every single LLM call**. This is the primary source of token waste in agent-hive.
-
-By configuring this hook to fire every 3rd turn instead of every turn, you can reduce token consumption by approximately 66% for this hook while maintaining context freshness.
+Some supported hooks can be useful on every turn, but not all of them need to run at the same cadence. Cadence gives operators a bounded way to trade refresh frequency against token cost without claiming deeper runtime coordination than OpenCode currently exposes.
 
 ## Configuration
 
@@ -17,7 +17,7 @@ Add a `hook_cadence` field to your `~/.config/opencode/agent_hive.json`:
 ```json
 {
   "hook_cadence": {
-    "experimental.chat.system.transform": 3,
+    "experimental.chat.messages.transform": 2,
     "chat.message": 1,
     "tool.execute.before": 1
   }
@@ -36,8 +36,8 @@ Add a `hook_cadence` field to your `~/.config/opencode/agent_hive.json`:
 
 | Hook Name | Purpose | Default Cadence | Recommended Cadence |
 |-----------|---------|-----------------|---------------------|
-| `experimental.chat.system.transform` | Injects HIVE_SYSTEM_PROMPT + feature status hint | 1 | 3-5 (reduces token waste) |
-| `chat.message` | Sets agent variant | 1 | 1 (lightweight, keep default) |
+| `chat.message` | Applies configured agent variant metadata | 1 | 1 |
+| `experimental.chat.messages.transform` | Replays bounded post-compaction recovery context when needed | 1 | 1-2 |
 | `tool.execute.before` | Docker sandbox command wrapping | 1 | **1 (SAFETY-CRITICAL)** |
 
 ## Behavior
@@ -93,15 +93,7 @@ If you attempt to set `cadence > 1` for this hook, you'll see a warning:
 
 ## Token Savings Estimation
 
-Assuming `HIVE_SYSTEM_PROMPT` is ~2KB per injection:
-
-| Cadence | Tokens per 10 turns | Savings vs. Default |
-|---------|---------------------|---------------------|
-| 1 (default) | ~20KB | 0% |
-| 3 | ~7KB | **65%** |
-| 5 | ~4KB | **80%** |
-
-**Note:** Actual savings depend on conversation length and hook complexity.
+Savings depend on which supported hooks you gate and how often they would otherwise run. Treat cadence as a small operator knob, not as a replacement for durable `.hive` state or bounded recovery design.
 
 ## Backward Compatibility
 
@@ -125,20 +117,7 @@ getHookCadence(hookName: string, options?: { safetyCritical?: boolean }): number
 
 ### Plugin Hook Integration
 
-Each hook uses a cadence gate at the top of its callback:
-
-```typescript
-"experimental.chat.system.transform": async (input, output) => {
-  // Cadence gate: check if this hook should execute this turn
-  if (!shouldExecuteHook("experimental.chat.system.transform")) {
-    return;
-  }
-
-  // Hook logic only executes if gate passes
-  output.system.push(HIVE_SYSTEM_PROMPT);
-  // ...
-}
-```
+Each supported hook can use a cadence gate at the top of its callback. In this branch, the cadence-tested surfaces are lightweight runtime hooks such as `chat.message` and `experimental.chat.messages.transform`, while `tool.execute.before` stays locked to cadence `1`.
 
 ### Turn Counter Logic
 
@@ -188,6 +167,14 @@ bun test src/__tests__/hook-cadence.test.ts
 3. Check console logs for validation warnings: `[hive:cadence]`
 4. Ensure cadence value is an integer >= 1
 
+### Recovery wording seems stale
+
+If local docs or prompts still mention unsupported hooks such as `experimental.chat.system.transform`, `experimental.session.compacting`, `session.status` idle replay, or legacy post-tool completion hooks, treat that wording as stale. The supported recovery path in this branch is:
+
+- `session.compacted` event observation
+- bounded replay through `experimental.chat.messages.transform`
+- durable `.hive` session metadata plus `worker-prompt.md` for task-worker re-entry
+
 ### Safety-critical hook warning
 
 If you see:
@@ -214,3 +201,4 @@ Potential improvements for future versions:
 - **Dynamic cadence**: Adjust cadence based on context size or token budget
 - **Per-agent cadence**: Different cadence values for different agents
 - **Observability**: Metrics and debugging info for cadence behavior
+- **Upstream API support**: If OpenCode later adds stronger lifecycle/todo hooks, Hive can document and adopt them explicitly rather than implying they already exist

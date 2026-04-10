@@ -386,34 +386,13 @@ describe("config hook autoLoadSkills injection", () => {
     expect(brainstormingSkill).toBeDefined();
     expect(parallelExplorationSkill).toBeDefined();
 
-    // Call system.transform WITH agent specified
-    const outputWithAgent = { system: [] as string[] };
-    await hooks["experimental.chat.system.transform"]?.({ agent: "hive-master" }, outputWithAgent);
-    const joinedWithAgent = outputWithAgent.system.join("\n");
-
-    // Skills should NOT be in system.transform output (legacy path removed)
-    expect(joinedWithAgent).not.toContain(brainstormingSkill!.template);
-    expect(joinedWithAgent).not.toContain(parallelExplorationSkill!.template);
-
-    // HIVE_SYSTEM_PROMPT should still be there
-    expect(joinedWithAgent).toContain("## Hive — Active Session");
-
-    // Call system.transform WITHOUT agent (simulates runtime scenario)
-    const outputWithoutAgent = { system: [] as string[] };
-    await hooks["experimental.chat.system.transform"]?.({}, outputWithoutAgent);
-    const joinedWithoutAgent = outputWithoutAgent.system.join("\n");
-
-    // Skills should also NOT be in system.transform output when agent is missing
-    expect(joinedWithoutAgent).not.toContain(brainstormingSkill!.template);
-    expect(joinedWithoutAgent).not.toContain(parallelExplorationSkill!.template);
-
-    // HIVE_SYSTEM_PROMPT should still be there
-    expect(joinedWithoutAgent).toContain("## Hive — Active Session");
+    expect(hooks["experimental.chat.system.transform" as keyof typeof hooks]).toBeUndefined();
 
     // Verify skills ARE in the config hook prompt (the correct path)
     const opencodeConfig: any = { agent: {} };
     await hooks.config!(opencodeConfig);
     const hiveMasterPrompt = opencodeConfig.agent["hive-master"]?.prompt as string;
+    expect(hiveMasterPrompt).toContain("## Hive — Active Session");
     expect(hiveMasterPrompt).toContain(brainstormingSkill!.template);
     expect(hiveMasterPrompt).toContain(parallelExplorationSkill!.template);
   });

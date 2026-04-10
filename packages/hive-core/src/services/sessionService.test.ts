@@ -194,6 +194,7 @@ describe('SessionService', () => {
       expect(featureSession?.directiveRecoveryState).toBe('consumed');
       expect(featureSession?.directivePrompt).toBe('Investigate the current issue.');
     });
+
   });
 
   describe('findFeatureBySession', () => {

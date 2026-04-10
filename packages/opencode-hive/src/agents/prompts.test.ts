@@ -176,6 +176,19 @@ describe('Hive (Hybrid) prompt', () => {
       expect(QUEEN_BEE_PROMPT).toContain('bun run build');
       expect(QUEEN_BEE_PROMPT).toContain('bun run test');
     });
+
+    it('teaches Hive to delegate bounded hard-task cleanup and safe follow-up handling to hive-helper', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('hard-task cleanup');
+      expect(QUEEN_BEE_PROMPT).toContain('interrupted wrap-up candidates');
+      expect(QUEEN_BEE_PROMPT).toContain('safe append-only manual follow-up');
+      expect(QUEEN_BEE_PROMPT).toContain('observably mergeable/resumable/blocked');
+    });
+
+    it('keeps DAG-changing requests routed back to Hive for plan amendment', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('DAG-changing');
+      expect(QUEEN_BEE_PROMPT).toContain('route back to Hive');
+      expect(QUEEN_BEE_PROMPT).toContain('plan amendment');
+    });
   });
 
   describe('turn termination and hard blocks', () => {
@@ -345,6 +358,19 @@ describe('Swarm (Orchestrator) prompt', () => {
       expect(SWARM_BEE_PROMPT).toContain('bun run build');
       expect(SWARM_BEE_PROMPT).toContain('bun run test');
     });
+
+    it('teaches Swarm to delegate bounded hard-task cleanup and safe follow-up handling to hive-helper', () => {
+      expect(SWARM_BEE_PROMPT).toContain('hard-task cleanup');
+      expect(SWARM_BEE_PROMPT).toContain('interrupted wrap-up candidates');
+      expect(SWARM_BEE_PROMPT).toContain('safe append-only manual follow-up');
+      expect(SWARM_BEE_PROMPT).toContain('observably mergeable/resumable/blocked');
+    });
+
+    it('keeps DAG-changing requests routed back to Swarm for plan amendment', () => {
+      expect(SWARM_BEE_PROMPT).toContain('DAG-changing');
+      expect(SWARM_BEE_PROMPT).toContain('route back to Swarm');
+      expect(SWARM_BEE_PROMPT).toContain('plan amendment');
+    });
   });
 
   it('does NOT contain oracle reference', () => {
@@ -422,8 +448,12 @@ describe('Forager (Worker/Coder) prompt', () => {
 });
 
 describe('Hive Helper prompt', () => {
-  it('forbids planning and orchestration', () => {
-    expect(HIVE_HELPER_PROMPT).toContain('never plans or orchestrates');
+  it('defines the bounded helper modes and forbids generalized orchestration', () => {
+    expect(HIVE_HELPER_PROMPT).toContain('bounded hard-task operational assistant');
+    expect(HIVE_HELPER_PROMPT).toContain('merge recovery');
+    expect(HIVE_HELPER_PROMPT).toContain('state clarification');
+    expect(HIVE_HELPER_PROMPT).toContain('safe manual-follow-up assistance');
+    expect(HIVE_HELPER_PROMPT).toContain('never plans, orchestrates, or broadens the assignment');
   });
 
   it('uses hive_merge first and resolves preserved conflicts locally', () => {
@@ -433,9 +463,21 @@ describe('Hive Helper prompt', () => {
     expect(HIVE_HELPER_PROMPT).toContain('continues the merge batch');
   });
 
-  it('requires concise summary-only output', () => {
+  it('allows state summaries and append-only manual tasks but forbids plan-backed task updates', () => {
+    expect(HIVE_HELPER_PROMPT).toContain('summarize observable state');
+    expect(HIVE_HELPER_PROMPT).toContain('safe append-only manual tasks');
+    expect(HIVE_HELPER_PROMPT).toContain('never update plan-backed task state');
+    expect(HIVE_HELPER_PROMPT).toContain('Hive Master / Swarm');
+    expect(HIVE_HELPER_PROMPT).toContain('plan amendment');
+  });
+
+  it('requires concise operational summaries only', () => {
     expect(HIVE_HELPER_PROMPT).toContain('concise');
-    expect(HIVE_HELPER_PROMPT).toContain('merged/conflict/blocker summary');
+    expect(HIVE_HELPER_PROMPT).toContain('merged/state/task/blocker summary');
+  });
+
+  it('does not auto-load a Hive Skill appendix into the helper prompt', () => {
+    expect(HIVE_HELPER_PROMPT).not.toContain('## Hive Skill:');
   });
 });
 
@@ -561,6 +603,8 @@ describe('README.md documentation', () => {
       expect(readmeContent).toContain('`hive-helper`');
       expect(readmeContent).toContain('runtime-only');
       expect(readmeContent).toContain('merge recovery');
+      expect(readmeContent).toContain('state clarification');
+      expect(readmeContent).toContain('safe manual-follow-up assistance');
     });
 
     it('documents hive-helper in the built-in agent defaults table', () => {
@@ -576,7 +620,9 @@ describe('README.md documentation', () => {
 
     it('documents hive-helper in the top-level runtime roster and recovery notes', () => {
       expect(rootReadmeContent).toContain('**Hive Helper**');
-      expect(rootReadmeContent).toContain('Runtime-only merge recovery helper');
+      expect(rootReadmeContent).toContain('Runtime-only bounded hard-task operational assistant');
+      expect(rootReadmeContent).toContain('merge recovery');
+      expect(rootReadmeContent).toContain('safe manual-follow-up assistance');
       expect(rootReadmeContent).toContain('does not appear in generated `.github/agents/` docs');
       expect(rootReadmeContent).toContain('does not appear in `packages/vscode-hive/src/generators/`');
     });
@@ -648,5 +694,34 @@ describe('AGENTS.md tool guidance', () => {
     it('contains agents-md-mastery skill reference', () => {
       expect(SWARM_BEE_PROMPT).toContain('agents-md-mastery');
     });
+  });
+});
+
+describe('trimmed OpenCode runtime prompts', () => {
+  const removedProjectedTodoField = ['todo', 'Projection'].join('');
+  const legacyIdleReplayPhrase = ['child-session', ' idle'].join('');
+
+  it('removes Hive projected-todo and checkpoint rituals from the Hive prompt', () => {
+    expect(QUEEN_BEE_PROMPT).not.toContain(removedProjectedTodoField);
+    expect(QUEEN_BEE_PROMPT).not.toContain('todoread');
+    expect(QUEEN_BEE_PROMPT).not.toContain('todowrite');
+    expect(QUEEN_BEE_PROMPT).not.toContain('task checkpoints');
+    expect(QUEEN_BEE_PROMPT).not.toContain(legacyIdleReplayPhrase);
+  });
+
+  it('removes planner projected-todo and checkpoint rituals from the Architect prompt', () => {
+    expect(ARCHITECT_BEE_PROMPT).not.toContain(removedProjectedTodoField);
+    expect(ARCHITECT_BEE_PROMPT).not.toContain('todoread');
+    expect(ARCHITECT_BEE_PROMPT).not.toContain('todowrite');
+    expect(ARCHITECT_BEE_PROMPT).not.toContain('task checkpoints');
+    expect(ARCHITECT_BEE_PROMPT).not.toContain('task-checkpoint');
+  });
+
+  it('removes orchestration projected-todo and checkpoint rituals from the Swarm prompt', () => {
+    expect(SWARM_BEE_PROMPT).not.toContain(removedProjectedTodoField);
+    expect(SWARM_BEE_PROMPT).not.toContain('todoread');
+    expect(SWARM_BEE_PROMPT).not.toContain('todowrite');
+    expect(SWARM_BEE_PROMPT).not.toContain('task checkpoints');
+    expect(SWARM_BEE_PROMPT).not.toContain('worker return/block');
   });
 });

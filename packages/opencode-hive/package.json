@@ -28,7 +28,9 @@
   "scripts": {
     "clean": "rm -rf dist",
     "generate-skills": "bun run scripts/generate-skills.ts",
-    "build": "npm run clean && npm run generate-skills && bun build src/index.ts --outdir dist --target node --format esm --packages=bundle && tsc --emitDeclarationOnly",
+    "generate-plugin-manifest": "bun run scripts/generate-plugin-manifest.ts",
+    "generate": "npm run generate-skills && npm run generate-plugin-manifest",
+    "build": "npm run clean && npm run generate && bun build src/index.ts --outdir dist --target node --format esm --packages=bundle && tsc --emitDeclarationOnly",
     "dev": "opencode plugin dev",
     "test": "bun test"
   },

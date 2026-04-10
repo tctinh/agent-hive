@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`hive-helper` hard-task guidance is now explicit**: `hive-helper` now documents bounded merge recovery, `helperStatus`-based state clarification, interrupted-state wrap-up, and safe manual follow-up handling while keeping the contract honest: manual tasks are append-only, unfinished-task dependencies require plan amendment, and Helper remains runtime-only plus network-blind.
+
 ## [1.4.1] - 2026-04-10
 
 ### Changed

@@ -193,7 +193,7 @@ describe('Agent permissions', () => {
     }
   });
 
-  it('gives hive-helper only merge recovery tools and no auto-loaded skills appendix', async () => {
+  it('gives hive-helper the bounded hard-task tool set and no auto-loaded skills appendix', async () => {
     spyOn(ConfigService.prototype, 'get').mockReturnValue({
       agentMode: 'unified',
       agents: {
@@ -225,11 +225,15 @@ describe('Agent permissions', () => {
     expect(helper?.tools?.['hive_merge']).toBeUndefined();
     expect(helper?.tools?.['hive_status']).toBeUndefined();
     expect(helper?.tools?.['hive_context_write']).toBeUndefined();
+    expect(helper?.tools?.['hive_task_create']).toBeUndefined();
     expect(helper?.tools?.['hive_skill']).toBeUndefined();
+    expect(helper?.tools?.['hive_task_update']).toBe(false);
+    expect(helper?.tools?.['hive_plan_read']).toBe(false);
+    expect(helper?.tools?.['hive_tasks_sync']).toBe(false);
     expect(helper?.tools?.['hive_worktree_start']).toBe(false);
     expect(helper?.tools?.['hive_worktree_create']).toBe(false);
     expect(helper?.tools?.['hive_worktree_commit']).toBe(false);
-    expect(helper?.tools?.['hive_plan_write']).toBe(false);
+    expect(helper?.tools?.['hive_network_query']).toBe(false);
     expect(helper?.permission?.task).toBe('deny');
     expect(helper?.permission?.delegate).toBe('deny');
     expect(helper?.permission?.skill).toBe('allow');
@@ -334,14 +338,16 @@ describe('Per-agent tool filtering', () => {
     expect(foragerTools!['hive_skill']).toBeUndefined();
   });
 
-  it('hive-helper tool list is exactly [hive_merge, hive_status, hive_context_write, hive_skill]', async () => {
+  it('hive-helper tool list is exactly [hive_merge, hive_status, hive_context_write, hive_task_create, hive_skill]', async () => {
     const agents = await buildConfig('unified');
     const helperTools = agents['hive-helper']?.tools;
     expect(helperTools).toBeTruthy();
     expect(helperTools!['hive_merge']).toBeUndefined();
     expect(helperTools!['hive_status']).toBeUndefined();
     expect(helperTools!['hive_context_write']).toBeUndefined();
+    expect(helperTools!['hive_task_create']).toBeUndefined();
     expect(helperTools!['hive_skill']).toBeUndefined();
+    expect(helperTools!['hive_task_update']).toBe(false);
     expect(helperTools!['hive_plan_read']).toBe(false);
     expect(helperTools!['hive_worktree_commit']).toBe(false);
     expect(helperTools!['hive_worktree_start']).toBe(false);
@@ -392,6 +398,34 @@ describe('Per-agent tool filtering', () => {
     expect(swarmTools!['hive_plan_write']).toBe(false);
     expect(swarmTools!['hive_worktree_commit']).toBe(false);
     expect(swarmTools!['hive_plan_approve']).toBeUndefined();
+  });
+
+  it('allows todo read/write only for hive, architect, and swarm primary roles', async () => {
+    const unifiedAgents = await buildConfig('unified');
+    expect(unifiedAgents['hive-master']?.permission?.todoread).toBe('allow');
+    expect(unifiedAgents['hive-master']?.permission?.todowrite).toBe('allow');
+    expect(unifiedAgents['scout-researcher']?.permission?.todoread).toBeUndefined();
+    expect(unifiedAgents['scout-researcher']?.permission?.todowrite).toBeUndefined();
+    expect(unifiedAgents['forager-worker']?.permission?.todoread).toBeUndefined();
+    expect(unifiedAgents['forager-worker']?.permission?.todowrite).toBeUndefined();
+    expect(unifiedAgents['hive-helper']?.permission?.todoread).toBeUndefined();
+    expect(unifiedAgents['hive-helper']?.permission?.todowrite).toBeUndefined();
+    expect(unifiedAgents['hygienic-reviewer']?.permission?.todoread).toBeUndefined();
+    expect(unifiedAgents['hygienic-reviewer']?.permission?.todowrite).toBeUndefined();
+
+    const dedicatedAgents = await buildConfig('dedicated');
+    expect(dedicatedAgents['architect-planner']?.permission?.todoread).toBe('allow');
+    expect(dedicatedAgents['architect-planner']?.permission?.todowrite).toBe('allow');
+    expect(dedicatedAgents['swarm-orchestrator']?.permission?.todoread).toBe('allow');
+    expect(dedicatedAgents['swarm-orchestrator']?.permission?.todowrite).toBe('allow');
+    expect(dedicatedAgents['scout-researcher']?.permission?.todoread).toBeUndefined();
+    expect(dedicatedAgents['scout-researcher']?.permission?.todowrite).toBeUndefined();
+    expect(dedicatedAgents['forager-worker']?.permission?.todoread).toBeUndefined();
+    expect(dedicatedAgents['forager-worker']?.permission?.todowrite).toBeUndefined();
+    expect(dedicatedAgents['hive-helper']?.permission?.todoread).toBeUndefined();
+    expect(dedicatedAgents['hive-helper']?.permission?.todowrite).toBeUndefined();
+    expect(dedicatedAgents['hygienic-reviewer']?.permission?.todoread).toBeUndefined();
+    expect(dedicatedAgents['hygienic-reviewer']?.permission?.todowrite).toBeUndefined();
   });
 
   it('limits hive_network_query to planning orchestration and review roles', async () => {

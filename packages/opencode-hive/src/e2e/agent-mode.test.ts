@@ -178,4 +178,51 @@ describe("agentMode gating", () => {
     expect(opencodeConfig.agent["scout-researcher"]?.tools?.["hive_network_query"]).toBe(false);
     expect(opencodeConfig.agent["hive-helper"]?.tools?.["hive_network_query"]).toBe(false);
   });
+
+  it("keeps hive-helper bounded to merge recovery, state clarification, and append-only manual follow-up", async () => {
+    const configPath = path.join(testRoot, ".config", "opencode", "agent_hive.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify({
+        agentMode: "dedicated",
+      }),
+    );
+
+    const ctx: any = {
+      directory: testRoot,
+      worktree: testRoot,
+      serverUrl: new URL("http://localhost:1"),
+      project: createProject(testRoot),
+      client: OPENCODE_CLIENT,
+    };
+
+    const hooks = await plugin(ctx);
+    const opencodeConfig: any = { agent: {} };
+    await hooks.config!(opencodeConfig);
+
+    const helper = opencodeConfig.agent["hive-helper"];
+    expect(helper).toBeDefined();
+    expect(helper.description).toContain("bounded hard-task operational assistant");
+    expect(helper.description).toContain("merge recovery");
+    expect(helper.description).toContain("state clarification");
+    expect(helper.description).toContain("manual follow-up");
+    expect(helper.prompt).toContain("safe append-only manual tasks");
+    expect(helper.prompt).toContain("never update plan-backed task state");
+    expect(helper.prompt).not.toContain("## Hive Skill:");
+    expect(helper.tools?.["hive_merge"]).toBeUndefined();
+    expect(helper.tools?.["hive_status"]).toBeUndefined();
+    expect(helper.tools?.["hive_context_write"]).toBeUndefined();
+    expect(helper.tools?.["hive_task_create"]).toBeUndefined();
+    expect(helper.tools?.["hive_skill"]).toBeUndefined();
+    expect(helper.tools?.["hive_task_update"]).toBe(false);
+    expect(helper.tools?.["hive_plan_read"]).toBe(false);
+    expect(helper.tools?.["hive_tasks_sync"]).toBe(false);
+    expect(helper.tools?.["hive_worktree_start"]).toBe(false);
+    expect(helper.tools?.["hive_worktree_create"]).toBe(false);
+    expect(helper.tools?.["hive_worktree_commit"]).toBe(false);
+    expect(helper.tools?.["hive_network_query"]).toBe(false);
+    expect(helper.permission?.task).toBe("deny");
+    expect(helper.permission?.delegate).toBe("deny");
+  });
 });
