@@ -14,7 +14,7 @@ import {
   generateHiveWorkflowInstructions,
 } from '../generators/instructions.js';
 import { generatePluginManifest } from '../generators/plugin.js';
-import { generateAllPrompts } from '../generators/prompts.js';
+import { generateAllPrompts, generatePlanFeaturePrompt } from '../generators/prompts.js';
 import { generateSkillFile, getBuiltinSkills } from '../generators/skills.js';
 
 function extractFrontmatter(content: string): string {
@@ -186,6 +186,9 @@ describe('Instruction Generators', () => {
     const body = getBody(content);
     expect(body).toContain('AGENTS.md');
     expect(body).toContain('.github/prompts/');
+    expect(body).toContain('vscode/askQuestions');
+    expect(body).toContain('plain chat only as a fallback');
+    expect(body).not.toContain('inside prompt files only');
     expect(body.length).toBeLessThanOrEqual(1000);
   });
 });
@@ -210,6 +213,17 @@ describe('Prompt Generators', () => {
       expect(frontmatter).toContain('model:');
       expect(frontmatter).toContain('tools:');
     }
+  });
+
+  test('plan feature prompt includes structured clarification tool parity', () => {
+    const prompt = generatePlanFeaturePrompt();
+    const frontmatter = extractFrontmatter(prompt.body);
+    const body = getBody(prompt.body);
+
+    expect(frontmatter).toContain('- "vscode/askQuestions"');
+    expect(body).toContain('vscode/askQuestions');
+    expect(body).toContain('plain chat only as a fallback');
+    expect(body).not.toContain('question()');
   });
 });
 

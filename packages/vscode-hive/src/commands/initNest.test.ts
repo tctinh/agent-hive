@@ -116,7 +116,10 @@ describe('initNest', () => {
     ]);
 
     assert.match(readFile(projectRoot, '.github/copilot-instructions.md'), /AGENTS\.md/);
+    assert.match(readFile(projectRoot, '.github/copilot-instructions.md'), /vscode\/askQuestions/);
+    assert.match(readFile(projectRoot, '.github/copilot-instructions.md'), /plain chat only as a fallback/);
     assert.match(readFile(projectRoot, '.github/prompts/plan-feature.prompt.md'), /hive_plan_write/);
+    assert.match(readFile(projectRoot, '.github/prompts/plan-feature.prompt.md'), /vscode\/askQuestions/);
 
     const plugin = JSON.parse(readFile(projectRoot, 'plugin.json')) as { agents: string[]; hooks: string[]; instructions: string[] };
     assert.deepEqual(plugin.agents, ['.github/agents']);

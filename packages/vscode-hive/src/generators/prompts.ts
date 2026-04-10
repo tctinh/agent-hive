@@ -34,11 +34,11 @@ export function generatePlanFeaturePrompt(): PromptFile {
       description: 'Create or revise a Hive feature plan with plan-first guardrails.',
       agent: 'hive',
       model: 'gpt-5.4',
-      tools: ['read', 'search', 'codebase', 'usages', `${EXTENSION_ID}/hiveStatus`, `${EXTENSION_ID}/hivePlanWrite`],
+      tools: ['read', 'search', 'codebase', 'usages', 'vscode/askQuestions', `${EXTENSION_ID}/hiveStatus`, `${EXTENSION_ID}/hivePlanWrite`],
     },
     `Start by checking AGENTS.md, .github/copilot-instructions.md, and any relevant .github/instructions/ files. Use read-only exploration first, then write or revise the plan with hive_plan_write.
 
-If key requirements are missing, use vscode/askQuestions only for the minimum structured clarification needed; otherwise prefer Copilot's built-in clarification flow in chat.
+If key requirements are missing, use vscode/askQuestions as the normal structured clarification path for the minimum practical decision checkpoints. Use plain chat only as a fallback when the tool is unavailable or a truly lightweight clarification is better.
 
 Keep Hive's plan-first contract intact: no implementation edits, explicit task dependencies, exact file references, and concrete verification commands.`,
   );
