@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Release prep and recovery guidance now document version-agnostic `vX.Y.Z` release steps, required npm / VS Code credential preflights, recovery of the missed `1.4.0` publish from the tagged commit, and the hardening/package-contract prep expected before tagging `1.4.1`.
+
 ## [1.4.0] - 2026-04-07
 
 ### Added
