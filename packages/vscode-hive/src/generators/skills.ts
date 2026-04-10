@@ -261,7 +261,8 @@ Use \`hive_status()\` to get the **runnable** list — tasks with all dependenci
 Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, \`cancelled\`).
 
 **When 2+ tasks are runnable:**
-- Ask the user directly in chat: "Multiple tasks are runnable: [list]. Run in parallel, sequential, or a specific subset?"
+- Prefer \`vscode/askQuestions\` for a structured choice: "Multiple tasks are runnable: [list]. Run in parallel, sequential, or a specific subset?"
+- Fall back to asking directly in chat only when \`vscode/askQuestions\` is unavailable or a lightweight follow-up is enough
 - Record the decision with \`hive_context_write({ name: "execution-decisions", content: "..." })\` for future reference
 
 **When 1 task is runnable:** Proceed directly.
@@ -282,7 +283,8 @@ When batch complete:
 
 ### Step 4.5: Post-Batch Hygienic Review
 
-After the batch report, ask the user directly in chat if they want a Hygienic code review for the batch.
+After the batch report, prefer \`vscode/askQuestions\` to ask whether the user wants a Hygienic code review for the batch.
+Fall back to asking directly in chat only when \`vscode/askQuestions\` is unavailable or a lightweight follow-up is enough.
 If yes, invoke the @hygienic agent via the agent tool to review implementation changes from the latest batch, then apply feedback before starting the next batch.
 
 ### Step 5: Continue
@@ -594,7 +596,8 @@ Before dispatching, use \`hive_status()\` to get the **runnable** list — tasks
 Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, \`cancelled\`).
 
 **Ask the operator first:**
-- Ask the operator directly in chat: "These tasks are runnable and independent: [list]. Execute in parallel?"
+- Prefer \`vscode/askQuestions\` for the approval prompt: "These tasks are runnable and independent: [list]. Execute in parallel?"
+- Fall back to asking directly in chat only when \`vscode/askQuestions\` is unavailable or a lightweight follow-up is enough
 - Record the decision with \`hive_context_write({ name: "execution-decisions", content: "..." })\`
 - Proceed only after operator approval
 

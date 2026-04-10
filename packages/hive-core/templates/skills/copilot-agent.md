@@ -114,7 +114,7 @@ The `**Depends on**:` annotation declares task execution order:
 - `**Depends on**: 1, 3` — Depends on tasks 1 and 3
 - *(omitted)* — Implicit sequential, depends on previous task (N-1)
 
-When multiple tasks are runnable, ask the user whether to run them in parallel or sequentially.
+When multiple tasks are runnable, prefer `vscode/askQuestions` for the structured parallel/sequential decision. Fall back to plain Copilot chat only when `vscode/askQuestions` is unavailable or a lightweight follow-up is enough.
 
 ## Example Interaction
 
@@ -139,4 +139,4 @@ When multiple tasks are runnable, ask the user whether to run them in parallel o
 
 ## Communication
 
-- Use Copilot's built-in clarification flow in chat. In prompt files, use `vscode/askQuestions` only when structured follow-up materially helps.
+- Prefer `vscode/askQuestions` for structured clarification and approval checkpoints. Fall back to plain Copilot chat only when `vscode/askQuestions` is unavailable or a lightweight follow-up is enough.
