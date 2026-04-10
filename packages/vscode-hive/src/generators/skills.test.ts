@@ -23,6 +23,7 @@ describe('skills generator', () => {
     const parallelExploration = byName.get('parallel-exploration');
     const writingPlans = byName.get('writing-plans');
     const executingPlans = byName.get('executing-plans');
+    const dispatchingParallelAgents = byName.get('dispatching-parallel-agents');
 
     expect(parallelExploration).toContain('Invoke the @scout agent via the agent tool');
     expect(parallelExploration).not.toContain('task(');
@@ -31,9 +32,15 @@ describe('skills generator', () => {
     expect(writingPlans).toContain('Refer to the skill at .github/skills/executing-plans/SKILL.md');
     expect(writingPlans).not.toContain('hive_skill:executing-plans');
 
-    expect(executingPlans).toContain('ask the user directly in chat');
+    expect(executingPlans).toContain('Prefer `vscode/askQuestions` for a structured choice');
+    expect(executingPlans).toContain('Fall back to asking directly in chat only when `vscode/askQuestions` is unavailable');
+    expect(executingPlans).toContain('prefer `vscode/askQuestions` to ask whether the user wants a Hygienic code review');
     expect(executingPlans).toContain('Refer to the skill at .github/skills/verification-before-completion/SKILL.md');
     expect(executingPlans).not.toContain('question()');
+
+    expect(dispatchingParallelAgents).toContain('Prefer `vscode/askQuestions` for the approval prompt');
+    expect(dispatchingParallelAgents).toContain('Fall back to asking directly in chat only when `vscode/askQuestions` is unavailable');
+    expect(dispatchingParallelAgents).not.toContain('question()');
   });
 
   it('includes overview-first context guidance in writing-plans', () => {

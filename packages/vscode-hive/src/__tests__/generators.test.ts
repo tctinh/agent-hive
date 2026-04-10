@@ -127,6 +127,18 @@ describe('Skill Generators', () => {
     expect(extractFrontmatter(content)).toContain('name: sample-skill');
     expect(getBody(content)).toContain('# Heading');
   });
+
+  test('copilot skill output prefers askQuestions for runnable-task and approval checkpoints', () => {
+    const byName = new Map(getBuiltinSkills().map((skill) => [skill.name, getBody(skill.content)]));
+    const executingPlans = byName.get('executing-plans') ?? '';
+    const dispatchingParallelAgents = byName.get('dispatching-parallel-agents') ?? '';
+
+    expect(executingPlans).toContain('Prefer `vscode/askQuestions` for a structured choice');
+    expect(executingPlans).toContain('prefer `vscode/askQuestions` to ask whether the user wants a Hygienic code review');
+    expect(dispatchingParallelAgents).toContain('Prefer `vscode/askQuestions` for the approval prompt');
+    expect(executingPlans).not.toContain('question()');
+    expect(dispatchingParallelAgents).not.toContain('question()');
+  });
 });
 
 describe('Hook Generators', () => {
