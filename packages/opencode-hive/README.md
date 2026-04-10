@@ -24,7 +24,7 @@ npm install opencode-hive
 
 1. Create `.opencode/mcp-servers.json` using the template:
    - From this repo: `packages/opencode-hive/templates/mcp-servers.json`
-   - Or from npm: `node_modules/opencode-hive/templates/mcp-servers.json`
+   - Or from the installed npm package: `node_modules/opencode-hive/templates/mcp-servers.json`
 2. Set `EXA_API_KEY` to enable `websearch_exa` (optional).
 3. Restart OpenCode.
 

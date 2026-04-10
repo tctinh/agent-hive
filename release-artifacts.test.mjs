@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { describe, it } from 'node:test';
 
 const workspaceRoot = path.resolve(import.meta.dirname);
 const releaseVersion = readJson('package.json').version;
-const escapedReleaseVersion = releaseVersion.replaceAll('.', '\\.');
+const opencodeHiveRoot = path.join(workspaceRoot, 'packages', 'opencode-hive');
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(workspaceRoot, relativePath), 'utf8'));
@@ -13,6 +14,30 @@ function readJson(relativePath) {
 
 function readText(relativePath) {
   return fs.readFileSync(path.join(workspaceRoot, relativePath), 'utf8');
+}
+
+function listPackedOpencodeHiveFiles() {
+  execFileSync('npm', ['run', 'build'], {
+    cwd: opencodeHiveRoot,
+    encoding: 'utf8',
+  });
+
+  const stdout = execFileSync('npm', ['pack', '--dry-run', '--json'], {
+    cwd: opencodeHiveRoot,
+    encoding: 'utf8',
+  });
+
+  const [packResult] = JSON.parse(stdout);
+
+  return new Set(packResult.files.map((file) => file.path));
+}
+
+function assertPackedFile(fileSet, relativePath) {
+  assert.equal(
+    fileSet.has(relativePath),
+    true,
+    `README-promised opencode-hive asset missing from npm pack dry run: ${relativePath}`
+  );
 }
 
 describe(`release ${releaseVersion} artifact contract on main`, () => {
@@ -30,6 +55,7 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
   it('refreshes tracked workspace lockfile version markers to the root release version', () => {
     const packageLock = readJson('package-lock.json');
     const bunLock = readText('bun.lock');
+    const escapedReleaseVersion = releaseVersion.replaceAll('.', '\\.');
 
     assert.equal(packageLock.version, releaseVersion, `package-lock.json root version should be ${releaseVersion}`);
     assert.equal(packageLock.packages[''].version, releaseVersion, `package-lock.json workspace root should be ${releaseVersion}`);
@@ -83,5 +109,17 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
       /node --test release-artifacts\.test\.mjs/,
       'package.json should run the release artifact contract from release:check'
     );
+  });
+
+  it('packs every opencode-hive asset promised by the README install contract', () => {
+    const packedFiles = listPackedOpencodeHiveFiles();
+
+    assertPackedFile(packedFiles, 'dist/index.js');
+    assert.ok(
+      [...packedFiles].some((filePath) => filePath.startsWith('skills/')),
+      'README-promised opencode-hive asset missing from npm pack dry run: skills/'
+    );
+    assertPackedFile(packedFiles, 'templates/mcp-servers.json');
+    assertPackedFile(packedFiles, 'templates/context/tools.md');
   });
 });
