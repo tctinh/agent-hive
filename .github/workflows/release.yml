@@ -84,7 +84,7 @@ jobs:
           npm_user="$(npm whoami)"
           echo "Authenticated to npm as ${npm_user}"
           collaborators_json="$(npm access list collaborators opencode-hive --json)"
-          node -e "const collaborators = JSON.parse(process.argv[1]); const npmUser = process.argv[2]; const access = collaborators[npmUser]; if (!npmUser) { throw new Error('npm whoami returned an empty username'); } if (!access) { throw new Error(`npm user ${npmUser} is not listed as a collaborator on opencode-hive`); } if (access !== 'read-write') { throw new Error(`npm user ${npmUser} has ${access} access to opencode-hive; expected read-write`); } console.log(`npm publish preflight passed for ${npmUser} (${access})`);" "$collaborators_json" "$npm_user"
+          node -e "const collaborators = JSON.parse(process.argv[1]); const npmUser = process.argv[2]; const access = collaborators[npmUser]; if (!npmUser) { throw new Error('npm whoami returned an empty username'); } if (!access) { throw new Error('npm user ' + npmUser + ' is not listed as a collaborator on opencode-hive'); } if (access !== 'read-write') { throw new Error('npm user ' + npmUser + ' has ' + access + ' access to opencode-hive; expected read-write'); } console.log('npm publish preflight passed for ' + npmUser + ' (' + access + ')');" "$collaborators_json" "$npm_user"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
 
