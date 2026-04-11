@@ -124,3 +124,19 @@ describe('npm publish access helper', () => {
     assert.doesNotMatch(workflow, /node -e/);
   });
 });
+
+describe('release recovery docs contract', () => {
+  it('documents rehearsal defaults, tag-only recovery, and operator-selected recovery targets', () => {
+    const releasing = readText('docs/RELEASING.md');
+    const agents = readText('AGENTS.md');
+
+    assert.match(releasing, /workflow_dispatch/);
+    assert.match(releasing, /manual runs default to .*rehearse/i);
+    assert.match(releasing, /Recovery mode is only for existing .*vX\.Y\.Z.* tags/i);
+    assert.match(releasing, /requires a recovery tag and at least one explicit target toggle/i);
+    assert.match(releasing, /rerun only the unfinished targets/i);
+    assert.match(releasing, /npm, VS Code, and\/or GitHub Release as needed/i);
+    assert.match(releasing, /release-only recovery remains possible even when npm and VS Code were intentionally skipped/i);
+    assert.match(agents, /manual selective recovery exists after a tagged release partially fails/i);
+  });
+});

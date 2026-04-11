@@ -21,7 +21,7 @@ bun run test -- <file>    # Run specific test
 bun run release:check     # Install, build, and test all packages
 ```
 
-Release note: prepare version bumps, lockfile updates, changelog entries, and `docs/releases/vX.Y.Z.md` manually before running the GitHub `workflow_dispatch` rehearsal and tagging.
+Release note: prepare version bumps, lockfile updates, changelog entries, and `docs/releases/vX.Y.Z.md` manually before running the GitHub `workflow_dispatch` rehearsal and tagging. If a tagged release partially fails, manual selective recovery exists after a tagged release partially fails: rerun the same workflow in tag-backed recovery mode and enable only the unfinished npm, VS Code, and/or GitHub Release targets.
 
 Worktree dependency note: worktrees are lightweight checkouts without project dependencies. Workers do best-effort verification using ast-grep (no dependencies needed). Full build and test verification (`bun run build` + `bun run test`) runs on the main branch after the orchestrator merges a batch of task branches.
 
