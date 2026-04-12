@@ -63,8 +63,11 @@ describe('instructions generator', () => {
     expect(body).toContain('AGENTS.md');
     expect(body).toContain('.github/instructions/');
     expect(body).toContain('.github/prompts/');
+    expect(body).toContain('vscode/askQuestions');
+    expect(body).toContain('plain chat only as a fallback');
     expect(body).toContain('built-in browser tools');
     expect(body).toContain('MCP');
+    expect(body).not.toContain('inside prompt files only');
     expect(body).not.toContain('question()');
     expect(body.length).toBeLessThanOrEqual(1000);
   });

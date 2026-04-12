@@ -14,7 +14,7 @@ import {
   generateHiveWorkflowInstructions,
 } from '../generators/instructions.js';
 import { generatePluginManifest } from '../generators/plugin.js';
-import { generateAllPrompts } from '../generators/prompts.js';
+import { generateAllPrompts, generatePlanFeaturePrompt } from '../generators/prompts.js';
 import { generateSkillFile, getBuiltinSkills } from '../generators/skills.js';
 
 function extractFrontmatter(content: string): string {
@@ -72,7 +72,19 @@ describe('Agent Generators', () => {
     const hive = generateHiveAgent(opts);
     const frontmatter = extractFrontmatter(hive);
     expect(frontmatter).toContain('- agent');
+    expect(frontmatter).toContain('- vscode/askQuestions');
     expect(frontmatter).toContain('agents:');
+  });
+
+  test('hive agent uses askQuestions-first wording without leaking question()', () => {
+    const hive = generateHiveAgent(opts);
+    const body = getBody(hive);
+
+    expect(body).toContain('Use `vscode/askQuestions` for structured decision checkpoints');
+    expect(body).toContain('Plain chat is allowed only for lightweight clarification or when `vscode/askQuestions` is unavailable');
+    expect(body).not.toContain('Ask the user directly in chat');
+    expect(body).not.toContain('ask the user directly in chat');
+    expect(body).not.toContain('question()');
   });
 
   test('individual agent generators return content', () => {
@@ -114,6 +126,18 @@ describe('Skill Generators', () => {
 
     expect(extractFrontmatter(content)).toContain('name: sample-skill');
     expect(getBody(content)).toContain('# Heading');
+  });
+
+  test('copilot skill output prefers askQuestions for runnable-task and approval checkpoints', () => {
+    const byName = new Map(getBuiltinSkills().map((skill) => [skill.name, getBody(skill.content)]));
+    const executingPlans = byName.get('executing-plans') ?? '';
+    const dispatchingParallelAgents = byName.get('dispatching-parallel-agents') ?? '';
+
+    expect(executingPlans).toContain('Prefer `vscode/askQuestions` for a structured choice');
+    expect(executingPlans).toContain('prefer `vscode/askQuestions` to ask whether the user wants a Hygienic code review');
+    expect(dispatchingParallelAgents).toContain('Prefer `vscode/askQuestions` for the approval prompt');
+    expect(executingPlans).not.toContain('question()');
+    expect(dispatchingParallelAgents).not.toContain('question()');
   });
 });
 
@@ -174,6 +198,9 @@ describe('Instruction Generators', () => {
     const body = getBody(content);
     expect(body).toContain('AGENTS.md');
     expect(body).toContain('.github/prompts/');
+    expect(body).toContain('vscode/askQuestions');
+    expect(body).toContain('plain chat only as a fallback');
+    expect(body).not.toContain('inside prompt files only');
     expect(body.length).toBeLessThanOrEqual(1000);
   });
 });
@@ -198,6 +225,17 @@ describe('Prompt Generators', () => {
       expect(frontmatter).toContain('model:');
       expect(frontmatter).toContain('tools:');
     }
+  });
+
+  test('plan feature prompt includes structured clarification tool parity', () => {
+    const prompt = generatePlanFeaturePrompt();
+    const frontmatter = extractFrontmatter(prompt.body);
+    const body = getBody(prompt.body);
+
+    expect(frontmatter).toContain('- "vscode/askQuestions"');
+    expect(body).toContain('vscode/askQuestions');
+    expect(body).toContain('plain chat only as a fallback');
+    expect(body).not.toContain('question()');
   });
 });
 

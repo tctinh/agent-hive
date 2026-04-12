@@ -40,12 +40,16 @@ describe('prompt generator', () => {
   it('guides planning and review prompts toward current Copilot flows', () => {
     const planPrompt = generators.generatePlanFeaturePrompt();
     const reviewPrompt = generators.generateReviewPlanPrompt();
+    const planBody = getBody(planPrompt.body);
 
-    expect(getBody(planPrompt.body)).toContain('vscode/askQuestions');
-    expect(getBody(planPrompt.body)).toContain('hive_plan_write');
-    expect(getBody(planPrompt.body)).toContain('read-only');
-    expect(getBody(planPrompt.body)).toContain('AGENTS.md');
-    expect(getBody(planPrompt.body)).not.toContain('question()');
+    expect(planPrompt.body).toContain('  - "vscode/askQuestions"');
+    expect(planBody).toContain('vscode/askQuestions');
+    expect(planBody).toContain('hive_plan_write');
+    expect(planBody).toContain('read-only');
+    expect(planBody).toContain('AGENTS.md');
+    expect(planBody).toContain('plain chat only as a fallback');
+    expect(planBody).not.toContain('prefer Copilot\'s built-in clarification flow in chat');
+    expect(planBody).not.toContain('question()');
 
     expect(getBody(reviewPrompt.body)).toContain('hive_plan_read');
     expect(getBody(reviewPrompt.body)).toContain('approval');

@@ -116,7 +116,19 @@ describe('initNest', () => {
     ]);
 
     assert.match(readFile(projectRoot, '.github/copilot-instructions.md'), /AGENTS\.md/);
+    assert.match(readFile(projectRoot, '.github/copilot-instructions.md'), /vscode\/askQuestions/);
+    assert.match(readFile(projectRoot, '.github/copilot-instructions.md'), /plain chat only as a fallback/);
     assert.match(readFile(projectRoot, '.github/prompts/plan-feature.prompt.md'), /hive_plan_write/);
+    assert.match(readFile(projectRoot, '.github/prompts/plan-feature.prompt.md'), /vscode\/askQuestions/);
+
+    const executingPlansSkill = readFile(projectRoot, '.github/skills/executing-plans/SKILL.md');
+    assert.match(executingPlansSkill, /Prefer `vscode\/askQuestions` for a structured choice/);
+    assert.match(executingPlansSkill, /prefer `vscode\/askQuestions` to ask whether the user wants a Hygienic code review/);
+    assert.doesNotMatch(executingPlansSkill, /question\(\)/);
+
+    const dispatchingParallelAgentsSkill = readFile(projectRoot, '.github/skills/dispatching-parallel-agents/SKILL.md');
+    assert.match(dispatchingParallelAgentsSkill, /Prefer `vscode\/askQuestions` for the approval prompt/);
+    assert.doesNotMatch(dispatchingParallelAgentsSkill, /question\(\)/);
 
     const plugin = JSON.parse(readFile(projectRoot, 'plugin.json')) as { agents: string[]; hooks: string[]; instructions: string[] };
     assert.deepEqual(plugin.agents, ['.github/agents']);
