@@ -744,6 +744,18 @@ The alignment in this branch is intentionally pragmatic. OpenCode still owns ses
 
 **Boundary insight:** Honest contracts make systems easier to operate. Saying “OpenCode-owned todos plus bounded replay from `.hive` artifacts” is less glamorous than saying “native OpenCode sync,” but it matches the code and gives operators something real to trust.
 
+### v1.4.3 (Parity and Recovery Without Guesswork)
+
+**Theme:** Keep cross-surface behavior aligned, and make release recovery a tested operator contract instead of tribal knowledge.
+
+Two threads define this patch:
+
+**Copilot askQuestions parity (PR #82):** The generated Copilot/VS Code artifacts now stay aligned with Hive's current planning-and-execution surface instead of drifting behind the OpenCode-first contract. This reinforces P8/P9 (Cross-Model Prompts, Deterministic Contracts Beat Soft Memory): when multiple agent surfaces exist, they should expose the same real decision points and operator expectations instead of forcing users to reverse-engineer differences from generated files.
+
+**Release workflow and recovery hardening:** `release:check` now guards both the release artifacts and the workflow contract, the npm publish preflight lives in a checked-in helper instead of an inline shell snippet, and the operator docs now describe rehearsal-before-tagging plus selective tag-backed recovery for partially finished releases. This is P7 (Iron Laws + Hard Gates) applied to shipping itself: the release path is safer when recovery rules are explicit, scripted, and verified before operators need them under pressure.
+
+**Shared insight:** A release process is part of the product contract. `v1.4.3` treats shipping guidance the same way Hive treats runtime behavior: define the real boundary, encode it in tests where possible, and document only the path operators can actually trust.
+
 ### v1.4.2 (Honest Contracts — Config, Helper, and Copilot)
 
 **Theme:** Trim what was aspirational, name what is real, and restore what was prematurely retired.

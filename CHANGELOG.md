@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-04-12
+
+### Added
+- **Selective release recovery is now an explicit operator workflow**: The release documentation and workflow contract now describe how to rerun only the unfinished release targets for an existing `vX.Y.Z` tag, instead of improvising ad-hoc recovery after a partial publish.
+
+### Changed
+- **Copilot askQuestions parity now ships consistently across generated artifacts (PR #82)**: The merged askQuestions parity work is now part of the documented `1.4.3` release story, keeping the VS Code/Copilot artifact surface aligned with the same planning and execution flow that Hive already exposes elsewhere.
+- **Release hardening now ships as part of the same patch**: `release:check` continues to enforce both the release artifact and workflow contracts, the workflow uses the checked-in npm publish access helper, and the release docs now spell out rehearsal-before-tagging plus tag-backed recovery so operators can validate and recover releases without relying on stale helper flows.
+
+### Fixed
+- **Release recovery guidance now matches the actual workflow gates**: The shipped docs and tests now reflect that manual rehearsals never publish, recovery is tag-only, and a recovery run must opt into the exact unfinished targets, reducing the chance of accidental republish attempts from the wrong ref or mode.
+
 ## [1.4.2] - 2026-04-10
 
 ### Added
