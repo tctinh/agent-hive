@@ -1,0 +1,12 @@
+{
+  "description": "Hive workflow hooks: inject feature context on session start",
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "exec",
+        "handler": "./scripts/inject-context.sh",
+        "timeout": 10000
+      }
+    ]
+  }
+}

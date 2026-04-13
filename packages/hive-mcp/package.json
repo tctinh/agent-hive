@@ -1,0 +1,26 @@
+{
+  "name": "hive-mcp",
+  "version": "1.4.3",
+  "type": "module",
+  "description": "MCP server exposing Agent Hive tools for Claude Code and other MCP clients",
+  "license": "MIT",
+  "author": "tctinh",
+  "main": "./dist/index.js",
+  "bin": {
+    "hive-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "npm run clean && bun build src/index.ts --outdir dist --target node --format esm",
+    "dev": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "hive-core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": ["dist/"]
+}
