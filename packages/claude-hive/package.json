@@ -1,0 +1,49 @@
+{
+  "name": "claude-hive",
+  "version": "1.4.3",
+  "type": "module",
+  "description": "Claude Code plugin package for Agent Hive",
+  "license": "MIT WITH Commons-Clause",
+  "author": "tctinh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tctinh/agent-hive.git",
+    "directory": "packages/claude-hive"
+  },
+  "homepage": "https://github.com/tctinh/agent-hive#readme",
+  "bugs": {
+    "url": "https://github.com/tctinh/agent-hive/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "claude",
+    "hive",
+    "plugin",
+    "workflow",
+    "planning",
+    "agent"
+  ],
+  "main": "./dist/runtime/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build:runtime": "bun build src/index.ts src/mcp/server.ts --outdir dist/runtime --target node --format esm --packages=bundle",
+    "build:plugin": "node scripts/build-plugin.mjs",
+    "build": "bun run clean && bun run build:runtime && bun run build:plugin && tsc --emitDeclarationOnly",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "hive-core": "workspace:*",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ]
+}
