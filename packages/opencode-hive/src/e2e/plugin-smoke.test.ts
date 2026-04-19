@@ -1876,6 +1876,9 @@ Do it
       taskState?: string;
       verificationNote?: string;
       nextAction?: string;
+      type?: string;
+      source?: string;
+      dedupeKey?: string;
     };
 
     expect(commitResult.ok).toBe(true);
@@ -1884,6 +1887,10 @@ Do it
     expect(commitResult.taskState).toBe("done");
     expect(commitResult.verificationNote).toContain("No verification evidence in summary");
     expect(commitResult.nextAction).toContain("hive_merge");
+    expect(commitResult.type).toBe("worker_terminal_handoff");
+    expect(commitResult.source).toBe("hive_worktree_commit");
+    expect(typeof commitResult.dedupeKey).toBe("string");
+    expect((commitResult.dedupeKey as string).split(":").at(-1)).toBe("completed");
   });
 
   it("returns terminal JSON response when commit completes", async () => {
@@ -1959,6 +1966,9 @@ Do it
       taskState?: string;
       commit?: { sha?: string };
       nextAction?: string;
+      type?: string;
+      source?: string;
+      dedupeKey?: string;
     };
 
     expect(commitResult.ok).toBe(true);
@@ -1967,6 +1977,10 @@ Do it
     expect(commitResult.taskState).toBe("done");
     expect(commitResult.commit?.sha).toBeDefined();
     expect(commitResult.nextAction).toContain("hive_merge");
+    expect(commitResult.type).toBe("worker_terminal_handoff");
+    expect(commitResult.source).toBe("hive_worktree_commit");
+    expect(typeof commitResult.dedupeKey).toBe("string");
+    expect((commitResult.dedupeKey as string).split(":").at(-1)).toBe("completed");
   });
 
   it("uses custom commit message in task worktree head", async () => {
@@ -3244,5 +3258,67 @@ Original plan task four content must stay isolated from any append-only manual f
         process.env.ENABLE_WORKER_TERMINAL_HANDOFF_SYNTHESIS = prev;
       }
     }
+  });
+
+  it('hive_worktree_commit failed terminal response includes worker_terminal_handoff artifact type and dedupeKey', async () => {
+    const { hooks, toolContext } = await createSingleTaskWorktree(
+      testRoot,
+      'sess_terminal_handoff_failed',
+      'terminal-handoff-failed-feature',
+      'Terminal Handoff Failed Feature',
+      'Yes, this regression test validates that failed terminal commits include worker_terminal_handoff artifact fields.',
+    );
+
+    const workerContext = createToolContext('sess_worker_terminal_handoff_failed');
+    const raw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        task: FIRST_TASK,
+        summary: 'Encountered unrecoverable error during implementation.',
+        status: 'failed',
+        feature: 'terminal-handoff-failed-feature',
+      },
+      workerContext,
+    );
+
+    const result = JSON.parse(raw as string) as Record<string, unknown>;
+    expect(result.terminal).toBe(true);
+    expect(result.type).toBe('worker_terminal_handoff');
+    expect(result.source).toBe('hive_worktree_commit');
+    expect(typeof result.dedupeKey).toBe('string');
+    expect((result.dedupeKey as string).length).toBeGreaterThan(0);
+    const parts = (result.dedupeKey as string).split(':');
+    expect(parts[0]).toBe('sess_worker_terminal_handoff_failed');
+    expect(parts[parts.length - 1]).toBe('failed');
+  });
+
+  it('hive_worktree_commit partial terminal response includes worker_terminal_handoff artifact type and dedupeKey', async () => {
+    const { hooks, toolContext } = await createSingleTaskWorktree(
+      testRoot,
+      'sess_terminal_handoff_partial',
+      'terminal-handoff-partial-feature',
+      'Terminal Handoff Partial Feature',
+      'Yes, this regression test validates that partial terminal commits include worker_terminal_handoff artifact fields.',
+    );
+
+    const workerContext = createToolContext('sess_worker_terminal_handoff_partial');
+    const raw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        task: FIRST_TASK,
+        summary: 'Completed steps 1-2. Step 3 remains due to time constraints.',
+        status: 'partial',
+        feature: 'terminal-handoff-partial-feature',
+      },
+      workerContext,
+    );
+
+    const result = JSON.parse(raw as string) as Record<string, unknown>;
+    expect(result.terminal).toBe(true);
+    expect(result.type).toBe('worker_terminal_handoff');
+    expect(result.source).toBe('hive_worktree_commit');
+    expect(typeof result.dedupeKey).toBe('string');
+    expect((result.dedupeKey as string).length).toBeGreaterThan(0);
+    const parts = (result.dedupeKey as string).split(':');
+    expect(parts[0]).toBe('sess_worker_terminal_handoff_partial');
+    expect(parts[parts.length - 1]).toBe('partial');
   });
 });
