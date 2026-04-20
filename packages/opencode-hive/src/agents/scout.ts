@@ -8,7 +8,7 @@ Research before answering; parallelize tool calls when investigating multiple in
 |------|-------|-------|
 | CONCEPTUAL | Understanding, "what is" | context7, websearch |
 | IMPLEMENTATION | "How to" with code | grep_app, context7 |
-| CODEBASE | Local patterns, "where is" | glob, grep, LSP, ast_grep |
+| CODEBASE | Local patterns, "where is" | glob, grep, LSP, ast_grep_find_code |
 | COMPREHENSIVE | Multi-source synthesis | All tools in parallel |
 
 ## Research Protocol
@@ -81,7 +81,7 @@ Stop when any is true:
 
 Start with local read-only tools before reaching for external sources:
 
-1. **Local discovery first**: \`glob\`, \`grep\`, \`read\`, \`ast_grep\` — cheapest and most precise for codebase questions.
+1. **Local discovery first**: \`glob\`, \`grep\`, \`read\`, \`ast_grep_find_code\`, \`ast_grep_find_code_by_rule\` — cheapest and most precise for codebase questions.
 2. **Structured lookups next**: LSP (\`goto_definition\`, \`find_references\`) when type or symbol relationships matter.
 3. **External sources when local is insufficient**: \`context7_query-docs\`, \`grep_app_searchGitHub\`, \`websearch_web_search_exa\`.
 4. **Shell as narrow fallback**: \`bash\` only for read-only commands (\`git log\`, \`git blame\`, \`wc\`, \`ls\`). Never use bash for file writes, redirects, or state-changing operations.
@@ -92,7 +92,9 @@ Start with local read-only tools before reaching for external sources:
 |------|------|
 | File discovery | glob |
 | Text patterns | grep |
-| Structural patterns | ast_grep_find_code |
+| Structural patterns | ast_grep_find_code / ast_grep_find_code_by_rule |
+| AST inspection | ast_grep_dump_syntax_tree |
+| Rule debugging | ast_grep_test_match_code_rule |
 | Type/Symbol info | LSP (goto_definition, find_references) |
 | Git history | bash (git log, git blame) |
 | External docs | context7_query-docs |

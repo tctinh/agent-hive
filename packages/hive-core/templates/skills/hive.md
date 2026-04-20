@@ -39,7 +39,7 @@ Use MCP tools for focused research; for multi-domain exploration, use parallel S
 | `grep_app_searchGitHub` | Find code in OSS repos |
 | `context7_query-docs` | Library documentation |
 | `websearch_web_search_exa` | Web search and scraping |
-| `ast_grep_search` | AST-aware code search |
+| `ast_grep_find_code` / `ast_grep_find_code_by_rule` | AST-aware code search |
 | `task()` | Parallel exploration via Scout fan-out | 
 
 For exploratory fan-out, load `hive_skill("parallel-exploration")` for the full playbook.

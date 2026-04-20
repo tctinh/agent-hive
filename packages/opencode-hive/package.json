@@ -38,10 +38,11 @@
     "@opencode-ai/plugin": ">=0.13.7"
   },
   "dependencies": {
+    "@ast-grep/cli": "^0.42.0",
+    "@manzt/uv": "^0.8.13",
     "simple-git": "^3.27.0"
   },
   "optionalDependencies": {
-    "@notprolands/ast-grep-mcp": "^1.1.1",
     "@upstash/context7-mcp": "^2.1.0",
     "exa-mcp-server": "^3.1.5",
     "grep-mcp": "^1.1.0"

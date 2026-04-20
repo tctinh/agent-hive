@@ -85,6 +85,28 @@ describe('Forager verification and tool-scope clarity', () => {
     expect(FORAGER_BEE_PROMPT).toContain('Record observed output');
     expect(FORAGER_BEE_PROMPT).toContain('do not substitute explanation for execution');
   });
+
+  it('references the upstream ast-grep MCP tools without legacy names', () => {
+    expect(FORAGER_BEE_PROMPT).toContain('ast_grep_dump_syntax_tree');
+    expect(FORAGER_BEE_PROMPT).toContain('ast_grep_test_match_code_rule');
+    expect(FORAGER_BEE_PROMPT).toContain('ast_grep_find_code');
+    expect(FORAGER_BEE_PROMPT).toContain('ast_grep_find_code_by_rule');
+    expect(FORAGER_BEE_PROMPT).not.toContain('ast_grep_search');
+    expect(FORAGER_BEE_PROMPT).not.toContain('ast_grep_replace');
+    expect(FORAGER_BEE_PROMPT).not.toContain('ast_grep_scan-code');
+  });
+});
+
+describe('Scout ast-grep references', () => {
+  it('names the upstream ast-grep MCP tools in guidance', () => {
+    expect(SCOUT_BEE_PROMPT).toContain('ast_grep_dump_syntax_tree');
+    expect(SCOUT_BEE_PROMPT).toContain('ast_grep_test_match_code_rule');
+    expect(SCOUT_BEE_PROMPT).toContain('ast_grep_find_code');
+    expect(SCOUT_BEE_PROMPT).toContain('ast_grep_find_code_by_rule');
+    expect(SCOUT_BEE_PROMPT).not.toContain('ast_grep_search');
+    expect(SCOUT_BEE_PROMPT).not.toContain('ast_grep_replace');
+    expect(SCOUT_BEE_PROMPT).not.toContain('ast_grep_scan-code');
+  });
 });
 
 describe('Hygienic verification routing', () => {
