@@ -5,6 +5,12 @@ tools:
   - search
   - search/codebase
   - search/usages
+  - web
+  - browser
+  - io.github.upstash/context7/*
+  - playwright/*
+  - todo
+  - vscode/memory
 user-invocable: false
 model:
   - Claude Sonnet 4.6 (copilot)

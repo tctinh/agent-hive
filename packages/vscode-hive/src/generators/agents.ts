@@ -279,9 +279,9 @@ Research before answering; parallelize tool calls when investigating multiple in
 
 | Type | Focus | Tools |
 |------|-------|-------|
-| CONCEPTUAL | Understanding, "what is" | web/fetch |
-| IMPLEMENTATION | "How to" with code | search/codebase, search/usages, web/fetch |
-| CODEBASE | Local patterns, "where is" | read, search, search/codebase, search/usages |
+| CONCEPTUAL | Understanding, "what is" | web, io.github.upstash/context7/* |
+| IMPLEMENTATION | "How to" with code | search/codebase, search/usages, web, io.github.upstash/context7/* |
+| CODEBASE | Local patterns, "where is" | read, search, search/codebase, search/usages, browser |
 | COMPREHENSIVE | Multi-source synthesis | Combine local and fetched evidence in parallel |
 
 ## Research Protocol
@@ -302,7 +302,8 @@ When investigating multiple independent questions, run related tools in parallel
 \`\`\`
 read(path/to/file)
 search(pattern)
-web/fetch(url)
+web(...)
+context7(...)
 \`\`\`
 
 ### Phase 3: Structured Results
@@ -346,7 +347,9 @@ Stop when any is true:
 | Structural code discovery | search/codebase |
 | Text patterns | search |
 | File reading | read |
-| External docs or web pages | web/fetch |
+| External docs or web pages | web |
+| Library or framework docs | io.github.upstash/context7/* |
+| Browser inspection or reproduction | browser |
 
 ## External System Data
 
@@ -402,7 +405,9 @@ Use quick local exploration when needed:
 - \`read\` — inspect referenced files
 - \`search\` — find nearby patterns
 - \`execute\` — run verification commands available in the environment
+- \`web\` / \`io.github.upstash/context7/*\` — retrieve current docs when local context is insufficient
 - \`browser\` / \`playwright/*\` — verify browser flows and UI regressions when native automation is the best fit
+- \`todo\` — keep a short working checklist when the task has multiple steps
 
 ## Resolve Before Blocking
 
@@ -617,7 +622,11 @@ export function generateScoutAgent(opts: AgentGeneratorOptions): string {
       '  - search',
       '  - search/codebase',
       '  - search/usages',
-      '  - web/fetch',
+      '  - web',
+      '  - browser',
+      '  - io.github.upstash/context7/*',
+      '  - todo',
+      '  - vscode/memory',
       'user-invocable: false',
       'model:',
       `  - ${CLAUDE_SONNET_46_MODEL}`,
@@ -635,8 +644,11 @@ export function generateForagerAgent(opts: AgentGeneratorOptions): string {
       '  - read',
       '  - edit',
       '  - search',
+      '  - web',
       '  - browser',
       '  - playwright/*',
+      '  - io.github.upstash/context7/*',
+      '  - todo',
       '  - vscode/memory',
       '  - vscode/newWorkspace',
       '  - vscode/getProjectSetupInfo',
@@ -660,6 +672,12 @@ export function generateHygienicAgent(opts: AgentGeneratorOptions): string {
       '  - search',
       '  - search/codebase',
       '  - search/usages',
+      '  - web',
+      '  - browser',
+      '  - io.github.upstash/context7/*',
+      '  - playwright/*',
+      '  - todo',
+      '  - vscode/memory',
       'user-invocable: false',
       'model:',
       `  - ${CLAUDE_SONNET_46_MODEL}`,

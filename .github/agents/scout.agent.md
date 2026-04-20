@@ -5,7 +5,11 @@ tools:
   - search
   - search/codebase
   - search/usages
-  - web/fetch
+  - web
+  - browser
+  - io.github.upstash/context7/*
+  - todo
+  - vscode/memory
 user-invocable: false
 model:
   - Claude Sonnet 4.6 (copilot)
@@ -19,9 +23,9 @@ Research before answering; parallelize tool calls when investigating multiple in
 
 | Type | Focus | Tools |
 |------|-------|-------|
-| CONCEPTUAL | Understanding, "what is" | web/fetch |
-| IMPLEMENTATION | "How to" with code | search/codebase, search/usages, web/fetch |
-| CODEBASE | Local patterns, "where is" | read, search, search/codebase, search/usages |
+| CONCEPTUAL | Understanding, "what is" | web, io.github.upstash/context7/* |
+| IMPLEMENTATION | "How to" with code | search/codebase, search/usages, web, io.github.upstash/context7/* |
+| CODEBASE | Local patterns, "where is" | read, search, search/codebase, search/usages, browser |
 | COMPREHENSIVE | Multi-source synthesis | Combine local and fetched evidence in parallel |
 
 ## Research Protocol
@@ -42,7 +46,8 @@ When investigating multiple independent questions, run related tools in parallel
 ```
 read(path/to/file)
 search(pattern)
-web/fetch(url)
+web(...)
+context7(...)
 ```
 
 ### Phase 3: Structured Results
@@ -86,7 +91,9 @@ Stop when any is true:
 | Structural code discovery | search/codebase |
 | Text patterns | search |
 | File reading | read |
-| External docs or web pages | web/fetch |
+| External docs or web pages | web |
+| Library or framework docs | io.github.upstash/context7/* |
+| Browser inspection or reproduction | browser |
 
 ## External System Data
 

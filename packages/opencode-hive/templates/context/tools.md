@@ -7,8 +7,10 @@ Reference for Forager and Scout Bees on available MCP tools.
 | Tool | Purpose | When to Use |
 |------|---------|-------------|
 | `grep_app_searchGitHub` | GitHub code search | Find real-world examples, patterns in OSS |
-| `ast_grep_search` | AST pattern matching | Find code structures, refactoring targets |
-| `ast_grep_replace` | AST refactoring | Safe code transformations (use dryRun=true first) |
+| `ast_grep_dump_syntax_tree` | AST inspection | Understand code shape or debug patterns |
+| `ast_grep_test_match_code_rule` | Rule validation | Test YAML rules before searching the repo |
+| `ast_grep_find_code` | Simple structural search | Find code structures with a single AST pattern |
+| `ast_grep_find_code_by_rule` | Advanced structural search | Find relational or composite code patterns |
 
 ### grep_app Examples
 ```
@@ -18,8 +20,10 @@ grep_app_searchGitHub({ query: "(?s)try {.*await", useRegexp: true })
 
 ### ast_grep Examples
 ```
-ast_grep_search({ pattern: "console.log($MSG)", lang: "typescript" })
-ast_grep_replace({ pattern: "console.log($MSG)", rewrite: "logger.info($MSG)", lang: "typescript", dryRun: true })
+ast_grep_dump_syntax_tree({ code: "console.log(value)", language: "typescript", format: "pattern" })
+ast_grep_test_match_code_rule({ code: "async function run() { await work(); }", yaml: "id: async-with-await\nlanguage: typescript\nrule:\n  kind: function_declaration\n  has:\n    pattern: await $EXPR\n    stopBy: end" })
+ast_grep_find_code({ project_folder: "/repo", pattern: "console.log($MSG)", language: "typescript" })
+ast_grep_find_code_by_rule({ project_folder: "/repo", yaml: "id: async-with-await\nlanguage: typescript\nrule:\n  kind: function_declaration\n  has:\n    pattern: await $EXPR\n    stopBy: end" })
 ```
 
 ## Documentation
@@ -75,9 +79,10 @@ Use `hive_background_output({ task_id })` to retrieve results when notified.
 
 | Need | Best Tool |
 |------|-----------|
-| Find code in THIS repo | `grep`, `glob`, `ast_grep_search` |
+| Find code in THIS repo | `grep`, `glob`, `ast_grep_find_code`, `ast_grep_find_code_by_rule` |
 | Find code in OTHER repos | `grep_app_searchGitHub` |
 | Understand a library | `context7_query-docs` |
 | Current events/info | `websearch_web_search_exa` |
-| Structural refactoring | `ast_grep_replace` |
+| Inspect AST structure | `ast_grep_dump_syntax_tree` |
+| Validate a YAML rule | `ast_grep_test_match_code_rule` |
 | Multi-domain exploration | `hive_skill("parallel-exploration")` + `hive_background_task` |

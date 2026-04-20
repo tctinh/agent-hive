@@ -242,7 +242,7 @@ Auto-enabled by default. Disable with `disableMcps`:
 | `websearch` | `websearch_web_search_exa` | Web search via Exa AI | `EXA_API_KEY` env var |
 | `context7` | `context7_query-docs` | Library documentation lookup | None |
 | `grep_app` | `grep_app_searchGitHub` | GitHub code search via grep.app | None |
-| `ast_grep` | `ast_grep_search` | AST-aware code search/replace | None (runs via npx) |
+| `ast_grep` | `ast_grep_dump_syntax_tree`, `ast_grep_test_match_code_rule`, `ast_grep_find_code`, `ast_grep_find_code_by_rule` | Official ast-grep structural search and rule testing | Bundled `uv` runtime + bundled `ast-grep` directory prepended to `PATH` |
 
 #### Model Variants
 

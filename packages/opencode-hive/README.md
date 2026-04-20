@@ -28,7 +28,9 @@ npm install opencode-hive
 2. Set `EXA_API_KEY` to enable `websearch_exa` (optional).
 3. Restart OpenCode.
 
-This enables tools like `grep_app_searchGitHub`, `context7_query-docs`, `websearch_web_search_exa`, and `ast_grep_search`.
+This enables tools like `grep_app_searchGitHub`, `context7_query-docs`, `websearch_web_search_exa`, and the official ast-grep MCP tools: `ast_grep_dump_syntax_tree`, `ast_grep_test_match_code_rule`, `ast_grep_find_code`, and `ast_grep_find_code_by_rule`.
+
+The builtin `ast_grep` MCP now runs the official server through a plain local command array using bundled `uv` and by prepending the bundled `ast-grep` binary directory to `PATH`.
 
 ## The Workflow
 

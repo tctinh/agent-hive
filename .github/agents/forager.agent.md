@@ -5,8 +5,11 @@ tools:
   - read
   - edit
   - search
+  - web
   - browser
   - playwright/*
+  - io.github.upstash/context7/*
+  - todo
   - vscode/memory
   - vscode/newWorkspace
   - vscode/getProjectSetupInfo
@@ -46,7 +49,9 @@ Use quick local exploration when needed:
 - `read` — inspect referenced files
 - `search` — find nearby patterns
 - `execute` — run verification commands available in the environment
+- `web` / `io.github.upstash/context7/*` — retrieve current docs when local context is insufficient
 - `browser` / `playwright/*` — verify browser flows and UI regressions when native automation is the best fit
+- `todo` — keep a short working checklist when the task has multiple steps
 
 ## Resolve Before Blocking
 

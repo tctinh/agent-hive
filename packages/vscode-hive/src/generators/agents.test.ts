@@ -119,7 +119,11 @@ describe('generateAllAgents', () => {
       'search',
       'search/codebase',
       'search/usages',
-      'web/fetch',
+      'web',
+      'browser',
+      'io.github.upstash/context7/*',
+      'todo',
+      'vscode/memory',
     ]);
     expect(getFrontmatterModels(scout ?? '')).toEqual(['Claude Sonnet 4.6 (copilot)']);
     expect(scout).toContain('user-invocable: false');
@@ -129,8 +133,11 @@ describe('generateAllAgents', () => {
       'read',
       'edit',
       'search',
+      'web',
       'browser',
       'playwright/*',
+      'io.github.upstash/context7/*',
+      'todo',
       'vscode/memory',
       'vscode/newWorkspace',
       'vscode/getProjectSetupInfo',
@@ -150,6 +157,12 @@ describe('generateAllAgents', () => {
       'search',
       'search/codebase',
       'search/usages',
+      'web',
+      'browser',
+      'io.github.upstash/context7/*',
+      'playwright/*',
+      'todo',
+      'vscode/memory',
     ]);
     expect(getFrontmatterModels(hygienic ?? '')).toEqual(['Claude Sonnet 4.6 (copilot)']);
     expect(hygienic).toContain('user-invocable: false');

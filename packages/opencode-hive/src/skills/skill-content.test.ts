@@ -2,6 +2,18 @@ import { describe, it, expect } from 'bun:test';
 import { BUILTIN_SKILLS } from './registry.generated.js';
 
 describe('skill content', () => {
+  it('bundles the ast-grep skill with the upstream tool surface', () => {
+    const skill = BUILTIN_SKILLS.find((entry) => entry.name === 'ast-grep');
+
+    expect(skill).toBeDefined();
+    expect(skill!.template).toContain('ast_grep_dump_syntax_tree');
+    expect(skill!.template).toContain('ast_grep_test_match_code_rule');
+    expect(skill!.template).toContain('ast_grep_find_code');
+    expect(skill!.template).toContain('ast_grep_find_code_by_rule');
+    expect(skill!.template).not.toContain('ast_grep_search');
+    expect(skill!.template).not.toContain('ast_grep_replace');
+  });
+
   it('documents overview-first execution truth in writing-plans', () => {
     const skill = BUILTIN_SKILLS.find((entry) => entry.name === 'writing-plans');
 

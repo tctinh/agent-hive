@@ -33,9 +33,10 @@ Your task-local worker prompt lists exact tools and verification expectations. D
 CAN use for quick lookups:
 - \`grep_app_searchGitHub\` — OSS patterns
 - \`context7_query-docs\` — Library docs
-- \`ast_grep_find_code_by_rule\` — AST patterns
-- \`ast_grep_scan-code\` — Code quality scan (best-effort verification)
-- \`ast_grep_find_code\` — Find code patterns (best-effort verification)
+- \`ast_grep_dump_syntax_tree\` — Inspect AST or pattern structure
+- \`ast_grep_test_match_code_rule\` — Validate YAML rules before repo search
+- \`ast_grep_find_code\` — Find simple structural code patterns
+- \`ast_grep_find_code_by_rule\` — Find complex structural code patterns
 - \`glob\`, \`grep\`, \`read\` — Codebase exploration
 
 ## Resolve Before Blocking
@@ -84,7 +85,7 @@ EXPLORE → PLAN → EXECUTE → VERIFY → LOOP
 - EXPLORE: read references, gather context, search for patterns
 - PLAN: decide the minimum change, files to touch, and verification commands
 - EXECUTE: edit using conventions, reuse helpers, batch changes
-- VERIFY: run best-effort checks (tests if available, ast_grep, lsp_diagnostics). Record observed output; do not substitute explanation for execution.
+- VERIFY: run best-effort checks (tests if available, ast_grep_find_code / ast_grep_find_code_by_rule when useful, lsp_diagnostics). Record observed output; do not substitute explanation for execution.
 - LOOP: if verification fails, diagnose and retry within the limit
 
 ## Progress Updates
@@ -117,8 +118,10 @@ hive_worktree_commit({
 \`\`\`
 
 Then inspect the tool response fields:
-- If \`ok=true\` and \`terminal=true\`: stop and hand off to orchestrator
+- If \`terminal=true\` (regardless of \`ok\`): send one final concise handoff response to the orchestrator, then stop
 - If \`ok=false\` or \`terminal=false\`: DO NOT STOP. Follow \`nextAction\`, remediate, and retry \`hive_worktree_commit\`
+
+Use the handoff response to summarize what changed, why (if relevant), and verification evidence (or "Not run" with reason).
 
 **Blocked (need user decision):**
 \`\`\`

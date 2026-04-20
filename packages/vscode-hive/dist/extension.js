@@ -51,26 +51,12 @@ function generateHiveAgent(opts) {
   return buildAgent(
     [
       "description: 'Plan-first development orchestrator for Copilot-native Hive workflows.'",
-      "tools:",
-      "  - agent",
-      "  - execute",
-      "  - read",
-      "  - edit",
-      "  - search",
-      "  - web/fetch",
-      "  - search/codebase",
-      "  - search/usages",
-      "  - browser",
-      "  - playwright/*",
-      "  - vscode/memory",
-      "  - vscode/askQuestions",
-      `  - ${opts.extensionId}/*`,
       "agents:",
       "  - scout",
       "  - forager",
       "  - hygienic",
       "model:",
-      "  - gpt-5.4",
+      `  - ${GPT_54_MODEL}`,
       "handoffs:",
       '  - label: "Review Plan"',
       "    agent: hive",
@@ -93,10 +79,14 @@ function generateScoutAgent(opts) {
       "  - search",
       "  - search/codebase",
       "  - search/usages",
-      "  - web/fetch",
+      "  - web",
+      "  - browser",
+      "  - io.github.upstash/context7/*",
+      "  - todo",
+      "  - vscode/memory",
       "user-invocable: false",
       "model:",
-      "  - gpt-5.4"
+      `  - ${CLAUDE_SONNET_46_MODEL}`
     ].join("\n"),
     scoutBody
   );
@@ -110,8 +100,11 @@ function generateForagerAgent(opts) {
       "  - read",
       "  - edit",
       "  - search",
+      "  - web",
       "  - browser",
       "  - playwright/*",
+      "  - io.github.upstash/context7/*",
+      "  - todo",
       "  - vscode/memory",
       "  - vscode/newWorkspace",
       "  - vscode/getProjectSetupInfo",
@@ -119,7 +112,8 @@ function generateForagerAgent(opts) {
       `  - ${opts.extensionId}/hiveTaskUpdate`,
       "user-invocable: false",
       "model:",
-      "  - gpt-5.4"
+      `  - ${GPT_54_MODEL}`,
+      `  - ${CLAUDE_SONNET_46_MODEL}`
     ].join("\n"),
     foragerBody
   );
@@ -133,9 +127,15 @@ function generateHygienicAgent(opts) {
       "  - search",
       "  - search/codebase",
       "  - search/usages",
+      "  - web",
+      "  - browser",
+      "  - io.github.upstash/context7/*",
+      "  - playwright/*",
+      "  - todo",
+      "  - vscode/memory",
       "user-invocable: false",
       "model:",
-      "  - gpt-5.4"
+      `  - ${CLAUDE_SONNET_46_MODEL}`
     ].join("\n"),
     hygienicBody
   );
@@ -149,7 +149,7 @@ function generateAllAgents(opts) {
   ];
   return agents;
 }
-var hiveBody, scoutBody, foragerBody, hygienicBody;
+var hiveBody, scoutBody, foragerBody, hygienicBody, GPT_54_MODEL, CLAUDE_SONNET_46_MODEL;
 var init_agents = __esm({
   "src/generators/agents.ts"() {
     hiveBody = `# Hive (Hybrid)
@@ -419,9 +419,9 @@ Research before answering; parallelize tool calls when investigating multiple in
 
 | Type | Focus | Tools |
 |------|-------|-------|
-| CONCEPTUAL | Understanding, "what is" | web/fetch |
-| IMPLEMENTATION | "How to" with code | search/codebase, search/usages, web/fetch |
-| CODEBASE | Local patterns, "where is" | read, search, search/codebase, search/usages |
+| CONCEPTUAL | Understanding, "what is" | web, io.github.upstash/context7/* |
+| IMPLEMENTATION | "How to" with code | search/codebase, search/usages, web, io.github.upstash/context7/* |
+| CODEBASE | Local patterns, "where is" | read, search, search/codebase, search/usages, browser |
 | COMPREHENSIVE | Multi-source synthesis | Combine local and fetched evidence in parallel |
 
 ## Research Protocol
@@ -442,7 +442,8 @@ When investigating multiple independent questions, run related tools in parallel
 \`\`\`
 read(path/to/file)
 search(pattern)
-web/fetch(url)
+web(...)
+context7(...)
 \`\`\`
 
 ### Phase 3: Structured Results
@@ -486,7 +487,9 @@ Stop when any is true:
 | Structural code discovery | search/codebase |
 | Text patterns | search |
 | File reading | read |
-| External docs or web pages | web/fetch |
+| External docs or web pages | web |
+| Library or framework docs | io.github.upstash/context7/* |
+| Browser inspection or reproduction | browser |
 
 ## External System Data
 
@@ -541,7 +544,9 @@ Use quick local exploration when needed:
 - \`read\` \u2014 inspect referenced files
 - \`search\` \u2014 find nearby patterns
 - \`execute\` \u2014 run verification commands available in the environment
+- \`web\` / \`io.github.upstash/context7/*\` \u2014 retrieve current docs when local context is insufficient
 - \`browser\` / \`playwright/*\` \u2014 verify browser flows and UI regressions when native automation is the best fit
+- \`todo\` \u2014 keep a short working checklist when the task has multiple steps
 
 ## Resolve Before Blocking
 
@@ -614,6 +619,7 @@ Use \`hive_task_update\` to keep the assigned task status accurate.
 
 - Mark work \`in_progress\`, \`completed\`, or \`blocked\` with a concise summary.
 - Include the verification result when reporting completion.
+- After the final \`hive_task_update\` completion report, still send one short natural-language handoff summarizing what changed and what it verified.
 - If blocked, include the reason, options, recommendation, and enough context for Hive to recover.
 `;
     hygienicBody = `# Hygienic (Consultant/Reviewer/Debugger)
@@ -717,6 +723,8 @@ Before verdict, mentally execute 2-3 tasks:
 - Cite specific locations for gaps
 - Focus on worker success, not perfection
 `;
+    GPT_54_MODEL = "GPT-5.4 (copilot)";
+    CLAUDE_SONNET_46_MODEL = "Claude Sonnet 4.6 (copilot)";
   }
 });
 

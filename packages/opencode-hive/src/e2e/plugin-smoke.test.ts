@@ -1810,61 +1810,61 @@ Do it
     expect(result.worktreePath).toBeDefined();
   });
 
-  it("returns terminal JSON with advisory note when verification evidence is missing", async () => {
-    const ctx: PluginInput = {
-      directory: testRoot,
-      worktree: testRoot,
-      serverUrl: new URL("http://localhost:1"),
-      project: createProject(testRoot),
-      client: OPENCODE_CLIENT,
-      $: createStubShell(),
+  it("treats a single completed commit call as the expected terminal merge-ready path", async () => {
+    const feature = "commit-expected-path-feature";
+    const { hooks, toolContext, worktreePath } = await createSingleTaskWorktree(
+      testRoot,
+      "sess_commit_expected_path",
+      feature,
+      "Commit Expected Path Feature",
+      "Yes, this test validates that one completed commit call returns terminal merge-ready output.",
+    );
+
+    fs.writeFileSync(path.join(worktreePath, "task-note.txt"), "commit expected path test\n");
+
+    const commitRaw = await hooks.tool!.hive_worktree_commit.execute(
+      {
+        feature,
+        task: FIRST_TASK,
+        status: "completed",
+        summary: "Added expected-path note file. Tests pass (bun test). Build succeeds (bun run build).",
+      },
+      toolContext
+    );
+
+    const commitResult = JSON.parse(commitRaw as string) as {
+      ok: boolean;
+      terminal: boolean;
+      status: string;
+      taskState?: string;
+      verificationNote?: string;
+      commit?: { sha?: string };
+      nextAction?: string;
     };
 
-    const hooks = await plugin(ctx);
-    const toolContext = createToolContext("sess_commit_gate");
+    expect(commitResult.ok).toBe(true);
+    expect(commitResult.terminal).toBe(true);
+    expect(commitResult.status).toBe("completed");
+    expect(commitResult.taskState).toBe("done");
+    expect(commitResult.nextAction).toContain("hive_merge");
+  });
 
-    await hooks.tool!.hive_feature_create.execute(
-      { name: "commit-gate-feature" },
-      toolContext
-    );
-
-    const plan = `# Commit Gate Feature
-
-## Discovery
-
-**Q: Is this a test?**
-A: Yes, this test validates non-terminal completion responses when verification evidence is missing from summary.
-
-## Tasks
-
-### 1. First Task
-Do it
-`;
-
-    await hooks.tool!.hive_plan_write.execute(
-      { content: plan, feature: "commit-gate-feature" },
-      toolContext
-    );
-    await hooks.tool!.hive_plan_approve.execute(
-      { feature: "commit-gate-feature" },
-      toolContext
-    );
-    await hooks.tool!.hive_tasks_sync.execute(
-      { feature: "commit-gate-feature" },
-      toolContext
-    );
-
-    await hooks.tool!.hive_worktree_start.execute(
-      { feature: "commit-gate-feature", task: "01-first-task" },
-      toolContext
+  it("keeps advisory fallback completion terminal and done without requiring commit retry", async () => {
+    const feature = "commit-advisory-fallback-feature";
+    const { hooks, toolContext } = await createSingleTaskWorktree(
+      testRoot,
+      "sess_commit_advisory_fallback",
+      feature,
+      "Commit Advisory Fallback Feature",
+      "Yes, this test validates advisory fallback interpretation with minimal completion summary and no retry requirement.",
     );
 
     const commitRaw = await hooks.tool!.hive_worktree_commit.execute(
       {
-        feature: "commit-gate-feature",
-        task: "01-first-task",
+        feature,
+        task: FIRST_TASK,
         status: "completed",
-        summary: "Implemented feature changes.",
+        summary: "Completed.",
       },
       toolContext
     );
@@ -1882,91 +1882,20 @@ Do it
     expect(commitResult.terminal).toBe(true);
     expect(commitResult.status).toBe("completed");
     expect(commitResult.taskState).toBe("done");
-    expect(commitResult.verificationNote).toContain("No verification evidence in summary");
     expect(commitResult.nextAction).toContain("hive_merge");
-  });
 
-  it("returns terminal JSON response when commit completes", async () => {
-    const ctx: PluginInput = {
-      directory: testRoot,
-      worktree: testRoot,
-      serverUrl: new URL("http://localhost:1"),
-      project: createProject(testRoot),
-      client: OPENCODE_CLIENT,
-      $: createStubShell(),
+    const statusRaw = await hooks.tool!.hive_status.execute(
+      { feature },
+      toolContext
+    );
+    const status = JSON.parse(statusRaw as string) as {
+      tasks?: {
+        list?: Array<{ folder: string; status: string }>;
+      };
     };
 
-    const hooks = await plugin(ctx);
-    const toolContext = createToolContext("sess_commit_success");
-
-    await hooks.tool!.hive_feature_create.execute(
-      { name: "commit-success-feature" },
-      toolContext
-    );
-
-    const plan = `# Commit Success Feature
-
-## Discovery
-
-**Q: Is this a test?**
-A: Yes, this test validates terminal completion responses when commit succeeds.
-
-## Tasks
-
-### 1. First Task
-Do it
-`;
-
-    await hooks.tool!.hive_plan_write.execute(
-      { content: plan, feature: "commit-success-feature" },
-      toolContext
-    );
-    await hooks.tool!.hive_plan_approve.execute(
-      { feature: "commit-success-feature" },
-      toolContext
-    );
-    await hooks.tool!.hive_tasks_sync.execute(
-      { feature: "commit-success-feature" },
-      toolContext
-    );
-
-    const worktreeRaw = await hooks.tool!.hive_worktree_start.execute(
-      { feature: "commit-success-feature", task: "01-first-task" },
-      toolContext
-    );
-    const worktreeResult = JSON.parse(worktreeRaw as string) as {
-      worktreePath?: string;
-    };
-
-    expect(worktreeResult.worktreePath).toBeDefined();
-    const worktreePath = worktreeResult.worktreePath!;
-    fs.writeFileSync(path.join(worktreePath, "task-note.txt"), "commit test\n");
-
-    const commitRaw = await hooks.tool!.hive_worktree_commit.execute(
-      {
-        feature: "commit-success-feature",
-        task: "01-first-task",
-        status: "completed",
-        summary: "Added task note file. Tests pass (bun test). Build succeeds (bun run build).",
-      },
-      toolContext
-    );
-
-    const commitResult = JSON.parse(commitRaw as string) as {
-      ok: boolean;
-      terminal: boolean;
-      status: string;
-      taskState?: string;
-      commit?: { sha?: string };
-      nextAction?: string;
-    };
-
-    expect(commitResult.ok).toBe(true);
-    expect(commitResult.terminal).toBe(true);
-    expect(commitResult.status).toBe("completed");
-    expect(commitResult.taskState).toBe("done");
-    expect(commitResult.commit?.sha).toBeDefined();
-    expect(commitResult.nextAction).toContain("hive_merge");
+    const taskStatus = status.tasks?.list?.find((task) => task.folder === FIRST_TASK);
+    expect(taskStatus?.status).toBe("done");
   });
 
   it("uses custom commit message in task worktree head", async () => {

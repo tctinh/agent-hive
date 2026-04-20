@@ -129,19 +129,38 @@ describe('initNest', () => {
     assert.doesNotMatch(executePrompt, /hiveWorktreeStart|hive_worktree_start|hive_merge/);
 
     const foragerAgent = readFile(projectRoot, '.github/agents/forager.agent.md');
+    assert.match(foragerAgent, /\n  - web\n/);
+    assert.match(foragerAgent, /io\.github\.upstash\/context7\/\*/);
     assert.match(foragerAgent, /playwright\/\*/);
+    assert.match(foragerAgent, /\n  - todo\n/);
+    assert.match(foragerAgent, /vscode\/memory/);
     assert.match(foragerAgent, /tctinh\.vscode-hive\/hiveTaskUpdate/);
     assert.match(foragerAgent, /GPT-5\.4 \(copilot\)/);
     assert.match(foragerAgent, /Claude Sonnet 4\.6 \(copilot\)/);
     assert.doesNotMatch(foragerAgent, /hiveContextWrite|hiveWorktreeCommit|editFiles/);
 
     const scoutAgent = readFile(projectRoot, '.github/agents/scout.agent.md');
+    assert.match(scoutAgent, /\n  - web\n/);
+    assert.match(scoutAgent, /\n  - browser\n/);
+    assert.match(scoutAgent, /io\.github\.upstash\/context7\/\*/);
+    assert.match(scoutAgent, /\n  - todo\n/);
+    assert.match(scoutAgent, /vscode\/memory/);
     assert.match(scoutAgent, /Claude Sonnet 4\.6 \(copilot\)/);
     assert.doesNotMatch(scoutAgent, /\bgpt-5\.4\b|GPT-5\.4 \(copilot\)/);
 
     const hiveAgent = readFile(projectRoot, '.github/agents/hive.agent.md');
     assert.match(hiveAgent, /model:\n  - GPT-5\.4 \(copilot\)/);
     assert.doesNotMatch(hiveAgent, /^tools:\n/m);
+
+    const hygienicAgent = readFile(projectRoot, '.github/agents/hygienic.agent.md');
+    assert.match(hygienicAgent, /search\/codebase/);
+    assert.match(hygienicAgent, /\n  - web\n/);
+    assert.match(hygienicAgent, /\n  - browser\n/);
+    assert.match(hygienicAgent, /io\.github\.upstash\/context7\/\*/);
+    assert.match(hygienicAgent, /playwright\/\*/);
+    assert.match(hygienicAgent, /\n  - todo\n/);
+    assert.match(hygienicAgent, /vscode\/memory/);
+    assert.doesNotMatch(hygienicAgent, /^  - codebase$/m);
 
     const executingPlansSkill = readFile(projectRoot, '.github/skills/executing-plans/SKILL.md');
     assert.match(executingPlansSkill, /Prefer `vscode\/askQuestions` for a structured choice/);
