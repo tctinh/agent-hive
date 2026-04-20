@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "command": {
+          "bash": ".github/hooks/scripts/check-plan.sh"
+        },
+        "timeoutSec": 5
+      }
+    ]
+  }
+}

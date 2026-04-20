@@ -34,7 +34,9 @@ describe('instructions generator', () => {
     expect(instruction.body).toContain('applyTo: "**"');
     expect(body).toContain('Hive plan-first development');
     expect(body).toContain('hive_status');
-    expect(body).toContain('hive_context_write');
+    expect(body).toContain('plan.md is the only required human-review and execution document');
+    expect(body).not.toContain('hive_context_write');
+    expect(body).not.toContain('Merge');
     expect(body.length).toBeLessThanOrEqual(1000);
   });
 

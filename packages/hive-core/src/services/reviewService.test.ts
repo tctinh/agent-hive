@@ -35,25 +35,29 @@ describe('ReviewService', () => {
     cleanup();
   });
 
-  it('treats any remaining thread in overview comments as unresolved', () => {
+  it('ignores overview comments when counting unresolved review threads', () => {
     const featureName = 'test-feature';
-    setupFeature(featureName);
+    const featurePath = setupFeature(featureName);
 
-    service.saveThreads(featureName, 'overview', [
-      {
-        id: 'thread-1',
-        line: 3,
-        body: 'Needs clarification',
-        replies: ['Please tighten wording'],
-      },
-    ]);
+    fs.mkdirSync(path.join(featurePath, 'comments'), { recursive: true });
+    fs.writeFileSync(
+      path.join(featurePath, 'comments', 'overview.json'),
+      JSON.stringify({
+        threads: [
+          {
+            id: 'thread-1',
+            line: 3,
+            body: 'Needs clarification',
+            replies: ['Please tighten wording'],
+          },
+        ],
+      })
+    );
 
     expect(service.countByDocument(featureName)).toEqual({
       plan: 0,
-      overview: 1,
     });
-    expect(service.hasUnresolvedThreads(featureName)).toBe(true);
-    expect(service.hasUnresolvedThreads(featureName, 'overview')).toBe(true);
+    expect(service.hasUnresolvedThreads(featureName)).toBe(false);
   });
 
   it('falls back to legacy comments.json for plan reviews', () => {
@@ -84,7 +88,6 @@ describe('ReviewService', () => {
     ]);
     expect(service.countByDocument(featureName)).toEqual({
       plan: 1,
-      overview: 0,
     });
   });
 });

@@ -9,7 +9,6 @@ import type { CommentsJson, ReviewCounts, ReviewDocument, ReviewThread } from '.
 
 const EMPTY_COUNTS: ReviewCounts = {
   plan: 0,
-  overview: 0,
 };
 
 export class ReviewService {
@@ -27,15 +26,15 @@ export class ReviewService {
   clear(featureName: string, document: ReviewDocument): void {
     this.saveThreads(featureName, document, []);
 
-    if (document === 'plan' && fileExists(getCommentsPath(this.projectRoot, featureName))) {
+    if (fileExists(getCommentsPath(this.projectRoot, featureName))) {
       writeJson(getCommentsPath(this.projectRoot, featureName), { threads: [] });
     }
   }
 
   countByDocument(featureName: string): ReviewCounts {
     return {
+      ...EMPTY_COUNTS,
       plan: this.getThreads(featureName, 'plan').length,
-      overview: this.getThreads(featureName, 'overview').length,
     };
   }
 
@@ -45,7 +44,7 @@ export class ReviewService {
     }
 
     const counts = this.countByDocument(featureName);
-    return counts.plan > 0 || counts.overview > 0;
+    return counts.plan > 0;
   }
 
   private readComments(featureName: string, document: ReviewDocument): CommentsJson | null {
@@ -55,11 +54,7 @@ export class ReviewService {
       return canonical;
     }
 
-    if (document === 'plan') {
-      return readJson<CommentsJson>(getCommentsPath(this.projectRoot, featureName));
-    }
-
-    return null;
+    return readJson<CommentsJson>(getCommentsPath(this.projectRoot, featureName));
   }
 
   private getCanonicalPath(featureName: string, document: ReviewDocument): string {

@@ -6,6 +6,30 @@ function getBody(content: string): string {
   return parts.slice(2).join('---').trimStart();
 }
 
+function getFrontmatter(content: string): string {
+  const parts = content.split(/^---$/m);
+  return parts[1] ?? '';
+}
+
+function getFrontmatterTools(content: string): string[] {
+  const lines = getFrontmatter(content).split('\n');
+  const toolsIndex = lines.indexOf('tools:');
+  if (toolsIndex === -1) {
+    return [];
+  }
+
+  const tools: string[] = [];
+  for (const line of lines.slice(toolsIndex + 1)) {
+    if (!line.startsWith('  - ')) {
+      break;
+    }
+
+    tools.push(line.replace(/^  - /, '').replace(/^"|"$/g, ''));
+  }
+
+  return tools;
+}
+
 describe('generateAllAgents', () => {
   const agents = generateAllAgents({ extensionId: 'tctinh.vscode-hive' });
   const byFilename = new Map(agents.map((agent) => [agent.filename, agent.content]));
@@ -43,6 +67,10 @@ describe('generateAllAgents', () => {
     expect(hive).toContain('browser tools');
     expect(body).toContain('Use `vscode/askQuestions` for structured decision checkpoints');
     expect(body).toContain('Plain chat is allowed only for lightweight clarification or when `vscode/askQuestions` is unavailable');
+    expect(body).not.toContain('hive_context_write');
+    expect(body).not.toContain('context/overview.md');
+    expect(body).not.toContain('hive_worktree_create');
+    expect(body).not.toContain('hive_merge');
 
     expect(hive).not.toContain('question()');
     expect(hive).not.toContain('task({ subagent_type: "scout-researcher" })');
@@ -60,15 +88,14 @@ describe('generateAllAgents', () => {
     expect(hive).not.toContain('config hook');
   });
 
-  it('includes clarified context model in the hive agent', () => {
+  it('uses plan.md as the only required review surface in the hive agent', () => {
     const hive = byFilename.get('hive.agent.md');
 
-    expect(hive).toContain('`overview` = human-facing summary/history');
-    expect(hive).toContain('`draft` = planner scratchpad');
-    expect(hive).toContain('`execution-decisions` = orchestration log');
-    expect(hive).toContain('all other names');
-    expect(hive).toContain('durable');
-    expect(hive).not.toContain('plan.md is the primary human-facing summary');
+    expect(hive).toContain('Design Summary');
+    expect(hive).toContain('plan.md');
+    expect(hive).not.toContain('`overview` = human-facing summary/history');
+    expect(hive).not.toContain('Refresh `context/overview.md`');
+    expect(hive).not.toContain('hive_context_write');
   });
 
   it('uses the required tool allowlists for the subagents', () => {
@@ -76,20 +103,37 @@ describe('generateAllAgents', () => {
     const forager = byFilename.get('forager.agent.md');
     const hygienic = byFilename.get('hygienic.agent.md');
 
-    expect(scout).toContain('- tctinh.vscode-hive/hiveContextWrite');
-    expect(scout).toContain('- tctinh.vscode-hive/hivePlanRead');
-    expect(scout).toContain('- tctinh.vscode-hive/hiveStatus');
+    expect(getFrontmatterTools(scout ?? '')).toEqual([
+      'read',
+      'search',
+      'search/codebase',
+      'search/usages',
+      'web/fetch',
+    ]);
     expect(scout).toContain('user-invocable: false');
 
-    expect(forager).toContain('- tctinh.vscode-hive/hivePlanRead');
-    expect(forager).toContain('- tctinh.vscode-hive/hiveWorktreeCommit');
-    expect(forager).toContain('- tctinh.vscode-hive/hiveContextWrite');
+    expect(getFrontmatterTools(forager ?? '')).toEqual([
+      'execute',
+      'read',
+      'edit',
+      'search',
+      'browser',
+      'playwright/*',
+      'vscode/memory',
+      'vscode/newWorkspace',
+      'vscode/getProjectSetupInfo',
+      'tctinh.vscode-hive/hivePlanRead',
+      'tctinh.vscode-hive/hiveTaskUpdate',
+    ]);
     expect(forager).toContain('user-invocable: false');
     expect(forager).not.toContain('Docker Sandbox');
 
-    expect(hygienic).toContain('- tctinh.vscode-hive/hivePlanRead');
-    expect(hygienic).toContain('- tctinh.vscode-hive/hiveContextWrite');
-    expect(hygienic).toContain('- tctinh.vscode-hive/hiveStatus');
+    expect(getFrontmatterTools(hygienic ?? '')).toEqual([
+      'read',
+      'search',
+      'search/codebase',
+      'search/usages',
+    ]);
     expect(hygienic).toContain('user-invocable: false');
   });
 });

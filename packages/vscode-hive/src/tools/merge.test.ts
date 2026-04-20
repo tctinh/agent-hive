@@ -103,7 +103,7 @@ describe('getMergeTools', () => {
     }
   });
 
-  it('keeps merge-related extension commands while LM tools are contributed separately', () => {
+  it('does not contribute removed merge and start-task surfaces in the reduced Copilot UI', () => {
     const packageJson = JSON.parse(
       fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf-8')
     ) as {
@@ -116,8 +116,8 @@ describe('getMergeTools', () => {
     const commandNames = packageJson.contributes?.commands?.map(command => command.command) ?? [];
     const toolNames = packageJson.contributes?.languageModelTools?.map(tool => tool.name) ?? [];
 
-    expect(toolNames).toContain('hive_merge');
-    expect(commandNames).toContain('hive.startTask');
+    expect(toolNames).not.toContain('hive_merge');
+    expect(commandNames).not.toContain('hive.startTask');
     expect(commandNames).toContain('hive.regenerateAgents');
   });
 });

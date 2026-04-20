@@ -88,7 +88,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** Planning is read-only. Use \`hive_feature_create\` + \`hive_plan_write\` and avoid worktrees during planning.
+**Context:** Planning is read-only. Use \`hive_feature_create\` + \`hive_plan_write\` and keep implementation out of the planning session.
 
 **Save plans to:** \`hive_plan_write\` (writes to \`.hive/features/<feature>/plan.md\`)
 
@@ -207,10 +207,10 @@ All verification MUST be agent-executable (no human intervention):
 - Reference relevant skills with @ syntax
 - DRY, YAGNI, TDD, frequent commits
 - All acceptance criteria must be agent-executable (zero human intervention)
-- Treat \`context/overview.md\` as the human-facing review surface
-- \`plan.md\` remains execution truth
+- Treat \`plan.md\` as the human-facing review surface and execution truth
 - Every plan needs a concise human-facing \`Design Summary\` before \`## Tasks\`
-- The \`Design Summary\` in \`plan.md\` should stay readable and review-friendly even though overview-first review happens in \`context/overview.md\`
+- Make that section an overview/design summary before \`## Tasks\`
+- Use Copilot memory or normal file edits when planning notes are needed; do not depend on special-purpose note helpers
 
 ## Execution Handoff
 
@@ -229,7 +229,7 @@ Which approach?
 - Fresh subagent per task + code review
 
 **If Parallel Session chosen:**
-- Guide them to open new session in worktree
+- Guide them to open a new Copilot session focused on execution
 - **REQUIRED SUB-SKILL:** New session uses Refer to the skill at .github/skills/executing-plans/SKILL.md
 `,
   },
@@ -263,17 +263,17 @@ Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, 
 **When 2+ tasks are runnable:**
 - Prefer \`vscode/askQuestions\` for a structured choice: "Multiple tasks are runnable: [list]. Run in parallel, sequential, or a specific subset?"
 - Fall back to asking directly in chat only when \`vscode/askQuestions\` is unavailable or a lightweight follow-up is enough
-- Record the decision with \`hive_context_write({ name: "execution-decisions", content: "..." })\` for future reference
+- Record the decision in Copilot memory or current working notes only when future turns need it
 
 **When 1 task is runnable:** Proceed directly.
 
 ### Step 3: Execute Batch
 
 For each task in the batch:
-1. Mark as in_progress via \`hive_worktree_start()\`
-2. Follow each step exactly (plan has bite-sized steps)
-3. Run verifications as specified
-4. Mark as completed
+1. Delegate implementation directly to @forager
+2. Make sure the worker reads the approved plan and records progress with \`hive_task_update\`
+3. Follow each step exactly (plan has bite-sized steps)
+4. Run verifications as specified and confirm the task state is updated accurately
 
 ### Step 4: Report
 When batch complete:
@@ -393,7 +393,7 @@ When you need to answer "where/how does X work?" across multiple domains (codeba
 
 **Safe in Planning mode:** This is read-only exploration. It is OK to use during exploratory research even when there is no feature, no plan, and no approved tasks.
 
-**This skill is for read-only research.** For parallel implementation work, refer to the skill at .github/skills/dispatching-parallel-agents/SKILL.md and use \`hive_worktree_start\`.
+**This skill is for read-only research.** For parallel implementation work, refer to the skill at .github/skills/dispatching-parallel-agents/SKILL.md and invoke @forager directly for each runnable task.
 
 ## When to Use
 
@@ -598,7 +598,7 @@ Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, 
 **Ask the operator first:**
 - Prefer \`vscode/askQuestions\` for the approval prompt: "These tasks are runnable and independent: [list]. Execute in parallel?"
 - Fall back to asking directly in chat only when \`vscode/askQuestions\` is unavailable or a lightweight follow-up is enough
-- Record the decision with \`hive_context_write({ name: "execution-decisions", content: "..." })\`
+- Record the decision in Copilot memory or current working notes only when future turns need it
 - Proceed only after operator approval
 
 ## When to Use
@@ -653,12 +653,10 @@ Each agent gets:
 
 ### 3. Dispatch in Parallel
 
-\`\`\`typescript
-// Using Hive tools for parallel execution
-hive_worktree_start({ task: "01-fix-abort-tests" })
-hive_worktree_start({ task: "02-fix-batch-tests" })
-hive_worktree_start({ task: "03-fix-race-condition-tests" })
-// All three run concurrently in isolated worktrees
+\`\`\`text
+Invoke @forager for runnable task 01 and require \`hive_task_update\` for progress reporting.
+Invoke @forager for runnable task 02 and require \`hive_task_update\` for progress reporting.
+Invoke @forager for runnable task 03 and require \`hive_task_update\` for progress reporting.
 \`\`\`
 
 Parallelize by issuing multiple agent-tool invocations in the same response.
@@ -674,7 +672,7 @@ When agents return:
 - Read each summary
 - Verify fixes don't conflict
 - Run full test suite
-- Integrate all changes with \`hive_merge\`
+- Apply any needed follow-up edits directly and rerun verification
 
 ## Agent Prompt Structure
 
@@ -2170,7 +2168,7 @@ If an entry doesn't:
 | Trigger | Action |
 |---------|--------|
 | New project bootstrap | Write initial AGENTS.md with build/test/style basics |
-| Feature completion | Sync new learnings via \`hive_agents_md\` |
+| Feature completion | Sync new learnings by editing AGENTS.md directly after reviewing the diff |
 | Periodic review | Audit for stale/redundant entries (quarterly) |
 | Quality issues | Agent repeating mistakes? Check if AGENTS.md has the fix |
 
@@ -2185,7 +2183,7 @@ If an entry doesn't:
 
 ✅ **Non-obvious patterns:**
 - "Use \`.js\` extension for local imports (ESM requirement)"
-- "Worktrees don't share \`node_modules\` — run \`bun install\` in each"
+- "Use Copilot memory for durable notes; don\'t invent extra workflow files"
 - "SandboxConfig is in \`dockerSandboxService.ts\`, NOT \`types.ts\`"
 
 ✅ **Gotchas that break builds:**
@@ -2254,10 +2252,9 @@ NEVER use \`ensureDirSync\` — doesn't exist
 
 After completing a feature, sync learnings to AGENTS.md:
 
-1. **Trigger sync:**
-   \`\`\`typescript
-   hive_agents_md({ action: 'sync', feature: 'feature-name' })
-   \`\`\`
+1. **Draft the proposed additions:**
+  - Use Copilot memory or temporary notes if you need a staging area
+  - Keep each proposal to one behavior-changing point
 
 2. **Review each proposal:**
    - Read the proposed change
@@ -2268,10 +2265,9 @@ After completing a feature, sync learnings to AGENTS.md:
    - ❌ "TypeScript is used" → Agent detects this
    - ✅ "Use \`.js\` extension for imports" → Prevents build failures
 
-4. **Apply approved changes:**
-   \`\`\`typescript
-   hive_agents_md({ action: 'apply' })
-   \`\`\`
+4. **Apply approved changes directly:**
+  - Edit AGENTS.md with the approved additions and removals
+  - Review the diff before finalizing
 
 **Warning:** Don't auto-approve all proposals. One bad entry pollutes all future sessions.
 

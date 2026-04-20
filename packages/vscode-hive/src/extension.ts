@@ -1,14 +1,14 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
 import * as path from 'path'
-import { FeatureService, PlanService, TaskService, WorktreeService } from 'hive-core'
+import { FeatureService, PlanService, TaskService } from 'hive-core'
 import { HiveWatcher, Launcher } from './services'
 import { HiveSidebarProvider, PlanCommentController } from './providers'
 import { initNest } from './commands/initNest'
 import { regenerateAgents } from './commands/regenerateAgents'
 import { getAllToolRegistrations } from './tools'
 
-type ReviewDocument = 'plan' | 'overview'
+type ReviewDocument = 'plan'
 
 type HiveLanguageModelTool = {
   prepareInvocation?: (
@@ -84,22 +84,16 @@ function getReviewTarget(workspaceRoot: string, filePath: string): { featureName
     return { featureName: planMatch[1], document: 'plan' }
   }
 
-  const overviewMatch = normalizedPath.match(/\.hive\/features\/([^/]+)\/context\/overview\.md$/)
-  if (overviewMatch) {
-    return { featureName: overviewMatch[1], document: 'overview' }
-  }
-
   return null
 }
 
 function getReviewCommentsPath(workspaceRoot: string, featureName: string, document: ReviewDocument): string {
-  if (document === 'plan') {
-    const canonicalPath = path.join(workspaceRoot, '.hive', 'features', featureName, 'comments', 'plan.json')
-    const legacyPath = path.join(workspaceRoot, '.hive', 'features', featureName, 'comments.json')
-    return fs.existsSync(canonicalPath) ? canonicalPath : fs.existsSync(legacyPath) ? legacyPath : canonicalPath
+  const canonicalPath = path.join(workspaceRoot, '.hive', 'features', featureName, 'comments', `${document}.json`)
+  if (fs.existsSync(canonicalPath)) {
+    return canonicalPath
   }
 
-  return path.join(workspaceRoot, '.hive', 'features', featureName, 'comments', 'overview.json')
+  return path.join(workspaceRoot, '.hive', 'features', featureName, 'comments.json')
 }
 
 function findHiveRoot(startPath: string): string | null {
@@ -224,7 +218,7 @@ class HiveExtension {
           try {
             featureService.create(name)
             this.sidebarProvider?.refresh()
-            vscode.window.showInformationMessage(`Hive: Feature "${name}" created. Open the overview or plan from the sidebar to continue.`)
+            vscode.window.showInformationMessage(`Hive: Feature "${name}" created. Open the plan from the sidebar to continue.`)
           } catch (error) {
             vscode.window.showErrorMessage(`Hive: Failed to create feature - ${error}`)
           }
@@ -237,7 +231,7 @@ class HiveExtension {
           const featureService = new FeatureService(workspaceFolder)
           featureService.create(name)
           this.sidebarProvider?.refresh()
-          vscode.window.showInformationMessage(`Hive: Feature "${name}" created. Open the overview or plan from the sidebar to continue.`)
+          vscode.window.showInformationMessage(`Hive: Feature "${name}" created. Open the plan from the sidebar to continue.`)
         }
       }),
 
@@ -261,15 +255,11 @@ class HiveExtension {
         if (item?.featureName && this.workspaceRoot) {
           const featureService = new FeatureService(this.workspaceRoot)
           const planService = new PlanService(this.workspaceRoot)
-          const reviewCounts = featureService.getInfo(item.featureName)?.reviewCounts ?? { plan: 0, overview: 0 }
-          const unresolvedTotal = reviewCounts.plan + reviewCounts.overview
+          const reviewCounts = featureService.getInfo(item.featureName)?.reviewCounts ?? { plan: 0 }
+          const unresolvedTotal = reviewCounts.plan
           
           if (unresolvedTotal > 0) {
-            const documents = [
-              reviewCounts.plan > 0 ? `plan (${reviewCounts.plan})` : null,
-              reviewCounts.overview > 0 ? `overview (${reviewCounts.overview})` : null,
-            ].filter(Boolean).join(', ')
-            vscode.window.showWarningMessage(`Hive: Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`)
+            vscode.window.showWarningMessage(`Hive: Cannot approve - ${unresolvedTotal} unresolved plan review comment(s) remain. Address them first.`)
             return
           }
           
@@ -307,33 +297,6 @@ class HiveExtension {
         }
       }),
 
-      vscode.commands.registerCommand('hive.startTask', async (item: { featureName?: string; folder?: string }) => {
-        if (item?.featureName && item?.folder && this.workspaceRoot) {
-          const worktreeService = new WorktreeService({
-            baseDir: this.workspaceRoot,
-            hiveDir: path.join(this.workspaceRoot, '.hive'),
-          })
-          const taskService = new TaskService(this.workspaceRoot)
-          
-          try {
-            const worktree = await worktreeService.create(item.featureName, item.folder)
-            taskService.update(item.featureName, item.folder, { status: 'in_progress' })
-            this.sidebarProvider?.refresh()
-            
-            const openWorktree = await vscode.window.showInformationMessage(
-              `Hive: Worktree created at ${worktree.path}`,
-              'Open in New Window'
-            )
-            
-            if (openWorktree === 'Open in New Window') {
-              this.launcher?.openTask(item.featureName, item.folder)
-            }
-          } catch (error) {
-            vscode.window.showErrorMessage(`Hive: Failed to start task - ${error}`)
-          }
-        }
-      }),
-
       vscode.commands.registerCommand('hive.plan.doneReview', async () => {
         const editor = vscode.window.activeTextEditor
         if (!editor) return
@@ -346,7 +309,7 @@ class HiveExtension {
         const filePath = editor.document.uri.fsPath
         const target = getReviewTarget(this.workspaceRoot, filePath)
         if (!target) {
-          vscode.window.showErrorMessage('Not a reviewable plan.md or context/overview.md file')
+          vscode.window.showErrorMessage('Not a reviewable plan.md file')
           return
         }
 
@@ -362,10 +325,9 @@ class HiveExtension {
         }
 
         const hasComments = comments.length > 0
-        const documentLabel = target.document === 'overview' ? 'Overview' : 'Plan'
         const inputPrompt = hasComments 
-          ? `${documentLabel}: ${comments.length} comment(s) found. Add feedback or leave empty to submit comments only`
-          : `Enter your ${documentLabel.toLowerCase()} review feedback (or leave empty to approve)`
+          ? `Plan: ${comments.length} comment(s) found. Add feedback or leave empty to submit comments only`
+          : 'Enter your plan review feedback (or leave empty to approve)'
         
         const userInput = await vscode.window.showInputBox({
           prompt: inputPrompt,
@@ -378,12 +340,12 @@ class HiveExtension {
         if (hasComments) {
           const allComments = comments.map(c => `Line ${c.line}: ${c.body}`).join('\n')
           feedback = userInput === '' 
-            ? `${documentLabel} review comments:\n${allComments}`
-            : `${documentLabel} review comments:\n${allComments}\n\nAdditional feedback: ${userInput}`
+            ? `Plan review comments:\n${allComments}`
+            : `Plan review comments:\n${allComments}\n\nAdditional feedback: ${userInput}`
         } else {
           feedback = userInput === ''
-            ? `${documentLabel} approved`
-            : `${documentLabel} review feedback: ${userInput}`
+            ? 'Plan approved'
+            : `Plan review feedback: ${userInput}`
         }
 
         vscode.window.showInformationMessage(

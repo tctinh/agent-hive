@@ -21,7 +21,7 @@ function setupFeature(featureName: string): void {
   );
 }
 
-describe('ContextService reserved overview context', () => {
+describe('ContextService overview as regular context', () => {
   let service: ContextService;
 
   beforeEach(() => {
@@ -34,20 +34,26 @@ describe('ContextService reserved overview context', () => {
     cleanup();
   });
 
-  it('returns overview as a reserved context file when present', () => {
+  it('treats overview like any other durable context file', () => {
     const featureName = 'reserved-overview';
     setupFeature(featureName);
 
     service.write(featureName, 'overview', 'Human-facing summary');
     service.write(featureName, 'decisions', 'Technical decisions');
 
-    const overview = service.getOverview(featureName);
-
-    expect(overview?.name).toBe('overview');
-    expect(overview?.content).toBe('Human-facing summary');
+    expect(service.list(featureName).map((file) => [
+      file.name,
+      file.role,
+      file.includeInExecution,
+      file.includeInAgentsMdSync,
+      file.includeInNetwork,
+    ])).toEqual([
+      ['decisions', 'durable', true, true, true],
+      ['overview', 'durable', true, true, true],
+    ]);
   });
 
-  it('excludes overview from execution context listings', () => {
+  it('keeps overview in execution context listings', () => {
     const featureName = 'execution-context';
     setupFeature(featureName);
 
@@ -56,10 +62,10 @@ describe('ContextService reserved overview context', () => {
 
     const executionContext = service.listExecutionContext(featureName);
 
-    expect(executionContext?.map((file: { name: string }) => file.name)).toEqual(['decisions']);
+    expect(executionContext?.map((file: { name: string }) => file.name)).toEqual(['decisions', 'overview']);
   });
 
-  it('classifies known context names without constraining unknown ones', () => {
+  it('classifies overview as durable while preserving special handling for other known names', () => {
     const featureName = 'classified-context';
     setupFeature(featureName);
 
@@ -78,11 +84,11 @@ describe('ContextService reserved overview context', () => {
       ['draft', 'scratchpad', false, false, false],
       ['execution-decisions', 'operational', false, false, false],
       ['learnings', 'durable', true, true, true],
-      ['overview', 'human', false, false, false],
+      ['overview', 'durable', true, true, true],
     ]);
   });
 
-  it('lists only durable context for network retrieval while preserving freshness metadata', () => {
+  it('includes overview in durable network context retrieval while preserving freshness metadata', () => {
     const featureName = 'network-context';
     setupFeature(featureName);
 
@@ -94,7 +100,7 @@ describe('ContextService reserved overview context', () => {
 
     const networkContext = service.listNetworkContext(featureName);
 
-    expect(networkContext.map(file => file.name)).toEqual(['learnings', 'research']);
+    expect(networkContext.map(file => file.name)).toEqual(['learnings', 'overview', 'research']);
     expect(networkContext.every(file => file.includeInNetwork)).toBe(true);
     expect(networkContext.every(file => typeof file.updatedAt === 'string' && file.updatedAt.length > 0)).toBe(true);
   });

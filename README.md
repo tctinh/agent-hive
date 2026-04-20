@@ -87,13 +87,13 @@ Today, the supported execution contract is still OpenCode-native:
 
 ### Option B: VS Code companion (recommended with OpenCode)
 
-Install the **Agent Hive** extension for review, comments, and sidebar status:
+Install the **Agent Hive** extension for review, comments, sidebar status, and the retained Copilot-facing Hive tools:
 
 ```bash
 code --install-extension tctinh.vscode-hive
 ```
 
-Use the VS Code extension to review `context/overview.md`, comment on `plan.md`, approve work, and launch back into OpenCode when you want a visual companion. `vscode-hive` remains a review/sidebar surface in `1.4.0`; OpenCode is the supported execution harness.
+Use the VS Code extension to review `plan.md` as the single required review document, comment inline, approve work, inspect task status, and use the retained feature/plan/task/status tools in Copilot Chat. Context files remain optional notes, and direct implementation handoff should go to `@forager` with `hive_task_update` for progress tracking. `vscode-hive` remains a review/sidebar surface in `1.4.0`; OpenCode is the supported execution harness.
 
 For local plugin testing:
 
