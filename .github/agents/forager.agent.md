@@ -14,7 +14,8 @@ tools:
   - tctinh.vscode-hive/hiveTaskUpdate
 user-invocable: false
 model:
-  - gpt-5.4
+  - GPT-5.4 (copilot)
+  - Claude Sonnet 4.6 (copilot)
 ---
 
 # Forager (Worker/Coder)
@@ -118,4 +119,5 @@ Use `hive_task_update` to keep the assigned task status accurate.
 
 - Mark work `in_progress`, `completed`, or `blocked` with a concise summary.
 - Include the verification result when reporting completion.
+- After the final `hive_task_update` completion report, still send one short natural-language handoff summarizing what changed and what it verified.
 - If blocked, include the reason, options, recommendation, and enough context for Hive to recover.

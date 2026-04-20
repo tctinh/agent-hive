@@ -11,23 +11,31 @@ function getFrontmatter(content: string): string {
   return parts[1] ?? '';
 }
 
-function getFrontmatterTools(content: string): string[] {
+function getFrontmatterList(content: string, key: string): string[] {
   const lines = getFrontmatter(content).split('\n');
-  const toolsIndex = lines.indexOf('tools:');
-  if (toolsIndex === -1) {
+  const sectionIndex = lines.indexOf(`${key}:`);
+  if (sectionIndex === -1) {
     return [];
   }
 
-  const tools: string[] = [];
-  for (const line of lines.slice(toolsIndex + 1)) {
+  const values: string[] = [];
+  for (const line of lines.slice(sectionIndex + 1)) {
     if (!line.startsWith('  - ')) {
       break;
     }
 
-    tools.push(line.replace(/^  - /, '').replace(/^"|"$/g, ''));
+    values.push(line.replace(/^  - /, '').replace(/^"|"$/g, ''));
   }
 
-  return tools;
+  return values;
+}
+
+function getFrontmatterTools(content: string): string[] {
+  return getFrontmatterList(content, 'tools');
+}
+
+function getFrontmatterModels(content: string): string[] {
+  return getFrontmatterList(content, 'model');
 }
 
 describe('generateAllAgents', () => {
@@ -55,8 +63,7 @@ describe('generateAllAgents', () => {
     const hive = byFilename.get('hive.agent.md');
     const body = getBody(hive ?? '');
 
-    expect(hive).toContain("- tctinh.vscode-hive/*");
-    expect(hive).toContain('- vscode/askQuestions');
+    expect(getFrontmatterTools(hive ?? '')).toEqual([]);
     expect(hive).toContain('use the agent tool to invoke @scout');
     expect(hive).toContain('refer to the skill at .github/skills/parallel-exploration/');
     expect(hive).toContain('.github/prompts/');
@@ -99,9 +106,13 @@ describe('generateAllAgents', () => {
   });
 
   it('uses the required tool allowlists for the subagents', () => {
+    const hive = byFilename.get('hive.agent.md');
     const scout = byFilename.get('scout.agent.md');
     const forager = byFilename.get('forager.agent.md');
     const hygienic = byFilename.get('hygienic.agent.md');
+
+    expect(getFrontmatterTools(hive ?? '')).toEqual([]);
+    expect(getFrontmatterModels(hive ?? '')).toEqual(['GPT-5.4 (copilot)']);
 
     expect(getFrontmatterTools(scout ?? '')).toEqual([
       'read',
@@ -110,6 +121,7 @@ describe('generateAllAgents', () => {
       'search/usages',
       'web/fetch',
     ]);
+    expect(getFrontmatterModels(scout ?? '')).toEqual(['Claude Sonnet 4.6 (copilot)']);
     expect(scout).toContain('user-invocable: false');
 
     expect(getFrontmatterTools(forager ?? '')).toEqual([
@@ -125,8 +137,13 @@ describe('generateAllAgents', () => {
       'tctinh.vscode-hive/hivePlanRead',
       'tctinh.vscode-hive/hiveTaskUpdate',
     ]);
+    expect(getFrontmatterModels(forager ?? '')).toEqual([
+      'GPT-5.4 (copilot)',
+      'Claude Sonnet 4.6 (copilot)',
+    ]);
     expect(forager).toContain('user-invocable: false');
     expect(forager).not.toContain('Docker Sandbox');
+    expect(forager).toContain('still send one short natural-language handoff');
 
     expect(getFrontmatterTools(hygienic ?? '')).toEqual([
       'read',
@@ -134,6 +151,7 @@ describe('generateAllAgents', () => {
       'search/codebase',
       'search/usages',
     ]);
+    expect(getFrontmatterModels(hygienic ?? '')).toEqual(['Claude Sonnet 4.6 (copilot)']);
     expect(hygienic).toContain('user-invocable: false');
   });
 });

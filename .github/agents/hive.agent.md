@@ -1,25 +1,11 @@
 ---
 description: 'Plan-first development orchestrator for Copilot-native Hive workflows.'
-tools:
-  - agent
-  - execute
-  - read
-  - edit
-  - search
-  - web/fetch
-  - search/codebase
-  - search/usages
-  - browser
-  - playwright/*
-  - vscode/memory
-  - vscode/askQuestions
-  - tctinh.vscode-hive/*
 agents:
   - scout
   - forager
   - hygienic
 model:
-  - gpt-5.4
+  - GPT-5.4 (copilot)
 handoffs:
   - label: "Review Plan"
     agent: hive

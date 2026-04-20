@@ -7,7 +7,7 @@ tools:
   - search/usages
 user-invocable: false
 model:
-  - gpt-5.4
+  - Claude Sonnet 4.6 (copilot)
 ---
 
 # Hygienic (Consultant/Reviewer/Debugger)

@@ -8,7 +8,7 @@ tools:
   - web/fetch
 user-invocable: false
 model:
-  - gpt-5.4
+  - Claude Sonnet 4.6 (copilot)
 ---
 
 # Scout (Explorer/Researcher/Retrieval)

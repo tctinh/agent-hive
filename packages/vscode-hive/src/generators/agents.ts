@@ -475,6 +475,7 @@ Use \`hive_task_update\` to keep the assigned task status accurate.
 
 - Mark work \`in_progress\`, \`completed\`, or \`blocked\` with a concise summary.
 - Include the verification result when reporting completion.
+- After the final \`hive_task_update\` completion report, still send one short natural-language handoff summarizing what changed and what it verified.
 - If blocked, include the reason, options, recommendation, and enough context for Hive to recover.
 `;
 
@@ -580,30 +581,19 @@ Before verdict, mentally execute 2-3 tasks:
 - Focus on worker success, not perfection
 `;
 
+const GPT_54_MODEL = 'GPT-5.4 (copilot)';
+const CLAUDE_SONNET_46_MODEL = 'Claude Sonnet 4.6 (copilot)';
+
 export function generateHiveAgent(opts: AgentGeneratorOptions): string {
   return buildAgent(
     [
       "description: 'Plan-first development orchestrator for Copilot-native Hive workflows.'",
-      'tools:',
-      '  - agent',
-      '  - execute',
-      '  - read',
-      '  - edit',
-      '  - search',
-      '  - web/fetch',
-      '  - search/codebase',
-      '  - search/usages',
-      '  - browser',
-      '  - playwright/*',
-      '  - vscode/memory',
-      '  - vscode/askQuestions',
-      `  - ${opts.extensionId}/*`,
       'agents:',
       '  - scout',
       '  - forager',
       '  - hygienic',
       'model:',
-      '  - gpt-5.4',
+      `  - ${GPT_54_MODEL}`,
       'handoffs:',
       '  - label: "Review Plan"',
       '    agent: hive',
@@ -630,7 +620,7 @@ export function generateScoutAgent(opts: AgentGeneratorOptions): string {
       '  - web/fetch',
       'user-invocable: false',
       'model:',
-      '  - gpt-5.4',
+      `  - ${CLAUDE_SONNET_46_MODEL}`,
     ].join('\n'),
     scoutBody,
   );
@@ -654,7 +644,8 @@ export function generateForagerAgent(opts: AgentGeneratorOptions): string {
       `  - ${opts.extensionId}/hiveTaskUpdate`,
       'user-invocable: false',
       'model:',
-      '  - gpt-5.4',
+      `  - ${GPT_54_MODEL}`,
+      `  - ${CLAUDE_SONNET_46_MODEL}`,
     ].join('\n'),
     foragerBody,
   );
@@ -671,7 +662,7 @@ export function generateHygienicAgent(opts: AgentGeneratorOptions): string {
       '  - search/usages',
       'user-invocable: false',
       'model:',
-      '  - gpt-5.4',
+      `  - ${CLAUDE_SONNET_46_MODEL}`,
     ].join('\n'),
     hygienicBody,
   );

@@ -131,7 +131,17 @@ describe('initNest', () => {
     const foragerAgent = readFile(projectRoot, '.github/agents/forager.agent.md');
     assert.match(foragerAgent, /playwright\/\*/);
     assert.match(foragerAgent, /tctinh\.vscode-hive\/hiveTaskUpdate/);
+    assert.match(foragerAgent, /GPT-5\.4 \(copilot\)/);
+    assert.match(foragerAgent, /Claude Sonnet 4\.6 \(copilot\)/);
     assert.doesNotMatch(foragerAgent, /hiveContextWrite|hiveWorktreeCommit|editFiles/);
+
+    const scoutAgent = readFile(projectRoot, '.github/agents/scout.agent.md');
+    assert.match(scoutAgent, /Claude Sonnet 4\.6 \(copilot\)/);
+    assert.doesNotMatch(scoutAgent, /\bgpt-5\.4\b|GPT-5\.4 \(copilot\)/);
+
+    const hiveAgent = readFile(projectRoot, '.github/agents/hive.agent.md');
+    assert.match(hiveAgent, /model:\n  - GPT-5\.4 \(copilot\)/);
+    assert.doesNotMatch(hiveAgent, /^tools:\n/m);
 
     const executingPlansSkill = readFile(projectRoot, '.github/skills/executing-plans/SKILL.md');
     assert.match(executingPlansSkill, /Prefer `vscode\/askQuestions` for a structured choice/);
