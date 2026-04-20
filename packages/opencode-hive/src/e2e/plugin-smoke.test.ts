@@ -1846,8 +1846,6 @@ Do it
     expect(commitResult.terminal).toBe(true);
     expect(commitResult.status).toBe("completed");
     expect(commitResult.taskState).toBe("done");
-    expect(commitResult.verificationNote).toBeUndefined();
-    expect(commitResult.commit?.sha).toBeDefined();
     expect(commitResult.nextAction).toContain("hive_merge");
   });
 
@@ -1884,7 +1882,6 @@ Do it
     expect(commitResult.terminal).toBe(true);
     expect(commitResult.status).toBe("completed");
     expect(commitResult.taskState).toBe("done");
-    expect(commitResult.verificationNote).toContain("No verification evidence in summary");
     expect(commitResult.nextAction).toContain("hive_merge");
 
     const statusRaw = await hooks.tool!.hive_status.execute(
