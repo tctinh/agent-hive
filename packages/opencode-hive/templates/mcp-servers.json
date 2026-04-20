@@ -6,9 +6,9 @@
       "description": "GitHub code search via grep.app"
     },
     "ast_grep": {
-      "command": "npx",
-      "args": ["-y", "@notprolands/ast-grep-mcp"],
-      "description": "AST-aware code search and refactoring"
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/ast-grep/ast-grep-mcp", "ast-grep-server"],
+      "description": "Official ast-grep MCP server (requires ast-grep on PATH)"
     },
     "context7": {
       "command": "npx",

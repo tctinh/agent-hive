@@ -60,6 +60,7 @@ function generateHiveAgent(opts) {
       "  - fetch",
       "  - codebase",
       "  - usages",
+      "  - vscode/askQuestions",
       `  - ${opts.extensionId}/*`,
       "agents:",
       "  - scout",
@@ -187,7 +188,7 @@ Intent Verbalization \u2014 verbalize before acting:
 | "Quick change" | Trivial | Act directly |
 | "Add new flow" | Complex | Plan/delegate |
 | "Where is X?" | Research | Scout exploration |
-| "Should we\u2026?" | Ambiguous | Ask the user directly in chat |
+| "Should we\u2026?" | Ambiguous | Use \`vscode/askQuestions\` for the decision checkpoint |
 
 ### Canonical Delegation Threshold
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
@@ -229,10 +230,14 @@ Before major transitions, verify:
 - [ ] Scope defined?
 - [ ] No critical ambiguities?
 
+Use \`vscode/askQuestions\` for structured decision checkpoints such as ambiguity resolution, review approval, parallelization approval, blocker recovery, and batch review confirmation.
+Plain chat is allowed only for lightweight clarification or when \`vscode/askQuestions\` is unavailable.
+
 ### Turn Termination
 Valid endings:
-- Ask a concrete question directly in chat
-- Update draft + ask a concrete question directly in chat
+- Use \`vscode/askQuestions\` for a concrete structured decision checkpoint
+- Update draft + use \`vscode/askQuestions\` for the next structured decision checkpoint
+- Ask a lightweight clarification in chat only when it does not need structured options
 - Explicitly state you are waiting on tool or subagent work
 - Auto-transition to the next required action
 
@@ -313,7 +318,7 @@ Refresh \`context/overview.md\` as the primary human-facing review surface, whil
 - Never require Mermaid.
 
 ### After Plan Written
-Ask the user directly in chat whether they want a Hygienic review.
+Use \`vscode/askQuestions\` to ask whether they want a Hygienic review.
 
 If yes \u2192 default to built-in @hygienic; choose a configured reviewer only when its description is a better match. Then use the agent tool to invoke @hygienic to review the plan.
 
@@ -334,7 +339,7 @@ Search stop conditions: enough context, repeated info, 2 rounds with no new data
 ### Task Dependencies (Always Check)
 Use \`hive_status()\` to see runnable tasks and blockedBy info.
 - Only start tasks from the runnable list
-- When 2+ tasks are runnable: ask the user directly in chat before parallelizing
+- When 2+ tasks are runnable: use \`vscode/askQuestions\` before parallelizing
 - Record execution decisions with \`hive_context_write({ name: "execution-decisions", ... })\`
 
 ### When to Load Skills
@@ -357,12 +362,12 @@ hive_worktree_create({ task: "01-task-name" })
 3. Use \`continueFrom: "blocked"\` only when status is exactly \`blocked\`
 4. If status is not \`blocked\`, do not use \`continueFrom: "blocked"\`; use normal worktree start/resume workflows for \`pending\` / \`in_progress\` tasks
 5. Never loop \`continueFrom: "blocked"\` on non-blocked statuses
-6. If a task is blocked: read blocker info \u2192 ask the user directly in chat \u2192 resume with \`continueFrom: "blocked"\`
+6. If a task is blocked: read blocker info \u2192 use \`vscode/askQuestions\` to present the decision \u2192 resume with \`continueFrom: "blocked"\`
 7. Skip polling \u2014 the result is available when the worker returns
 
 ### Batch Merge + Verify Workflow
 When multiple tasks are in flight, prefer **batch completion** over per-task verification:
-1. Dispatch a batch of runnable tasks (ask the user before parallelizing).
+1. Dispatch a batch of runnable tasks (use \`vscode/askQuestions\` before parallelizing).
 2. Wait for all workers to finish.
 3. Merge each completed task branch into the current branch.
 4. Run full verification once on the merged batch.
@@ -372,11 +377,11 @@ When multiple tasks are in flight, prefer **batch completion** over per-task ver
 1. Stop all further edits
 2. Revert to last known working state
 3. Document what was attempted
-4. Ask the user directly in chat \u2014 present options and context
+4. Use \`vscode/askQuestions\` to present options and context
 
 ### Post-Batch Review (Hygienic)
 After completing and merging a batch:
-1. Ask the user directly in chat if they want a Hygienic code review for the batch.
+1. Use \`vscode/askQuestions\` to ask if they want a Hygienic code review for the batch.
 2. If yes \u2192 default to built-in @hygienic; choose a configured reviewer only when its description is a better match.
 3. Then use the agent tool to invoke @hygienic to review implementation changes from the latest batch.
 4. Apply feedback before starting the next batch.
@@ -393,7 +398,7 @@ For projects without AGENTS.md:
 ### Orchestration Iron Laws
 - Delegate by default
 - Verify all work completes
-- Ask the user directly in chat for user input
+- Use \`vscode/askQuestions\` for structured user input checkpoints
 
 ---
 
@@ -418,7 +423,7 @@ Do not violate:
 
 Blocking violations:
 - Ending a turn without a next action
-- Asking for user input indirectly or vaguely
+- Relying on plain or vague chat for structured decision checkpoints
 `;
     scoutBody = `# Scout (Explorer/Researcher/Retrieval)
 
@@ -788,15 +793,29 @@ var __getProtoOf2 = Object.getPrototypeOf;
 var __defProp2 = Object.defineProperty;
 var __getOwnPropNames2 = Object.getOwnPropertyNames;
 var __hasOwnProp2 = Object.prototype.hasOwnProperty;
+function __accessProp(key) {
+  return this[key];
+}
+var __toESMCache_node;
+var __toESMCache_esm;
 var __toESM2 = (mod, isNodeMode, target) => {
+  var canCache = mod != null && typeof mod === "object";
+  if (canCache) {
+    var cache2 = isNodeMode ? __toESMCache_node ??= /* @__PURE__ */ new WeakMap() : __toESMCache_esm ??= /* @__PURE__ */ new WeakMap();
+    var cached = cache2.get(mod);
+    if (cached)
+      return cached;
+  }
   target = mod != null ? __create2(__getProtoOf2(mod)) : {};
   const to = isNodeMode || !mod || !mod.__esModule ? __defProp2(target, "default", { value: mod, enumerable: true }) : target;
   for (let key of __getOwnPropNames2(mod))
     if (!__hasOwnProp2.call(to, key))
       __defProp2(to, key, {
-        get: () => mod[key],
+        get: __accessProp.bind(mod, key),
         enumerable: true
       });
+  if (canCache)
+    cache2.set(mod, to);
   return to;
 };
 var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
@@ -3165,7 +3184,7 @@ var init_argument_filters = __esm2({
       return typeof input === "number";
     };
     filterString = (input) => {
-      return typeof input === "string" || isPathSpec(input);
+      return typeof input === "string";
     };
     filterStringOrStringArray = (input) => {
       return filterString(input) || Array.isArray(input) && input.every(filterString);
@@ -5306,15 +5325,15 @@ function parser3(indexX, indexY, handler) {
   return [`${indexX}${indexY}`, handler];
 }
 function conflicts(indexX, ...indexY) {
-  return indexY.map((y) => parser3(indexX, y, (result, file) => result.conflicted.push(file)));
+  return indexY.map((y) => parser3(indexX, y, (result, file) => append(result.conflicted, file)));
 }
 function splitLine(result, lineStr) {
   const trimmed2 = lineStr.trim();
   switch (" ") {
     case trimmed2.charAt(2):
-      return data(trimmed2.charAt(0), trimmed2.charAt(1), trimmed2.slice(3));
+      return data(trimmed2.charAt(0), trimmed2.charAt(1), trimmed2.substr(3));
     case trimmed2.charAt(1):
-      return data(" ", trimmed2.charAt(0), trimmed2.slice(2));
+      return data(" ", trimmed2.charAt(0), trimmed2.substr(2));
     default:
       return;
   }
@@ -5358,42 +5377,26 @@ var init_StatusSummary = __esm2({
       }
     };
     parsers6 = new Map([
-      parser3(" ", "A", (result, file) => result.created.push(file)),
-      parser3(" ", "D", (result, file) => result.deleted.push(file)),
-      parser3(" ", "M", (result, file) => result.modified.push(file)),
-      parser3("A", " ", (result, file) => {
-        result.created.push(file);
-        result.staged.push(file);
-      }),
-      parser3("A", "M", (result, file) => {
-        result.created.push(file);
-        result.staged.push(file);
-        result.modified.push(file);
-      }),
-      parser3("D", " ", (result, file) => {
-        result.deleted.push(file);
-        result.staged.push(file);
-      }),
-      parser3("M", " ", (result, file) => {
-        result.modified.push(file);
-        result.staged.push(file);
-      }),
-      parser3("M", "M", (result, file) => {
-        result.modified.push(file);
-        result.staged.push(file);
-      }),
+      parser3(" ", "A", (result, file) => append(result.created, file)),
+      parser3(" ", "D", (result, file) => append(result.deleted, file)),
+      parser3(" ", "M", (result, file) => append(result.modified, file)),
+      parser3("A", " ", (result, file) => append(result.created, file) && append(result.staged, file)),
+      parser3("A", "M", (result, file) => append(result.created, file) && append(result.staged, file) && append(result.modified, file)),
+      parser3("D", " ", (result, file) => append(result.deleted, file) && append(result.staged, file)),
+      parser3("M", " ", (result, file) => append(result.modified, file) && append(result.staged, file)),
+      parser3("M", "M", (result, file) => append(result.modified, file) && append(result.staged, file)),
       parser3("R", " ", (result, file) => {
-        result.renamed.push(renamedFile(file));
+        append(result.renamed, renamedFile(file));
       }),
       parser3("R", "M", (result, file) => {
         const renamed = renamedFile(file);
-        result.renamed.push(renamed);
-        result.modified.push(renamed.to);
+        append(result.renamed, renamed);
+        append(result.modified, renamed.to);
       }),
       parser3("!", "!", (_result, _file) => {
-        (_result.ignored = _result.ignored || []).push(_file);
+        append(_result.ignored = _result.ignored || [], _file);
       }),
-      parser3("?", "?", (result, file) => result.not_added.push(file)),
+      parser3("?", "?", (result, file) => append(result.not_added, file)),
       ...conflicts("A", "A", "U"),
       ...conflicts("D", "D", "U"),
       ...conflicts("U", "A", "D", "U"),
@@ -5519,41 +5522,6 @@ var init_version = __esm2({
     ];
   }
 });
-function createCloneTask(api, task, repoPath, ...args) {
-  if (!filterString(repoPath)) {
-    return configurationErrorTask(`git.${api}() requires a string 'repoPath'`);
-  }
-  return task(repoPath, filterType(args[0], filterString), getTrailingOptions(arguments));
-}
-function clone_default() {
-  return {
-    clone(repo, ...rest) {
-      return this._runTask(createCloneTask("clone", cloneTask, filterType(repo, filterString), ...rest), trailingFunctionArgument(arguments));
-    },
-    mirror(repo, ...rest) {
-      return this._runTask(createCloneTask("mirror", cloneMirrorTask, filterType(repo, filterString), ...rest), trailingFunctionArgument(arguments));
-    }
-  };
-}
-var cloneTask;
-var cloneMirrorTask;
-var init_clone = __esm2({
-  "src/lib/tasks/clone.ts"() {
-    init_task();
-    init_utils();
-    init_pathspec();
-    cloneTask = (repo, directory, customArgs) => {
-      const commands4 = ["clone", ...customArgs];
-      filterString(repo) && commands4.push(pathspec(repo));
-      filterString(directory) && commands4.push(pathspec(directory));
-      return straightThroughStringTask(commands4);
-    };
-    cloneMirrorTask = (repo, directory, customArgs) => {
-      append(customArgs, "--mirror");
-      return cloneTask(repo, directory, customArgs);
-    };
-  }
-});
 var simple_git_api_exports = {};
 __export2(simple_git_api_exports, {
   SimpleGitApi: () => SimpleGitApi
@@ -5579,7 +5547,6 @@ var init_simple_git_api = __esm2({
     init_task();
     init_version();
     init_utils();
-    init_clone();
     SimpleGitApi = class {
       constructor(_executor) {
         this._executor = _executor;
@@ -5642,7 +5609,7 @@ var init_simple_git_api = __esm2({
         return this._runTask(statusTask(getTrailingOptions(arguments)), trailingFunctionArgument(arguments));
       }
     };
-    Object.assign(SimpleGitApi.prototype, checkout_default(), clone_default(), commit_default(), config_default(), count_objects_default(), first_commit_default(), grep_default(), log_default(), show_default(), version_default());
+    Object.assign(SimpleGitApi.prototype, checkout_default(), commit_default(), config_default(), count_objects_default(), first_commit_default(), grep_default(), log_default(), show_default(), version_default());
   }
 });
 var scheduler_exports = {};
@@ -5930,6 +5897,34 @@ var init_check_ignore = __esm2({
     init_CheckIgnore();
   }
 });
+var clone_exports = {};
+__export2(clone_exports, {
+  cloneMirrorTask: () => cloneMirrorTask,
+  cloneTask: () => cloneTask
+});
+function disallowedCommand(command) {
+  return /^--upload-pack(=|$)/.test(command);
+}
+function cloneTask(repo, directory, customArgs) {
+  const commands4 = ["clone", ...customArgs];
+  filterString(repo) && commands4.push(repo);
+  filterString(directory) && commands4.push(directory);
+  const banned = commands4.find(disallowedCommand);
+  if (banned) {
+    return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
+  }
+  return straightThroughStringTask(commands4);
+}
+function cloneMirrorTask(repo, directory, customArgs) {
+  append(customArgs, "--mirror");
+  return cloneTask(repo, directory, customArgs);
+}
+var init_clone = __esm2({
+  "src/lib/tasks/clone.ts"() {
+    init_task();
+    init_utils();
+  }
+});
 function parseFetchResult(stdOut, stdErr) {
   const result = {
     raw: stdOut,
@@ -5981,7 +5976,7 @@ var fetch_exports = {};
 __export2(fetch_exports, {
   fetchTask: () => fetchTask
 });
-function disallowedCommand(command) {
+function disallowedCommand2(command) {
   return /^--upload-pack(=|$)/.test(command);
 }
 function fetchTask(remote, branch, customArgs) {
@@ -5989,7 +5984,7 @@ function fetchTask(remote, branch, customArgs) {
   if (remote && branch) {
     commands4.push(remote, branch);
   }
-  const banned = commands4.find(disallowedCommand);
+  const banned = commands4.find(disallowedCommand2);
   if (banned) {
     return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
   }
@@ -6288,7 +6283,7 @@ var require_git = __commonJS2({
     var { GitExecutor: GitExecutor2 } = (init_git_executor(), __toCommonJS2(git_executor_exports));
     var { SimpleGitApi: SimpleGitApi2 } = (init_simple_git_api(), __toCommonJS2(simple_git_api_exports));
     var { Scheduler: Scheduler2 } = (init_scheduler(), __toCommonJS2(scheduler_exports));
-    var { adhocExecTask: adhocExecTask2, configurationErrorTask: configurationErrorTask2 } = (init_task(), __toCommonJS2(task_exports));
+    var { configurationErrorTask: configurationErrorTask2 } = (init_task(), __toCommonJS2(task_exports));
     var {
       asArray: asArray2,
       filterArray: filterArray2,
@@ -6309,6 +6304,7 @@ var require_git = __commonJS2({
     } = (init_branch(), __toCommonJS2(branch_exports));
     var { checkIgnoreTask: checkIgnoreTask2 } = (init_check_ignore(), __toCommonJS2(check_ignore_exports));
     var { checkIsRepoTask: checkIsRepoTask2 } = (init_check_is_repo(), __toCommonJS2(check_is_repo_exports));
+    var { cloneTask: cloneTask2, cloneMirrorTask: cloneMirrorTask2 } = (init_clone(), __toCommonJS2(clone_exports));
     var { cleanWithOptionsTask: cleanWithOptionsTask2, isCleanOptionsArray: isCleanOptionsArray2 } = (init_clean(), __toCommonJS2(clean_exports));
     var { diffSummaryTask: diffSummaryTask2 } = (init_diff(), __toCommonJS2(diff_exports));
     var { fetchTask: fetchTask2 } = (init_fetch(), __toCommonJS2(fetch_exports));
@@ -6353,6 +6349,18 @@ var require_git = __commonJS2({
     Git2.prototype.stashList = function(options) {
       return this._runTask(stashListTask2(trailingOptionsArgument2(arguments) || {}, filterArray2(options) && options || []), trailingFunctionArgument2(arguments));
     };
+    function createCloneTask(api, task, repoPath, localPath) {
+      if (typeof repoPath !== "string") {
+        return configurationErrorTask2(`git.${api}() requires a string 'repoPath'`);
+      }
+      return task(repoPath, filterType2(localPath, filterString2), getTrailingOptions2(arguments));
+    }
+    Git2.prototype.clone = function() {
+      return this._runTask(createCloneTask("clone", cloneTask2, ...arguments), trailingFunctionArgument2(arguments));
+    };
+    Git2.prototype.mirror = function() {
+      return this._runTask(createCloneTask("mirror", cloneMirrorTask2, ...arguments), trailingFunctionArgument2(arguments));
+    };
     Git2.prototype.mv = function(from, to) {
       return this._runTask(moveTask2(from, to), trailingFunctionArgument2(arguments));
     };
@@ -6371,7 +6379,8 @@ var require_git = __commonJS2({
       return this._runTask(fetchTask2(filterType2(remote, filterString2), filterType2(branch, filterString2), getTrailingOptions2(arguments)), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.silent = function(silence) {
-      return this._runTask(adhocExecTask2(() => console.warn("simple-git deprecation notice: git.silent: logging should be configured using the `debug` library / `DEBUG` environment variable, this method will be removed.")));
+      console.warn("simple-git deprecation notice: git.silent: logging should be configured using the `debug` library / `DEBUG` environment variable, this will be an error in version 3");
+      return this;
     };
     Git2.prototype.tags = function(options, then) {
       return this._runTask(tagListTask2(getTrailingOptions2(arguments)), trailingFunctionArgument2(arguments));
@@ -6524,7 +6533,7 @@ var require_git = __commonJS2({
       return this._runTask(task);
     };
     Git2.prototype.clearQueue = function() {
-      return this._runTask(adhocExecTask2(() => console.warn("simple-git deprecation notice: clearQueue() is deprecated and will be removed, switch to using the abortPlugin instead.")));
+      return this;
     };
     Git2.prototype.checkIgnore = function(pathnames, then) {
       return this._runTask(checkIgnoreTask2(asArray2(filterType2(pathnames, filterStringOrStringArray2, []))), trailingFunctionArgument2(arguments));
@@ -6588,33 +6597,20 @@ function abortPlugin(signal) {
 function isConfigSwitch(arg) {
   return typeof arg === "string" && arg.trim().toLowerCase() === "-c";
 }
-function isCloneUploadPackSwitch(char, arg) {
-  if (typeof arg !== "string" || !arg.includes(char)) {
-    return false;
+function preventProtocolOverride(arg, next) {
+  if (!isConfigSwitch(arg)) {
+    return;
   }
-  const cleaned = arg.trim().replace(/\0/g, "");
-  return /^(--no)?-{1,2}[\dlsqvnobucj]+(\s|$)/.test(cleaned);
+  if (!/^\s*protocol(.[a-z]+)?.allow/.test(next)) {
+    return;
+  }
+  throw new GitPluginError(void 0, "unsafe", "Configuring protocol.allow is not permitted without enabling allowUnsafeExtProtocol");
 }
-function preventConfigBuilder(config, setting, message = String(config)) {
-  const regex = typeof config === "string" ? new RegExp(`\\s*${config}`, "i") : config;
-  return function preventCommand(options, arg, next) {
-    if (options[setting] !== true && isConfigSwitch(arg) && regex.test(next)) {
-      throw new GitPluginError(void 0, "unsafe", `Configuring ${message} is not permitted without enabling ${setting}`);
-    }
-  };
-}
-var preventUnsafeConfig = [
-  preventConfigBuilder(/^\s*protocol(.[a-z]+)?.allow/i, "allowUnsafeProtocolOverride", "protocol.allow"),
-  preventConfigBuilder("core.sshCommand", "allowUnsafeSshCommand"),
-  preventConfigBuilder("core.gitProxy", "allowUnsafeGitProxy"),
-  preventConfigBuilder("core.hooksPath", "allowUnsafeHooksPath"),
-  preventConfigBuilder("diff.external", "allowUnsafeDiffExternal")
-];
 function preventUploadPack(arg, method) {
   if (/^\s*--(upload|receive)-pack/.test(arg)) {
     throw new GitPluginError(void 0, "unsafe", `Use of --upload-pack or --receive-pack is not permitted without enabling allowUnsafePack`);
   }
-  if (method === "clone" && isCloneUploadPackSwitch("u", arg)) {
+  if (method === "clone" && /^\s*-u\b/.test(arg)) {
     throw new GitPluginError(void 0, "unsafe", `Use of clone with option -u is not permitted without enabling allowUnsafePack`);
   }
   if (method === "push" && /^\s*--exec\b/.test(arg)) {
@@ -6622,16 +6618,16 @@ function preventUploadPack(arg, method) {
   }
 }
 function blockUnsafeOperationsPlugin({
-  allowUnsafePack = false,
-  ...options
+  allowUnsafeProtocolOverride = false,
+  allowUnsafePack = false
 } = {}) {
   return {
     type: "spawn.args",
     action(args, context) {
       args.forEach((current, index) => {
         const next = index < args.length ? args[index + 1] : "";
+        allowUnsafeProtocolOverride || preventProtocolOverride(current, next);
         allowUnsafePack || preventUploadPack(current, context.method);
-        preventUnsafeConfig.forEach((helper) => helper(options, current, next));
       });
       return args;
     }
@@ -6715,7 +6711,7 @@ init_utils();
 var WRONG_NUMBER_ERR = `Invalid value supplied for custom binary, requires a single string or an array containing either one or two strings`;
 var WRONG_CHARS_ERR = `Invalid value supplied for custom binary, restricted characters must be removed or supply the unsafe.allowUnsafeCustomBinary option`;
 function isBadArgument(arg) {
-  return !arg || !/^([a-z]:)?([a-z0-9/.\\_~-]+)$/i.test(arg);
+  return !arg || !/^([a-z]:)?([a-z0-9/.\\_-]+)$/i.test(arg);
 }
 function toBinaryConfig(input, allowUnsafe) {
   if (input.length < 1 || input.length > 2) {
@@ -6935,12 +6931,12 @@ function gitInstanceFactory(baseDir, options) {
     plugins.add(commandConfigPrefixingPlugin(config.config));
   }
   plugins.add(blockUnsafeOperationsPlugin(config.unsafe));
+  plugins.add(suffixPathsPlugin());
   plugins.add(completionDetectionPlugin(config.completion));
   config.abort && plugins.add(abortPlugin(config.abort));
   config.progress && plugins.add(progressMonitorPlugin(config.progress));
   config.timeout && plugins.add(timeoutPlugin(config.timeout));
   config.spawnOptions && plugins.add(spawnOptionsPlugin(config.spawnOptions));
-  plugins.add(suffixPathsPlugin());
   plugins.add(errorDetectionPlugin(errorDetectionHandler(true)));
   config.errors && plugins.add(errorDetectionPlugin(config.errors));
   customBinaryPlugin(plugins, config.binary, config.unsafe?.allowUnsafeCustomBinary);
@@ -8918,7 +8914,7 @@ function generateCopilotInstructions() {
 
 Use .github/instructions/ for path-specific coding and workflow guidance, and .github/prompts/ for reusable entry points such as plan creation, plan review, execution, review handoff, and completion verification.
 
-Prefer GitHub Copilot's built-in clarification flow in chat. Use vscode/askQuestions inside prompt files only when extra structured input materially improves the result.
+Use vscode/askQuestions for practical structured decision checkpoints wherever Copilot supports it. Use plain chat only as a fallback when the tool is unavailable or a truly lightweight clarification is better.
 
 When web research, browser inspection, or end-to-end verification is needed, prefer built-in browser tools and MCP integrations such as Playwright MCP over extension-specific substitutes.`
   );
@@ -8982,11 +8978,11 @@ function generatePlanFeaturePrompt() {
       description: "Create or revise a Hive feature plan with plan-first guardrails.",
       agent: "hive",
       model: "gpt-5.4",
-      tools: ["read", "search", "codebase", "usages", `${EXTENSION_ID}/hiveStatus`, `${EXTENSION_ID}/hivePlanWrite`]
+      tools: ["read", "search", "codebase", "usages", "vscode/askQuestions", `${EXTENSION_ID}/hiveStatus`, `${EXTENSION_ID}/hivePlanWrite`]
     },
     `Start by checking AGENTS.md, .github/copilot-instructions.md, and any relevant .github/instructions/ files. Use read-only exploration first, then write or revise the plan with hive_plan_write.
 
-If key requirements are missing, use vscode/askQuestions only for the minimum structured clarification needed; otherwise prefer Copilot's built-in clarification flow in chat.
+If key requirements are missing, use vscode/askQuestions as the normal structured clarification path for the minimum practical decision checkpoints. Use plain chat only as a fallback when the tool is unavailable or a truly lightweight clarification is better.
 
 Keep Hive's plan-first contract intact: no implementation edits, explicit task dependencies, exact file references, and concrete verification commands.`
   );
@@ -9304,7 +9300,8 @@ Use \`hive_status()\` to get the **runnable** list \u2014 tasks with all depende
 Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, \`cancelled\`).
 
 **When 2+ tasks are runnable:**
-- Ask the user directly in chat: "Multiple tasks are runnable: [list]. Run in parallel, sequential, or a specific subset?"
+- Prefer \`vscode/askQuestions\` for a structured choice: "Multiple tasks are runnable: [list]. Run in parallel, sequential, or a specific subset?"
+- Fall back to asking directly in chat only when \`vscode/askQuestions\` is unavailable or a lightweight follow-up is enough
 - Record the decision with \`hive_context_write({ name: "execution-decisions", content: "..." })\` for future reference
 
 **When 1 task is runnable:** Proceed directly.
@@ -9325,7 +9322,8 @@ When batch complete:
 
 ### Step 4.5: Post-Batch Hygienic Review
 
-After the batch report, ask the user directly in chat if they want a Hygienic code review for the batch.
+After the batch report, prefer \`vscode/askQuestions\` to ask whether the user wants a Hygienic code review for the batch.
+Fall back to asking directly in chat only when \`vscode/askQuestions\` is unavailable or a lightweight follow-up is enough.
 If yes, invoke the @hygienic agent via the agent tool to review implementation changes from the latest batch, then apply feedback before starting the next batch.
 
 ### Step 5: Continue
@@ -9637,7 +9635,8 @@ Before dispatching, use \`hive_status()\` to get the **runnable** list \u2014 ta
 Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, \`cancelled\`).
 
 **Ask the operator first:**
-- Ask the operator directly in chat: "These tasks are runnable and independent: [list]. Execute in parallel?"
+- Prefer \`vscode/askQuestions\` for the approval prompt: "These tasks are runnable and independent: [list]. Execute in parallel?"
+- Fall back to asking directly in chat only when \`vscode/askQuestions\` is unavailable or a lightweight follow-up is enough
 - Record the decision with \`hive_context_write({ name: "execution-decisions", content: "..." })\`
 - Proceed only after operator approval
 
