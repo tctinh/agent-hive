@@ -155,13 +155,35 @@ UNIQUE_MARKER_12345
     expect(prompt).toContain('hive_worktree_commit');
   });
 
-  it('requires terminal commit result before stopping', () => {
+  it('requires terminal commit result before stopping and preserves retry flow for non-terminal results', () => {
     const params = createTestParams();
     const prompt = buildWorkerPrompt(params);
 
     expect(prompt).toContain('terminal=true');
+    expect(prompt).toContain('this call is final');
     expect(prompt).toContain('DO NOT STOP');
     expect(prompt).toContain('result.nextAction');
+    expect(prompt).toContain('regardless of `ok`');
+    expect(prompt).toContain('must not be retried with the same parameters');
+  });
+
+  it('requires final concise handoff response after terminal commit', () => {
+    const params = createTestParams();
+    const prompt = buildWorkerPrompt(params);
+
+    expect(prompt).toContain('send one final concise handoff response');
+    expect(prompt).toContain('to the orchestrator');
+    expect(prompt).toContain('what changed');
+    expect(prompt).toContain('why');
+    expect(prompt).toContain('verification evidence');
+  });
+
+  it('omits contradictory no-response wording after terminal commit', () => {
+    const params = createTestParams();
+    const prompt = buildWorkerPrompt(params);
+
+    expect(prompt).not.toContain('Do NOT respond further');
+    expect(prompt).not.toContain('no conversational response is required or expected');
   });
 
   it('keeps ordinary workers merge-forbidden and delegation-forbidden', () => {

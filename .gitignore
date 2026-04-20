@@ -22,6 +22,7 @@ npm-debug.log*
 .env.local
 .ignore
 tmp/
+.tmp/
 
 # Hive runtime data
 .hive/

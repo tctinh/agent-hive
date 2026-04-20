@@ -146,6 +146,7 @@ describe('Hive (Hybrid) prompt', () => {
 
     it('allows blocked resume only for exactly blocked tasks', () => {
       expect(QUEEN_BEE_PROMPT).toContain('Use `continueFrom: "blocked"` only when status is exactly `blocked`');
+      expect(QUEEN_BEE_PROMPT).not.toContain('Use `continueFrom: "blocked"` when status is unresolved');
     });
 
     it('forbids blocked resume loops on non-blocked statuses', () => {
@@ -160,6 +161,9 @@ describe('Hive (Hybrid) prompt', () => {
     it('treats terminal tool responses as non-retriable for same parameters', () => {
       expect(QUEEN_BEE_PROMPT).toContain('If any Hive tool response has `terminal: true`');
       expect(QUEEN_BEE_PROMPT).toContain('do not retry the same parameters');
+      expect(QUEEN_BEE_PROMPT).toContain('finality applies to the tool call parameters');
+      expect(QUEEN_BEE_PROMPT).toContain('tool call parameters');
+      expect(QUEEN_BEE_PROMPT).toContain('final natural-language handoff response');
     });
 
     it('redirects non-blocked unresolved tasks to normal dispatch', () => {
@@ -336,8 +340,20 @@ describe('Swarm (Orchestrator) prompt', () => {
       expect(SWARM_BEE_PROMPT).toContain('Use `continueFrom: "blocked"` only when status is exactly `blocked`');
     });
 
+    it('requires immediate status re-check before each blocked resume', () => {
+      expect(SWARM_BEE_PROMPT).toContain('Before every blocked resume, call `hive_status()` immediately beforehand');
+      expect(SWARM_BEE_PROMPT).toContain('verify the task is still exactly `blocked`');
+    });
+
     it('forbids blocked resume loops on non-blocked statuses', () => {
       expect(SWARM_BEE_PROMPT).toContain('Never loop `continueFrom: "blocked"` on non-blocked statuses');
+    });
+
+    it('clarifies terminal finality scope while allowing final natural-language handoff', () => {
+      expect(SWARM_BEE_PROMPT).toContain('If any Hive tool response has `terminal: true`');
+      expect(SWARM_BEE_PROMPT).toContain('do not retry the same parameters');
+      expect(SWARM_BEE_PROMPT).toContain('tool call parameters');
+      expect(SWARM_BEE_PROMPT).toContain('final natural-language handoff response');
     });
 
     it('redirects non-blocked unresolved tasks to normal dispatch', () => {
@@ -422,9 +438,19 @@ describe('Forager (Worker/Coder) prompt', () => {
   });
 
   it('requires terminal commit result before stopping', () => {
-    expect(FORAGER_BEE_PROMPT).toContain('ok');
+    expect(FORAGER_BEE_PROMPT).toContain('regardless of `ok`');
     expect(FORAGER_BEE_PROMPT).toContain('terminal');
     expect(FORAGER_BEE_PROMPT).toContain('DO NOT STOP');
+  });
+
+  it('requires a final concise handoff response after terminal commit', () => {
+    expect(FORAGER_BEE_PROMPT).toContain('send one final concise handoff response');
+    expect(FORAGER_BEE_PROMPT).toContain('to the orchestrator');
+    expect(FORAGER_BEE_PROMPT).toContain('what changed');
+    expect(FORAGER_BEE_PROMPT).toContain('why (if relevant)');
+    expect(FORAGER_BEE_PROMPT).toContain('verification evidence');
+    expect(FORAGER_BEE_PROMPT).not.toContain('stop and hand off to orchestrator');
+    expect(FORAGER_BEE_PROMPT).not.toContain('Do NOT respond further');
   });
 
   it('adds resolve-before-blocking guidance', () => {

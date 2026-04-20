@@ -84,6 +84,7 @@ Delegation guidance:
 - If status is not \`blocked\`, do not use \`continueFrom: "blocked"\`; use \`hive_worktree_start({ feature, task })\` only for normal starts (\`pending\` / \`in_progress\`)
 - Never loop \`continueFrom: "blocked"\` on non-blocked statuses
 - If any Hive tool response has \`terminal: true\`, treat it as final for that call and do not retry the same parameters
+- This finality applies to the tool call parameters and does not prohibit the worker’s final natural-language handoff response
 - For parallel fan-out, issue multiple \`task()\` calls in the same message
 
 ## After Delegation - VERIFY

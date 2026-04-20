@@ -117,8 +117,10 @@ hive_worktree_commit({
 \`\`\`
 
 Then inspect the tool response fields:
-- If \`ok=true\` and \`terminal=true\`: stop and hand off to orchestrator
+- If \`terminal=true\` (regardless of \`ok\`): send one final concise handoff response to the orchestrator, then stop
 - If \`ok=false\` or \`terminal=false\`: DO NOT STOP. Follow \`nextAction\`, remediate, and retry \`hive_worktree_commit\`
+
+Use the handoff response to summarize what changed, why (if relevant), and verification evidence (or "Not run" with reason).
 
 **Blocked (need user decision):**
 \`\`\`
