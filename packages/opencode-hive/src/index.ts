@@ -1286,17 +1286,11 @@ Expand your Discovery section and try again.`;
           captureSession(feature, toolContext);
           const info = featureService.getInfo(feature);
           const planComments = info?.reviewCounts.plan ?? 0;
-          const overviewComments = info?.reviewCounts.overview ?? 0;
-          const unresolvedTotal = planComments + overviewComments;
-          if (unresolvedTotal > 0) {
-            const documents = [
-              planComments > 0 ? `plan (${planComments})` : null,
-              overviewComments > 0 ? `overview (${overviewComments})` : null,
-            ].filter(Boolean).join(', ');
-            return `Error: Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`;
+          if (planComments > 0) {
+            return `Error: Cannot approve - ${planComments} unresolved plan review comment(s) remain. Address them first.`;
           }
           planService.approve(feature);
-          return 'Plan approved. Run hive_tasks_sync to generate tasks. Refresh the overview if approval changed the plan narrative, workstreams, or milestones; context/overview.md is the primary human-facing surface and plan.md remains execution truth.';
+          return 'Plan approved. Run hive_tasks_sync to generate tasks. Refresh the plan summary if approval changed the narrative, workstreams, or milestones; plan.md remains execution truth.';
         },
       }),
 
