@@ -46,12 +46,14 @@ Your tool access is scoped to your role. Use only the tools available to you.
 ## Allowed Research
 
 Use quick local exploration when needed:
+- When a task depends on browser behavior, use `browser` for quick inspection and `playwright/*` for repeatable automation or end-to-end verification.
 - `read` — inspect referenced files
 - `search` — find nearby patterns
 - `execute` — run verification commands available in the environment
 - `web` / `io.github.upstash/context7/*` — retrieve current docs when local context is insufficient
-- `browser` / `playwright/*` — verify browser flows and UI regressions when native automation is the best fit
-- `todo` — keep a short working checklist when the task has multiple steps
+- `browser` — inspect rendered UI, browser state, console output, and network behavior when the task depends on live behavior
+- `playwright/*` — use for repeatable automation or end-to-end verification once the browser path is clear
+- Use `todo` only when the assigned task has enough moving pieces that a live checklist prevents misses.
 
 ## Resolve Before Blocking
 
@@ -75,7 +77,7 @@ Do not modify the plan file.
 
 ## Persistent Notes
 
-Use `vscode/memory` for short durable notes only when future turns need them.
+Use `vscode/memory` only for durable context that must survive the current task handoff.
 Keep task-specific progress in `hive_task_update` rather than inventing special note files.
 
 ## Working Rules

@@ -744,6 +744,20 @@ The alignment in this branch is intentionally pragmatic. OpenCode still owns ses
 
 **Boundary insight:** Honest contracts make systems easier to operate. Saying “OpenCode-owned todos plus bounded replay from `.hive` artifacts” is less glamorous than saying “native OpenCode sync,” but it matches the code and gives operators something real to trust.
 
+### v1.4.5 (Explicit Tool Triggers, Not Ambient Capability)
+
+**Theme:** Teach the Copilot-facing workflow when to use the tools it already has, instead of merely exposing those tools and hoping the agent chooses well.
+
+Three threads define this patch:
+
+**Trigger-based skill loading:** The generated Hive guidance now turns skill loading into a task-triggered contract. Multi-domain read-only investigation points at `parallel-exploration`, bugs and failing tests point at `systematic-debugging`, implementation points at `test-driven-development`, and completion claims point at `verification-before-completion`. This sharpens P2/P8 (Plan → Approve → Execute, Cross-Model Prompts): the workflow is more deterministic because the agent no longer has to infer the right procedural layer from a flat catalog of skills.
+
+**Tool-aware procedural guidance:** The Scout, Forager, and Hygienic prompts, along with the built-in planning/execution/research/debugging/TDD/verification skills, now explain when `browser`, Playwright MCP, `todo`, `vscode/memory`, and `hive_status()` actually reduce guesswork. That matters because capability lists alone do not produce good operator outcomes. This strengthens P3/P9 (Human Shapes, Agent Builds, Deterministic Contracts Beat Soft Memory): the human sees a more honest workflow, and the agent gets bounded, situational instructions instead of vague encouragement.
+
+**Committed artifact parity as product discipline:** The shipped `.github/*` artifacts are treated as part of the product surface, not disposable scaffolding. When the generator contract changes, the committed outputs and the parity tests now move with it. This is P7/P9 (Iron Laws + Hard Gates, Deterministic Contracts Beat Soft Memory): the release is safer because the documented Copilot path and the generated repo surface stay aligned.
+
+**Shared insight:** Good agent tooling is not just about what tools exist. It is about teaching the agent when a tool meaningfully changes the quality of the decision.
+
 ### v1.4.4 (One Copilot Story, One Plan Contract)
 
 **Theme:** Make the generated Copilot surface tell the same truth as the code: one required plan document, one response-first worker story, and explicit tool/model contracts instead of stale artifact drift.

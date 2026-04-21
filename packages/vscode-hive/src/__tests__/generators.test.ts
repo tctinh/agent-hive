@@ -86,6 +86,10 @@ describe('Agent Generators', () => {
 
     expect(body).toContain('Use `vscode/askQuestions` for structured decision checkpoints');
     expect(body).toContain('Plain chat is allowed only for lightweight clarification or when `vscode/askQuestions` is unavailable');
+    expect(body).toContain('Before any multi-domain, read-only investigation, refer to .github/skills/parallel-exploration/');
+    expect(body).toContain('When the work is a bug, failing test, or unexpected behavior, refer to .github/skills/systematic-debugging/');
+    expect(body).toContain('When implementing a feature, fix, or refactor, refer to .github/skills/test-driven-development/ before editing production code');
+    expect(body).toContain('Before any completion claim, handoff, or PR/update that says work is done or passing, refer to .github/skills/verification-before-completion/');
     expect(body).not.toContain('Ask the user directly in chat');
     expect(body).not.toContain('ask the user directly in chat');
     expect(body).not.toContain('question()');
@@ -143,6 +147,34 @@ describe('Skill Generators', () => {
     expect(dispatchingParallelAgents).toContain('Prefer `vscode/askQuestions` for the approval prompt');
     expect(executingPlans).not.toContain('question()');
     expect(dispatchingParallelAgents).not.toContain('question()');
+  });
+
+  test('copilot skill output is operationally tool-aware for task lookup, browser work, and durable notes', () => {
+    const byName = new Map(getBuiltinSkills().map((skill) => [skill.name, getBody(skill.content)]));
+    const writingPlans = byName.get('writing-plans') ?? '';
+    const parallelExploration = byName.get('parallel-exploration') ?? '';
+    const dispatchingParallelAgents = byName.get('dispatching-parallel-agents') ?? '';
+    const systematicDebugging = byName.get('systematic-debugging') ?? '';
+    const testDrivenDevelopment = byName.get('test-driven-development') ?? '';
+    const verificationBeforeCompletion = byName.get('verification-before-completion') ?? '';
+
+    expect(writingPlans).toContain('start from `hive_status()` to confirm the active feature, current task IDs, and any blocked or runnable work');
+    expect(writingPlans).toContain('Use `todo` only when shaping a multi-task plan or review response needs an active checklist');
+    expect(writingPlans).toContain('Use `vscode/memory` only for durable planning decisions or blocker history that future turns need');
+
+    expect(parallelExploration).toContain('Load this skill before any multi-domain, read-only investigation that benefits from Scout fan-out');
+    expect(parallelExploration).toContain('use `web` or `io.github.upstash/context7/*` for the docs/OSS slice');
+    expect(parallelExploration).toContain('Use `vscode/memory` only for findings the parent agent or a later turn will need after synthesis');
+
+    expect(dispatchingParallelAgents).toContain('Load this skill when `hive_status()` shows 2+ runnable independent tasks');
+    expect(dispatchingParallelAgents).toContain('refer to the skill at .github/skills/parallel-exploration/SKILL.md instead');
+
+    expect(systematicDebugging).toContain('reproduce it with `browser` before changing code');
+    expect(systematicDebugging).toContain('Use `playwright/*` when you need a repeatable browser repro or end-to-end trace');
+    expect(testDrivenDevelopment).toContain('refer to the skill at .github/skills/systematic-debugging/SKILL.md first to confirm root cause');
+    expect(testDrivenDevelopment).toContain('use `browser` for quick inspection and `playwright/*` for repeatable failing and passing coverage');
+    expect(verificationBeforeCompletion).toContain('use `browser` to gather direct evidence');
+    expect(verificationBeforeCompletion).toContain('use `playwright/*` to run the proving sequence');
   });
 });
 
@@ -203,8 +235,16 @@ describe('Instruction Generators', () => {
     const body = getBody(content);
     expect(body).toContain('AGENTS.md');
     expect(body).toContain('.github/prompts/');
+    expect(body).toContain('Load .github/skills/ only when the current task triggers that workflow');
+    expect(body).toContain('parallel read-only investigation');
+    expect(body).toContain('bugs or test failures');
+    expect(body).toContain('implementation work');
+    expect(body).toContain('completion claims');
     expect(body).toContain('vscode/askQuestions');
     expect(body).toContain('plain chat only as a fallback');
+    expect(body).toContain('Copilot memory only for durable notes');
+    expect(body).toContain('todo for multi-step work');
+    expect(body).toContain('Playwright MCP');
     expect(body).not.toContain('inside prompt files only');
     expect(body.length).toBeLessThanOrEqual(1000);
   });

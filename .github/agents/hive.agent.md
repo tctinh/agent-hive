@@ -75,6 +75,7 @@ During Planning, use the agent tool to invoke @scout for exploration. When multi
 
 ### Memory and Working Notes
 Use Copilot memory for durable notes only when future turns need them.
+Use the todo tool only when a multi-step investigation, batch, or handoff needs active tracking.
 Treat `plan.md` as the only required human-facing review surface and execution truth for each feature.
 Use ordinary file edits for repository documents such as AGENTS.md when the workflow calls for updates.
 Do not invent special-purpose note files or helper tools just to persist findings.
@@ -102,20 +103,14 @@ NEVER end with:
 - "When you're ready..."
 
 ### Loading Skills (On-Demand)
-Refer to a skill only when detailed guidance is needed:
-| Skill | Use when |
-|-------|----------|
-| .github/skills/brainstorming/ | Exploring ideas and requirements |
-| .github/skills/writing-plans/ | Structuring implementation plans |
-| .github/skills/dispatching-parallel-agents/ | Parallel task delegation |
-| .github/skills/parallel-exploration/ | Parallel read-only research |
-| .github/skills/executing-plans/ | Step-by-step plan execution |
-| .github/skills/systematic-debugging/ | Bugs, test failures, unexpected behavior |
-| .github/skills/test-driven-development/ | TDD approach |
-| .github/skills/verification-before-completion/ | Before claiming work is complete or creating PRs |
-| .github/skills/agents-md-mastery/ | Agent and AGENTS.md quality review |
+Load only the skill the current task triggers:
+- Before any multi-domain, read-only investigation, refer to .github/skills/parallel-exploration/ and use it to structure Scout fan-out.
+- When the work is a bug, failing test, or unexpected behavior, refer to .github/skills/systematic-debugging/ before proposing fixes.
+- When implementing a feature, fix, or refactor, refer to .github/skills/test-driven-development/ before editing production code.
+- Before any completion claim, handoff, or PR/update that says work is done or passing, refer to .github/skills/verification-before-completion/ and run the proving command.
+- Use .github/skills/brainstorming/ for vague requirements, .github/skills/writing-plans/ for plan authoring, .github/skills/dispatching-parallel-agents/ for parallel task execution, .github/skills/executing-plans/ for approved-plan execution, and .github/skills/agents-md-mastery/ for AGENTS.md quality work.
 
-Load one skill at a time, only when guidance is needed.
+Load one skill at a time, only when the current task triggers it.
 
 ### Copilot-Native Workspace Surfaces
 - Treat .github/copilot-instructions.md as concise repository-wide steering that complements AGENTS.md instead of replacing it.
@@ -124,9 +119,9 @@ Load one skill at a time, only when guidance is needed.
 - Use .github/skills/ directly when you need deeper procedural guidance instead of routing skill access through extension-specific helpers.
 
 ### Browser, MCP, and Web Work
-- For browser exploration or web verification, prefer Copilot's built-in browser tools.
-- For browser automation and end-to-end testing, prefer Playwright MCP when it is available.
-- Use MCP or browser tools when they are a better fit than inventing extension-specific replacements.
+- When the answer depends on rendered UI, live browser state, console output, or network activity, prefer Copilot's built-in browser tools.
+- When you need repeatable browser automation or end-to-end verification, prefer Playwright MCP when it is available.
+- Use MCP or browser tools when they materially reduce guesswork instead of inventing extension-specific replacements.
 
 ---
 

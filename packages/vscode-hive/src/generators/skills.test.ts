@@ -56,6 +56,50 @@ describe('skills generator', () => {
     expect(dispatchingParallelAgents).not.toContain('question()');
   });
 
+  it('adds tool-aware task lookup, research, debugging, and verification guidance to the task 2 skills', () => {
+    const byName = new Map(skills.map((skill) => [skill.name, skill.content]));
+    const writingPlans = byName.get('writing-plans');
+    const executingPlans = byName.get('executing-plans');
+    const parallelExploration = byName.get('parallel-exploration');
+    const dispatchingParallelAgents = byName.get('dispatching-parallel-agents');
+    const systematicDebugging = byName.get('systematic-debugging');
+    const testDrivenDevelopment = byName.get('test-driven-development');
+    const verificationBeforeCompletion = byName.get('verification-before-completion');
+
+    expect(writingPlans).toContain('start from `hive_status()` to confirm the active feature, current task IDs, and any blocked or runnable work');
+    expect(writingPlans).toContain('Use `todo` only when shaping a multi-task plan or review response needs an active checklist');
+    expect(writingPlans).toContain('Use `vscode/memory` only for durable planning decisions or blocker history that future turns need');
+
+    expect(executingPlans).toContain('Create a short checklist in `todo` or your working notes only when the batch has enough moving parts to justify active tracking');
+    expect(executingPlans).toContain('Use `vscode/memory` only for durable execution decisions or blocker history that future turns need');
+
+    expect(parallelExploration).toContain('Load this skill before any multi-domain, read-only investigation that benefits from Scout fan-out');
+    expect(parallelExploration).toContain('use `browser` as one of the read-only slices');
+    expect(parallelExploration).toContain('use `web` or `io.github.upstash/context7/*` for the docs/OSS slice');
+    expect(parallelExploration).toContain('Use `todo` only when you need to track multiple questions and evidence coverage during synthesis');
+    expect(parallelExploration).toContain('Use `vscode/memory` only for findings the parent agent or a later turn will need after synthesis');
+
+    expect(dispatchingParallelAgents).toContain('Load this skill when `hive_status()` shows 2+ runnable independent tasks');
+    expect(dispatchingParallelAgents).toContain('refer to the skill at .github/skills/parallel-exploration/SKILL.md instead');
+    expect(dispatchingParallelAgents).toContain('Use `todo` only when the batch needs a live checklist for task ownership, integration, or follow-up');
+    expect(dispatchingParallelAgents).toContain('Use `vscode/memory` only for durable coordination decisions or blocker history that future turns need');
+
+    expect(systematicDebugging).toContain('reproduce it with `browser` before changing code');
+    expect(systematicDebugging).toContain('Use `playwright/*` when you need a repeatable browser repro or end-to-end trace');
+    expect(systematicDebugging).toContain('Use `todo` only when tracking multiple hypotheses, component boundaries, or repro attempts');
+    expect(systematicDebugging).toContain('Use `vscode/memory` only for durable root-cause findings or blocker history another turn will need');
+
+    expect(testDrivenDevelopment).toContain('refer to the skill at .github/skills/systematic-debugging/SKILL.md first to confirm root cause');
+    expect(testDrivenDevelopment).toContain('use `browser` for quick inspection and `playwright/*` for repeatable failing and passing coverage');
+    expect(testDrivenDevelopment).toContain('Use `todo` only when the red-green-refactor cycle spans multiple cases that need active tracking');
+    expect(testDrivenDevelopment).toContain('Use `vscode/memory` only for durable test decisions, flaky-environment notes, or blocker history that later turns need');
+
+    expect(verificationBeforeCompletion).toContain('use `browser` to gather direct evidence');
+    expect(verificationBeforeCompletion).toContain('use `playwright/*` to run the proving sequence');
+    expect(verificationBeforeCompletion).toContain('Use `todo` only when the verification plan has multiple independent checks');
+    expect(verificationBeforeCompletion).toContain('Use `vscode/memory` only for durable verification gaps or recurring environment caveats that later turns need');
+  });
+
   it('keeps writing-plans aligned to the single-document plan workflow', () => {
     const byName = new Map(skills.map((skill) => [skill.name, skill.content]));
     const writingPlans = byName.get('writing-plans');

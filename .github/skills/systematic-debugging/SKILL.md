@@ -43,6 +43,13 @@ Use for ANY technical issue:
 - You're in a hurry (rushing guarantees rework)
 - Manager wants it fixed NOW (systematic is faster than thrashing)
 
+## Tool-Aware Evidence Gathering
+
+- If the issue depends on rendered UI, browser state, console output, or network activity, reproduce it with `browser` before changing code.
+- Use `playwright/*` when you need a repeatable browser repro or end-to-end trace.
+- Use `todo` only when tracking multiple hypotheses, component boundaries, or repro attempts.
+- Use `vscode/memory` only for durable root-cause findings or blocker history another turn will need.
+
 ## The Four Phases
 
 You MUST complete each phase before proceeding to the next.

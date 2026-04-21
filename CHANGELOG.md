@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.5] - 2026-04-21
+
+### Added
+- **Hive now teaches trigger-based skill loading for Copilot work**: The generated Hive prompt and repository-wide guidance now explicitly load `parallel-exploration` for multi-domain research, `systematic-debugging` for bugs and failing tests, `test-driven-development` for implementation, and `verification-before-completion` before completion claims.
+- **Task lookup and tool-aware workflow guidance now ship across the built-in skills**: Writing-plans, executing-plans, parallel-exploration, dispatching-parallel-agents, systematic-debugging, test-driven-development, and verification-before-completion now explain when `hive_status()`, browser tools, Playwright MCP, `todo`, and `vscode/memory` materially improve the work instead of treating those capabilities as ambient background tools.
+
+### Changed
+- **Generated Scout, Forager, and Hygienic prompts now explain when to use browser, Playwright, todo, and memory**: The committed `.github/agents/*` artifacts and their generators now give role-specific guidance for rendered UI inspection, repeatable browser automation, active checklists, and durable note-taking.
+- **Copilot instructions and workflow guidance now prefer task-triggered tool usage over generic capability lists**: The repo-wide Copilot steering and Hive workflow instruction now tell agents to load only the skill or tool guidance the current task actually triggers, reducing guesswork during planning, execution, and verification.
+- **Version-bearing release surfaces are refreshed to `1.4.5`**: Root/workspace manifests, `packages/opencode-hive/plugin.json`, tracked workspace lockfile markers, the changelog, the dedicated release note, and the PHILOSOPHY evolution history now all describe the same shipped patch.
+
+### Fixed
+- **Multi-domain read-only investigations no longer leave `parallel-exploration` implicit**: Hive's generated Copilot guidance now makes the fan-out path explicit instead of relying on agents to infer the right skill from a generic list.
+- **Committed generated Copilot artifacts no longer drift behind the updated generator contract**: The `.github/agents`, `.github/instructions`, `.github/copilot-instructions.md`, and `.github/skills/*` outputs are resynchronized with the source generators for the new tool-aware guidance.
+
 ## [1.4.4] - 2026-04-21
 
 ### Added

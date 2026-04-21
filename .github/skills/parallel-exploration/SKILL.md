@@ -35,6 +35,15 @@ When you need to answer "where/how does X work?" across multiple domains (codeba
 
 **Important:** Do not treat "this is exploratory" as a reason to avoid delegation. This skill is specifically for exploratory research when fan-out makes it faster and cleaner.
 
+## Tool-Aware Research
+
+Load this skill before any multi-domain, read-only investigation that benefits from Scout fan-out.
+
+- When the answer depends on rendered UI, browser state, console output, or network activity, use `browser` as one of the read-only slices.
+- When external docs, APIs, or third-party implementations matter, use `web` or `io.github.upstash/context7/*` for the docs/OSS slice.
+- Use `todo` only when you need to track multiple questions and evidence coverage during synthesis.
+- Use `vscode/memory` only for findings the parent agent or a later turn will need after synthesis.
+
 ## The Pattern
 
 ### 1. Decompose Into Independent Questions

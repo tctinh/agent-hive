@@ -1,14 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { FeatureService } from '../../../hive-core/src/services/featureService.ts';
-import { PlanService } from '../../../hive-core/src/services/planService.ts';
-import { getFeaturePath, listFeatureDirectories } from '../../../hive-core/src/utils/paths.ts';
+const hiveCore = await import('../../../hive-core/src/index.ts');
+const { FeatureService, PlanService } = hiveCore;
 
-mock.module('hive-core', () => ({
-  getFeaturePath,
-  listFeatureDirectories,
-}));
+mock.module('hive-core', () => hiveCore);
 
 mock.module('vscode', () => {
   class TreeItem {
