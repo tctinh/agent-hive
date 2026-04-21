@@ -2,7 +2,7 @@
   "name": "vscode-hive",
   "displayName": "Agent Hive",
   "description": "From Vibe Coding to Hive Coding - Review and approve AI-generated plans",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "publisher": "tctinh",
   "license": "MIT WITH Commons-Clause",
   "icon": "icon.png",
@@ -67,7 +67,7 @@
         "name": "hive_feature_create",
         "toolReferenceName": "hiveFeatureCreate",
         "displayName": "Create Hive Feature",
-        "modelDescription": "Create a new Hive feature for plan-first development. Use at the start of any new work to establish a planning workspace with context, plan, and task tracking.",
+        "modelDescription": "Create a new Hive feature for plan-first development. Use at the start of any new work to establish a planning workspace with plan.md and task tracking.",
         "userDescription": "Create a new Hive feature and initialize its planning workspace.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
@@ -107,7 +107,7 @@
         "name": "hive_plan_write",
         "toolReferenceName": "hivePlanWrite",
         "displayName": "Write Hive Plan",
-        "modelDescription": "Write or update the plan.md for a feature. Review context/overview.md first as the human-facing summary/history surface on this branch, while plan.md remains execution truth. Include a concise design summary before ## Tasks, and optionally include a Mermaid dependency or sequence overview in that pre-task summary only. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.",
+        "modelDescription": "Write or update the plan.md for a feature. plan.md is the only required human-review and execution document. Include a concise overview/design summary before ## Tasks, and optionally include a Mermaid dependency or sequence overview in that pre-task summary only. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.",
         "userDescription": "Write or rewrite a feature plan.md file.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
@@ -129,7 +129,7 @@
         "name": "hive_plan_read",
         "toolReferenceName": "hivePlanRead",
         "displayName": "Read Hive Plan",
-        "modelDescription": "Read the plan.md and related review comments for a feature. Use to inspect the plan.md execution contract, task structure, status, and review feedback while keeping context/overview.md as the human-facing summary/history surface on this branch.",
+        "modelDescription": "Read the plan.md and related review comments for a feature. Use to inspect the single execution contract, task structure, status, and review feedback in the only required review document.",
         "userDescription": "Read a feature plan and its review comments.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
@@ -147,7 +147,7 @@
         "name": "hive_plan_approve",
         "toolReferenceName": "hivePlanApprove",
         "displayName": "Approve Hive Plan",
-        "modelDescription": "Approve a plan for execution. Use after reviewers have checked context/overview.md first, confirmed plan.md as the execution contract, and resolved any comments. Changes feature status to approved.",
+        "modelDescription": "Approve a plan for execution. Use after reviewers have checked plan.md as the only required review document and resolved any plan comments. Changes feature status to approved.",
         "userDescription": "Approve a Hive feature plan for execution.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
@@ -212,7 +212,7 @@
         "name": "hive_task_update",
         "toolReferenceName": "hiveTaskUpdate",
         "displayName": "Update Hive Task",
-        "modelDescription": "Update a task status or add a work summary. Does NOT merge - use hive_merge for integration.",
+        "modelDescription": "Update a task status or add a work summary. Use during direct @forager execution to record progress or completion.",
         "userDescription": "Update a Hive task status or summary.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
@@ -227,115 +227,10 @@
         }
       },
       {
-        "name": "hive_worktree_start",
-        "toolReferenceName": "hiveWorktreeStart",
-        "displayName": "Start Task Worktree",
-        "modelDescription": "Create a git worktree for a pending or in-progress task. Use for normal task starts.",
-        "userDescription": "Create a worktree for a runnable Hive task.",
-        "canBeReferencedInPrompt": true,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": { "type": "string", "description": "Feature name" },
-            "task": { "type": "string", "description": "Task folder name" }
-          },
-          "required": ["feature", "task"]
-        }
-      },
-      {
-        "name": "hive_worktree_create",
-        "toolReferenceName": "hiveWorktreeCreate",
-        "displayName": "Resume Blocked Task Worktree",
-        "modelDescription": "Resume a blocked task in its existing worktree. Requires continueFrom: 'blocked' and a decision.",
-        "userDescription": "Resume a blocked Hive task in its existing worktree.",
-        "canBeReferencedInPrompt": true,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": { "type": "string", "description": "Feature name" },
-            "task": { "type": "string", "description": "Task folder name" },
-            "continueFrom": { "type": "string", "enum": ["blocked"], "description": "Resume a blocked task" },
-            "decision": { "type": "string", "description": "Answer to blocker question when continuing" }
-          },
-          "required": ["feature", "task", "continueFrom"]
-        }
-      },
-      {
-        "name": "hive_worktree_commit",
-        "toolReferenceName": "hiveWorktreeCommit",
-        "displayName": "Commit Task Worktree",
-        "modelDescription": "Commit changes in worktree and mark task done. Does NOT merge - use hive_merge for that.",
-        "userDescription": "Commit changes in a Hive task worktree and mark the task done.",
-        "canBeReferencedInPrompt": true,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": { "type": "string", "description": "Feature name" },
-            "task": { "type": "string", "description": "Task folder name" },
-            "summary": { "type": "string", "description": "Summary of what was done" },
-            "message": { "type": "string", "description": "Optional git commit message; subject/body allowed. Empty uses default." }
-          },
-          "required": ["feature", "task", "summary"]
-        }
-      },
-      {
-        "name": "hive_worktree_discard",
-        "toolReferenceName": "hiveWorktreeDiscard",
-        "displayName": "Discard Task Worktree",
-        "modelDescription": "Discard all changes and remove worktree. Use when task approach is wrong and needs restart. This is destructive and irreversible.",
-        "userDescription": "Discard a Hive task worktree and reset the task to pending.",
-        "canBeReferencedInPrompt": true,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": { "type": "string", "description": "Feature name" },
-            "task": { "type": "string", "description": "Task folder name" }
-          },
-          "required": ["feature", "task"]
-        }
-      },
-      {
-        "name": "hive_merge",
-        "toolReferenceName": "hiveMerge",
-        "displayName": "Merge Task Branch",
-        "modelDescription": "Merge a completed task branch into current branch. Supports merge, squash, or rebase strategies. Use after hive_worktree_commit to integrate changes.",
-        "userDescription": "Merge a completed Hive task branch into the current branch.",
-        "canBeReferencedInPrompt": true,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": { "type": "string", "description": "Feature name" },
-            "task": { "type": "string", "description": "Task folder name" },
-            "strategy": { "type": "string", "enum": ["merge", "squash", "rebase"], "description": "Merge strategy (default: merge)" },
-            "message": { "type": "string", "description": "Optional merge commit message for merge/squash only. Empty uses default." },
-            "preserveConflicts": { "type": "boolean", "description": "Keep merge conflict state intact instead of auto-aborting (default: false)." },
-            "cleanup": { "type": "string", "enum": ["none", "worktree", "worktree+branch"], "description": "Cleanup mode after a successful merge (default: none)." }
-          },
-          "required": ["feature", "task"]
-        }
-      },
-      {
-        "name": "hive_context_write",
-        "toolReferenceName": "hiveContextWrite",
-        "displayName": "Write Context File",
-        "modelDescription": "Write a context file to store research findings, decisions, or reference material. System-known names are overview, draft, and execution-decisions. All other names remain durable free-form context while plan.md remains execution truth.",
-        "userDescription": "Write a Hive context markdown file.",
-        "canBeReferencedInPrompt": true,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "feature": { "type": "string", "description": "Feature name" },
-            "name": { "type": "string", "description": "Context file name (without .md)." },
-            "content": { "type": "string", "description": "Context content in markdown" }
-          },
-          "required": ["feature", "name", "content"]
-        }
-      },
-      {
         "name": "hive_status",
         "toolReferenceName": "hiveStatus",
         "displayName": "Get Hive Status",
-        "modelDescription": "Get comprehensive status of a feature including plan, tasks, and context. Returns JSON with all relevant state for resuming work.",
+        "modelDescription": "Get comprehensive status of a feature including plan.md, tasks, and context. plan.md is the only required review document. Returns JSON with all relevant state for resuming work.",
         "userDescription": "Get comprehensive Hive feature status.",
         "canBeReferencedInPrompt": true,
         "inputSchema": {
@@ -346,38 +241,6 @@
               "description": "Feature name (optional, uses active feature if omitted)"
             }
           }
-        }
-      },
-      {
-        "name": "hive_agents_md",
-        "toolReferenceName": "hiveAgentsMd",
-        "displayName": "Manage AGENTS.md",
-        "modelDescription": "Initialize, sync, or apply changes to AGENTS.md. init: scan codebase and generate. sync: propose updates from feature contexts. apply: write approved content.",
-        "userDescription": "Initialize, sync, or apply AGENTS.md content.",
-        "canBeReferencedInPrompt": true,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "action": { "type": "string", "enum": ["init", "sync", "apply"], "description": "Action to perform" },
-            "feature": { "type": "string", "description": "Feature name (required for sync)" },
-            "content": { "type": "string", "description": "Content to apply (required for apply)" }
-          },
-          "required": ["action"]
-        }
-      },
-      {
-        "name": "hive_skill",
-        "toolReferenceName": "hiveSkill",
-        "displayName": "Load Hive Skill",
-        "modelDescription": "Load a skill by name. Returns the SKILL.md content with instructions for the specified workflow skill.",
-        "userDescription": "Load a Hive workflow skill file by name.",
-        "canBeReferencedInPrompt": true,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "name": { "type": "string", "description": "Skill name (e.g. writing-plans, brainstorming)" }
-          },
-          "required": ["name"]
         }
       }
     ],
@@ -438,11 +301,6 @@
         "command": "hive.syncTasks",
         "title": "Generate Tasks",
         "icon": "$(list-tree)"
-      },
-      {
-        "command": "hive.startTask",
-        "title": "Start Task",
-        "icon": "$(play)"
       }
     ],
     "menus": {
@@ -472,17 +330,12 @@
           "command": "hive.syncTasks",
           "when": "viewItem =~ /^feature-(approved|executing)$/",
           "group": "inline"
-        },
-        {
-          "command": "hive.startTask",
-          "when": "viewItem == task-pending",
-          "group": "inline"
         }
       ],
       "editor/title": [
         {
           "command": "hive.plan.doneReview",
-          "when": "resourceFilename =~ /^(plan|overview)\\.md$/",
+          "when": "resourceFilename =~ /^plan\\.md$/",
           "group": "navigation"
         }
       ],

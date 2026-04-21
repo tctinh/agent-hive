@@ -17,9 +17,9 @@ PROBLEM  -> CONTEXT  -> EXECUTION -> REPORT
 ├── features/             <- Feature-scoped work
 │   └── 01_feature-name/
 │       ├── feature.json  <- Feature metadata and state
-│       ├── plan.md       <- Execution truth (may include a readable design summary before ## Tasks)
+│       ├── plan.md       <- Single required human-review and execution document (keep a readable design summary before ## Tasks)
 │       ├── tasks.json    <- Task list with status
-│       ├── context/      <- Persistent knowledge files (overview is human-facing; others are free-form)
+│       ├── context/      <- Optional persistent knowledge files (all free-form support notes)
 │       └── tasks/        <- Individual task folders
 │           └── {task}/
 │               ├── status.json      <- Task state
@@ -32,14 +32,14 @@ PROBLEM  -> CONTEXT  -> EXECUTION -> REPORT
 packages/
 ├── hive-core/            <- Shared logic (services, types, utils)
 ├── opencode-hive/        <- OpenCode plugin (planning, execution, tracking)
-└── vscode-hive/          <- VS Code extension (visualization, review, approval)
+└── vscode-hive/          <- VS Code extension (plan-only review, status, reduced Copilot-facing tool surface)
 ```
 
 ## Data Flow
 
 1. User creates feature via `hive_feature_create`
 2. Agent writes plan via `hive_plan_write`
-3. User reviews `context/overview.md` first, then `plan.md`, and adds comments
+3. User reviews `plan.md` and adds comments there
 4. User approves via `hive_plan_approve`
 5. Tasks synced via `hive_tasks_sync` (generates spec.md for each)
 6. Each task executed via `hive_worktree_start` -> work -> `hive_worktree_commit`

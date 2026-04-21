@@ -6,10 +6,8 @@ import {
   getFeaturesPath,
   getNextIndexedFeatureDirectoryName,
   getFeatureJsonPath,
-  getContextPath,
   getTasksPath,
   getPlanPath,
-  getOverviewPath,
   listFeatureDirectories,
   ensureDir,
   readJson,
@@ -41,7 +39,6 @@ export class FeatureService {
     const featurePath = path.join(getFeaturesPath(this.projectRoot), getNextIndexedFeatureDirectoryName(this.projectRoot, name));
 
     ensureDir(featurePath);
-    ensureDir(getContextPath(this.projectRoot, name));
     ensureDir(getTasksPath(this.projectRoot, name));
 
     const feature: FeatureJson = {
@@ -120,16 +117,14 @@ export class FeatureService {
 
     const tasks = this.getTasks(name);
     const hasPlan = fileExists(getPlanPath(this.projectRoot, name));
-    const hasOverview = fileExists(getOverviewPath(this.projectRoot, name));
     const reviewCounts = this.getReviewService().countByDocument(name);
-    const commentCount = reviewCounts.plan + reviewCounts.overview;
+    const commentCount = reviewCounts.plan;
 
     return {
       name: feature.name,
       status: feature.status,
       tasks,
       hasPlan,
-      hasOverview,
       commentCount,
       reviewCounts,
     };

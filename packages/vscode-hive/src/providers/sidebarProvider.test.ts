@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { FeatureService, PlanService } from 'hive-core';
+import { FeatureService } from '../../../hive-core/src/services/featureService.ts';
+import { PlanService } from '../../../hive-core/src/services/planService.ts';
+import { getFeaturePath, listFeatureDirectories } from '../../../hive-core/src/utils/paths.ts';
+
+mock.module('hive-core', () => ({
+  getFeaturePath,
+  listFeatureDirectories,
+}));
 
 mock.module('vscode', () => {
   class TreeItem {
@@ -165,7 +172,7 @@ describe('HiveSidebarProvider', () => {
     expect(completedGroup?.features[0]?.description).toBe('Completed · 1/1');
   });
 
-  it('shows reserved overview ahead of context and tasks for a feature', async () => {
+  it('keeps overview inside context instead of as a first-class review item', async () => {
     const featureName = 'overview-sidebar-feature';
     const featureService = new FeatureService(testRoot);
     const planService = new PlanService(testRoot);
@@ -201,10 +208,9 @@ describe('HiveSidebarProvider', () => {
 
     const children = await provider.getChildren(featureItem);
 
-    expect(children.map(child => child.label)).toEqual(['Plan', 'Overview', 'Context', 'Tasks']);
-    expect((children[1] as any).description).toBe('1 comment(s)');
-    expect((children[1] as any).contextValue).toBe('overview-file');
-    expect((children[2] as any).description).toBe('1 file(s)');
+    expect(children.map(child => child.label)).toEqual(['Plan', 'Context', 'Tasks']);
+    expect(children.find((child) => (child as any).contextValue === 'overview-file')).toBeUndefined();
+    expect((children[1] as any).description).toBe('2 file(s)');
   });
 
   it('shows workspace artifacts with prompts and copilot steering when .github exists', async () => {

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-04-21
+
+### Added
+- **Copilot-native scaffolding now ships the full review/execution surface**: The generated `.github` artifact suite now carries the modern Copilot-first Hive workflow end to end — aligned agents, prompts, instructions, hooks, and skills that treat `plan.md` as the single required review and execution document while leaning on native browser, MCP, memory, and delegation capabilities instead of legacy helper flows.
+- **Official ast-grep MCP adoption is now part of the shipped package contract**: The OpenCode-side package, templates, and supporting docs now point at the official ast-grep MCP server surface, so the recommended verification and structural-search setup no longer depends on an implied custom launcher story.
+
+### Changed
+- **Hive's Copilot/VS Code path now tells one response-first story**: The VS Code extension surface, generated Copilot agents, and supporting artifacts now consistently favor direct `@forager` execution, structured `hive_task_update` progress reporting, and a short final natural-language handoff rather than older worktree/merge-oriented Copilot guidance.
+- **Generated agent metadata is aligned with current GitHub Copilot contracts**: Hive now keeps GPT-5.4 with no curated `tools:` block, Scout and Hygienic use Claude Sonnet 4.6, Forager offers GPT-5.4 or Claude Sonnet 4.6, and curated subagents now consistently expose `web`, `browser`, `io.github.upstash/context7/*`, `playwright/*`, `todo`, and `vscode/memory` where the Copilot path benefits from them.
+- **Version-bearing release surfaces are refreshed to `1.4.4`**: Root/workspace manifests, `packages/opencode-hive/plugin.json`, tracked workspace lockfile markers, the changelog, the dedicated release note, and the PHILOSOPHY evolution history now all describe the same shipped `1.4.4` contract.
+
+### Fixed
+- **Generated Copilot artifacts no longer drift behind their source generators**: Stale model strings, outdated scoped tool IDs, and missing browser / Context7 / memory / todo assignments are now corrected in both generator source and committed artifacts, reducing divergence between what `initNest` produces and what the repo documents.
+- **Worker completion stays machine-readable without losing the human summary**: The response-first worker path now preserves structured task-state updates and still ends with a concise natural-language handoff, making orchestrator state and operator review easier to trust.
+- **OpenCode plan approval no longer depends on removed overview review counts**: `opencode-hive` now follows the shared plan-only approval contract instead of referencing the deleted `reviewCounts.overview` field, which restores a clean package build for release verification.
+
 ## [1.4.3] - 2026-04-12
 
 ### Added

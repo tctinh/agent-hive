@@ -7,7 +7,7 @@ export class Launcher {
   constructor(private workspaceRoot: string) {}
 
   /**
-   * Open a feature's overview in VS Code and show instructions
+    * Open a feature's plan in VS Code and show instructions
    */
   async openFeature(feature: string): Promise<void> {
     if (!feature || !this.workspaceRoot) {
@@ -20,18 +20,17 @@ export class Launcher {
     fs.writeFileSync(activeFeaturePath, feature, 'utf-8')
 
     const featurePath = getFeaturePath(this.workspaceRoot, feature)
-    const overviewPath = `${featurePath}/context/overview.md`
     const planPath = `${featurePath}/plan.md`
-    const targetPath = fs.existsSync(overviewPath) ? overviewPath : planPath
+    const targetPath = planPath
     try {
       const uri = vscode.Uri.file(targetPath)
       await vscode.workspace.openTextDocument(uri)
       await vscode.window.showTextDocument(uri)
       vscode.window.showInformationMessage(
-        `Hive: Opened ${feature} ${fs.existsSync(overviewPath) ? 'overview' : 'plan'}. Continue reviewing in the sidebar or editor.`
+        `Hive: Opened ${feature} plan. Continue reviewing in the sidebar or editor.`
       )
     } catch (error: any) {
-      vscode.window.showWarningMessage(`Hive: No overview or plan found for feature "${feature}" - ${error}`)
+      vscode.window.showWarningMessage(`Hive: No plan found for feature "${feature}" - ${error}`)
     }
   }
 

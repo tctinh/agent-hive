@@ -35,7 +35,30 @@ describe('PlanService', () => {
     cleanup();
   });
 
-  it('blocks approval when either plan or overview has unresolved comments', () => {
+  it('blocks approval when unresolved canonical plan comments remain', () => {
+    const featureName = 'canonical-plan-comments';
+    const featurePath = setupFeature(featureName);
+
+    fs.mkdirSync(path.join(featurePath, 'comments'), { recursive: true });
+    fs.writeFileSync(
+      path.join(featurePath, 'comments', 'plan.json'),
+      JSON.stringify({
+        threads: [
+          {
+            id: 'plan-thread',
+            line: 1,
+            body: 'Plan still needs edits',
+            replies: [],
+          },
+        ],
+      })
+    );
+
+    expect(() => service.approve(featureName)).toThrow(/unresolved review comments/i);
+    expect(service.isApproved(featureName)).toBe(false);
+  });
+
+  it('approves when only legacy overview comments remain unresolved', () => {
     const featureName = 'test-feature';
     const featurePath = setupFeature(featureName);
 
@@ -55,6 +78,7 @@ describe('PlanService', () => {
       })
     );
 
-    expect(() => service.approve(featureName)).toThrow(/unresolved review comments/i);
+    expect(() => service.approve(featureName)).not.toThrow();
+    expect(service.isApproved(featureName)).toBe(true);
   });
 });

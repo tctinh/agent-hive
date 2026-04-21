@@ -6,6 +6,38 @@ function getBody(content: string): string {
   return parts.slice(2).join('---').trimStart();
 }
 
+function getFrontmatter(content: string): string {
+  const parts = content.split(/^---$/m);
+  return parts[1] ?? '';
+}
+
+function getFrontmatterList(content: string, key: string): string[] {
+  const lines = getFrontmatter(content).split('\n');
+  const sectionIndex = lines.indexOf(`${key}:`);
+  if (sectionIndex === -1) {
+    return [];
+  }
+
+  const values: string[] = [];
+  for (const line of lines.slice(sectionIndex + 1)) {
+    if (!line.startsWith('  - ')) {
+      break;
+    }
+
+    values.push(line.replace(/^  - /, '').replace(/^"|"$/g, ''));
+  }
+
+  return values;
+}
+
+function getFrontmatterTools(content: string): string[] {
+  return getFrontmatterList(content, 'tools');
+}
+
+function getFrontmatterModels(content: string): string[] {
+  return getFrontmatterList(content, 'model');
+}
+
 describe('generateAllAgents', () => {
   const agents = generateAllAgents({ extensionId: 'tctinh.vscode-hive' });
   const byFilename = new Map(agents.map((agent) => [agent.filename, agent.content]));
@@ -31,8 +63,7 @@ describe('generateAllAgents', () => {
     const hive = byFilename.get('hive.agent.md');
     const body = getBody(hive ?? '');
 
-    expect(hive).toContain("- tctinh.vscode-hive/*");
-    expect(hive).toContain('- vscode/askQuestions');
+    expect(getFrontmatterTools(hive ?? '')).toEqual([]);
     expect(hive).toContain('use the agent tool to invoke @scout');
     expect(hive).toContain('refer to the skill at .github/skills/parallel-exploration/');
     expect(hive).toContain('.github/prompts/');
@@ -43,6 +74,10 @@ describe('generateAllAgents', () => {
     expect(hive).toContain('browser tools');
     expect(body).toContain('Use `vscode/askQuestions` for structured decision checkpoints');
     expect(body).toContain('Plain chat is allowed only for lightweight clarification or when `vscode/askQuestions` is unavailable');
+    expect(body).not.toContain('hive_context_write');
+    expect(body).not.toContain('context/overview.md');
+    expect(body).not.toContain('hive_worktree_create');
+    expect(body).not.toContain('hive_merge');
 
     expect(hive).not.toContain('question()');
     expect(hive).not.toContain('task({ subagent_type: "scout-researcher" })');
@@ -60,36 +95,76 @@ describe('generateAllAgents', () => {
     expect(hive).not.toContain('config hook');
   });
 
-  it('includes clarified context model in the hive agent', () => {
+  it('uses plan.md as the only required review surface in the hive agent', () => {
     const hive = byFilename.get('hive.agent.md');
 
-    expect(hive).toContain('`overview` = human-facing summary/history');
-    expect(hive).toContain('`draft` = planner scratchpad');
-    expect(hive).toContain('`execution-decisions` = orchestration log');
-    expect(hive).toContain('all other names');
-    expect(hive).toContain('durable');
-    expect(hive).not.toContain('plan.md is the primary human-facing summary');
+    expect(hive).toContain('Design Summary');
+    expect(hive).toContain('plan.md');
+    expect(hive).not.toContain('`overview` = human-facing summary/history');
+    expect(hive).not.toContain('Refresh `context/overview.md`');
+    expect(hive).not.toContain('hive_context_write');
   });
 
   it('uses the required tool allowlists for the subagents', () => {
+    const hive = byFilename.get('hive.agent.md');
     const scout = byFilename.get('scout.agent.md');
     const forager = byFilename.get('forager.agent.md');
     const hygienic = byFilename.get('hygienic.agent.md');
 
-    expect(scout).toContain('- tctinh.vscode-hive/hiveContextWrite');
-    expect(scout).toContain('- tctinh.vscode-hive/hivePlanRead');
-    expect(scout).toContain('- tctinh.vscode-hive/hiveStatus');
+    expect(getFrontmatterTools(hive ?? '')).toEqual([]);
+    expect(getFrontmatterModels(hive ?? '')).toEqual(['GPT-5.4 (copilot)']);
+
+    expect(getFrontmatterTools(scout ?? '')).toEqual([
+      'read',
+      'search',
+      'search/codebase',
+      'search/usages',
+      'web',
+      'browser',
+      'io.github.upstash/context7/*',
+      'todo',
+      'vscode/memory',
+    ]);
+    expect(getFrontmatterModels(scout ?? '')).toEqual(['Claude Sonnet 4.6 (copilot)']);
     expect(scout).toContain('user-invocable: false');
 
-    expect(forager).toContain('- tctinh.vscode-hive/hivePlanRead');
-    expect(forager).toContain('- tctinh.vscode-hive/hiveWorktreeCommit');
-    expect(forager).toContain('- tctinh.vscode-hive/hiveContextWrite');
+    expect(getFrontmatterTools(forager ?? '')).toEqual([
+      'execute',
+      'read',
+      'edit',
+      'search',
+      'web',
+      'browser',
+      'playwright/*',
+      'io.github.upstash/context7/*',
+      'todo',
+      'vscode/memory',
+      'vscode/newWorkspace',
+      'vscode/getProjectSetupInfo',
+      'tctinh.vscode-hive/hivePlanRead',
+      'tctinh.vscode-hive/hiveTaskUpdate',
+    ]);
+    expect(getFrontmatterModels(forager ?? '')).toEqual([
+      'GPT-5.4 (copilot)',
+      'Claude Sonnet 4.6 (copilot)',
+    ]);
     expect(forager).toContain('user-invocable: false');
     expect(forager).not.toContain('Docker Sandbox');
+    expect(forager).toContain('still send one short natural-language handoff');
 
-    expect(hygienic).toContain('- tctinh.vscode-hive/hivePlanRead');
-    expect(hygienic).toContain('- tctinh.vscode-hive/hiveContextWrite');
-    expect(hygienic).toContain('- tctinh.vscode-hive/hiveStatus');
+    expect(getFrontmatterTools(hygienic ?? '')).toEqual([
+      'read',
+      'search',
+      'search/codebase',
+      'search/usages',
+      'web',
+      'browser',
+      'io.github.upstash/context7/*',
+      'playwright/*',
+      'todo',
+      'vscode/memory',
+    ]);
+    expect(getFrontmatterModels(hygienic ?? '')).toEqual(['Claude Sonnet 4.6 (copilot)']);
     expect(hygienic).toContain('user-invocable: false');
   });
 });

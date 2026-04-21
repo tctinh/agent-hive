@@ -3,11 +3,11 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/tctinh.vscode-hive)](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive)
 [![License: MIT with Commons Clause](https://img.shields.io/badge/License-MIT%20with%20Commons%20Clause-blue.svg)](../../LICENSE)
 
-**From Vibe Coding to Hive Coding** — The VS Code companion for reviewing, commenting on, and approving Hive work.
+**From Vibe Coding to Hive Coding** — The VS Code companion for reviewing, commenting on, and approving Hive work through plan.md.
 
 ## Why Hive?
 
-OpenCode runs the work. This extension keeps the plan, comments, approvals, and feature status close to your editor.
+OpenCode runs the work. This extension keeps the plan, comments, approvals, feature status, and retained Copilot-facing Hive tools close to your editor.
 
 ```
 Vibe: Hope it works
@@ -38,8 +38,11 @@ Add comments directly on plan.md. Discuss, iterate, approve.
 ### 🔄 Real-time Updates
 Watches `.hive/` folder for changes. Always in sync.
 
-### 🚀 OpenCode Companion
-Launch the active step in OpenCode from the sidebar without losing review context.
+### 🧭 Retained Copilot Tool Surface
+Copilot Chat sees only the Hive feature, plan, task, and status tools that still add structured value.
+
+### 🚀 Execution Companion
+Keep review and task status in VS Code, then delegate implementation directly to `@forager` and record progress with `hive_task_update`.
 
 ## Usage
 
@@ -47,17 +50,17 @@ Launch the active step in OpenCode from the sidebar without losing review contex
 
 1. Create or open a repository that already has `.hive/` output from `opencode-hive`
 2. Click the Hive icon in the Activity Bar
-3. Open `context/overview.md` first for the branch summary/history
-4. Open `plan.md` to add comments and review the execution contract
-5. Click **Done Review** when the branch summary and plan are aligned
-6. Use **Open in OpenCode** when you want to continue execution from the active step
+3. Open `plan.md` from the sidebar and review it as the single required review and execution document
+4. Add comments directly on `plan.md`, then click **Done Review** when the plan is ready
+5. Sync or inspect tasks with the retained Hive feature/plan/task/status tools in Copilot Chat
+6. Delegate runnable implementation directly to `@forager` and use `hive_task_update` to record progress or completion
 
 ### What this extension is for in `1.4.0`
 
-- **Plan-first review**: inspect overview + plan before execution continues
+- **Plan-first review**: inspect `plan.md` as the single required review and execution document
 - **Sidebar visibility**: features, tasks, status, and reports in one place
 - **Inline comments**: discuss changes directly in `plan.md`
-- **OpenCode handoff**: jump from the review surface back to the supported execution harness
+- **Retained Hive tools**: use feature, plan, task, and status tools in Copilot Chat without the legacy worktree/merge/context-write surface
 
 ### Bootstrap generation (kept for continuity)
 
@@ -78,9 +81,9 @@ Those generated artifacts are no longer the primary supported execution path for
 ### Usage Tips
 
 - **Task names**: Use kebab-case or snake_case. Spaces in task names may cause git worktree errors.
-- **Context management**: Check `.hive/features/<name>/context/` for reference; `overview.md` is reserved, while files like `decisions.md` or `architecture.md` are optional examples.
-- **Plan review**: Open `context/overview.md` first, then `plan.md`; `plan.md` remains execution truth and can still contain a readable design summary before `## Tasks`.
-- **OpenCode execution**: use the sidebar action to jump back into OpenCode for implementation work.
+- **Context management**: Check `.hive/features/<name>/context/` for optional notes; files like `overview.md`, `decisions.md`, or `architecture.md` are ordinary context files, not separate review gates.
+- **Plan review**: `plan.md` is the only required review document and should keep a readable overview/design summary before `## Tasks`.
+- **Execution handoff**: delegate runnable implementation directly to `@forager` and record task progress with `hive_task_update`.
 
 ### Troubleshooting
 
@@ -89,7 +92,7 @@ Those generated artifacts are no longer the primary supported execution path for
 
 ## Pair with OpenCode
 
-For the supported workflow, install [opencode-hive](https://www.npmjs.com/package/opencode-hive) and use this extension as the review/sidebar companion.
+For the supported workflow, install [opencode-hive](https://www.npmjs.com/package/opencode-hive) and use this extension as the review/sidebar companion plus the reduced Copilot-facing Hive tool surface.
 
 ## Requirements
 

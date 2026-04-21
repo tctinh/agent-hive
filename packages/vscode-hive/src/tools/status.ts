@@ -1,6 +1,4 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { FeatureService, TaskService, PlanService, ContextService, buildEffectiveDependencies, computeRunnableAndBlocked, getFeaturePath } from 'hive-core';
+import { FeatureService, TaskService, ContextService, buildEffectiveDependencies, computeRunnableAndBlocked } from 'hive-core';
 import type { TaskWithDeps } from 'hive-core';
 import type { ToolRegistration } from './base';
 import { defineTool } from './base';
@@ -8,7 +6,6 @@ import { defineTool } from './base';
 export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
   const featureService = new FeatureService(workspaceRoot);
   const taskService = new TaskService(workspaceRoot);
-  const planService = new PlanService(workspaceRoot);
   const contextService = new ContextService(workspaceRoot);
 
   const invokeStatus = async (input: unknown) => {
@@ -36,13 +33,12 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
       });
     }
 
-    const plan = planService.read(feature);
+    const featureInfo = featureService.getInfo(feature);
     const tasks = taskService.list(feature);
     const contextFiles = contextService.list(feature);
-    const overview = contextService.getOverview(feature);
-    const reviewCounts = readReviewCounts(workspaceRoot, feature);
+    const reviewCounts = featureInfo?.reviewCounts ?? { plan: 0 };
+    const hasPlan = featureInfo?.hasPlan ?? false;
 
-    // Build task summaries with dependency info from raw status
     const tasksSummary = tasks.map(t => {
       const rawStatus = taskService.getRawStatus(feature, t.folder);
       return {
@@ -55,7 +51,6 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
       };
     });
 
-    // Compute runnable and blocked tasks for orchestrators (apply legacy fallback)
     const tasksWithDeps: TaskWithDeps[] = tasksSummary.map(t => ({
       folder: t.folder,
       status: t.status,
@@ -93,19 +88,14 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
         createdAt: featureData.createdAt,
       },
       plan: {
-        exists: !!plan,
+        exists: hasPlan,
         status: planStatus,
         approved: planStatus === 'approved' || planStatus === 'locked',
-      },
-      overview: {
-        exists: !!overview,
-        path: ['.hive', 'features', feature, 'context', 'overview.md'].join('/'),
-        updatedAt: overview?.updatedAt ?? null,
+        reviewDocument: 'plan.md is the only required review document',
       },
       review: {
-        unresolvedTotal: reviewCounts.plan + reviewCounts.overview,
+        unresolvedTotal: reviewCounts.plan,
         byDocument: {
-          overview: reviewCounts.overview,
           plan: reviewCounts.plan,
         },
       },
@@ -122,13 +112,13 @@ export function getStatusTools(workspaceRoot: string): ToolRegistration[] {
         fileCount: contextFiles.length,
         files: contextSummary,
       },
-      nextAction: getNextAction(planStatus, tasksSummary, runnable, !!plan, !!overview),
+      nextAction: getNextAction(planStatus, tasksSummary, runnable, hasPlan),
     });
   };
 
   const baseStatusTool: Omit<ToolRegistration, 'name' | 'toolReferenceName'> = {
     displayName: 'Get Hive Status',
-    modelDescription: 'Get comprehensive status of a feature including plan, tasks, and context. Returns JSON with all relevant state for resuming work.',
+    modelDescription: 'Get comprehensive status of a feature including plan.md, tasks, and context. plan.md is the only required review document. Returns JSON with all relevant state for resuming work.',
     userDescription: 'Get comprehensive Hive feature status.',
     canBeReferencedInPrompt: true,
     readOnly: true,
@@ -163,56 +153,29 @@ function getNextAction(
   tasks: Array<{ status: string; folder: string }>,
   runnable: string[],
   hasPlan: boolean,
-  hasOverview: boolean,
 ): string {
   if (planStatus === 'review') {
     return 'Wait for plan approval or revise based on comments';
   }
   if (!hasPlan || planStatus === 'draft') {
-    return 'Write or revise plan with hive_plan_write. Refresh context/overview.md first for human review; plan.md remains execution truth and pre-task Mermaid overview diagrams are optional.';
+    return 'Write or revise plan with hive_plan_write. plan.md is the only required review document and execution contract. Keep an overview/design summary before ## Tasks.';
   }
   if (tasks.length === 0) {
     return 'Generate tasks from plan with hive_tasks_sync';
   }
   const inProgress = tasks.find(t => t.status === 'in_progress');
   if (inProgress) {
-    return `Continue work on task: ${inProgress.folder}`;
+    return `Continue direct @forager execution on task: ${inProgress.folder}. Use hive_task_update to record progress.`;
   }
-  // Use runnable list to suggest tasks that can actually start
   if (runnable.length > 1) {
-    return `${runnable.length} tasks are ready to start in parallel: ${runnable.join(', ')}`;
+    return `${runnable.length} tasks are ready for direct @forager delegation in parallel: ${runnable.join(', ')}. Use hive_task_update to record progress.`;
   }
   if (runnable.length === 1) {
-    return `Start next task with hive_worktree_start: ${runnable[0]}`;
+    return `Delegate next runnable task directly to @forager: ${runnable[0]}. Use hive_task_update to record progress or completion.`;
   }
   const pending = tasks.find(t => t.status === 'pending');
   if (pending) {
     return `Pending tasks exist but are blocked by dependencies. Check blockedBy for details.`;
   }
-  return 'All tasks complete. Review and merge or complete feature.';
-}
-
-function readReviewCounts(workspaceRoot: string, feature: string): { plan: number; overview: number } {
-  const featurePath = getFeaturePath(workspaceRoot, feature);
-  const reviewDir = path.join(featurePath, 'comments');
-  const planThreads = readThreads(path.join(reviewDir, 'plan.json')) ?? readThreads(path.join(featurePath, 'comments.json'));
-  const overviewThreads = readThreads(path.join(reviewDir, 'overview.json'));
-
-  return {
-    plan: planThreads?.length ?? 0,
-    overview: overviewThreads?.length ?? 0,
-  };
-}
-
-function readThreads(filePath: string): Array<unknown> | null {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-
-  try {
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as { threads?: Array<unknown> };
-    return data.threads ?? [];
-  } catch {
-    return [];
-  }
+  return 'All tasks complete. Review plan.md and complete the feature when ready.';
 }

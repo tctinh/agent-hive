@@ -744,6 +744,20 @@ The alignment in this branch is intentionally pragmatic. OpenCode still owns ses
 
 **Boundary insight:** Honest contracts make systems easier to operate. Saying “OpenCode-owned todos plus bounded replay from `.hive` artifacts” is less glamorous than saying “native OpenCode sync,” but it matches the code and gives operators something real to trust.
 
+### v1.4.4 (One Copilot Story, One Plan Contract)
+
+**Theme:** Make the generated Copilot surface tell the same truth as the code: one required plan document, one response-first worker story, and explicit tool/model contracts instead of stale artifact drift.
+
+Three threads define this patch:
+
+**Copilot-native workflow alignment:** The `.github` scaffolding, VS Code extension messaging, and generated prompts/skills now converge on one core contract: `plan.md` is the required review and execution document for the Copilot path, free-form notes rely on native memory or normal files, and direct `@forager` delegation is the default execution route instead of teaching Copilot the older overview/worktree/merge choreography. This sharpens P2/P3 (Plan → Approve → Execute, Human Shapes/Agent Builds): the operator-facing workflow is simpler, and the generated artifacts finally match it.
+
+**Response-first worker and agent metadata cleanup:** The worker path now stays structured without becoming robotic. `hive_task_update` remains the authoritative task-state update channel, but Forager still ends with a short human handoff. At the same time, the generated agent frontmatter now matches current GitHub Copilot expectations: model names use the Copilot display format, Hive stops curating tools entirely, and the curated subagents expose the modern browser / web / Context7 / memory / todo mix explicitly. This is P8/P9 (Cross-Model Prompts, Deterministic Contracts Beat Soft Memory): the surrounding artifacts are no longer allowed to lag behind the workflow they describe.
+
+**Official ast-grep MCP adoption:** Structural-search guidance is now anchored on the official ast-grep MCP surface rather than an implied custom-built server contract. That matters because tool boundaries are part of the product surface too. A generated template should prefer the maintained upstream server path the same way a release note should prefer the actual supported operator workflow.
+
+**Shared insight:** Preview surfaces become trustworthy only when their generated artifacts, tool metadata, and runtime behavior all describe the same bounded workflow. `v1.4.4` treats Copilot scaffolding as product surface, not as disposable documentation.
+
 ### v1.4.3 (Parity and Recovery Without Guesswork)
 
 **Theme:** Keep cross-surface behavior aligned, and make release recovery a tested operator contract instead of tribal knowledge.

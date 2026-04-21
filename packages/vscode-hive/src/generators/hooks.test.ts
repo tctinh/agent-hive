@@ -74,7 +74,7 @@ describe('hooks generator', () => {
     }
   });
 
-  it('builds the plan enforcement hook with preToolUse deny logic for editFiles and execute', () => {
+  it('builds the plan enforcement hook with preToolUse deny logic for edit and execute', () => {
     expect(generators.generatePlanEnforcementHook).toBeDefined();
 
     const hook = generators.generatePlanEnforcementHook();
@@ -88,6 +88,7 @@ describe('hooks generator', () => {
       timeoutSec: 5,
     });
     expect(script).toContain('permissionDecision');
+    expect(script).toContain('edit');
     expect(script).toContain('editFiles');
     expect(script).toContain('execute');
     expect(script).toContain('approved');
@@ -100,9 +101,11 @@ describe('hooks generator', () => {
 
     const script = generators.generatePlanEnforcementHook().scripts[0]?.content;
 
-    const output = runHookScript(script ?? '', JSON.stringify({ toolName: 'execute' }), workspaceRoot);
+    const editOutput = runHookScript(script ?? '', JSON.stringify({ toolName: 'edit' }), workspaceRoot);
+    const executeOutput = runHookScript(script ?? '', JSON.stringify({ toolName: 'execute' }), workspaceRoot);
 
-    expect(output).toBe('');
+    expect(editOutput).toBe('');
+    expect(executeOutput).toBe('');
   });
 
   it('builds the context injection hook with sessionStart context aggregation logic', () => {

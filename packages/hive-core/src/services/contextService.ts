@@ -4,7 +4,7 @@ import { getContextPath, ensureDir, fileExists, readText, writeText } from '../u
 import type { ContextFile, ContextRole } from '../types.js';
 export type { ContextFile, ContextRole };
 
-export const RESERVED_OVERVIEW_CONTEXT = 'overview';
+export const OVERVIEW_CONTEXT_NAME = 'overview';
 
 const DEFAULT_CONTEXT_CLASSIFICATION = {
   role: 'durable',
@@ -19,9 +19,9 @@ const DEFAULT_CONTEXT_CLASSIFICATION = {
 };
 
 const SPECIAL_CONTEXTS = {
-  overview: { role: 'human', includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
   draft: { role: 'scratchpad', includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
   'execution-decisions': { role: 'operational', includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
+  overview: { role: 'operational', includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
 } as const satisfies Record<string, {
   role: ContextRole;
   includeInExecution: boolean;
@@ -80,7 +80,7 @@ export class ContextService {
   }
 
   getOverview(featureName: string): ContextFile | null {
-    return this.list(featureName).find(file => file.name === RESERVED_OVERVIEW_CONTEXT) ?? null;
+    return this.list(featureName).find(file => file.name === OVERVIEW_CONTEXT_NAME) ?? null;
   }
 
   listExecutionContext(featureName: string): ContextFile[] {

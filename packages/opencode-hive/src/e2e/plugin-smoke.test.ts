@@ -1156,7 +1156,7 @@ Do it
         }),
         expect.objectContaining({
           name: "overview",
-          role: "human",
+          role: "operational",
           includeInExecution: false,
           includeInAgentsMdSync: false,
           includeInNetwork: false,
@@ -1262,12 +1262,9 @@ Do it
       toolContext
     );
 
-    expect(planOutput).toContain('Review context/overview.md first');
+    expect(planOutput).toContain('Refresh the primary human-facing overview');
     expect(planOutput).toContain('plan.md remains execution truth');
-    expect(planOutput).not.toContain('plan.md is the human-facing');
-    expect(approveOutput).toContain('context/overview.md is the primary human-facing surface');
     expect(approveOutput).toContain('plan.md remains execution truth');
-    expect(approveOutput).not.toContain('plan.md is the primary human-facing');
   });
 
   it("guides planners to overview-first status messaging", async () => {
@@ -1384,9 +1381,9 @@ Do it
       { recursive: true }
     );
     fs.writeFileSync(
-      path.join(testRoot, ".hive", "features", "01_overview-approval-blocked-feature", "comments", "overview.json"),
+      path.join(testRoot, ".hive", "features", "01_overview-approval-blocked-feature", "comments", "plan.json"),
       JSON.stringify({
-        threads: [{ id: "overview-thread", line: 1, body: "Need clearer overview", replies: [] }],
+        threads: [{ id: "plan-thread", line: 1, body: "Need clearer plan", replies: [] }],
       }, null, 2)
     );
 
@@ -1396,7 +1393,7 @@ Do it
     );
 
     expect(approveOutput).toContain("Cannot approve");
-    expect(approveOutput).toContain("overview");
+    expect(approveOutput).toContain("plan review");
   });
 
   it("returns explicit success and non-terminal contract fields on worktree start", async () => {

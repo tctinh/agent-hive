@@ -13,7 +13,7 @@ interface CommentsFile {
   threads: StoredThread[]
 }
 
-type ReviewDocument = 'plan' | 'overview'
+type ReviewDocument = 'plan'
 
 interface ReviewTarget {
   featureName: string
@@ -42,7 +42,7 @@ export class PlanCommentController {
 
     const patterns = [
       new vscode.RelativePattern(workspaceRoot, '.hive/features/*/comments.json'),
-      new vscode.RelativePattern(workspaceRoot, '.hive/features/*/comments/*.json')
+      new vscode.RelativePattern(workspaceRoot, '.hive/features/*/comments/plan.json')
     ]
     const rootWatcher = vscode.workspace.createFileSystemWatcher(patterns[0])
     const nestedWatcher = vscode.workspace.createFileSystemWatcher(patterns[1])
@@ -56,7 +56,7 @@ export class PlanCommentController {
   private onCommentsFileChanged(commentsUri: vscode.Uri): void {
     const target = this.getCommentsTarget(commentsUri.fsPath)
     if (!target) return
-    this.loadComments(vscode.Uri.file(this.getDocumentPath(target.featureName, target.document)))
+    this.loadComments(vscode.Uri.file(this.getDocumentPath(target.featureName)))
   }
 
   registerCommands(context: vscode.ExtensionContext): void {
@@ -123,19 +123,14 @@ export class PlanCommentController {
       return { featureName: planMatch[1], document: 'plan' }
     }
 
-    const overviewMatch = normalized.match(/\.hive\/features\/([^/]+)\/context\/overview\.md$/)
-    if (overviewMatch) {
-      return { featureName: overviewMatch[1], document: 'overview' }
-    }
-
     return null
   }
 
   private getCommentsTarget(filePath: string): ReviewTarget | null {
     const normalized = this.normalizePath(filePath)
-    const reviewMatch = normalized.match(/\.hive\/features\/([^/]+)\/comments\/(plan|overview)\.json$/)
+    const reviewMatch = normalized.match(/\.hive\/features\/([^/]+)\/comments\/plan\.json$/)
     if (reviewMatch) {
-      return { featureName: reviewMatch[1], document: reviewMatch[2] as ReviewDocument }
+      return { featureName: reviewMatch[1], document: 'plan' }
     }
 
     const legacyMatch = normalized.match(/\.hive\/features\/([^/]+)\/comments\.json$/)
@@ -194,34 +189,24 @@ export class PlanCommentController {
   private getCommentsPath(uri: vscode.Uri): string | null {
     const target = this.getReviewTarget(uri.fsPath)
     if (!target) return null
-    return path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments', `${target.document}.json`)
+    return path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments', 'plan.json')
   }
 
   private getReadableCommentsPath(uri: vscode.Uri): string | null {
     const target = this.getReviewTarget(uri.fsPath)
     if (!target) return null
 
-    if (target.document === 'plan') {
-      const canonicalPath = path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments', 'plan.json')
-      if (fs.existsSync(canonicalPath)) {
-        return canonicalPath
-      }
-
-      const legacyPath = path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments.json')
-      if (fs.existsSync(legacyPath)) {
-        return legacyPath
-      }
-
+    const canonicalPath = path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments', 'plan.json')
+    if (fs.existsSync(canonicalPath)) {
       return canonicalPath
     }
 
-    return path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments', `${target.document}.json`)
+    const legacyPath = path.join(this.workspaceRoot, '.hive', 'features', target.featureName, 'comments.json')
+    return legacyPath
   }
 
-  private getDocumentPath(featureName: string, document: ReviewDocument): string {
-    return document === 'overview'
-      ? path.join(this.workspaceRoot, '.hive', 'features', featureName, 'context', 'overview.md')
-      : path.join(this.workspaceRoot, '.hive', 'features', featureName, 'plan.md')
+  private getDocumentPath(featureName: string): string {
+    return path.join(this.workspaceRoot, '.hive', 'features', featureName, 'plan.md')
   }
 
   private loadComments(uri: vscode.Uri): void {

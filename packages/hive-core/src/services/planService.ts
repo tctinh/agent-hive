@@ -56,7 +56,7 @@ export class PlanService {
       throw new Error(`No plan.md found for feature '${featureName}'`);
     }
 
-    if (this.getReviewService().hasUnresolvedThreads(featureName)) {
+    if (this.getReviewService().hasUnresolvedThreads(featureName, 'plan')) {
       throw new Error(`Cannot approve feature '${featureName}' with unresolved review comments`);
     }
 

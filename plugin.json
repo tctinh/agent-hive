@@ -1,0 +1,29 @@
+{
+  "name": "agent-hive",
+  "description": "Plan-first AI development with isolated worktrees and human review",
+  "author": {
+    "name": "tctinh"
+  },
+  "repository": "https://github.com/tctinh/agent-hive",
+  "license": "MIT",
+  "keywords": [
+    "planning",
+    "orchestration",
+    "multi-agent",
+    "worktree",
+    "hive"
+  ],
+  "agents": [
+    ".github/agents"
+  ],
+  "skills": [
+    ".github/skills/*"
+  ],
+  "hooks": [
+    ".github/hooks/*"
+  ],
+  "instructions": [
+    ".github/instructions"
+  ],
+  "version": "1.0.0"
+}

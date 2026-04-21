@@ -118,17 +118,67 @@ describe('initNest', () => {
     assert.match(readFile(projectRoot, '.github/copilot-instructions.md'), /AGENTS\.md/);
     assert.match(readFile(projectRoot, '.github/copilot-instructions.md'), /vscode\/askQuestions/);
     assert.match(readFile(projectRoot, '.github/copilot-instructions.md'), /plain chat only as a fallback/);
-    assert.match(readFile(projectRoot, '.github/prompts/plan-feature.prompt.md'), /hive_plan_write/);
+    assert.match(readFile(projectRoot, '.github/prompts/plan-feature.prompt.md'), /search\/codebase/);
+    assert.match(readFile(projectRoot, '.github/prompts/plan-feature.prompt.md'), /tctinh\.vscode-hive\/hivePlanWrite/);
+    assert.doesNotMatch(readFile(projectRoot, '.github/prompts/plan-feature.prompt.md'), /"codebase"/);
     assert.match(readFile(projectRoot, '.github/prompts/plan-feature.prompt.md'), /vscode\/askQuestions/);
+
+    const executePrompt = readFile(projectRoot, '.github/prompts/execute-approved-plan.prompt.md');
+    assert.match(executePrompt, /tctinh\.vscode-hive\/hiveTasksSync/);
+    assert.match(executePrompt, /tctinh\.vscode-hive\/hivePlanRead/);
+    assert.doesNotMatch(executePrompt, /hiveWorktreeStart|hive_worktree_start|hive_merge/);
+
+    const foragerAgent = readFile(projectRoot, '.github/agents/forager.agent.md');
+    assert.match(foragerAgent, /\n  - web\n/);
+    assert.match(foragerAgent, /io\.github\.upstash\/context7\/\*/);
+    assert.match(foragerAgent, /playwright\/\*/);
+    assert.match(foragerAgent, /\n  - todo\n/);
+    assert.match(foragerAgent, /vscode\/memory/);
+    assert.match(foragerAgent, /tctinh\.vscode-hive\/hiveTaskUpdate/);
+    assert.match(foragerAgent, /GPT-5\.4 \(copilot\)/);
+    assert.match(foragerAgent, /Claude Sonnet 4\.6 \(copilot\)/);
+    assert.doesNotMatch(foragerAgent, /hiveContextWrite|hiveWorktreeCommit|editFiles/);
+
+    const scoutAgent = readFile(projectRoot, '.github/agents/scout.agent.md');
+    assert.match(scoutAgent, /\n  - web\n/);
+    assert.match(scoutAgent, /\n  - browser\n/);
+    assert.match(scoutAgent, /io\.github\.upstash\/context7\/\*/);
+    assert.match(scoutAgent, /\n  - todo\n/);
+    assert.match(scoutAgent, /vscode\/memory/);
+    assert.match(scoutAgent, /Claude Sonnet 4\.6 \(copilot\)/);
+    assert.doesNotMatch(scoutAgent, /\bgpt-5\.4\b|GPT-5\.4 \(copilot\)/);
+
+    const hiveAgent = readFile(projectRoot, '.github/agents/hive.agent.md');
+    assert.match(hiveAgent, /model:\n  - GPT-5\.4 \(copilot\)/);
+    assert.doesNotMatch(hiveAgent, /^tools:\n/m);
+
+    const hygienicAgent = readFile(projectRoot, '.github/agents/hygienic.agent.md');
+    assert.match(hygienicAgent, /search\/codebase/);
+    assert.match(hygienicAgent, /\n  - web\n/);
+    assert.match(hygienicAgent, /\n  - browser\n/);
+    assert.match(hygienicAgent, /io\.github\.upstash\/context7\/\*/);
+    assert.match(hygienicAgent, /playwright\/\*/);
+    assert.match(hygienicAgent, /\n  - todo\n/);
+    assert.match(hygienicAgent, /vscode\/memory/);
+    assert.doesNotMatch(hygienicAgent, /^  - codebase$/m);
 
     const executingPlansSkill = readFile(projectRoot, '.github/skills/executing-plans/SKILL.md');
     assert.match(executingPlansSkill, /Prefer `vscode\/askQuestions` for a structured choice/);
     assert.match(executingPlansSkill, /prefer `vscode\/askQuestions` to ask whether the user wants a Hygienic code review/);
     assert.doesNotMatch(executingPlansSkill, /question\(\)/);
 
+    const writingPlansSkill = readFile(projectRoot, '.github/skills/writing-plans/SKILL.md');
+    assert.match(writingPlansSkill, /Treat `plan\.md` as the human-facing review surface and execution truth/);
+    assert.match(writingPlansSkill, /overview\/design summary before `## Tasks`/);
+    assert.doesNotMatch(writingPlansSkill, /context\/overview\.md/);
+
     const dispatchingParallelAgentsSkill = readFile(projectRoot, '.github/skills/dispatching-parallel-agents/SKILL.md');
     assert.match(dispatchingParallelAgentsSkill, /Prefer `vscode\/askQuestions` for the approval prompt/);
     assert.doesNotMatch(dispatchingParallelAgentsSkill, /question\(\)/);
+
+    const workflowInstructions = readFile(projectRoot, '.github/instructions/hive-workflow.instructions.md');
+    assert.match(workflowInstructions, /plan\.md is the only required human-review and execution document/);
+    assert.doesNotMatch(workflowInstructions, /hive_context_write|Merge/);
 
     const plugin = JSON.parse(readFile(projectRoot, 'plugin.json')) as { agents: string[]; hooks: string[]; instructions: string[] };
     assert.deepEqual(plugin.agents, ['.github/agents']);

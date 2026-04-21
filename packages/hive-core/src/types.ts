@@ -93,7 +93,7 @@ export interface TaskStatus {
   metadata?: ManualTaskMetadata;
 }
 
-export type ReviewDocument = 'plan' | 'overview';
+export type ReviewDocument = 'plan';
 
 export interface ReviewThread {
   id: string;
@@ -108,7 +108,6 @@ export interface CommentsJson {
 
 export interface ReviewCounts {
   plan: number;
-  overview: number;
 }
 
 export type PlanComment = ReviewThread;
@@ -140,7 +139,6 @@ export interface FeatureInfo {
   status: FeatureStatusType;
   tasks: TaskInfo[];
   hasPlan: boolean;
-  hasOverview: boolean;
   commentCount: number;
   reviewCounts: ReviewCounts;
 }

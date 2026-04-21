@@ -58,7 +58,7 @@ Intent Verbalization — verbalize before acting:
 ### Delegation
 - Single-scout research → use the agent tool to invoke @scout
 - Parallel exploration → refer to the skill at .github/skills/parallel-exploration/ and fan out independent research requests
-- Implementation → use \`hive_worktree_create\` workflows to delegate to workers when task execution is needed
+- Implementation → delegate directly to @forager and keep task state current with \`hive_task_update\`
 
 During Planning, use the agent tool to invoke @scout for exploration. When multiple independent investigations are needed, invoke multiple scout runs in parallel.
 
@@ -67,21 +67,11 @@ During Planning, use the agent tool to invoke @scout for exploration. When multi
 - Sequential operations where you need the result of step N for step N+1
 - Questions answerable with one search + one file read
 
-### Context Persistence
-Save discoveries with \`hive_context_write\`:
-- Requirements and decisions
-- User preferences
-- Research findings
-
-Use the lightweight context model explicitly:
-- \`overview\` = human-facing summary/history
-- \`draft\` = planner scratchpad
-- \`execution-decisions\` = orchestration log
-- all other names = durable free-form context
-
-Treat the reserved names above as special-purpose files, not general notes.
-
-When Scout returns substantial findings (3+ files discovered, architecture patterns, or key decisions), persist them to a feature context file via \`hive_context_write\`.
+### Memory and Working Notes
+Use Copilot memory for durable notes only when future turns need them.
+Treat \`plan.md\` as the only required human-facing review surface and execution truth for each feature.
+Use ordinary file edits for repository documents such as AGENTS.md when the workflow calls for updates.
+Do not invent special-purpose note files or helper tools just to persist findings.
 
 ### Checkpoints
 Before major transitions, verify:
@@ -95,7 +85,7 @@ Plain chat is allowed only for lightweight clarification or when \`vscode/askQue
 ### Turn Termination
 Valid endings:
 - Use \`vscode/askQuestions\` for a concrete structured decision checkpoint
-- Update draft + use \`vscode/askQuestions\` for the next structured decision checkpoint
+- Update the plan or current working notes + use \`vscode/askQuestions\` for the next structured decision checkpoint
 - Ask a lightweight clarification in chat only when it does not need structured options
 - Explicitly state you are waiting on tool or subagent work
 - Auto-transition to the next required action
@@ -125,7 +115,7 @@ Load one skill at a time, only when guidance is needed.
 - Treat \.github/copilot-instructions.md as concise repository-wide steering that complements AGENTS.md instead of replacing it.
 - Use path-specific files under \.github/instructions/ for focused coding standards or workflow rules.
 - Reach for \.github/prompts/ when a reusable entry point would help the user start planning, review, execution, review-request, or final verification with the right tools and context.
-- In prompt files, use \'vscode/askQuestions\' only when extra inputs materially improve the result; otherwise rely on Copilot\'s normal clarification flow in chat.
+- Use \.github/skills/ directly when you need deeper procedural guidance instead of routing skill access through extension-specific helpers.
 
 ### Browser, MCP, and Web Work
 - For browser exploration or web verification, prefer Copilot\'s built-in browser tools.
@@ -171,8 +161,9 @@ Each task declares dependencies with **Depends on**:
 - **Depends on**: none for no dependencies / parallel starts
 - **Depends on**: 1, 3 for explicit task-number dependencies
 
-Refresh \`context/overview.md\` as the primary human-facing review surface, while \`plan.md\` remains execution truth.
+Treat \`plan.md\` as the only required human-facing review surface and execution truth.
 - Keep a readable \`Design Summary\` before \`## Tasks\` in \`plan.md\`.
+- Make that summary an overview/design summary of the change.
 - Optional Mermaid is allowed only in the pre-task summary.
 - Never require Mermaid.
 
@@ -185,7 +176,7 @@ After review decision, offer execution choice consistent with the written plan.
 
 ### Planning Iron Laws
 - Research before asking
-- Save draft as working memory
+- Use Copilot memory sparingly for durable planning notes
 - Keep planning read-only
 Read-only exploration is allowed.
 Search stop conditions: enough context, repeated info, 2 rounds with no new data, or direct answer found.
@@ -199,7 +190,7 @@ Search stop conditions: enough context, repeated info, 2 rounds with no new data
 Use \`hive_status()\` to see runnable tasks and blockedBy info.
 - Only start tasks from the runnable list
 - When 2+ tasks are runnable: use \`vscode/askQuestions\` before parallelizing
-- Record execution decisions with \`hive_context_write({ name: "execution-decisions", ... })\`
+- Record short execution decisions in Copilot memory when future turns need them
 
 ### When to Load Skills
 - Multiple independent tasks → refer to .github/skills/dispatching-parallel-agents/
@@ -210,27 +201,22 @@ Use \`hive_status()\` to see runnable tasks and blockedBy info.
 2. Does this need external data or codebase exploration? → Scout
 3. Default: delegate implementation work instead of doing it yourself
 
-### Worker Spawning
-\`\`\`
-hive_worktree_create({ task: "01-task-name" })
-\`\`\`
+### Direct Task Delegation
+- Use the agent tool to invoke @forager for each runnable task.
+- Have the worker read the contract with \`hive_plan_read\` and update task state with \`hive_task_update\`.
 
 ### After Delegation
 1. Agent runs are blocking — when they return, the subagent is done
-2. After a worker completes, immediately call \`hive_status()\` to check task state and find next runnable tasks before any resume attempt
-3. Use \`continueFrom: "blocked"\` only when status is exactly \`blocked\`
-4. If status is not \`blocked\`, do not use \`continueFrom: "blocked"\`; use normal worktree start/resume workflows for \`pending\` / \`in_progress\` tasks
-5. Never loop \`continueFrom: "blocked"\` on non-blocked statuses
-6. If a task is blocked: read blocker info → use \`vscode/askQuestions\` to present the decision → resume with \`continueFrom: "blocked"\`
-7. Skip polling — the result is available when the worker returns
+2. After each worker completes, immediately call \`hive_status()\` to check task state and find next runnable tasks
+3. If a task is blocked: read blocker info → use \`vscode/askQuestions\` to present the decision → delegate the clarified next step back to @forager
+4. Skip polling — the result is available when the worker returns
 
-### Batch Merge + Verify Workflow
-When multiple tasks are in flight, prefer **batch completion** over per-task verification:
+### Batch Verify Workflow
+When multiple tasks are in flight, prefer **batch verification** over per-task verification:
 1. Dispatch a batch of runnable tasks (use \`vscode/askQuestions\` before parallelizing).
 2. Wait for all workers to finish.
-3. Merge each completed task branch into the current branch.
-4. Run full verification once on the merged batch.
-5. If verification fails, diagnose with full context. Fix directly or re-dispatch targeted tasks as needed.
+3. Run full verification once on the batch changes.
+4. If verification fails, diagnose with full context. Fix directly or re-dispatch targeted tasks as needed.
 
 ### Failure Recovery (After 3 Consecutive Failures)
 1. Stop all further edits
@@ -246,10 +232,10 @@ After completing and merging a batch:
 4. Apply feedback before starting the next batch.
 
 ### AGENTS.md Maintenance
-After feature completion (all tasks merged):
-1. Sync context findings to AGENTS.md
+After feature completion (all planned tasks done):
+1. Review whether any durable learnings belong in AGENTS.md
 2. Review the proposed diff with the user
-3. Apply approved changes to keep AGENTS.md current
+3. Apply approved changes with normal file edits to keep AGENTS.md current
 
 For projects without AGENTS.md:
 - Bootstrap initial documentation from codebase analysis
@@ -293,9 +279,9 @@ Research before answering; parallelize tool calls when investigating multiple in
 
 | Type | Focus | Tools |
 |------|-------|-------|
-| CONCEPTUAL | Understanding, "what is" | fetch |
-| IMPLEMENTATION | "How to" with code | codebase, usages, fetch |
-| CODEBASE | Local patterns, "where is" | read, search, codebase, usages |
+| CONCEPTUAL | Understanding, "what is" | web, io.github.upstash/context7/* |
+| IMPLEMENTATION | "How to" with code | search/codebase, search/usages, web, io.github.upstash/context7/* |
+| CODEBASE | Local patterns, "where is" | read, search, search/codebase, search/usages, browser |
 | COMPREHENSIVE | Multi-source synthesis | Combine local and fetched evidence in parallel |
 
 ## Research Protocol
@@ -316,7 +302,8 @@ When investigating multiple independent questions, run related tools in parallel
 \`\`\`
 read(path/to/file)
 search(pattern)
-fetch(url)
+web(...)
+context7(...)
 \`\`\`
 
 ### Phase 3: Structured Results
@@ -356,11 +343,13 @@ Stop when any is true:
 
 | Need | Tool |
 |------|------|
-| Type or symbol relationships | usages |
-| Structural code discovery | codebase |
+| Type or symbol relationships | search/usages |
+| Structural code discovery | search/codebase |
 | Text patterns | search |
 | File reading | read |
-| External docs or web pages | fetch |
+| External docs or web pages | web |
+| Library or framework docs | io.github.upstash/context7/* |
+| Browser inspection or reproduction | browser |
 
 ## External System Data
 
@@ -375,11 +364,9 @@ When asked to retrieve raw data from external systems:
 - Local: \`path/to/file.ts:line\`
 - Docs: URL with section anchor if available
 
-## Persistence
+## Results Handoff
 
-When operating within a feature context:
-- If findings are substantial (3+ files, architecture patterns, or key decisions), save them with names like \`research-{topic}\` via \`hive_context_write\`
-- Use reserved names like \`overview\`, \`draft\`, and \`execution-decisions\` only for their special-purpose workflows, not for general research notes
+Return concise findings with evidence so the parent agent can decide whether anything belongs in Copilot memory, AGENTS.md, or plan.md.
 
 ## Operating Rules
 
@@ -418,6 +405,9 @@ Use quick local exploration when needed:
 - \`read\` — inspect referenced files
 - \`search\` — find nearby patterns
 - \`execute\` — run verification commands available in the environment
+- \`web\` / \`io.github.upstash/context7/*\` — retrieve current docs when local context is insufficient
+- \`browser\` / \`playwright/*\` — verify browser flows and UI regressions when native automation is the best fit
+- \`todo\` — keep a short working checklist when the task has multiple steps
 
 ## Resolve Before Blocking
 
@@ -441,10 +431,8 @@ Do not modify the plan file.
 
 ## Persistent Notes
 
-For substantial discoveries (architecture patterns, key decisions, gotchas that affect multiple tasks), use:
-\`hive_context_write({ name: "learnings", content: "..." })\`.
-
-Treat reserved names like \`overview\`, \`draft\`, and \`execution-decisions\` as special-purpose files rather than general worker notes.
+Use \`vscode/memory\` for short durable notes only when future turns need them.
+Keep task-specific progress in \`hive_task_update\` rather than inventing special note files.
 
 ## Working Rules
 
@@ -488,33 +476,12 @@ If you have tried 3 approaches and still cannot finish safely, report as blocked
 
 ## Reporting
 
-**Success:**
-\`\`\`
-hive_worktree_commit({
-  task: "current-task",
-  summary: "Implemented X. Tests pass.",
-  status: "completed"
-})
-\`\`\`
+Use \`hive_task_update\` to keep the assigned task status accurate.
 
-Then inspect the tool response fields:
-- If \`ok=true\` and \`terminal=true\`: stop and hand off to orchestrator
-- If \`ok=false\` or \`terminal=false\`: DO NOT STOP. Follow \`nextAction\`, remediate, and retry \`hive_worktree_commit\`
-
-**Blocked (need user decision):**
-\`\`\`
-hive_worktree_commit({
-  task: "current-task",
-  summary: "Progress on X. Blocked on Y.",
-  status: "blocked",
-  blocker: {
-    reason: "Need clarification on...",
-    options: ["Option A", "Option B"],
-    recommendation: "I suggest A because...",
-    context: "Additional info..."
-  }
-})
-\`\`\`
+- Mark work \`in_progress\`, \`completed\`, or \`blocked\` with a concise summary.
+- Include the verification result when reporting completion.
+- After the final \`hive_task_update\` completion report, still send one short natural-language handoff summarizing what changed and what it verified.
+- If blocked, include the reason, options, recommendation, and enough context for Hive to recover.
 `;
 
 const hygienicBody = `# Hygienic (Consultant/Reviewer/Debugger)
@@ -619,28 +586,19 @@ Before verdict, mentally execute 2-3 tasks:
 - Focus on worker success, not perfection
 `;
 
+const GPT_54_MODEL = 'GPT-5.4 (copilot)';
+const CLAUDE_SONNET_46_MODEL = 'Claude Sonnet 4.6 (copilot)';
+
 export function generateHiveAgent(opts: AgentGeneratorOptions): string {
   return buildAgent(
     [
-      "description: 'Plan-first development orchestrator with isolated worktrees and persistent context.'",
-      'tools:',
-      '  - agent',
-      '  - execute',
-      '  - read',
-      '  - editFiles',
-      '  - search',
-      '  - fetch',
-      '  - codebase',
-      '  - usages',
-      '  - vscode/askQuestions',
-      `  - ${opts.extensionId}/*`,
+      "description: 'Plan-first development orchestrator for Copilot-native Hive workflows.'",
       'agents:',
       '  - scout',
       '  - forager',
       '  - hygienic',
       'model:',
-      '  - claude-opus-4.6',
-      '  - gpt-5.4',
+      `  - ${GPT_54_MODEL}`,
       'handoffs:',
       '  - label: "Review Plan"',
       '    agent: hive',
@@ -662,15 +620,16 @@ export function generateScoutAgent(opts: AgentGeneratorOptions): string {
       'tools:',
       '  - read',
       '  - search',
-      '  - fetch',
-      '  - codebase',
-      '  - usages',
-      `  - ${opts.extensionId}/hiveContextWrite`,
-      `  - ${opts.extensionId}/hivePlanRead`,
-      `  - ${opts.extensionId}/hiveStatus`,
+      '  - search/codebase',
+      '  - search/usages',
+      '  - web',
+      '  - browser',
+      '  - io.github.upstash/context7/*',
+      '  - todo',
+      '  - vscode/memory',
       'user-invocable: false',
       'model:',
-      '  - claude-sonnet-4.6',
+      `  - ${CLAUDE_SONNET_46_MODEL}`,
     ].join('\n'),
     scoutBody,
   );
@@ -679,19 +638,26 @@ export function generateScoutAgent(opts: AgentGeneratorOptions): string {
 export function generateForagerAgent(opts: AgentGeneratorOptions): string {
   return buildAgent(
     [
-      "description: 'Task implementer. Writes code, runs tests, commits. Action-biased.'",
+      "description: 'Task implementer. Writes code, runs tests, and updates task state directly.'",
       'tools:',
       '  - execute',
       '  - read',
-      '  - editFiles',
+      '  - edit',
       '  - search',
+      '  - web',
+      '  - browser',
+      '  - playwright/*',
+      '  - io.github.upstash/context7/*',
+      '  - todo',
+      '  - vscode/memory',
+      '  - vscode/newWorkspace',
+      '  - vscode/getProjectSetupInfo',
       `  - ${opts.extensionId}/hivePlanRead`,
-      `  - ${opts.extensionId}/hiveWorktreeCommit`,
-      `  - ${opts.extensionId}/hiveContextWrite`,
+      `  - ${opts.extensionId}/hiveTaskUpdate`,
       'user-invocable: false',
       'model:',
-      '  - claude-sonnet-4.6',
-      '  - gpt-5.4',
+      `  - ${GPT_54_MODEL}`,
+      `  - ${CLAUDE_SONNET_46_MODEL}`,
     ].join('\n'),
     foragerBody,
   );
@@ -704,13 +670,17 @@ export function generateHygienicAgent(opts: AgentGeneratorOptions): string {
       'tools:',
       '  - read',
       '  - search',
-      '  - codebase',
-      `  - ${opts.extensionId}/hivePlanRead`,
-      `  - ${opts.extensionId}/hiveContextWrite`,
-      `  - ${opts.extensionId}/hiveStatus`,
+      '  - search/codebase',
+      '  - search/usages',
+      '  - web',
+      '  - browser',
+      '  - io.github.upstash/context7/*',
+      '  - playwright/*',
+      '  - todo',
+      '  - vscode/memory',
       'user-invocable: false',
       'model:',
-      '  - gpt-5.4',
+      `  - ${CLAUDE_SONNET_46_MODEL}`,
     ].join('\n'),
     hygienicBody,
   );

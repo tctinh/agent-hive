@@ -47,7 +47,11 @@ describe('Agent Generators', () => {
       const frontmatter = extractFrontmatter(agent.content);
       expect(frontmatter).toBeTruthy();
       expect(frontmatter).toContain('description:');
-      expect(frontmatter).toContain('tools:');
+      if (agent.filename === 'hive.agent.md') {
+        expect(frontmatter).not.toContain('tools:');
+      } else {
+        expect(frontmatter).toContain('tools:');
+      }
     }
   });
 
@@ -68,12 +72,12 @@ describe('Agent Generators', () => {
     }
   });
 
-  test('hive agent has agent tool and agents list', () => {
+  test('hive agent leaves tools uncurated and keeps the requested model format', () => {
     const hive = generateHiveAgent(opts);
     const frontmatter = extractFrontmatter(hive);
-    expect(frontmatter).toContain('- agent');
-    expect(frontmatter).toContain('- vscode/askQuestions');
+    expect(frontmatter).not.toContain('tools:');
     expect(frontmatter).toContain('agents:');
+    expect(frontmatter).toContain('GPT-5.4 (copilot)');
   });
 
   test('hive agent uses askQuestions-first wording without leaking question()', () => {
@@ -88,9 +92,10 @@ describe('Agent Generators', () => {
   });
 
   test('individual agent generators return content', () => {
-    expect(generateScoutAgent(opts)).toContain('description:');
-    expect(generateForagerAgent(opts)).toContain('description:');
-    expect(generateHygienicAgent(opts)).toContain('description:');
+    expect(generateScoutAgent(opts)).toContain('Claude Sonnet 4.6 (copilot)');
+    expect(generateForagerAgent(opts)).toContain('GPT-5.4 (copilot)');
+    expect(generateForagerAgent(opts)).toContain('Claude Sonnet 4.6 (copilot)');
+    expect(generateHygienicAgent(opts)).toContain('Claude Sonnet 4.6 (copilot)');
   });
 });
 

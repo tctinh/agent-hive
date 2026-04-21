@@ -11,7 +11,7 @@ export function getFeatureTools(workspaceRoot: string): ToolRegistration[] {
       name: 'hive_feature_create',
       toolReferenceName: 'hiveFeatureCreate',
       displayName: 'Create Hive Feature',
-      modelDescription: 'Create a new Hive feature for plan-first development. Use at the start of any new work to establish a planning workspace with context, plan, and task tracking.',
+      modelDescription: 'Create a new Hive feature for plan-first development. Use at the start of any new work to establish a planning workspace with plan.md and task tracking.',
       userDescription: 'Create a new Hive feature and initialize its planning workspace.',
       canBeReferencedInPrompt: true,
       inputSchema: {

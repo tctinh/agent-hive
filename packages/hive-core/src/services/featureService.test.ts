@@ -51,7 +51,7 @@ describe('FeatureService', () => {
     cleanup();
   });
 
-  it('exposes overview presence and per-document review counts in getInfo', () => {
+  it('reports plan-only review state and does not expose overview-specific feature info', () => {
     const featureName = 'test-feature';
     const featurePath = setupFeature(featureName);
 
@@ -73,16 +73,17 @@ describe('FeatureService', () => {
       })
     );
 
-    expect(service.getInfo(featureName)).toMatchObject({
+    const info = service.getInfo(featureName);
+
+    expect(info).toMatchObject({
       name: featureName,
       hasPlan: true,
-      hasOverview: true,
-      commentCount: 3,
+      commentCount: 2,
       reviewCounts: {
         plan: 2,
-        overview: 1,
       },
     });
+    expect(info).not.toHaveProperty('hasOverview');
   });
 
   it('creates new features in the next indexed folder while keeping the logical name', () => {

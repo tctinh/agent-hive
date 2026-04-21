@@ -1,18 +1,16 @@
-import { FeatureService, PlanService, ContextService } from 'hive-core';
+import { PlanService } from 'hive-core';
 import type { ToolRegistration } from './base';
 import { defineTool } from './base';
 
 export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
-  const featureService = new FeatureService(workspaceRoot);
   const planService = new PlanService(workspaceRoot);
-  const contextService = new ContextService(workspaceRoot);
 
   return [
     defineTool({
       name: 'hive_plan_write',
       toolReferenceName: 'hivePlanWrite',
       displayName: 'Write Hive Plan',
-      modelDescription: 'Write or update the plan.md for a feature. Review context/overview.md first as the human-facing summary/history surface on this branch, while plan.md remains execution truth. Include a concise design summary before ## Tasks, and optionally include a Mermaid dependency or sequence overview in that pre-task summary only. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.',
+      modelDescription: 'Write or update the plan.md for a feature. plan.md is the only required human-review and execution document. Include a concise overview/design summary before ## Tasks, and optionally include a Mermaid dependency or sequence overview in that pre-task summary only. Use markdown with ### numbered headers for tasks. Clears existing plan review comments when plan is rewritten.',
       userDescription: 'Write or rewrite a feature plan.md file.',
       canBeReferencedInPrompt: true,
       inputSchema: {
@@ -32,21 +30,11 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
       invoke: async (input) => {
         const { feature, content } = input as { feature: string; content: string };
         const planPath = planService.write(feature, content);
-        
-        let contextWarning = '';
-        try {
-          const contexts = contextService.list(feature);
-          if (contexts.length === 0) {
-            contextWarning += '\n\n⚠️ WARNING: No context files created yet. If workers will need durable notes, use hive_context_write to document research findings, user decisions, architecture constraints, or references to existing code.';
-          }
-        } catch {
-          contextWarning = '\n\n⚠️ WARNING: Could not check context files. If needed, use hive_context_write to document durable findings for workers.';
-        }
-        
+
         return JSON.stringify({
           success: true,
           path: planPath,
-          message: `Plan written. Review context/overview.md first as the human-facing summary/history surface; plan.md remains execution truth. When ready, use hive_plan_approve.${contextWarning}`,
+          message: 'Plan written. plan.md is the only required review document and execution contract. Keep an overview/design summary before ## Tasks. When ready, use hive_plan_approve.',
         });
       },
     }),
@@ -54,7 +42,7 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
       name: 'hive_plan_read',
       toolReferenceName: 'hivePlanRead',
       displayName: 'Read Hive Plan',
-      modelDescription: 'Read the plan.md and related review comments for a feature. Use to inspect the plan.md execution contract, task structure, status, and review feedback while keeping context/overview.md as the human-facing summary/history surface on this branch.',
+      modelDescription: 'Read the plan.md and related review comments for a feature. Use to inspect the single execution contract, task structure, status, and review feedback in the only required review document.',
       userDescription: 'Read a feature plan and its review comments.',
       canBeReferencedInPrompt: true,
       readOnly: true,
@@ -86,7 +74,7 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
       name: 'hive_plan_approve',
       toolReferenceName: 'hivePlanApprove',
       displayName: 'Approve Hive Plan',
-      modelDescription: 'Approve a plan for execution. Use after reviewers have checked context/overview.md first, confirmed plan.md as the execution contract, and resolved any comments. Changes feature status to approved.',
+      modelDescription: 'Approve a plan for execution. Use after reviewers have checked plan.md as the only required review document and resolved any plan comments. Changes feature status to approved.',
       userDescription: 'Approve a Hive feature plan for execution.',
       canBeReferencedInPrompt: true,
       inputSchema: {
@@ -101,33 +89,15 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
       },
       invoke: async (input) => {
         const { feature } = input as { feature: string };
-        let contexts: Array<{ name: string }> = [];
-        
-        let contextWarning = '';
-        try {
-          contexts = contextService.list(feature);
-          if (contexts.length === 0) {
-            contextWarning += '\n\n⚠️ Note: No context files found. Consider using hive_context_write during execution to document findings for future reference.';
-          }
-        } catch { /* continue without warning */ }
-        
         try {
           planService.approve(feature);
         } catch (error) {
           if (error instanceof Error && /unresolved review comments/i.test(error.message)) {
-            const hasOverview = contexts.some(context => context.name === 'overview');
-            const reviewCounts = featureService.getInfo(feature)?.reviewCounts ?? { plan: 0, overview: 0 };
-            const planComments = reviewCounts.plan;
-            const overviewComments = hasOverview ? reviewCounts.overview : 0;
-            const unresolvedTotal = planComments + overviewComments;
-            const documents = [
-              planComments > 0 ? `plan (${planComments})` : null,
-              overviewComments > 0 ? `overview (${overviewComments})` : null,
-            ].filter(Boolean).join(', ');
+            const unresolvedTotal = planService.read(feature)?.comments.length ?? 0;
 
             return JSON.stringify({
               success: false,
-              message: `Cannot approve - ${unresolvedTotal} unresolved review comment(s) remain across ${documents}. Address them first.`,
+              message: `Cannot approve - ${unresolvedTotal} unresolved plan review comment(s) remain. Address them first.`,
             });
           }
 
@@ -135,7 +105,7 @@ export function getPlanTools(workspaceRoot: string): ToolRegistration[] {
         }
         return JSON.stringify({
           success: true,
-          message: `Plan approved. Use hive_tasks_sync to generate tasks from plan.md as the execution contract. Refresh context/overview.md if the human-facing summary/history should change.${contextWarning}`,
+          message: 'Plan approved. plan.md is the only required review document. Use hive_tasks_sync to generate tasks from the execution contract.',
         });
       },
     }),

@@ -6,6 +6,30 @@ function getBody(content: string): string {
   return parts.slice(2).join('---').trim();
 }
 
+function getFrontmatter(content: string): string {
+  const parts = content.split(/^---$/m);
+  return parts[1] ?? '';
+}
+
+function getFrontmatterTools(content: string): string[] {
+  const lines = getFrontmatter(content).split('\n');
+  const toolsIndex = lines.indexOf('tools:');
+  if (toolsIndex === -1) {
+    return [];
+  }
+
+  const tools: string[] = [];
+  for (const line of lines.slice(toolsIndex + 1)) {
+    if (!line.startsWith('  - ')) {
+      break;
+    }
+
+    tools.push(line.replace(/^  - /, '').replace(/^"|"$/g, ''));
+  }
+
+  return tools;
+}
+
 describe('prompt generator', () => {
   it('exports the prompt generators and returns the 5 workspace prompt files', () => {
     expect(generators.generateAllPrompts).toBeDefined();
@@ -42,18 +66,34 @@ describe('prompt generator', () => {
     const reviewPrompt = generators.generateReviewPlanPrompt();
     const planBody = getBody(planPrompt.body);
 
-    expect(planPrompt.body).toContain('  - "vscode/askQuestions"');
+    expect(getFrontmatterTools(planPrompt.body)).toEqual(expect.arrayContaining([
+      'search/codebase',
+      'search/usages',
+      'vscode/askQuestions',
+      'tctinh.vscode-hive/hiveStatus',
+      'tctinh.vscode-hive/hivePlanWrite',
+    ]));
+    expect(planPrompt.body).not.toContain('  - "codebase"');
+    expect(planPrompt.body).not.toContain('  - "usages"');
     expect(planBody).toContain('vscode/askQuestions');
     expect(planBody).toContain('hive_plan_write');
+    expect(planBody).toContain('overview/design summary before ## Tasks');
     expect(planBody).toContain('read-only');
     expect(planBody).toContain('AGENTS.md');
     expect(planBody).toContain('plain chat only as a fallback');
+    expect(planBody).not.toContain('context/overview.md');
     expect(planBody).not.toContain('prefer Copilot\'s built-in clarification flow in chat');
     expect(planBody).not.toContain('question()');
 
+    expect(getFrontmatterTools(reviewPrompt.body)).toEqual(expect.arrayContaining([
+      'tctinh.vscode-hive/hivePlanRead',
+      'tctinh.vscode-hive/hiveStatus',
+    ]));
     expect(getBody(reviewPrompt.body)).toContain('hive_plan_read');
     expect(getBody(reviewPrompt.body)).toContain('approval');
     expect(getBody(reviewPrompt.body)).toContain('revision');
+    expect(getBody(reviewPrompt.body)).toContain('plan.md');
+    expect(getBody(reviewPrompt.body)).not.toContain('context/overview.md');
   });
 
   it('guides execution and verification prompts toward built-in browser and review flows', () => {
@@ -61,10 +101,19 @@ describe('prompt generator', () => {
     const requestReviewPrompt = generators.generateRequestReviewPrompt();
     const verifyPrompt = generators.generateVerifyCompletionPrompt();
 
+    expect(getFrontmatterTools(executePrompt.body)).toEqual(expect.arrayContaining([
+      'tctinh.vscode-hive/hivePlanRead',
+      'tctinh.vscode-hive/hiveStatus',
+      'tctinh.vscode-hive/hiveTasksSync',
+    ]));
+    expect(executePrompt.body).not.toContain('hiveWorktreeStart');
     expect(getBody(executePrompt.body)).toContain('hive_tasks_sync');
-    expect(getBody(executePrompt.body)).toContain('hive_worktree_start');
+    expect(getBody(executePrompt.body)).toContain('@forager');
+    expect(getBody(executePrompt.body)).toContain('hive_task_update');
     expect(getBody(executePrompt.body)).toContain('Playwright MCP');
     expect(getBody(executePrompt.body)).toContain('browser tools');
+    expect(getBody(executePrompt.body)).not.toContain('hive_worktree_start');
+    expect(getBody(executePrompt.body)).not.toContain('hive_merge');
 
     expect(getBody(requestReviewPrompt.body)).toContain('Hygienic');
     expect(getBody(requestReviewPrompt.body)).toContain('code review');

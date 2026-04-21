@@ -5,6 +5,7 @@ import { defineTool } from './base';
 
 export function getTaskTools(workspaceRoot: string): ToolRegistration[] {
   const taskService = new TaskService(workspaceRoot);
+  const foragerGuidance = 'Delegate runnable execution directly to @forager and use hive_task_update to record progress or completion.';
 
   return [
     defineTool({
@@ -38,10 +39,9 @@ export function getTaskTools(workspaceRoot: string): ToolRegistration[] {
           manual: result.manual.length,
           message: `${result.created.length} tasks created, ${result.removed.length} removed, ${result.kept.length} kept, ${result.manual.length} manual`,
           hints: [
-            'Use hive_worktree_start to begin work on a runnable task.',
             'Check task dependencies with hive_status to find runnable tasks.',
             'A task is runnable when all its dependsOn tasks have status done.',
-            'Update via hive_task_update when work progresses.'
+            foragerGuidance,
           ]
         });
       },
@@ -132,14 +132,14 @@ export function getTaskTools(workspaceRoot: string): ToolRegistration[] {
         if (metadataFields.reason) metadata.reason = metadataFields.reason;
         if (metadataFields.source) metadata.source = metadataFields.source;
         const folder = taskService.create(feature, name, order, Object.keys(metadata).length > 0 ? metadata : undefined);
-        return `Created task "${folder}" with status: pending, dependsOn: [${(metadata.dependsOn ?? []).join(', ')}]\nReminder: run hive_worktree_start to work in its worktree, and ensure any subagents work in that worktree too.`;
+        return `Created task "${folder}" with status: pending, dependsOn: [${(metadata.dependsOn ?? []).join(', ')}]\nReminder: ${foragerGuidance}`;
       },
     }),
     defineTool({
       name: 'hive_task_update',
       toolReferenceName: 'hiveTaskUpdate',
       displayName: 'Update Hive Task',
-      modelDescription: 'Update a task status (pending/in_progress/done/cancelled) or add a work summary. Returns plain text confirmation. Does NOT merge - use hive_merge for integration.',
+      modelDescription: 'Update a task status (pending/in_progress/done/cancelled) or add a work summary. Use during direct @forager execution to record progress or completion.',
       userDescription: 'Update a Hive task status or summary.',
       canBeReferencedInPrompt: true,
       inputSchema: {

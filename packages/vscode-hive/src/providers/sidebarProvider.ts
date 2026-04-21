@@ -4,7 +4,7 @@ import * as path from 'path'
 import { getFeaturePath, listFeatureDirectories } from 'hive-core'
 import type { FeatureJson, TaskStatus } from 'hive-core'
 
-type SidebarItem = ActionItem | StatusGroupItem | FeatureItem | OverviewItem | PlanItem | ContextFolderItem | ContextFileItem | TasksGroupItem | TaskItem | TaskFileItem
+type SidebarItem = ActionItem | StatusGroupItem | FeatureItem | PlanItem | ContextFolderItem | ContextFileItem | TasksGroupItem | TaskItem | TaskFileItem
   | CopilotArtifactsGroupItem | ArtifactCategoryItem | ArtifactFileItem
 
 // Quick action button
@@ -94,25 +94,6 @@ class PlanItem extends vscode.TreeItem {
       command: 'vscode.open',
       title: 'Open Plan',
       arguments: [vscode.Uri.file(planPath)]
-    }
-  }
-}
-
-class OverviewItem extends vscode.TreeItem {
-  constructor(
-    public readonly featureName: string,
-    public readonly overviewPath: string,
-    public readonly commentCount: number
-  ) {
-    super('Overview', vscode.TreeItemCollapsibleState.None)
-
-    this.description = commentCount > 0 ? `${commentCount} comment(s)` : ''
-    this.contextValue = 'overview-file'
-    this.iconPath = new vscode.ThemeIcon('book')
-    this.command = {
-      command: 'vscode.open',
-      title: 'Open Overview',
-      arguments: [vscode.Uri.file(overviewPath)]
     }
   }
 }
@@ -373,20 +354,14 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
 
     const planPath = path.join(featurePath, 'plan.md')
     if (fs.existsSync(planPath)) {
-      const commentCount = this.getCommentCount(featureName, 'plan')
+      const commentCount = this.getCommentCount(featureName)
       items.push(new PlanItem(featureName, planPath, feature.status, commentCount))
     }
 
     const contextPath = path.join(featurePath, 'context')
     const contextFiles = fs.existsSync(contextPath)
-      ? fs.readdirSync(contextPath).filter(f => !f.startsWith('.') && f !== 'overview.md')
+      ? fs.readdirSync(contextPath).filter(f => !f.startsWith('.'))
       : []
-
-    const overviewPath = path.join(contextPath, 'overview.md')
-    if (fs.existsSync(overviewPath)) {
-      const commentCount = this.getCommentCount(featureName, 'overview')
-      items.push(new OverviewItem(featureName, overviewPath, commentCount))
-    }
 
     items.push(new ContextFolderItem(featureName, contextPath, contextFiles.length))
 
@@ -472,7 +447,7 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
     if (!fs.existsSync(contextPath)) return []
 
     return fs.readdirSync(contextPath)
-      .filter(f => !f.startsWith('.') && f !== 'overview.md')
+      .filter(f => !f.startsWith('.'))
       .map(f => new ContextFileItem(f, path.join(contextPath, f)))
   }
 
@@ -560,14 +535,12 @@ export class HiveSidebarProvider implements vscode.TreeDataProvider<SidebarItem>
     return JSON.parse(fs.readFileSync(featureJsonPath, 'utf-8'))
   }
 
-  private getCommentCount(featureName: string, document: 'plan' | 'overview'): number {
+  private getCommentCount(featureName: string): number {
     const featurePath = getFeaturePath(this.workspaceRoot, featureName)
-    const commentsPath = document === 'plan'
-      ? this.firstExistingPath([
-          path.join(featurePath, 'comments', 'plan.json'),
-          path.join(featurePath, 'comments.json')
-        ])
-      : path.join(featurePath, 'comments', 'overview.json')
+    const commentsPath = this.firstExistingPath([
+      path.join(featurePath, 'comments', 'plan.json'),
+      path.join(featurePath, 'comments.json')
+    ])
 
     if (!commentsPath || !fs.existsSync(commentsPath)) return 0
 
