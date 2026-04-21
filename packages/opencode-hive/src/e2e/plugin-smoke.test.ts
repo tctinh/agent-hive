@@ -1157,7 +1157,7 @@ Do it
         expect.objectContaining({
           name: "overview",
           role: "operational",
-          includeInExecution: true,
+          includeInExecution: false,
           includeInAgentsMdSync: false,
           includeInNetwork: false,
         }),

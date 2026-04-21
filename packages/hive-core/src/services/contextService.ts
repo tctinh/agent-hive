@@ -21,7 +21,7 @@ const DEFAULT_CONTEXT_CLASSIFICATION = {
 const SPECIAL_CONTEXTS = {
   draft: { role: 'scratchpad', includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
   'execution-decisions': { role: 'operational', includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
-  overview: { role: 'operational', includeInExecution: true, includeInAgentsMdSync: false, includeInNetwork: false },
+  overview: { role: 'operational', includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
 } as const satisfies Record<string, {
   role: ContextRole;
   includeInExecution: boolean;

@@ -49,7 +49,7 @@ describe('ContextService overview as regular context', () => {
       file.includeInNetwork,
     ])).toEqual([
       ['decisions', 'durable', true, true, true],
-      ['overview', 'operational', true, false, false],
+      ['overview', 'operational', false, false, false],
     ]);
   });
 
@@ -62,7 +62,7 @@ describe('ContextService overview as regular context', () => {
 
     const executionContext = service.listExecutionContext(featureName);
 
-    expect(executionContext?.map((file: { name: string }) => file.name)).toEqual(['decisions', 'overview']); // overview still included in execution, just not in agents-md-sync or network
+    expect(executionContext?.map((file: { name: string }) => file.name)).toEqual(['decisions']);
   });
 
   it('classifies overview as durable while preserving special handling for other known names', () => {
@@ -84,7 +84,7 @@ describe('ContextService overview as regular context', () => {
       ['draft', 'scratchpad', false, false, false],
       ['execution-decisions', 'operational', false, false, false],
       ['learnings', 'durable', true, true, true],
-      ['overview', 'operational', true, false, false],
+      ['overview', 'operational', false, false, false],
     ]);
   });
 
