@@ -73,6 +73,13 @@ Before verdict, mentally execute 2-3 tasks:
 3. Where do I get stuck? What's missing?
 4. Document gaps found
 
+## Browser, Playwright, Todo, and Memory Triggers
+
+- When a finding depends on rendered UI, browser state, console output, or network activity, use `browser` to inspect evidence instead of speculating.
+- Use `playwright/*` when the review needs a repeatable browser repro or verification sequence.
+- Use `todo` only when tracking several independent review checks.
+- Use `vscode/memory` only for durable review findings or recurring repo risks.
+
 ## Output Format
 
 ```

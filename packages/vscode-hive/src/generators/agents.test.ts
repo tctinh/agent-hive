@@ -72,6 +72,10 @@ describe('generateAllAgents', () => {
     expect(hive).toContain('vscode/askQuestions');
     expect(hive).toContain('Playwright MCP');
     expect(hive).toContain('browser tools');
+    expect(body).toContain('Before any multi-domain, read-only investigation, refer to .github/skills/parallel-exploration/');
+    expect(body).toContain('When the work is a bug, failing test, or unexpected behavior, refer to .github/skills/systematic-debugging/');
+    expect(body).toContain('When implementing a feature, fix, or refactor, refer to .github/skills/test-driven-development/ before editing production code');
+    expect(body).toContain('Before any completion claim, handoff, or PR/update that says work is done or passing, refer to .github/skills/verification-before-completion/');
     expect(body).toContain('Use `vscode/askQuestions` for structured decision checkpoints');
     expect(body).toContain('Plain chat is allowed only for lightweight clarification or when `vscode/askQuestions` is unavailable');
     expect(body).not.toContain('hive_context_write');
@@ -110,6 +114,9 @@ describe('generateAllAgents', () => {
     const scout = byFilename.get('scout.agent.md');
     const forager = byFilename.get('forager.agent.md');
     const hygienic = byFilename.get('hygienic.agent.md');
+    const scoutBody = getBody(scout ?? '');
+    const foragerBody = getBody(forager ?? '');
+    const hygienicBody = getBody(hygienic ?? '');
 
     expect(getFrontmatterTools(hive ?? '')).toEqual([]);
     expect(getFrontmatterModels(hive ?? '')).toEqual(['GPT-5.4 (copilot)']);
@@ -127,6 +134,9 @@ describe('generateAllAgents', () => {
     ]);
     expect(getFrontmatterModels(scout ?? '')).toEqual(['Claude Sonnet 4.6 (copilot)']);
     expect(scout).toContain('user-invocable: false');
+    expect(scoutBody).toContain('When the answer depends on rendered UI, browser state, console output, or network traffic, use `browser`');
+    expect(scoutBody).toContain('Use `todo` only when the investigation spans multiple independent questions or sources');
+    expect(scoutBody).toContain('Use `vscode/memory` only for findings the parent agent or a later turn will need');
 
     expect(getFrontmatterTools(forager ?? '')).toEqual([
       'execute',
@@ -151,6 +161,9 @@ describe('generateAllAgents', () => {
     expect(forager).toContain('user-invocable: false');
     expect(forager).not.toContain('Docker Sandbox');
     expect(forager).toContain('still send one short natural-language handoff');
+    expect(foragerBody).toContain('When a task depends on browser behavior, use `browser` for quick inspection and `playwright/*` for repeatable automation or end-to-end verification');
+    expect(foragerBody).toContain('Use `todo` only when the assigned task has enough moving pieces that a live checklist prevents misses');
+    expect(foragerBody).toContain('Use `vscode/memory` only for durable context that must survive the current task handoff');
 
     expect(getFrontmatterTools(hygienic ?? '')).toEqual([
       'read',
@@ -166,5 +179,9 @@ describe('generateAllAgents', () => {
     ]);
     expect(getFrontmatterModels(hygienic ?? '')).toEqual(['Claude Sonnet 4.6 (copilot)']);
     expect(hygienic).toContain('user-invocable: false');
+    expect(hygienicBody).toContain('When a finding depends on rendered UI, browser state, console output, or network activity, use `browser`');
+    expect(hygienicBody).toContain('Use `playwright/*` when the review needs a repeatable browser repro or verification sequence');
+    expect(hygienicBody).toContain('Use `todo` only when tracking several independent review checks');
+    expect(hygienicBody).toContain('Use `vscode/memory` only for durable review findings or recurring repo risks');
   });
 });

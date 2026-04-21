@@ -27,7 +27,7 @@ export function generateHiveWorkflowInstructions(): InstructionFile {
     'hive-workflow.instructions.md',
     'Hive plan-first development workflow',
     '**',
-    'This project uses Hive plan-first development. Before making changes, check for an active feature with hive_status. Follow: Plan → Review → Approve → Execute. plan.md is the only required human-review and execution document. Use Copilot memory or normal file edits for working notes when needed. Never execute code without an approved plan.',
+    'This project uses Hive plan-first development. Before making changes, check for an active feature with hive_status and follow Plan → Review → Approve → Execute. plan.md is the only required human-review and execution document. Load only the skill or tool guidance the current task triggers: use browser tools for web or UI inspection, Playwright MCP for browser automation or end-to-end verification, Copilot memory for durable notes needed across turns, and todo for multi-step work. Never execute code without an approved plan.',
   );
 }
 
@@ -65,11 +65,13 @@ export function generateCopilotInstructions(): string {
 
 Use .github/instructions/ for path-specific coding and workflow guidance, and .github/prompts/ for reusable entry points such as plan creation, plan review, execution, review handoff, and completion verification.
 
-Use .github/skills/ directly when a task benefits from a documented skill, and use Copilot memory for durable notes instead of extension-specific note-writing helpers.
+Load .github/skills/ only when the current task triggers that workflow: parallel read-only investigation, bugs or test failures, implementation work, or completion claims.
+
+Use Copilot memory only for durable notes and todo for multi-step work.
 
 Use vscode/askQuestions for practical structured decision checkpoints wherever Copilot supports it. Use plain chat only as a fallback when the tool is unavailable or a truly lightweight clarification is better.
 
-When web research, browser inspection, or end-to-end verification is needed, prefer built-in browser tools and MCP integrations such as Playwright MCP over extension-specific substitutes.`,
+When web research, browser inspection, or end-to-end verification is needed, prefer built-in browser tools and Playwright MCP over extension-specific substitutes.`,
   );
 }
 

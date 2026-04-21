@@ -210,6 +210,7 @@ During Planning, use the agent tool to invoke @scout for exploration. When multi
 
 ### Memory and Working Notes
 Use Copilot memory for durable notes only when future turns need them.
+Use the todo tool only when a multi-step investigation, batch, or handoff needs active tracking.
 Treat \`plan.md\` as the only required human-facing review surface and execution truth for each feature.
 Use ordinary file edits for repository documents such as AGENTS.md when the workflow calls for updates.
 Do not invent special-purpose note files or helper tools just to persist findings.
@@ -237,20 +238,14 @@ NEVER end with:
 - "When you're ready..."
 
 ### Loading Skills (On-Demand)
-Refer to a skill only when detailed guidance is needed:
-| Skill | Use when |
-|-------|----------|
-| .github/skills/brainstorming/ | Exploring ideas and requirements |
-| .github/skills/writing-plans/ | Structuring implementation plans |
-| .github/skills/dispatching-parallel-agents/ | Parallel task delegation |
-| .github/skills/parallel-exploration/ | Parallel read-only research |
-| .github/skills/executing-plans/ | Step-by-step plan execution |
-| .github/skills/systematic-debugging/ | Bugs, test failures, unexpected behavior |
-| .github/skills/test-driven-development/ | TDD approach |
-| .github/skills/verification-before-completion/ | Before claiming work is complete or creating PRs |
-| .github/skills/agents-md-mastery/ | Agent and AGENTS.md quality review |
+Load only the skill the current task triggers:
+- Before any multi-domain, read-only investigation, refer to .github/skills/parallel-exploration/ and use it to structure Scout fan-out.
+- When the work is a bug, failing test, or unexpected behavior, refer to .github/skills/systematic-debugging/ before proposing fixes.
+- When implementing a feature, fix, or refactor, refer to .github/skills/test-driven-development/ before editing production code.
+- Before any completion claim, handoff, or PR/update that says work is done or passing, refer to .github/skills/verification-before-completion/ and run the proving command.
+- Use .github/skills/brainstorming/ for vague requirements, .github/skills/writing-plans/ for plan authoring, .github/skills/dispatching-parallel-agents/ for parallel task execution, .github/skills/executing-plans/ for approved-plan execution, and .github/skills/agents-md-mastery/ for AGENTS.md quality work.
 
-Load one skill at a time, only when guidance is needed.
+Load one skill at a time, only when the current task triggers it.
 
 ### Copilot-Native Workspace Surfaces
 - Treat .github/copilot-instructions.md as concise repository-wide steering that complements AGENTS.md instead of replacing it.
@@ -259,9 +254,9 @@ Load one skill at a time, only when guidance is needed.
 - Use .github/skills/ directly when you need deeper procedural guidance instead of routing skill access through extension-specific helpers.
 
 ### Browser, MCP, and Web Work
-- For browser exploration or web verification, prefer Copilot's built-in browser tools.
-- For browser automation and end-to-end testing, prefer Playwright MCP when it is available.
-- Use MCP or browser tools when they are a better fit than inventing extension-specific replacements.
+- When the answer depends on rendered UI, live browser state, console output, or network activity, prefer Copilot's built-in browser tools.
+- When you need repeatable browser automation or end-to-end verification, prefer Playwright MCP when it is available.
+- Use MCP or browser tools when they materially reduce guesswork instead of inventing extension-specific replacements.
 
 ---
 
@@ -491,6 +486,13 @@ Stop when any is true:
 | Library or framework docs | io.github.upstash/context7/* |
 | Browser inspection or reproduction | browser |
 
+## Browser, Todo, and Memory Triggers
+
+- When the answer depends on rendered UI, browser state, console output, or network traffic, use \`browser\` to inspect or reproduce it.
+- If the investigation needs repeatable browser automation or Playwright MCP, call that out in the handoff instead of improvising it here.
+- Use \`todo\` only when the investigation spans multiple independent questions or sources and you need to track coverage.
+- Use \`vscode/memory\` only for findings the parent agent or a later turn will need.
+
 ## External System Data
 
 When asked to retrieve raw data from external systems:
@@ -541,12 +543,14 @@ Your tool access is scoped to your role. Use only the tools available to you.
 ## Allowed Research
 
 Use quick local exploration when needed:
+- When a task depends on browser behavior, use \`browser\` for quick inspection and \`playwright/*\` for repeatable automation or end-to-end verification.
 - \`read\` \u2014 inspect referenced files
 - \`search\` \u2014 find nearby patterns
 - \`execute\` \u2014 run verification commands available in the environment
 - \`web\` / \`io.github.upstash/context7/*\` \u2014 retrieve current docs when local context is insufficient
-- \`browser\` / \`playwright/*\` \u2014 verify browser flows and UI regressions when native automation is the best fit
-- \`todo\` \u2014 keep a short working checklist when the task has multiple steps
+- \`browser\` \u2014 inspect rendered UI, browser state, console output, and network behavior when the task depends on live behavior
+- \`playwright/*\` \u2014 use for repeatable automation or end-to-end verification once the browser path is clear
+- Use \`todo\` only when the assigned task has enough moving pieces that a live checklist prevents misses.
 
 ## Resolve Before Blocking
 
@@ -570,7 +574,7 @@ Do not modify the plan file.
 
 ## Persistent Notes
 
-Use \`vscode/memory\` for short durable notes only when future turns need them.
+Use \`vscode/memory\` only for durable context that must survive the current task handoff.
 Keep task-specific progress in \`hive_task_update\` rather than inventing special note files.
 
 ## Working Rules
@@ -678,6 +682,13 @@ Before verdict, mentally execute 2-3 tasks:
 2. Simulate: "I'm starting this task now..."
 3. Where do I get stuck? What's missing?
 4. Document gaps found
+
+## Browser, Playwright, Todo, and Memory Triggers
+
+- When a finding depends on rendered UI, browser state, console output, or network activity, use \`browser\` to inspect evidence instead of speculating.
+- Use \`playwright/*\` when the review needs a repeatable browser repro or verification sequence.
+- Use \`todo\` only when tracking several independent review checks.
+- Use \`vscode/memory\` only for durable review findings or recurring repo risks.
 
 ## Output Format
 
@@ -6531,7 +6542,8 @@ var DEFAULT_CONTEXT_CLASSIFICATION = {
 };
 var SPECIAL_CONTEXTS = {
   draft: { role: "scratchpad", includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
-  "execution-decisions": { role: "operational", includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false }
+  "execution-decisions": { role: "operational", includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false },
+  overview: { role: "operational", includeInExecution: false, includeInAgentsMdSync: false, includeInNetwork: false }
 };
 var ContextService = class {
   projectRoot;
@@ -7686,7 +7698,7 @@ function generateHiveWorkflowInstructions() {
     "hive-workflow.instructions.md",
     "Hive plan-first development workflow",
     "**",
-    "This project uses Hive plan-first development. Before making changes, check for an active feature with hive_status. Follow: Plan \u2192 Review \u2192 Approve \u2192 Execute. plan.md is the only required human-review and execution document. Use Copilot memory or normal file edits for working notes when needed. Never execute code without an approved plan."
+    "This project uses Hive plan-first development. Before making changes, check for an active feature with hive_status and follow Plan \u2192 Review \u2192 Approve \u2192 Execute. plan.md is the only required human-review and execution document. Load only the skill or tool guidance the current task triggers: use browser tools for web or UI inspection, Playwright MCP for browser automation or end-to-end verification, Copilot memory for durable notes needed across turns, and todo for multi-step work. Never execute code without an approved plan."
   );
 }
 function generateCodingStandardsTemplate() {
@@ -7722,11 +7734,13 @@ function generateCopilotInstructions() {
 
 Use .github/instructions/ for path-specific coding and workflow guidance, and .github/prompts/ for reusable entry points such as plan creation, plan review, execution, review handoff, and completion verification.
 
-Use .github/skills/ directly when a task benefits from a documented skill, and use Copilot memory for durable notes instead of extension-specific note-writing helpers.
+Load .github/skills/ only when the current task triggers that workflow: parallel read-only investigation, bugs or test failures, implementation work, or completion claims.
+
+Use Copilot memory only for durable notes and todo for multi-step work.
 
 Use vscode/askQuestions for practical structured decision checkpoints wherever Copilot supports it. Use plain chat only as a fallback when the tool is unavailable or a truly lightweight clarification is better.
 
-When web research, browser inspection, or end-to-end verification is needed, prefer built-in browser tools and MCP integrations such as Playwright MCP over extension-specific substitutes.`
+When web research, browser inspection, or end-to-end verification is needed, prefer built-in browser tools and Playwright MCP over extension-specific substitutes.`
   );
 }
 function generateAllInstructions() {
@@ -7941,6 +7955,12 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Save plans to:** \`hive_plan_write\` (writes to \`.hive/features/<feature>/plan.md\`)
 
+## Task Lookup and Working Notes
+
+- If a feature or draft plan already exists, start from \`hive_status()\` to confirm the active feature, current task IDs, and any blocked or runnable work before revising the plan.
+- Use \`todo\` only when shaping a multi-task plan or review response needs an active checklist.
+- Use \`vscode/memory\` only for durable planning decisions or blocker history that future turns need.
+
 ## Bite-Sized Task Granularity
 
 **Each step is one action (2-5 minutes):**
@@ -8101,7 +8121,7 @@ Load plan, review critically, execute tasks in batches, report for review betwee
 1. Read plan file
 2. Review critically - identify any questions or concerns about the plan
 3. If concerns: Raise them with your human partner before starting
-4. If no concerns: Create a short checklist in your working notes and proceed
+4. If no concerns: Create a short checklist in \`todo\` or your working notes only when the batch has enough moving parts to justify active tracking, then proceed
 
 ### Step 2: Identify Runnable Tasks
 
@@ -8115,6 +8135,8 @@ Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, 
 - Record the decision in Copilot memory or current working notes only when future turns need it
 
 **When 1 task is runnable:** Proceed directly.
+
+Use \`vscode/memory\` only for durable execution decisions or blocker history that future turns need.
 
 ### Step 3: Execute Batch
 
@@ -8263,6 +8285,15 @@ When you need to answer "where/how does X work?" across multiple domains (codeba
 - Work involves file edits (use Hive tasks / Forager instead)
 
 **Important:** Do not treat "this is exploratory" as a reason to avoid delegation. This skill is specifically for exploratory research when fan-out makes it faster and cleaner.
+
+## Tool-Aware Research
+
+Load this skill before any multi-domain, read-only investigation that benefits from Scout fan-out.
+
+- When the answer depends on rendered UI, browser state, console output, or network activity, use \`browser\` as one of the read-only slices.
+- When external docs, APIs, or third-party implementations matter, use \`web\` or \`io.github.upstash/context7/*\` for the docs/OSS slice.
+- Use \`todo\` only when you need to track multiple questions and evidence coverage during synthesis.
+- Use \`vscode/memory\` only for findings the parent agent or a later turn will need after synthesis.
 
 ## The Pattern
 
@@ -8436,6 +8467,8 @@ When you have multiple unrelated failures (different test files, different subsy
 
 **Core principle:** Dispatch one agent per independent problem domain. Let them work concurrently.
 
+Load this skill when \`hive_status()\` shows 2+ runnable independent tasks. If the work is still read-only investigation, refer to the skill at .github/skills/parallel-exploration/SKILL.md instead.
+
 ## Prerequisite: Check Runnable Tasks
 
 Before dispatching, use \`hive_status()\` to get the **runnable** list \u2014 tasks whose dependencies are all satisfied.
@@ -8448,6 +8481,8 @@ Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, 
 - Prefer \`vscode/askQuestions\` for the approval prompt: "These tasks are runnable and independent: [list]. Execute in parallel?"
 - Fall back to asking directly in chat only when \`vscode/askQuestions\` is unavailable or a lightweight follow-up is enough
 - Record the decision in Copilot memory or current working notes only when future turns need it
+- Use \`todo\` only when the batch needs a live checklist for task ownership, integration, or follow-up.
+- Use \`vscode/memory\` only for durable coordination decisions or blocker history that future turns need.
 - Proceed only after operator approval
 
 ## When to Use
@@ -8666,6 +8701,13 @@ Use for ANY technical issue:
 - Issue seems simple (simple bugs have root causes too)
 - You're in a hurry (rushing guarantees rework)
 - Manager wants it fixed NOW (systematic is faster than thrashing)
+
+## Tool-Aware Evidence Gathering
+
+- If the issue depends on rendered UI, browser state, console output, or network activity, reproduce it with \`browser\` before changing code.
+- Use \`playwright/*\` when you need a repeatable browser repro or end-to-end trace.
+- Use \`todo\` only when tracking multiple hypotheses, component boundaries, or repro attempts.
+- Use \`vscode/memory\` only for durable root-cause findings or blocker history another turn will need.
 
 ## The Four Phases
 
@@ -8963,6 +9005,13 @@ Write code before the test? Delete it. Start over.
 - Delete means delete
 
 Implement fresh from tests. Period.
+
+## Tool-Aware Test Setup
+
+- When the work starts from a bug, failing test, or unexpected behavior, refer to the skill at .github/skills/systematic-debugging/SKILL.md first to confirm root cause, then return here for the red-green-refactor cycle.
+- For UI or end-to-end behavior, use \`browser\` for quick inspection and \`playwright/*\` for repeatable failing and passing coverage.
+- Use \`todo\` only when the red-green-refactor cycle spans multiple cases that need active tracking.
+- Use \`vscode/memory\` only for durable test decisions, flaky-environment notes, or blocker history that later turns need.
 
 ## Red-Green-Refactor
 
@@ -9535,6 +9584,14 @@ BEFORE claiming any status or expressing satisfaction:
 
 Skip any step = lying, not verifying
 \`\`\`
+
+## Choosing the Proving Command
+
+- For code or CLI claims, run the narrowest test, build, or lint command that proves the claim.
+- For rendered UI, browser-state, console, or network claims, use \`browser\` to gather direct evidence.
+- For repeatable user-flow or end-to-end claims, use \`playwright/*\` to run the proving sequence.
+- Use \`todo\` only when the verification plan has multiple independent checks.
+- Use \`vscode/memory\` only for durable verification gaps or recurring environment caveats that later turns need.
 
 ## Common Failures
 

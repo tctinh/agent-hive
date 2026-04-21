@@ -11,6 +11,8 @@ When you have multiple unrelated failures (different test files, different subsy
 
 **Core principle:** Dispatch one agent per independent problem domain. Let them work concurrently.
 
+Load this skill when `hive_status()` shows 2+ runnable independent tasks. If the work is still read-only investigation, refer to the skill at .github/skills/parallel-exploration/SKILL.md instead.
+
 ## Prerequisite: Check Runnable Tasks
 
 Before dispatching, use `hive_status()` to get the **runnable** list — tasks whose dependencies are all satisfied.
@@ -23,6 +25,8 @@ Only `done` satisfies dependencies (not `blocked`, `failed`, `partial`, `cancell
 - Prefer `vscode/askQuestions` for the approval prompt: "These tasks are runnable and independent: [list]. Execute in parallel?"
 - Fall back to asking directly in chat only when `vscode/askQuestions` is unavailable or a lightweight follow-up is enough
 - Record the decision in Copilot memory or current working notes only when future turns need it
+- Use `todo` only when the batch needs a live checklist for task ownership, integration, or follow-up.
+- Use `vscode/memory` only for durable coordination decisions or blocker history that future turns need.
 - Proceed only after operator approval
 
 ## When to Use

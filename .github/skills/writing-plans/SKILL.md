@@ -17,6 +17,12 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Save plans to:** `hive_plan_write` (writes to `.hive/features/<feature>/plan.md`)
 
+## Task Lookup and Working Notes
+
+- If a feature or draft plan already exists, start from `hive_status()` to confirm the active feature, current task IDs, and any blocked or runnable work before revising the plan.
+- Use `todo` only when shaping a multi-task plan or review response needs an active checklist.
+- Use `vscode/memory` only for durable planning decisions or blocker history that future turns need.
+
 ## Bite-Sized Task Granularity
 
 **Each step is one action (2-5 minutes):**

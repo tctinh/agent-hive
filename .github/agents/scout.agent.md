@@ -95,6 +95,13 @@ Stop when any is true:
 | Library or framework docs | io.github.upstash/context7/* |
 | Browser inspection or reproduction | browser |
 
+## Browser, Todo, and Memory Triggers
+
+- When the answer depends on rendered UI, browser state, console output, or network traffic, use `browser` to inspect or reproduce it.
+- If the investigation needs repeatable browser automation or Playwright MCP, call that out in the handoff instead of improvising it here.
+- Use `todo` only when the investigation spans multiple independent questions or sources and you need to track coverage.
+- Use `vscode/memory` only for findings the parent agent or a later turn will need.
+
 ## External System Data
 
 When asked to retrieve raw data from external systems:

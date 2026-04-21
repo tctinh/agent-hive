@@ -19,7 +19,7 @@ Load plan, review critically, execute tasks in batches, report for review betwee
 1. Read plan file
 2. Review critically - identify any questions or concerns about the plan
 3. If concerns: Raise them with your human partner before starting
-4. If no concerns: Create a short checklist in your working notes and proceed
+4. If no concerns: Create a short checklist in `todo` or your working notes only when the batch has enough moving parts to justify active tracking, then proceed
 
 ### Step 2: Identify Runnable Tasks
 
@@ -33,6 +33,8 @@ Only `done` satisfies dependencies (not `blocked`, `failed`, `partial`, `cancell
 - Record the decision in Copilot memory or current working notes only when future turns need it
 
 **When 1 task is runnable:** Proceed directly.
+
+Use `vscode/memory` only for durable execution decisions or blocker history that future turns need.
 
 ### Step 3: Execute Batch
 

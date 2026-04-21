@@ -92,6 +92,12 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Save plans to:** \`hive_plan_write\` (writes to \`.hive/features/<feature>/plan.md\`)
 
+## Task Lookup and Working Notes
+
+- If a feature or draft plan already exists, start from \`hive_status()\` to confirm the active feature, current task IDs, and any blocked or runnable work before revising the plan.
+- Use \`todo\` only when shaping a multi-task plan or review response needs an active checklist.
+- Use \`vscode/memory\` only for durable planning decisions or blocker history that future turns need.
+
 ## Bite-Sized Task Granularity
 
 **Each step is one action (2-5 minutes):**
@@ -252,7 +258,7 @@ Load plan, review critically, execute tasks in batches, report for review betwee
 1. Read plan file
 2. Review critically - identify any questions or concerns about the plan
 3. If concerns: Raise them with your human partner before starting
-4. If no concerns: Create a short checklist in your working notes and proceed
+4. If no concerns: Create a short checklist in \`todo\` or your working notes only when the batch has enough moving parts to justify active tracking, then proceed
 
 ### Step 2: Identify Runnable Tasks
 
@@ -266,6 +272,8 @@ Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, 
 - Record the decision in Copilot memory or current working notes only when future turns need it
 
 **When 1 task is runnable:** Proceed directly.
+
+Use \`vscode/memory\` only for durable execution decisions or blocker history that future turns need.
 
 ### Step 3: Execute Batch
 
@@ -414,6 +422,15 @@ When you need to answer "where/how does X work?" across multiple domains (codeba
 - Work involves file edits (use Hive tasks / Forager instead)
 
 **Important:** Do not treat "this is exploratory" as a reason to avoid delegation. This skill is specifically for exploratory research when fan-out makes it faster and cleaner.
+
+## Tool-Aware Research
+
+Load this skill before any multi-domain, read-only investigation that benefits from Scout fan-out.
+
+- When the answer depends on rendered UI, browser state, console output, or network activity, use \`browser\` as one of the read-only slices.
+- When external docs, APIs, or third-party implementations matter, use \`web\` or \`io.github.upstash/context7/*\` for the docs/OSS slice.
+- Use \`todo\` only when you need to track multiple questions and evidence coverage during synthesis.
+- Use \`vscode/memory\` only for findings the parent agent or a later turn will need after synthesis.
 
 ## The Pattern
 
@@ -587,6 +604,8 @@ When you have multiple unrelated failures (different test files, different subsy
 
 **Core principle:** Dispatch one agent per independent problem domain. Let them work concurrently.
 
+Load this skill when \`hive_status()\` shows 2+ runnable independent tasks. If the work is still read-only investigation, refer to the skill at .github/skills/parallel-exploration/SKILL.md instead.
+
 ## Prerequisite: Check Runnable Tasks
 
 Before dispatching, use \`hive_status()\` to get the **runnable** list — tasks whose dependencies are all satisfied.
@@ -599,6 +618,8 @@ Only \`done\` satisfies dependencies (not \`blocked\`, \`failed\`, \`partial\`, 
 - Prefer \`vscode/askQuestions\` for the approval prompt: "These tasks are runnable and independent: [list]. Execute in parallel?"
 - Fall back to asking directly in chat only when \`vscode/askQuestions\` is unavailable or a lightweight follow-up is enough
 - Record the decision in Copilot memory or current working notes only when future turns need it
+- Use \`todo\` only when the batch needs a live checklist for task ownership, integration, or follow-up.
+- Use \`vscode/memory\` only for durable coordination decisions or blocker history that future turns need.
 - Proceed only after operator approval
 
 ## When to Use
@@ -817,6 +838,13 @@ Use for ANY technical issue:
 - Issue seems simple (simple bugs have root causes too)
 - You're in a hurry (rushing guarantees rework)
 - Manager wants it fixed NOW (systematic is faster than thrashing)
+
+## Tool-Aware Evidence Gathering
+
+- If the issue depends on rendered UI, browser state, console output, or network activity, reproduce it with \`browser\` before changing code.
+- Use \`playwright/*\` when you need a repeatable browser repro or end-to-end trace.
+- Use \`todo\` only when tracking multiple hypotheses, component boundaries, or repro attempts.
+- Use \`vscode/memory\` only for durable root-cause findings or blocker history another turn will need.
 
 ## The Four Phases
 
@@ -1114,6 +1142,13 @@ Write code before the test? Delete it. Start over.
 - Delete means delete
 
 Implement fresh from tests. Period.
+
+## Tool-Aware Test Setup
+
+- When the work starts from a bug, failing test, or unexpected behavior, refer to the skill at .github/skills/systematic-debugging/SKILL.md first to confirm root cause, then return here for the red-green-refactor cycle.
+- For UI or end-to-end behavior, use \`browser\` for quick inspection and \`playwright/*\` for repeatable failing and passing coverage.
+- Use \`todo\` only when the red-green-refactor cycle spans multiple cases that need active tracking.
+- Use \`vscode/memory\` only for durable test decisions, flaky-environment notes, or blocker history that later turns need.
 
 ## Red-Green-Refactor
 
@@ -1686,6 +1721,14 @@ BEFORE claiming any status or expressing satisfaction:
 
 Skip any step = lying, not verifying
 \`\`\`
+
+## Choosing the Proving Command
+
+- For code or CLI claims, run the narrowest test, build, or lint command that proves the claim.
+- For rendered UI, browser-state, console, or network claims, use \`browser\` to gather direct evidence.
+- For repeatable user-flow or end-to-end claims, use \`playwright/*\` to run the proving sequence.
+- Use \`todo\` only when the verification plan has multiple independent checks.
+- Use \`vscode/memory\` only for durable verification gaps or recurring environment caveats that later turns need.
 
 ## Common Failures
 
