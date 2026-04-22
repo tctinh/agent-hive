@@ -4,6 +4,7 @@ node_modules/
 # Build outputs
 dist/
 *.vsix
+*.tgz
 
 # IDE
 .vscode/

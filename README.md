@@ -101,6 +101,21 @@ For local plugin testing:
 2. Build `packages/hive-core` first, then `packages/opencode-hive`.
 3. Symlink `~/.cache/opencode/node_modules/opencode-hive` to your local `packages/opencode-hive` checkout.
 
+### Option C: Claude Code plugin package
+
+Install the Claude-facing plugin assets and the packaged MCP runtime into the same Node.js dependency tree:
+
+```bash
+mkdir -p .agent-hive/claude
+cd .agent-hive/claude
+npm init -y
+npm install claude-code-hive hive-mcp
+```
+
+Then point Claude Code at `node_modules/claude-code-hive/plugin.json`. The packaged launcher resolves `hive-mcp` from that same install tree, so the plugin no longer depends on a repo-local sibling path.
+
+This package is now shipped through the repo release workflow alongside `hive-mcp`, but OpenCode remains the most battle-tested execution harness today.
+
 ### Configuration
 
 Agent Hive reads configuration from the following locations (in order):

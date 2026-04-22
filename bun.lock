@@ -5,9 +5,16 @@
     "": {
       "name": "agent-hive",
     },
+    "packages/claude-code-hive": {
+      "name": "claude-code-hive",
+      "version": "1.4.6",
+      "dependencies": {
+        "hive-mcp": "1.4.6",
+      },
+    },
     "packages/hive-core": {
       "name": "hive-core",
-      "version": "1.4.5",
+      "version": "1.4.6",
       "dependencies": {
         "simple-git": "^3.27.0",
       },
@@ -17,9 +24,24 @@
         "typescript": "^5.0.0",
       },
     },
+    "packages/hive-mcp": {
+      "name": "hive-mcp",
+      "version": "1.4.6",
+      "bin": {
+        "hive-mcp": "./dist/index.js",
+      },
+      "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.12.1",
+      },
+      "devDependencies": {
+        "@types/node": "^20.0.0",
+        "hive-core": "1.4.6",
+        "typescript": "^5.0.0",
+      },
+    },
     "packages/opencode-hive": {
       "name": "opencode-hive",
-      "version": "1.4.5",
+      "version": "1.4.6",
       "bin": {
         "opencode-hive-ast-grep-mcp": "./bin/ast-grep-mcp-launcher.mjs",
       },
@@ -47,7 +69,7 @@
     },
     "packages/vscode-hive": {
       "name": "vscode-hive",
-      "version": "1.4.5",
+      "version": "1.4.6",
       "dependencies": {
         "hive-core": "workspace:*",
       },
@@ -386,6 +408,8 @@
 
     "citty": ["citty@0.1.6", "", { "dependencies": { "consola": "^3.2.3" } }, "sha512-tskPPKEs8D2KPafUypv2gxwJP8h/OaJmC82QQGGDQcHvXX43xF2VDACcJVmZ0EuSxkpO9Kc4MlrA3q0+FG58AQ=="],
 
+    "claude-code-hive": ["claude-code-hive@workspace:packages/claude-code-hive"],
+
     "cluster-key-slot": ["cluster-key-slot@1.1.2", "", {}, "sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA=="],
 
     "cockatiel": ["cockatiel@3.2.1", "", {}, "sha512-gfrHV6ZPkquExvMh9IOkKsBzNDk6sDuZ6DdBGUBkvFnTCqCxzpuq48RySgP0AnaqQkw2zynOFj9yly6T1Q2G5Q=="],
@@ -567,6 +591,8 @@
     "hasown": ["hasown@2.0.2", "", { "dependencies": { "function-bind": "^1.1.2" } }, "sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ=="],
 
     "hive-core": ["hive-core@workspace:packages/hive-core"],
+
+    "hive-mcp": ["hive-mcp@workspace:packages/hive-mcp"],
 
     "hono": ["hono@4.11.5", "", {}, "sha512-WemPi9/WfyMwZs+ZUXdiwcCh9Y+m7L+8vki9MzDw3jJ+W9Lc+12HGsd368Qc1vZi1xwW8BWMMsnK5efYKPdt4g=="],
 
