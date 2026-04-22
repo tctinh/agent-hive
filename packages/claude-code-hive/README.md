@@ -15,7 +15,7 @@ npm init -y
 npm install claude-code-hive hive-mcp
 ```
 
-Then point Claude Code at `node_modules/claude-code-hive/plugin.json`.
+Then point Claude Code at `node_modules/claude-code-hive/.claude-plugin/plugin.json`.
 
 ## Local Development
 

@@ -129,12 +129,12 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
     const claudeCodeHivePackageJson = readJson('packages/claude-code-hive/package.json');
     const vscodeHivePackageJson = readJson('packages/vscode-hive/package.json');
     const opencodePluginJson = readJson('packages/opencode-hive/plugin.json');
-    const claudePluginJson = readJson('packages/claude-code-hive/plugin.json');
+    const claudePluginJson = readJson('packages/claude-code-hive/.claude-plugin/plugin.json');
     const hiveMcpEntry = readText('packages/hive-mcp/src/index.ts');
     const philosophy = readText('PHILOSOPHY.md');
 
     assert.equal(opencodePluginJson.version, releaseVersion, `packages/opencode-hive/plugin.json should be ${releaseVersion}`);
-    assert.equal(claudePluginJson.version, releaseVersion, `packages/claude-code-hive/plugin.json should be ${releaseVersion}`);
+    assert.equal(claudePluginJson.version, releaseVersion, `packages/claude-code-hive/.claude-plugin/plugin.json should be ${releaseVersion}`);
     assert.equal(hiveMcpPackageJson.devDependencies['hive-core'], releaseVersion, `packages/hive-mcp/package.json should pin hive-core to ${releaseVersion}`);
     assert.equal(claudeCodeHivePackageJson.dependencies['@tctinh/agent-hive-mcp'], releaseVersion, `packages/claude-code-hive/package.json should pin @tctinh/agent-hive-mcp to ${releaseVersion}`);
     assert.equal(vscodeHivePackageJson.dependencies['hive-core'], releaseVersion, `packages/vscode-hive/package.json should pin hive-core to ${releaseVersion}`);
@@ -206,7 +206,7 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
   it('packs the self-contained claude-code-hive plugin assets', () => {
     const packedFiles = listPackedFiles(claudeCodeHiveRoot);
 
-    assertPackedFile(packedFiles, 'plugin.json', 'claude-code-hive');
+    assertPackedFile(packedFiles, '.claude-plugin/plugin.json', 'claude-code-hive');
     assertPackedFile(packedFiles, 'agents/hive.md', 'claude-code-hive');
     assertPackedFile(packedFiles, 'commands/hive.md', 'claude-code-hive');
     assertPackedFile(packedFiles, 'instructions/hive-workflow.md', 'claude-code-hive');

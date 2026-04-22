@@ -34,11 +34,11 @@
     "@tctinh/agent-hive-mcp": "1.4.7"
   },
   "files": [
+    ".claude-plugin/",
     "agents/",
     "commands/",
     "hooks/",
     "instructions/",
-    "plugin.json",
     "README.md",
     "scripts/",
     "skills/"

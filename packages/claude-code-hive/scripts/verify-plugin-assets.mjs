@@ -35,7 +35,7 @@ function collectMarkdownFiles(directory) {
 }
 
 const requiredFiles = [
-  'plugin.json',
+  '.claude-plugin/plugin.json',
   'agents/hive.md',
   'agents/forager.md',
   'agents/hygienic.md',
@@ -52,7 +52,7 @@ for (const relativePath of requiredFiles) {
   requireFile(relativePath);
 }
 
-const plugin = JSON.parse(readFileSync(requireFile('plugin.json'), 'utf8'));
+const plugin = JSON.parse(readFileSync(requireFile('.claude-plugin/plugin.json'), 'utf8'));
 
 if (plugin.agents !== './agents') {
   throw new Error(`Expected plugin.agents to be ./agents, received ${plugin.agents}`);
@@ -66,8 +66,8 @@ if (plugin.hooks !== './hooks/hooks.json') {
   throw new Error(`Expected plugin.hooks to be ./hooks/hooks.json, received ${plugin.hooks}`);
 }
 
-if (plugin.commands?.hive?.source !== './commands/hive.md') {
-  throw new Error('Expected plugin.commands.hive.source to point at ./commands/hive.md');
+if (plugin.commands !== './commands') {
+  throw new Error(`Expected plugin.commands to be ./commands, received ${plugin.commands}`);
 }
 
 if (plugin.mcpServers?.hive?.command !== 'node') {

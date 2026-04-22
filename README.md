@@ -84,7 +84,7 @@ npm init -y
 npm install claude-code-hive @tctinh/agent-hive-mcp
 ```
 
-Then register the plugin by pointing Claude Code at `.agent-hive/claude/node_modules/claude-code-hive/plugin.json`.
+Then register the plugin by pointing Claude Code at `.agent-hive/claude/node_modules/claude-code-hive/.claude-plugin/plugin.json`.
 
 ### Start
 

@@ -6,16 +6,13 @@
     "name": "Agent Hive",
     "url": "https://github.com/tctinh/agent-hive"
   },
+  "homepage": "https://github.com/tctinh/agent-hive",
+  "repository": "https://github.com/tctinh/agent-hive",
+  "license": "MIT",
   "keywords": ["hive", "planning", "orchestration", "worktree", "tdd", "parallel"],
   "agents": "./agents",
   "skills": "./skills",
-  "commands": {
-    "hive": {
-      "source": "./commands/hive.md",
-      "description": "Start or continue a Hive feature workflow",
-      "argumentHint": "[feature-name or instruction]"
-    }
-  },
+  "commands": "./commands",
   "hooks": "./hooks/hooks.json",
   "mcpServers": {
     "hive": {
