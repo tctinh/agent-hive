@@ -37,11 +37,13 @@ bun run release:check
 Treat these as preflight checks, not preparation shortcuts:
 
 - `npm whoami` confirms the npm token is valid
-- `node .github/scripts/verify-npm-publish-access.mjs opencode-hive hive-mcp claude-code-hive` confirms the publishing account still has collaborator access to every npm package the workflow may publish
+- `node .github/scripts/verify-npm-publish-access.mjs opencode-hive hive-mcp claude-code-hive` confirms the publishing account still has collaborator access to already-published npm packages and treats a package that does not exist yet as a first publish
 - `npx @vscode/vsce verify-pat tctinh` confirms the Marketplace PAT is still valid for the publisher account
 - `bun run release:check` is the repo safety net for artifacts, builds, and tests
 
 If any preflight fails, fix credentials/access or branch content before opening the release PR or creating a tag.
+
+For `claude-code-hive`, the first tagged publish may be the package's first publish on npm. In that case, the helper should report that the package is currently absent and allow the release path to continue as a first publish, rather than requiring existing collaborator metadata up front.
 
 ## 3) Rehearse the GitHub workflow with `workflow_dispatch`
 

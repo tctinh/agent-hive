@@ -94,6 +94,45 @@ describe('npm publish access helper', () => {
     );
   });
 
+  it('treats a missing package as first-publish-ready when auth is present', async () => {
+    const helperModule = await loadNpmPublishAccessHelper();
+
+    assert.ok(helperModule, 'expected .github/scripts/verify-npm-publish-access.mjs to exist');
+    assert.deepEqual(
+      helperModule.interpretPublishReadiness({
+        npmUser: 'release-bot',
+        packageName: 'claude-code-hive',
+        packageExists: false,
+        collaborators: null,
+      }),
+      {
+        status: 'first-publish',
+        npmUser: 'release-bot',
+        packageName: 'claude-code-hive',
+      }
+    );
+  });
+
+  it('skips collaborator lookup when the package does not exist yet', async () => {
+    const helperModule = await loadNpmPublishAccessHelper();
+
+    assert.ok(helperModule, 'expected .github/scripts/verify-npm-publish-access.mjs to exist');
+
+    let collaboratorLookupCalls = 0;
+    const readiness = helperModule.resolvePublishReadiness({
+      npmUser: 'release-bot',
+      packageName: 'claude-code-hive',
+      packageExists: false,
+      readCollaborators() {
+        collaboratorLookupCalls += 1;
+        return { 'release-bot': 'read-write' };
+      },
+    });
+
+    assert.equal(collaboratorLookupCalls, 0);
+    assert.equal(readiness.status, 'first-publish');
+  });
+
   it('rejects missing collaborator entries', async () => {
     const helperModule = await loadNpmPublishAccessHelper();
 
@@ -137,12 +176,14 @@ describe('npm publish access helper', () => {
 });
 
 describe('release recovery docs contract', () => {
-  it('documents rehearsal defaults, package publish order, tag-only recovery, and operator-selected recovery targets', () => {
+  it('documents rehearsal defaults, first-publish behavior, package publish order, tag-only recovery, and operator-selected recovery targets', () => {
     const releasing = readText('docs/RELEASING.md');
     const agents = readText('AGENTS.md');
 
     assert.match(releasing, /workflow_dispatch/);
     assert.match(releasing, /manual runs default to .*rehearse/i);
+    assert.match(releasing, /first publish/i);
+    assert.match(releasing, /package does not exist yet|package is currently absent/i);
     assert.match(releasing, /Recovery mode is only for existing .*vX\.Y\.Z.* tags/i);
     assert.match(releasing, /publish order.*opencode-hive.*hive-mcp.*claude-code-hive.*VS Code Marketplace/i);
     assert.match(releasing, /requires a recovery tag and at least one explicit target toggle/i);

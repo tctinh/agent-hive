@@ -2,7 +2,7 @@
   "name": "vscode-hive",
   "displayName": "Agent Hive",
   "description": "From Vibe Coding to Hive Coding - Review and approve AI-generated plans",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "publisher": "tctinh",
   "license": "MIT WITH Commons-Clause",
   "icon": "icon.png",
@@ -378,6 +378,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "hive-core": "1.4.5"
+    "hive-core": "1.4.6"
   }
 }

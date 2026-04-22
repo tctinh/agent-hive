@@ -124,6 +124,24 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
     assert.match(bunLock, new RegExp(`"name": "vscode-hive",\\s+"version": "${escapedReleaseVersion}"`, 's'));
   });
 
+  it(`refreshes plugin manifests, dependency pins, runtime version, and philosophy history to ${releaseVersion}`, () => {
+    const hiveMcpPackageJson = readJson('packages/hive-mcp/package.json');
+    const claudeCodeHivePackageJson = readJson('packages/claude-code-hive/package.json');
+    const vscodeHivePackageJson = readJson('packages/vscode-hive/package.json');
+    const opencodePluginJson = readJson('packages/opencode-hive/plugin.json');
+    const claudePluginJson = readJson('packages/claude-code-hive/plugin.json');
+    const hiveMcpEntry = readText('packages/hive-mcp/src/index.ts');
+    const philosophy = readText('PHILOSOPHY.md');
+
+    assert.equal(opencodePluginJson.version, releaseVersion, `packages/opencode-hive/plugin.json should be ${releaseVersion}`);
+    assert.equal(claudePluginJson.version, releaseVersion, `packages/claude-code-hive/plugin.json should be ${releaseVersion}`);
+    assert.equal(hiveMcpPackageJson.devDependencies['hive-core'], releaseVersion, `packages/hive-mcp/package.json should pin hive-core to ${releaseVersion}`);
+    assert.equal(claudeCodeHivePackageJson.dependencies['hive-mcp'], releaseVersion, `packages/claude-code-hive/package.json should pin hive-mcp to ${releaseVersion}`);
+    assert.equal(vscodeHivePackageJson.dependencies['hive-core'], releaseVersion, `packages/vscode-hive/package.json should pin hive-core to ${releaseVersion}`);
+    assert.match(hiveMcpEntry, new RegExp(`version: '${releaseVersion.replaceAll('.', '\\.')}'`), 'packages/hive-mcp/src/index.ts should advertise the release version');
+    assert.match(philosophy, new RegExp(`### v${releaseVersion.replaceAll('.', '\\.')}`), `PHILOSOPHY.md should include a v${releaseVersion} entry`);
+  });
+
   it(`publishes ${releaseVersion} release notes and changelog entries in descending order`, () => {
     assert.equal(
       fs.existsSync(path.join(workspaceRoot, `docs/releases/v${releaseVersion}.md`)),

@@ -758,6 +758,16 @@ Three threads define this patch:
 
 **Shared insight:** Good agent tooling is not just about what tools exist. It is about teaching the agent when a tool meaningfully changes the quality of the decision.
 
+### v1.4.6 (First Publish Is Part of the Release Contract)
+
+**Theme:** Treat the first publish of a new package as a normal release path, not as an operator surprise outside the workflow.
+
+This patch closes a gap between the release wiring and the release contract. `claude-code-hive` had already been added to CI, artifacts, docs, and the tagged publish workflow, but the npm preflight still assumed every package already existed and already had collaborator metadata. That was true for established packages and false for the first Claude release. `v1.4.6` makes that distinction explicit: already-published packages still require read-write collaborator access, while a package that is currently absent is treated as a first publish that the normal tagged release may create.
+
+The same release also restores parity across the version-bearing surfaces that operators actually trust. Root and workspace manifests, plugin manifests, exact packaged dependency pins, the `hive-mcp` runtime version string, tracked lockfiles, the changelog, and the dedicated release note now move together again, including the previously stale Bun lock markers. This is P7/P9 applied to shipping itself: a release process is only reliable when the checks, docs, and shipped metadata all describe the same thing.
+
+**Shared insight:** If the workflow is supposed to ship a package, the first publish of that package belongs inside the tested contract, not outside it.
+
 ### v1.4.4 (One Copilot Story, One Plan Contract)
 
 **Theme:** Make the generated Copilot surface tell the same truth as the code: one required plan document, one response-first worker story, and explicit tool/model contracts instead of stale artifact drift.
