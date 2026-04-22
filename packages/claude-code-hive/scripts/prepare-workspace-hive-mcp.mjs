@@ -36,7 +36,7 @@ export function shouldRefreshOutput({ outputPath, inputFiles = [], inputDirector
 }
 
 export function ensureWorkspaceHiveMcpReady({ requireFn = require, exec = execFileSync } = {}) {
-  const hiveMcpPackageJsonPath = requireFn.resolve('hive-mcp/package.json');
+  const hiveMcpPackageJsonPath = requireFn.resolve('@tctinh/agent-hive-mcp/package.json');
 
   if (!isWorkspacePackage(hiveMcpPackageJsonPath, 'hive-mcp')) {
     return { workspace: false, builtHiveCore: false, builtHiveMcp: false };

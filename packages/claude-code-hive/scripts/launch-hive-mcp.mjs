@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 export function resolveHiveMcpEntry({ requireFn = require } = {}) {
-  return requireFn.resolve('hive-mcp/dist/index.js');
+  return requireFn.resolve('@tctinh/agent-hive-mcp/dist/index.js');
 }
 
 export function launchHiveMcp({

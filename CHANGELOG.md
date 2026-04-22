@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **First-publish support for `claude-code-hive` is now part of the release contract**: The npm publish preflight now distinguishes between already-published packages and a package that does not exist yet, so the first tagged `claude-code-hive` publish can proceed through the normal release workflow instead of failing before `npm publish` runs.
+- **Publish preflight auto-derives npm package name from `package.json`**: The preflight script now reads the npm name from each directory's `package.json` rather than assuming directory name equals npm package name, making it resilient to scoped package names like `@tctinh/agent-hive-mcp`.
 
 ### Changed
-- **Version-bearing release surfaces are refreshed to `1.4.6`**: Root/workspace manifests, plugin manifests, exact release dependency pins, the hardcoded `hive-mcp` runtime version, tracked lockfile markers, the changelog, the dedicated release note, and the PHILOSOPHY evolution history now all describe the same shipped patch.
+- **MCP runtime package renamed to `@tctinh/agent-hive-mcp`**: The `hive-mcp` npm package name was taken; the package now ships as `@tctinh/agent-hive-mcp`. All module specifiers, dependency declarations, and lockfiles updated accordingly. The package directory on disk remains `packages/hive-mcp`.
+- **Version-bearing release surfaces are refreshed to `1.4.6`**: Root/workspace manifests, plugin manifests, exact release dependency pins, the hardcoded `@tctinh/agent-hive-mcp` runtime version, tracked lockfile markers, the changelog, the dedicated release note, and the PHILOSOPHY evolution history now all describe the same shipped patch.
 - **Release docs now explain the first-publish path for `claude-code-hive` honestly**: Operator preflight guidance now treats an absent npm package as a first publish instead of assuming collaborator metadata must already exist.
 
 ## [1.4.5] - 2026-04-21

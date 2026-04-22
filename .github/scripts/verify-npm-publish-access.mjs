@@ -1,8 +1,14 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-function getPackageDirectory(packageName) {
-  return path.resolve(import.meta.dirname, '..', '..', 'packages', packageName);
+function getPackageDirectory(dirName) {
+  return path.resolve(import.meta.dirname, '..', '..', 'packages', dirName);
+}
+
+function getNpmPackageName(packageDirectory) {
+  const packageJson = JSON.parse(readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
+  return packageJson.name;
 }
 
 function readCommandErrorText(error) {
@@ -118,8 +124,9 @@ function readCollaborators(packageName, packageDirectory) {
   return JSON.parse(collaboratorsJson);
 }
 
-function validatePackage(packageName, npmUser) {
-  const packageDirectory = getPackageDirectory(packageName);
+function validatePackage(dirName, npmUser) {
+  const packageDirectory = getPackageDirectory(dirName);
+  const packageName = getNpmPackageName(packageDirectory);
 
   const packageExists = readPackageExists(packageName, packageDirectory);
   const readiness = resolvePublishReadiness({

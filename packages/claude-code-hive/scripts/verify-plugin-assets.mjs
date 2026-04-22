@@ -122,15 +122,15 @@ for (const absolutePath of markdownAssetPaths) {
   }
 }
 
-const hiveMcpPackageJson = require.resolve('hive-mcp/package.json');
+const hiveMcpPackageJson = require.resolve('@tctinh/agent-hive-mcp/package.json');
 
 if (!existsSync(hiveMcpPackageJson)) {
-  throw new Error(`Resolved hive-mcp package.json does not exist: ${hiveMcpPackageJson}`);
+  throw new Error(`Resolved @tctinh/agent-hive-mcp package.json does not exist: ${hiveMcpPackageJson}`);
 }
 
 const hiveMcpEntry = resolveHiveMcpEntry();
 if (!existsSync(hiveMcpEntry)) {
-  throw new Error(`Resolved hive-mcp entry does not exist: ${hiveMcpEntry}`);
+  throw new Error(`Resolved @tctinh/agent-hive-mcp entry does not exist: ${hiveMcpEntry}`);
 }
 
 console.log(`Verified Claude plugin assets (${skillDirs.length} skills)`);

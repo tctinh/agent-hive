@@ -9,7 +9,7 @@
       "name": "claude-code-hive",
       "version": "1.4.6",
       "dependencies": {
-        "hive-mcp": "1.4.6",
+        "@tctinh/agent-hive-mcp": "1.4.6",
       },
     },
     "packages/hive-core": {
@@ -25,7 +25,7 @@
       },
     },
     "packages/hive-mcp": {
-      "name": "hive-mcp",
+      "name": "@tctinh/agent-hive-mcp",
       "version": "1.4.6",
       "bin": {
         "hive-mcp": "./dist/index.js",
@@ -263,6 +263,8 @@
     "@secretlint/types": ["@secretlint/types@10.2.2", "", {}, "sha512-Nqc90v4lWCXyakD6xNyNACBJNJ0tNCwj2WNk/7ivyacYHxiITVgmLUFXTBOeCdy79iz6HtN9Y31uw/jbLrdOAg=="],
 
     "@sindresorhus/merge-streams": ["@sindresorhus/merge-streams@2.3.0", "", {}, "sha512-LtoMMhxAlorcGhmFYI+LhPgbPZCkgP6ra1YL604EeF6U98pLlQ3iWIGMdWSC+vWmPBWBNgmDBAhnAobLROJmwg=="],
+
+    "@tctinh/agent-hive-mcp": ["@tctinh/agent-hive-mcp@workspace:packages/hive-mcp"],
 
     "@textlint/ast-node-types": ["@textlint/ast-node-types@15.5.0", "", {}, "sha512-K0LEuuTo4rza8yDrlYkRdXLao8Iz/QBMsQdIxRrOOrLYb4HAtZaypZ78c+J6rDA1UlGxadZVLmkkiv4KV5fMKQ=="],
 
@@ -591,8 +593,6 @@
     "hasown": ["hasown@2.0.2", "", { "dependencies": { "function-bind": "^1.1.2" } }, "sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ=="],
 
     "hive-core": ["hive-core@workspace:packages/hive-core"],
-
-    "hive-mcp": ["hive-mcp@workspace:packages/hive-mcp"],
 
     "hono": ["hono@4.11.5", "", {}, "sha512-WemPi9/WfyMwZs+ZUXdiwcCh9Y+m7L+8vki9MzDw3jJ+W9Lc+12HGsd368Qc1vZi1xwW8BWMMsnK5efYKPdt4g=="],
 

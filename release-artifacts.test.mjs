@@ -119,7 +119,7 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
 
     assert.match(bunLock, new RegExp(`"name": "hive-core",\\s+"version": "${escapedReleaseVersion}"`, 's'));
     assert.match(bunLock, new RegExp(`"name": "opencode-hive",\\s+"version": "${escapedReleaseVersion}"`, 's'));
-    assert.match(bunLock, new RegExp(`"name": "hive-mcp",\\s+"version": "${escapedReleaseVersion}"`, 's'));
+    assert.match(bunLock, new RegExp(`"name": "@tctinh/agent-hive-mcp",\\s+"version": "${escapedReleaseVersion}"`, 's'));
     assert.match(bunLock, new RegExp(`"name": "claude-code-hive",\\s+"version": "${escapedReleaseVersion}"`, 's'));
     assert.match(bunLock, new RegExp(`"name": "vscode-hive",\\s+"version": "${escapedReleaseVersion}"`, 's'));
   });
@@ -136,7 +136,7 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
     assert.equal(opencodePluginJson.version, releaseVersion, `packages/opencode-hive/plugin.json should be ${releaseVersion}`);
     assert.equal(claudePluginJson.version, releaseVersion, `packages/claude-code-hive/plugin.json should be ${releaseVersion}`);
     assert.equal(hiveMcpPackageJson.devDependencies['hive-core'], releaseVersion, `packages/hive-mcp/package.json should pin hive-core to ${releaseVersion}`);
-    assert.equal(claudeCodeHivePackageJson.dependencies['hive-mcp'], releaseVersion, `packages/claude-code-hive/package.json should pin hive-mcp to ${releaseVersion}`);
+    assert.equal(claudeCodeHivePackageJson.dependencies['@tctinh/agent-hive-mcp'], releaseVersion, `packages/claude-code-hive/package.json should pin @tctinh/agent-hive-mcp to ${releaseVersion}`);
     assert.equal(vscodeHivePackageJson.dependencies['hive-core'], releaseVersion, `packages/vscode-hive/package.json should pin hive-core to ${releaseVersion}`);
     assert.match(hiveMcpEntry, new RegExp(`version: '${releaseVersion.replaceAll('.', '\\.')}'`), 'packages/hive-mcp/src/index.ts should advertise the release version');
     assert.match(philosophy, new RegExp(`### v${releaseVersion.replaceAll('.', '\\.')}`), `PHILOSOPHY.md should include a v${releaseVersion} entry`);

@@ -77,7 +77,7 @@ describe('prepare-workspace-hive-mcp', () => {
         if (specifier === 'hive-core/package.json') {
           return hiveCorePackageJson;
         }
-        if (specifier === 'hive-mcp/package.json') {
+        if (specifier === '@tctinh/agent-hive-mcp/package.json') {
           return hiveMcpPackageJson;
         }
         throw new Error(`Unexpected resolve: ${specifier}`);
