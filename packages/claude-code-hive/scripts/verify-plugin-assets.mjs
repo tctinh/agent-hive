@@ -54,20 +54,12 @@ for (const relativePath of requiredFiles) {
 
 const plugin = JSON.parse(readFileSync(requireFile('.claude-plugin/plugin.json'), 'utf8'));
 
-if (plugin.agents !== './agents') {
-  throw new Error(`Expected plugin.agents to be ./agents, received ${plugin.agents}`);
-}
-
-if (plugin.skills !== './skills') {
-  throw new Error(`Expected plugin.skills to be ./skills, received ${plugin.skills}`);
+if (plugin.name !== 'hive') {
+  throw new Error(`Expected plugin.name to be hive, received ${plugin.name}`);
 }
 
 if (plugin.hooks !== './hooks/hooks.json') {
   throw new Error(`Expected plugin.hooks to be ./hooks/hooks.json, received ${plugin.hooks}`);
-}
-
-if (plugin.commands !== './commands') {
-  throw new Error(`Expected plugin.commands to be ./commands, received ${plugin.commands}`);
 }
 
 if (plugin.mcpServers?.hive?.command !== 'node') {
@@ -76,6 +68,12 @@ if (plugin.mcpServers?.hive?.command !== 'node') {
 
 if (plugin.mcpServers?.hive?.args?.[0] !== './scripts/launch-hive-mcp.mjs') {
   throw new Error('Expected plugin.mcpServers.hive.args[0] to point at ./scripts/launch-hive-mcp.mjs');
+}
+
+for (const explicitField of ['agents', 'skills', 'commands']) {
+  if (explicitField in plugin) {
+    throw new Error(`plugin.${explicitField} should be omitted so Claude Code auto-discovers ./${explicitField}`);
+  }
 }
 
 const hooksConfig = JSON.parse(readFileSync(requireFile('hooks/hooks.json'), 'utf8'));

@@ -1,7 +1,7 @@
 {
   "name": "hive",
   "version": "1.4.7",
-  "description": "Plan-first AI development with batched parallelism. Same philosophy as Agent Hive, native Claude Code implementation.",
+  "description": "Plan-first AI development with batched parallelism. Native Claude Code implementation of the Agent Hive workflow.",
   "author": {
     "name": "Agent Hive",
     "url": "https://github.com/tctinh/agent-hive"
@@ -10,9 +10,6 @@
   "repository": "https://github.com/tctinh/agent-hive",
   "license": "MIT",
   "keywords": ["hive", "planning", "orchestration", "worktree", "tdd", "parallel"],
-  "agents": "./agents",
-  "skills": "./skills",
-  "commands": "./commands",
   "hooks": "./hooks/hooks.json",
   "mcpServers": {
     "hive": {
