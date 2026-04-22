@@ -1,7 +1,6 @@
 ---
 name: writing-plans
 description: Use when you have a spec or requirements for a multi-step task, before touching code
-user-invocable: false
 ---
 
 # Writing Plans
@@ -14,11 +13,15 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** Planning is read-only. Use `hive_feature_create` + `hive_plan_save` + `Write(".hive/features/<feature>/context/<name>.md", "...")` and avoid worktrees during planning.
+**Context:** Planning is read-only. Use `hive_feature_create` + `hive_plan_write` and keep implementation out of the planning session.
 
-**Save plans to:** `hive_plan_save` (writes to `.hive/features/<feature>/plan.md`)
+**Save plans to:** `hive_plan_write` (writes to `.hive/features/<feature>/plan.md`)
 
-**Maintain context with:** `Write(".hive/features/<feature>/context/learnings.md", ...)` or another focused context name when durable notes would help future workers
+## Task Lookup and Working Notes
+
+- If a feature or draft plan already exists, start from `hive_status()` to confirm the active feature, current task IDs, and any blocked or runnable work before revising the plan.
+- Use `todo` only when shaping a multi-task plan or review response needs an active checklist.
+- Use `vscode/memory` only for durable planning decisions or blocker history that future turns need.
 
 ## Bite-Sized Task Granularity
 
@@ -132,17 +135,13 @@ All verification MUST be agent-executable (no human intervention):
 - Exact file paths always
 - Complete code in plan (not "add validation")
 - Exact commands with expected output
-- Reference relevant skills with Skill() syntax
+- Reference relevant skills with @ syntax
 - DRY, YAGNI, TDD, frequent commits
 - All acceptance criteria must be agent-executable (zero human intervention)
-- Treat `context/overview.md` as the human-facing review surface
-- `plan.md` remains execution truth
-- Every plan needs a concise human-facing summary before `## Tasks`
-- The `Design Summary` in `plan.md` should stay readable and review-friendly even though overview-first review happens in `context/overview.md`
-- Optional Mermaid is allowed only in that pre-task summary section
-- Mermaid is for dependency or sequence overview only and is never required
-- Keep Discovery, Non-Goals, diagrams, and tasks in the same `plan.md` file
-- Use context files only for durable notes that help future workers
+- Treat `plan.md` as the human-facing review surface and execution truth
+- Every plan needs a concise human-facing `Design Summary` before `## Tasks`
+- Make that section an overview/design summary before `## Tasks`
+- Use Copilot memory or normal file edits when planning notes are needed; do not depend on special-purpose note helpers
 
 ## Execution Handoff
 
@@ -151,15 +150,15 @@ After saving the plan, ask whether to consult Hygienic (Consultant/Reviewer/Debu
 Plan complete and saved to `.hive/features/<feature>/plan.md`.
 
 Two execution options:
-1. Subagent-Driven (this session) - I dispatch fresh subagent per task, review between tasks, fast iteration
+1. Agent-Driven (this session) - I dispatch fresh subagent per task, review between tasks, fast iteration
 2. Parallel Session (separate) - Open new session with executing-plans, batch execution with checkpoints
 
 Which approach?
 
-**If Subagent-Driven chosen:**
+**If Agent-Driven chosen:**
 - Stay in this session
 - Fresh subagent per task + code review
 
 **If Parallel Session chosen:**
-- Guide them to open new session in worktree
-- **REQUIRED SUB-SKILL:** New session uses Skill("hive:executing-plans")
+- Guide them to open a new Copilot session focused on execution
+- **REQUIRED SUB-SKILL:** New session uses Refer to the skill at ../executing-plans/SKILL.md

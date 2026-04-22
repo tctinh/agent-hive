@@ -1,7 +1,6 @@
 ---
 name: test-driven-development
 description: Use when implementing any feature or bugfix, before writing implementation code
-user-invocable: false
 ---
 
 # Test-Driven Development (TDD)
@@ -44,6 +43,13 @@ Write code before the test? Delete it. Start over.
 - Delete means delete
 
 Implement fresh from tests. Period.
+
+## Tool-Aware Test Setup
+
+- When the work starts from a bug, failing test, or unexpected behavior, refer to the skill at ../systematic-debugging/SKILL.md first to confirm root cause, then return here for the red-green-refactor cycle.
+- For UI or end-to-end behavior, use `browser` for quick inspection and `playwright/*` for repeatable failing and passing coverage.
+- Use `todo` only when the red-green-refactor cycle spans multiple cases that need active tracking.
+- Use `vscode/memory` only for durable test decisions, flaky-environment notes, or blocker history that later turns need.
 
 ## Red-Green-Refactor
 

@@ -1,7 +1,6 @@
 ---
 name: verification-before-completion
 description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
-user-invocable: false
 ---
 
 # Verification Before Completion
@@ -37,6 +36,14 @@ BEFORE claiming any status or expressing satisfaction:
 
 Skip any step = lying, not verifying
 ```
+
+## Choosing the Proving Command
+
+- For code or CLI claims, run the narrowest test, build, or lint command that proves the claim.
+- For rendered UI, browser-state, console, or network claims, use `browser` to gather direct evidence.
+- For repeatable user-flow or end-to-end claims, use `playwright/*` to run the proving sequence.
+- Use `todo` only when the verification plan has multiple independent checks.
+- Use `vscode/memory` only for durable verification gaps or recurring environment caveats that later turns need.
 
 ## Common Failures
 

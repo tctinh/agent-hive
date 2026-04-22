@@ -1,7 +1,6 @@
 ---
 name: executing-plans
 description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
-user-invocable: false
 ---
 
 # Executing Plans
@@ -10,7 +9,7 @@ user-invocable: false
 
 Load plan, review critically, execute tasks in batches, report for review between batches.
 
-**Core principle:** Batch execution with checkpoints for Hive review.
+**Core principle:** Batch execution with checkpoints for architect review.
 
 **Announce at start:** "I'm using the executing-plans skill to implement this plan."
 
@@ -20,27 +19,30 @@ Load plan, review critically, execute tasks in batches, report for review betwee
 1. Read plan file
 2. Review critically - identify any questions or concerns about the plan
 3. If concerns: Raise them with your human partner before starting
-4. If no concerns: Create TodoWrite and proceed
+4. If no concerns: Create a short checklist in `todo` or your working notes only when the batch has enough moving parts to justify active tracking, then proceed
 
 ### Step 2: Identify Runnable Tasks
 
-Call `mcp__hive__hive_status()` to get the **runnable** list — tasks with all dependencies satisfied.
+Use `hive_status()` to get the **runnable** list — tasks with all dependencies satisfied.
 
 Only `done` satisfies dependencies (not `blocked`, `failed`, `partial`, `cancelled`).
 
 **When 2+ tasks are runnable:**
-- **Ask the operator** via `AskUserQuestion`: "Multiple tasks are runnable: [list]. Run in parallel, sequential, or a specific subset?"
-- Record the decision with `Write(".hive/features/<feature>/context/execution-decisions.md", "...")` for future reference
+- Prefer `vscode/askQuestions` for a structured choice: "Multiple tasks are runnable: [list]. Run in parallel, sequential, or a specific subset?"
+- Fall back to asking directly in chat only when `vscode/askQuestions` is unavailable or a lightweight follow-up is enough
+- Record the decision in Copilot memory or current working notes only when future turns need it
 
 **When 1 task is runnable:** Proceed directly.
+
+Use `vscode/memory` only for durable execution decisions or blocker history that future turns need.
 
 ### Step 3: Execute Batch
 
 For each task in the batch:
-1. Mark as in_progress
-2. Follow each step exactly (plan has bite-sized steps)
-3. Run verifications as specified
-4. Mark as completed
+1. Delegate implementation directly to @forager
+2. Make sure the worker reads the approved plan and records progress with `hive_task_update`
+3. Follow each step exactly (plan has bite-sized steps)
+4. Run verifications as specified and confirm the task state is updated accurately
 
 ### Step 4: Report
 When batch complete:
@@ -50,30 +52,21 @@ When batch complete:
 
 ### Step 4.5: Post-Batch Hygienic Review
 
-After the batch report, ask the operator if they want a Hygienic code review for the batch.
-If yes, run `Agent({ agent: "hive:hygienic", prompt: "Review implementation changes from the latest batch.", run_in_background: true })`.
-Route review feedback through this decision tree before continuing:
-
-| Feedback type | Action |
-|---------------|--------|
-| Minor / local to the completed batch | **Inline fix** — apply directly, no new task |
-| New isolated work that does not affect downstream sequencing | **Manual task** — `hive_task_create()` for non-blocking ad-hoc work |
-| Changes downstream sequencing, dependencies, or scope | **Plan amendment** — update `plan.md`, then `hive_tasks_sync({ refreshPending: true })` to rewrite pending tasks from the amended plan |
-
-When amending the plan: append new task numbers at the end (do not renumber), update `Depends on:` entries to express the new DAG order, then sync.
+After the batch report, prefer `vscode/askQuestions` to ask whether the user wants a Hygienic code review for the batch.
+Fall back to asking directly in chat only when `vscode/askQuestions` is unavailable or a lightweight follow-up is enough.
+If yes, invoke the @hygienic agent via the agent tool to review implementation changes from the latest batch, then apply feedback before starting the next batch.
 
 ### Step 5: Continue
-After applying review feedback (or if none):
-- Re-check `mcp__hive__hive_status()` for the updated **runnable** set — tasks whose dependencies are all satisfied
-- Tasks blocked by unmet dependencies stay blocked until predecessors complete
-- Execute the next batch of runnable tasks
+Based on feedback:
+- Apply changes if needed
+- Execute next batch
 - Repeat until complete
 
 ### Step 6: Complete Development
 
 After all tasks complete and verified:
 - Announce: "I'm using the verification-before-completion skill to complete this work."
-- **REQUIRED SUB-SKILL:** Use Skill("hive:verification-before-completion")
+- **REQUIRED SUB-SKILL:** Refer to the skill at ../verification-before-completion/SKILL.md
 - Follow that skill to verify tests, present options, execute choice
 
 ## When to Stop and Ask for Help

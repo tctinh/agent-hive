@@ -1,6 +1,6 @@
 {
   "name": "hive",
-  "version": "1.5.0",
+  "version": "1.4.5",
   "description": "Plan-first AI development with batched parallelism. Same philosophy as Agent Hive, native Claude Code implementation.",
   "author": {
     "name": "Agent Hive",
@@ -20,7 +20,7 @@
   "mcpServers": {
     "hive": {
       "command": "node",
-      "args": ["../hive-mcp/dist/index.js"]
+      "args": ["./scripts/launch-hive-mcp.mjs"]
     }
   }
 }

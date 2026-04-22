@@ -37,7 +37,7 @@ export const tasksTools: ToolDefinition[] = [
       const refreshPending = args.refreshPending as boolean | undefined;
 
       if (!feature) {
-        return 'Error: No active feature. Call hive_init first.';
+        return 'Error: No active feature. Call hive_feature_create first.';
       }
 
       // P7 Gate: Plan must be approved

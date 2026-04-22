@@ -1,39 +1,22 @@
 /**
- * hive_plan_save — Discovery gate (P7).
+ * hive_plan_write — Plan authoring.
  * hive_plan_approve — State transition gate.
  */
 import type { ToolDefinition } from '../server.js';
 import { getServices, resolveFeature } from '../services.js';
 
-const DISCOVERY_HEADING = /^##\s+discovery/im;
-const NEXT_HEADING = /^##\s+/m;
-
-function extractDiscoveryContent(plan: string): string | null {
-  const match = DISCOVERY_HEADING.exec(plan);
-  if (!match) return null;
-
-  const afterHeading = plan.slice(match.index + match[0].length);
-  const nextSection = NEXT_HEADING.exec(afterHeading);
-  const content = nextSection
-    ? afterHeading.slice(0, nextSection.index)
-    : afterHeading;
-
-  return content.trim();
-}
-
 export const planTools: ToolDefinition[] = [
   {
-    name: 'hive_plan_save',
+    name: 'hive_plan_write',
     description:
-      'Write or update the feature plan. GATE: Rejects if the plan lacks a substantive ' +
-      '## Discovery section (must be ≥100 chars with Q&A and research findings). ' +
-      'This enforces the plan-first workflow — no planning without discovery.',
+      'Write or update the feature plan. The plan should remain the single execution ' +
+      'contract for the feature and include a concise overview before the task list.',
     inputSchema: {
       type: 'object',
       properties: {
         content: {
           type: 'string',
-          description: 'Full plan markdown content. Must include a ## Discovery section.',
+          description: 'Full plan markdown content. For substantial changes, include discovery notes and a concise overview before the task list.',
         },
         feature: {
           type: 'string',
@@ -49,35 +32,7 @@ export const planTools: ToolDefinition[] = [
       const feature = resolveFeature(services, args.feature as string | undefined);
 
       if (!feature) {
-        return 'Error: No active feature. Call hive_init first.';
-      }
-
-      // P7 Hard Gate: Discovery section required
-      const discoveryContent = extractDiscoveryContent(content);
-      if (discoveryContent === null) {
-        return [
-          'BLOCKED: Plan must include a ## Discovery section.',
-          '',
-          'The Discovery section documents your research before planning:',
-          '- Original request summary',
-          '- Interview Q&A with the user',
-          '- Research findings with file:line references',
-          '',
-          'Add ## Discovery to your plan and try again.',
-        ].join('\n');
-      }
-
-      if (discoveryContent.length < 100) {
-        return [
-          `BLOCKED: Discovery section too thin (${discoveryContent.length} chars, minimum 100).`,
-          '',
-          'A substantive Discovery section must include:',
-          '- Original request summary',
-          '- Interview Q&A (questions asked and answers received)',
-          '- Research findings with file:line references',
-          '',
-          'Flesh out your discovery and try again.',
-        ].join('\n');
+        return 'Error: No active feature. Call hive_feature_create first.';
       }
 
       const planPath = planService.write(feature, content);
@@ -104,7 +59,7 @@ export const planTools: ToolDefinition[] = [
       const feature = resolveFeature(services, args.feature as string | undefined);
 
       if (!feature) {
-        return 'Error: No active feature. Call hive_init first.';
+        return 'Error: No active feature. Call hive_feature_create first.';
       }
 
       const info = services.featureService.getInfo(feature);
@@ -113,7 +68,7 @@ export const planTools: ToolDefinition[] = [
       }
 
       if (!info.hasPlan) {
-        return 'Error: No plan exists. Call hive_plan_save first.';
+        return 'Error: No plan exists. Call hive_plan_write first.';
       }
 
       // Gate: check for unresolved review comments

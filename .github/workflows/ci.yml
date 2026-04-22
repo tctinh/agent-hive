@@ -28,17 +28,33 @@ jobs:
       - name: Reinstall to link workspace packages
         run: bun install
 
+      - name: Build hive-mcp
+        working-directory: packages/hive-mcp
+        run: bun run build
+
       - name: Build opencode-hive
         working-directory: packages/opencode-hive
+        run: bun run build
+
+      - name: Build claude-code-hive
+        working-directory: packages/claude-code-hive
         run: bun run build
 
       - name: Test hive-core
         working-directory: packages/hive-core
         run: bun test
 
+      - name: Test hive-mcp
+        working-directory: packages/hive-mcp
+        run: bun run test
+
       - name: Test opencode-hive
         working-directory: packages/opencode-hive
         run: bun test
+
+      - name: Test claude-code-hive
+        working-directory: packages/claude-code-hive
+        run: bun run test
 
       - name: Build vscode-hive
         working-directory: packages/vscode-hive

@@ -1,20 +1,19 @@
 ---
 name: parallel-exploration
-description: Use when you need parallel, read-only exploration with Agent() (Forager fan-out)
-user-invocable: false
+description: Use when you need parallel, read-only exploration with the agent tool (Scout fan-out)
 ---
 
-# Parallel Exploration (Forager Fan-Out)
+# Parallel Exploration (Scout Fan-Out)
 
 ## Overview
 
 When you need to answer "where/how does X work?" across multiple domains (codebase, tests, docs, OSS), investigating sequentially wastes time. Each investigation is independent and can happen in parallel.
 
-**Core principle:** Decompose into independent sub-questions that fit in one context window, spawn one Agent() per sub-question, then synthesize the bounded results.
+**Core principle:** Decompose into independent sub-questions, invoke one scout agent per sub-question, and synthesize the results together.
 
 **Safe in Planning mode:** This is read-only exploration. It is OK to use during exploratory research even when there is no feature, no plan, and no approved tasks.
 
-**This skill is for read-only research.** For parallel implementation work, use `Skill("hive:dispatching-parallel-agents")` with Hive worktrees.
+**This skill is for read-only research.** For parallel implementation work, refer to the skill at ../dispatching-parallel-agents/SKILL.md and invoke @forager directly for each runnable task.
 
 ## When to Use
 
@@ -30,17 +29,26 @@ When you need to answer "where/how does X work?" across multiple domains (codeba
 
 **Only skip this skill when:**
 - Investigation requires shared state or context between questions
-- It's a single focused question that is genuinely answerable with **one quick Grep + one file Read**
+- It's a single focused question that is genuinely answerable with **one quick grep + one file read**
 - Questions are dependent (answer A materially changes what to ask for B)
-- Work involves file Edits (use Hive tasks / Forager instead)
+- Work involves file edits (use Hive tasks / Forager instead)
 
 **Important:** Do not treat "this is exploratory" as a reason to avoid delegation. This skill is specifically for exploratory research when fan-out makes it faster and cleaner.
+
+## Tool-Aware Research
+
+Load this skill before any multi-domain, read-only investigation that benefits from Scout fan-out.
+
+- When the answer depends on rendered UI, browser state, console output, or network activity, use `browser` as one of the read-only slices.
+- When external docs, APIs, or third-party implementations matter, use `web` or `io.github.upstash/context7/*` for the docs/OSS slice.
+- Use `todo` only when you need to track multiple questions and evidence coverage during synthesis.
+- Use `vscode/memory` only for findings the parent agent or a later turn will need after synthesis.
 
 ## The Pattern
 
 ### 1. Decompose Into Independent Questions
 
-Split your investigation into 2-4 independent sub-questions. Each sub-question should fit in one context window. If a request will not fit in one context window, narrow the slice, capture bounded findings, and return to Hive with recommended next steps instead of pushing toward an oversized final report. Good decomposition:
+Split your investigation into 2-4 independent sub-questions. Good decomposition:
 
 | Domain | Question Example |
 |--------|------------------|
@@ -53,67 +61,44 @@ Split your investigation into 2-4 independent sub-questions. Each sub-question s
 - "What is X?" then "How is X used?" (second depends on first)
 - "Find the bug" then "Fix the bug" (not read-only)
 
-**Stop and return to Hive when:**
-- one more fan-out would broaden scope too far
-- a sub-question no longer fits in one context window
-- the next useful step is implementation rather than exploration
+### 2. Invoke Scout Agents in Parallel
 
-### 2. Spawn Agents (Fan-Out)
+Start all independent scout requests before waiting on any result.
 
-Launch all agents before waiting for any results:
-
-```typescript
-// Parallelize by issuing multiple Agent() calls in the same assistant message.
-Agent({
-  agent: 'hive:forager',
-  prompt: `Where are API routes implemented and registered?
-    - Find the tool definition
-    - Find the plugin registration
-    - Return file paths with line numbers`,
-  run_in_background: true,
-})
-
-Agent({
-  agent: 'hive:forager',
-  prompt: `How does background task concurrency/queueing work?
-    - Find the manager/scheduler code
-    - Document the concurrency model
-    - Return file paths with evidence`,
-  run_in_background: true,
-})
-
-Agent({
-  agent: 'hive:forager',
-  prompt: `How does parent notification work for background tasks?
-    - Where is the notification built?
-    - How is it sent to the parent session?
-    - Return file paths with evidence`,
-  run_in_background: true,
-})
+```text
+Invoke the @scout agent via the agent tool for question 1.
+Invoke the @scout agent via the agent tool for question 2.
+Invoke the @scout agent via the agent tool for question 3.
 ```
 
 **Key points:**
-- Use `agent: 'hive:forager'` for read-only exploration
-- Give each agent a clear, focused prompt
+- Invoke the @scout agent via the agent tool for read-only exploration
+- Give each invocation a clear, focused scope
 - Make prompts specific about what evidence to return
 
-### 3. Collect Results
+### 3. Continue Working (Optional)
 
-After the fan-out message, collect the agent results through the normal Agent() return flow. Do not invent background polling or a separate async workflow.
+While tasks run, you can:
+- Work on other aspects of the problem
+- Prepare synthesis structure
+- Start drafting based on what you already know
 
-### 4. Synthesize Findings
+Each scout result returns to the parent chat when it completes.
 
-When each agent completes, its result is returned directly. Collect the outputs from each agent and proceed to synthesis.
+### 4. Collect Results
 
-### 5. Cleanup (If Needed)
+When each task completes, its result is returned directly. Collect the outputs from each task and proceed to synthesis.
 
-Combine results from all agents:
-- Cross-reference findings (file X mentioned by agents A and B)
-- Identify gaps (agent C found nothing, need different approach)
+### 5. Synthesize Findings
+
+Combine results from all tasks:
+- Cross-reference findings (file X mentioned by tasks A and B)
+- Identify gaps (task C found nothing, need different approach)
 - Build coherent answer from parallel evidence
-- If the remaining work would no longer fit in one context window, return to Hive with bounded findings and recommended next steps
 
-No manual cancellation is required in agent mode.
+### 6. Cleanup (If Needed)
+
+No manual cancellation is required for these agent invocations.
 
 ## Prompt Templates
 
@@ -169,72 +154,52 @@ Return:
 3. Notifications: How are errors surfaced to the caller?
 
 **Fan-out:**
-```typescript
-// Parallelize by issuing multiple Agent() calls in the same assistant message.
-Agent({
-  agent: 'hive:forager',
-  prompt: 'Where are API routes implemented? Find tool definition and registration.',
-  run_in_background: true,
-})
-
-Agent({
-  agent: 'hive:forager',
-  prompt: 'How does background task concurrency work? Find the manager/scheduler.',
-  run_in_background: true,
-})
-
-Agent({
-  agent: 'hive:forager',
-  prompt: 'How are parent sessions notified of task completion?',
-  run_in_background: true,
-})
+```text
+Invoke the @scout agent via the agent tool to find API route implementation.
+Invoke the @scout agent via the agent tool to analyze concurrency.
+Invoke the @scout agent via the agent tool to find the notification mechanism.
 ```
 
 **Results:**
-- Agent 1: Found `background-tools.ts` (tool definition), `index.ts` (registration)
-- Agent 2: Found `manager.ts` with concurrency=3 default, queue-based scheduling
-- Agent 3: Found `session.prompt()` call in manager for parent notification
+- Task 1: Found `background-tools.ts` (tool definition), `index.ts` (registration)
+- Task 2: Found `manager.ts` with concurrency=3 default, queue-based scheduling
+- Task 3: Found `session.prompt()` call in manager for parent notification
 
 **Synthesis:** Complete picture of background task lifecycle in ~1/3 the time of sequential investigation.
 
 ## Common Mistakes
 
 **Spawning sequentially (defeats the purpose):**
-```typescript
-// BAD: Wait for each before spawning next
-await Agent({ ... });
-await Agent({ ... });
+```text
+Bad: invoke one scout agent, wait, then decide whether to invoke the next.
 ```
 
-```typescript
-// GOOD: Spawn all in the same assistant message
-Agent({ ..., run_in_background: true })
-Agent({ ..., run_in_background: true })
-Agent({ ..., run_in_background: true })
+```text
+Good: issue all independent scout invocations in the same response.
 ```
 
-**Too many agents (diminishing returns):**
-- 2-4 agents: Good parallelization
-- 5+ agents: Overhead exceeds benefit, harder to synthesize
+**Too many tasks (diminishing returns):**
+- 2-4 tasks: Good parallelization
+- 5+ tasks: Overhead exceeds benefit, harder to synthesize
 
 **Dependent questions:**
-- Don't spawn agent B if it needs agent A's answer
+- Don't spawn task B if it needs task A's answer
 - Either make them independent or run sequentially
 
-**Using for Edits:**
-- Forager is read-only; use Forager with Hive tasks for implementation
+**Using for edits:**
+- Scout is read-only; use Forager for implementation
 - This skill is for exploration, not execution
 
 ## Key Benefits
 
 1. **Speed** - 3 investigations in time of 1
-2. **Focus** - Each Forager has narrow scope
-3. **Independence** - No interference between agents
-4. **Flexibility** - Cancel unneeded agents, add new ones
+2. **Focus** - Each Scout has narrow scope
+3. **Independence** - No interference between tasks
+4. **Flexibility** - Cancel unneeded tasks, add new ones
 
 ## Verification
 
 After using this pattern, verify:
-- [ ] All agents spawned before collecting any results (true fan-out)
-- [ ] Verified Agent() fan-out pattern used for parallel exploration
+- [ ] All tasks spawned before collecting any results (true fan-out)
+- [ ] Verified agent-tool fan-out pattern used for parallel exploration
 - [ ] Synthesized findings into coherent answer

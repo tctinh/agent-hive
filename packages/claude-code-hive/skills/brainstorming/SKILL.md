@@ -1,7 +1,6 @@
 ---
 name: brainstorming
-description: "Use before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
-user-invocable: false
+description: Use before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.
 ---
 
 # Brainstorming Ideas Into Designs
@@ -41,7 +40,7 @@ Start by understanding the current project context, then ask questions one at a 
 
 **Implementation (if continuing):**
 - Ask: "Ready to set up for implementation?"
-- Use `Skill("hive:writing-plans")` to create detailed implementation plan
+- Refer to the skill at ../writing-plans/SKILL.md to create a detailed implementation plan
 
 ## Key Principles
 

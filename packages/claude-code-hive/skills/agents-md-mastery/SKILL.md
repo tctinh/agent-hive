@@ -1,7 +1,6 @@
 ---
 name: agents-md-mastery
-description: "Use when bootstrapping, updating, or reviewing AGENTS.md — teaches what makes effective agent memory, how to structure sections, signal vs noise filtering, and when to prune stale entries"
-user-invocable: false
+description: Use when bootstrapping, updating, or reviewing AGENTS.md — teaches what makes effective agent memory, how to structure sections, signal vs noise filtering, and when to prune stale entries
 ---
 
 # AGENTS.md Mastery
@@ -34,7 +33,7 @@ If an entry doesn't:
 | Trigger | Action |
 |---------|--------|
 | New project bootstrap | Write initial AGENTS.md with build/test/style basics |
-| Feature completion | Sync new learnings via `hive_agents_md` tool |
+| Feature completion | Sync new learnings by editing AGENTS.md directly after reviewing the diff |
 | Periodic review | Audit for stale/redundant entries (quarterly) |
 | Quality issues | Agent repeating mistakes? Check if AGENTS.md has the fix |
 
@@ -49,7 +48,7 @@ If an entry doesn't:
 
 ✅ **Non-obvious patterns:**
 - "Use `.js` extension for local imports (ESM requirement)"
-- "Worktrees don't share `node_modules` — run `bun install` in each"
+- "Use Copilot memory for durable notes; don't invent extra workflow files"
 - "SandboxConfig is in `dockerSandboxService.ts`, NOT `types.ts`"
 
 ✅ **Gotchas that break builds:**
@@ -69,7 +68,7 @@ If an entry doesn't:
 - "License: MIT" (in LICENSE file already)
 
 ❌ **Describes what code does:**
-- "FeatureService manages features" (agent can Read code)
+- "FeatureService manages features" (agent can read code)
 - "The system uses git worktrees" (observable from commands)
 
 ### Rule of Thumb
@@ -79,7 +78,7 @@ If an entry doesn't:
 
 ## Section Structure for Fast Comprehension
 
-Agents Read AGENTS.md top-to-bottom once at session start. Put high-value info first:
+Agents read AGENTS.md top-to-bottom once at session start. Put high-value info first:
 
 ```markdown
 # Project Name
@@ -100,7 +99,7 @@ bun run release:check
 # ← Key directories, where things live
 packages/
 ├── hive-core/      # Shared logic
-├── claude-code-hive/  # Plugin
+├── opencode-hive/  # Plugin
 └── vscode-hive/    # Extension
 
 ## Important Patterns
@@ -118,10 +117,9 @@ NEVER use `ensureDirSync` — doesn't exist
 
 After completing a feature, sync learnings to AGENTS.md:
 
-1. **Trigger sync:**
-   ```typescript
-   hive_agents_md({ action: 'sync', feature: 'feature-name' })
-   ```
+1. **Draft the proposed additions:**
+  - Use Copilot memory or temporary notes if you need a staging area
+  - Keep each proposal to one behavior-changing point
 
 2. **Review each proposal:**
    - Read the proposed change
@@ -132,10 +130,9 @@ After completing a feature, sync learnings to AGENTS.md:
    - ❌ "TypeScript is used" → Agent detects this
    - ✅ "Use `.js` extension for imports" → Prevents build failures
 
-4. **Apply approved changes:**
-   ```typescript
-   hive_agents_md({ action: 'apply' })
-   ```
+4. **Apply approved changes directly:**
+  - Edit AGENTS.md with the approved additions and removals
+  - Review the diff before finalizing
 
 **Warning:** Don't auto-approve all proposals. One bad entry pollutes all future sessions.
 
@@ -156,7 +153,7 @@ Remove entries when they become:
 - "Test your changes" → Universal advice
 
 **Describing code:**
-- "TaskService manages tasks" → Agent can Read `TaskService` class
+- "TaskService manages tasks" → Agent can read `TaskService` class
 - "Worktrees are in `.hive/.worktrees/`" → Observable from filesystem
 
 **Proven unnecessary:**
@@ -167,7 +164,7 @@ Remove entries when they become:
 | Warning Sign | Why It's Bad | Fix |
 |-------------|-------------|-----|
 | AGENTS.md > 800 lines | Agents lose focus, miss critical info | Prune aggressively |
-| Describes what code does | Agent can Read code | Remove descriptions |
+| Describes what code does | Agent can read code | Remove descriptions |
 | Missing build/test commands | First thing agents need | Add at top |
 | No gotchas section | Agents repeat past mistakes | Document failure modes |
 | Generic best practices | Doesn't change behavior | Remove or make specific |
@@ -180,7 +177,7 @@ Remove entries when they become:
 | "Document everything" | Document only what changes behavior |
 | "Keep for historical record" | Version control is history |
 | "Might be useful someday" | Add when proven necessary |
-| "Explains the system" | Agents Read code for that |
+| "Explains the system" | Agents read code for that |
 | "Comprehensive reference" | AGENTS.md is a filter, not docs |
 
 ## Good Examples
@@ -217,7 +214,7 @@ NEVER use `ensureDirSync` (doesn't exist)
 - Follow DRY principle
 ```
 
-**Describes code (agent can Read it):**
+**Describes code (agent can read it):**
 ```markdown
 ## Architecture
 The FeatureService class manages features. It has methods

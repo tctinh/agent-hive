@@ -7,12 +7,14 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { getAllTools } from './server.js';
 
+const rootDir = process.env.HIVE_PROJECT_ROOT ?? process.cwd();
+
 const server = new Server(
-  { name: 'hive', version: '1.5.0' },
+  { name: 'hive', version: '1.4.5' },
   { capabilities: { tools: {} } },
 );
 
-const tools = getAllTools();
+const tools = getAllTools(rootDir);
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: tools.map((t) => ({

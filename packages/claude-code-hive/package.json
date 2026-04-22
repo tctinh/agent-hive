@@ -1,0 +1,46 @@
+{
+  "name": "claude-code-hive",
+  "version": "1.4.5",
+  "type": "module",
+  "description": "Claude Code plugin assets for Agent Hive",
+  "license": "MIT",
+  "author": "tctinh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tctinh/agent-hive.git",
+    "directory": "packages/claude-code-hive"
+  },
+  "homepage": "https://github.com/tctinh/agent-hive#readme",
+  "bugs": {
+    "url": "https://github.com/tctinh/agent-hive/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "ai",
+    "hive",
+    "workflow",
+    "planning",
+    "agent"
+  ],
+  "scripts": {
+    "clean": "rm -rf skills",
+    "prepare-runtime": "node scripts/prepare-workspace-hive-mcp.mjs",
+    "generate": "node scripts/generate-plugin-assets.mjs",
+    "verify": "node scripts/prepare-workspace-hive-mcp.mjs && node scripts/verify-plugin-assets.mjs",
+    "build": "node scripts/generate-plugin-assets.mjs && node scripts/prepare-workspace-hive-mcp.mjs && node scripts/verify-plugin-assets.mjs",
+    "test": "node scripts/generate-plugin-assets.mjs && node --test scripts/prepare-workspace-hive-mcp.test.mjs scripts/launch-hive-mcp.test.mjs && node scripts/prepare-workspace-hive-mcp.mjs && node scripts/verify-plugin-assets.mjs"
+  },
+  "dependencies": {
+    "hive-mcp": "1.4.5"
+  },
+  "files": [
+    "agents/",
+    "commands/",
+    "hooks/",
+    "instructions/",
+    "plugin.json",
+    "README.md",
+    "scripts/",
+    "skills/"
+  ]
+}

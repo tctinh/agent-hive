@@ -4,11 +4,7 @@
  *
  * Shared by opencode-hive, hive-mcp, and any future harness.
  */
-
-export interface ContextFile {
-  name: string;
-  content: string;
-}
+import type { ContextFile } from '../types.js';
 
 export interface CompletedTask {
   name: string;

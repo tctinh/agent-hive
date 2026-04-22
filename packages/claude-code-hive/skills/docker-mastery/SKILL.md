@@ -1,7 +1,6 @@
 ---
 name: docker-mastery
-description: "Use when working with Docker containers — debugging container failures, writing Dockerfiles, docker-compose for integration tests, image optimization, or deploying containerized applications"
-user-invocable: false
+description: Use when working with Docker containers — debugging container failures, writing Dockerfiles, docker-compose for integration tests, image optimization, or deploying containerized applications
 ---
 
 # Docker Mastery
@@ -75,11 +74,11 @@ Mount host directories into containers for persistence and code sharing:
 docker run -v $(pwd):/app myapp:latest
 
 # Hive worktrees are mounted automatically
-# Your code Edits (via Read/Write/Edit tools) affect the host
+# Your code edits (via Read/Write/editFiles tools) affect the host
 # Container sees the same files at runtime
 ```
 
-**How Hive uses this:** Worktree is mounted into container, so file tools work on host, Bash commands run in container.
+**How Hive uses this:** Worktree is mounted into container, so file tools work on host, bash commands run in container.
 
 ### Multi-Stage Builds
 
@@ -242,16 +241,16 @@ dist
    ```
 3. Or use a richer base image (e.g., `node:22` instead of `node:22-slim`).
 
-## Hive Sandbox Integration
+## Sandbox Integration
 
 ### How Hive Wraps Commands
 
 When sandbox mode is active (`sandbox: 'docker'` in config):
-1. Hive hook intercepts Bash commands before execution
+1. Hive hook intercepts bash commands before execution
 2. Wraps with `docker run --rm -v <worktree>:/workspace -w /workspace <image> sh -c "<command>"`
-3. Command runs in container, but file Edits (Read/Write/Edit) still affect host
+3. Command runs in container, but file edits (read/editFiles) still affect the host
 
-**Workers are unaware** — they issue normal Bash commands, Hive handles containerization.
+**Workers are unaware** — they issue normal bash commands, Hive handles containerization.
 
 ### When Host Access is Needed
 
@@ -288,9 +287,7 @@ Hive detects runtime from project files:
 - `Dockerfile` → Builds from project Dockerfile
 - Fallback → `ubuntu:24.04`
 
-**Override:** Set `dockerImage` in config (`<project>/.hive/agent-hive.json` preferred, legacy `<project>/.opencode/agent_hive.json`, `~/.config/opencode/agent_hive.json` fallback).
-
-If project config is missing, invalid JSON, or invalid shape, Hive reads global config next and then falls back to defaults, surfacing a runtime warning when the project config is invalid.
+**Override:** Set `dockerImage` in config (`~/.config/opencode/agent_hive.json`).
 
 ## Red Flags - STOP
 
@@ -344,6 +341,6 @@ Before marking Docker work complete:
 
 ## Related Skills
 
-- **Skill("hive:systematic-debugging")** - When container behavior is unexpected
-- **Skill("hive:test-driven-development")** - Write tests that run in containers
-- **Skill("hive:verification-before-completion")** - Verify tests pass in container before claiming done
+- **Refer to the skill at ../systematic-debugging/SKILL.md** - When container behavior is unexpected
+- **Refer to the skill at ../test-driven-development/SKILL.md** - Write tests that run in containers
+- **Refer to the skill at ../verification-before-completion/SKILL.md** - Verify tests pass in container before claiming done

@@ -17,9 +17,9 @@ import {
 } from 'hive-core';
 
 let _services: ReturnType<typeof initServices> | null = null;
+let _rootDir: string | null = null;
 
-function initServices() {
-  const directory = process.cwd();
+function initServices(directory: string) {
   const featureService = new FeatureService(directory);
   const planService = new PlanService(directory);
   const taskService = new TaskService(directory);
@@ -47,9 +47,16 @@ function initServices() {
   };
 }
 
-export function getServices() {
-  if (!_services) {
-    _services = initServices();
+export function getServices(directory?: string) {
+  const resolvedDirectory = directory ?? _rootDir ?? process.env.HIVE_PROJECT_ROOT;
+
+  if (!resolvedDirectory) {
+    throw new Error('Hive MCP root directory is not configured. Pass rootDir from the entrypoint or set HIVE_PROJECT_ROOT.');
+  }
+
+  if (!_services || _rootDir !== resolvedDirectory) {
+    _rootDir = resolvedDirectory;
+    _services = initServices(resolvedDirectory);
   }
   return _services;
 }

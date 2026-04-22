@@ -1,7 +1,6 @@
 ---
 name: code-reviewer
 description: Use when reviewing implementation changes against an approved plan or task (especially before merging or between Hive tasks) to catch missing requirements, YAGNI, dead code, and risky patterns
-user-invocable: false
 ---
 
 # Code Reviewer

@@ -37,8 +37,8 @@ export const statusTools: ToolDefinition[] = [
           error: 'No active feature.',
           availableFeatures: available,
           nextAction: available.length > 0
-            ? `Set an active feature or call hive_init to create one.`
-            : 'Call hive_init to create a feature.',
+            ? `Set an active feature or call hive_feature_create to create one.`
+            : 'Call hive_feature_create to create a feature.',
         });
       }
 
@@ -88,7 +88,7 @@ export const statusTools: ToolDefinition[] = [
       let nextAction: string;
       if (featureData.status === 'planning') {
         if (!plan) {
-          nextAction = 'Write a plan with hive_plan_save (discovery required).';
+          nextAction = 'Write or revise a plan with hive_plan_write.';
         } else if (!services.planService.isApproved(feature)) {
           nextAction = 'Plan exists but not approved. Present to user for approval, then call hive_plan_approve.';
         } else {
@@ -105,7 +105,7 @@ export const statusTools: ToolDefinition[] = [
       } else if (pending > 0) {
         nextAction = 'Pending tasks exist but are blocked by dependencies. Check blockedBy map.';
       } else if (done === tasks.length) {
-        nextAction = 'All tasks complete. Run batch verification (build+test), then call hive_complete.';
+        nextAction = 'All tasks complete. Run batch verification (build+test), then call hive_feature_complete.';
       } else {
         nextAction = `Review status: ${done} done, ${blocked} blocked, ${failed} failed.`;
       }

@@ -1,7 +1,6 @@
 ---
 name: systematic-debugging
 description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes
-user-invocable: false
 ---
 
 # Systematic Debugging
@@ -43,6 +42,13 @@ Use for ANY technical issue:
 - Issue seems simple (simple bugs have root causes too)
 - You're in a hurry (rushing guarantees rework)
 - Manager wants it fixed NOW (systematic is faster than thrashing)
+
+## Tool-Aware Evidence Gathering
+
+- If the issue depends on rendered UI, browser state, console output, or network activity, reproduce it with `browser` before changing code.
+- Use `playwright/*` when you need a repeatable browser repro or end-to-end trace.
+- Use `todo` only when tracking multiple hypotheses, component boundaries, or repro attempts.
+- Use `vscode/memory` only for durable root-cause findings or blocker history another turn will need.
 
 ## The Four Phases
 
@@ -129,8 +135,8 @@ You MUST complete each phase before proceeding to the next.
    - What works that's similar to what's broken?
 
 2. **Compare Against References**
-   - If implementing pattern, Read reference implementation COMPLETELY
-   - Don't skim - Read every line
+   - If implementing pattern, read reference implementation COMPLETELY
+   - Don't skim - read every line
    - Understand the pattern fully before applying
 
 3. **Identify Differences**
@@ -177,7 +183,7 @@ You MUST complete each phase before proceeding to the next.
    - Automated test if possible
    - One-off test script if no framework
    - MUST have before fixing
-   - Use the `Skill("hive:test-driven-development")` skill for writing proper failing tests
+   - Refer to the skill at ../test-driven-development/SKILL.md for writing proper failing tests
 
 2. **Implement Single Fix**
    - Address the root cause identified
@@ -285,8 +291,8 @@ These techniques are part of systematic debugging and available in this director
 - **`condition-based-waiting.md`** - Replace arbitrary timeouts with condition polling
 
 **Related skills:**
-- **Skill("hive:test-driven-development")** - For creating failing test case (Phase 4, Step 1)
-- **Skill("hive:verification-before-completion")** - Verify fix worked before claiming success
+- **Refer to the skill at ../test-driven-development/SKILL.md** - For creating a failing test case (Phase 4, Step 1)
+- **Refer to the skill at ../verification-before-completion/SKILL.md** - Verify the fix worked before claiming success
 
 ## Real-World Impact
 

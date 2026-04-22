@@ -1,7 +1,6 @@
 ---
 name: dispatching-parallel-agents
 description: Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
-user-invocable: false
 ---
 
 # Dispatching Parallel Agents
@@ -12,17 +11,22 @@ When you have multiple unrelated failures (different test files, different subsy
 
 **Core principle:** Dispatch one agent per independent problem domain. Let them work concurrently.
 
+Load this skill when `hive_status()` shows 2+ runnable independent tasks. If the work is still read-only investigation, refer to the skill at ../parallel-exploration/SKILL.md instead.
+
 ## Prerequisite: Check Runnable Tasks
 
-Before dispatching, call `mcp__hive__hive_status()` to get the **runnable** list — tasks whose dependencies are all satisfied.
+Before dispatching, use `hive_status()` to get the **runnable** list — tasks whose dependencies are all satisfied.
 
 **Only dispatch tasks that are runnable.** Never start tasks with unmet dependencies.
 
 Only `done` satisfies dependencies (not `blocked`, `failed`, `partial`, `cancelled`).
 
 **Ask the operator first:**
-- Use `AskUserQuestion`: "These tasks are runnable and independent: [list]. Execute in parallel?"
-- Record the decision with `Write(".hive/features/<feature>/context/execution-decisions.md", "...")`
+- Prefer `vscode/askQuestions` for the approval prompt: "These tasks are runnable and independent: [list]. Execute in parallel?"
+- Fall back to asking directly in chat only when `vscode/askQuestions` is unavailable or a lightweight follow-up is enough
+- Record the decision in Copilot memory or current working notes only when future turns need it
+- Use `todo` only when the batch needs a live checklist for task ownership, integration, or follow-up.
+- Use `vscode/memory` only for durable coordination decisions or blocker history that future turns need.
 - Proceed only after operator approval
 
 ## When to Use
@@ -77,12 +81,17 @@ Each agent gets:
 
 ### 3. Dispatch in Parallel
 
-Parallelize by issuing multiple Agent() calls in the same assistant message.
+```text
+Invoke @forager for runnable task 01 and require `hive_task_update` for progress reporting.
+Invoke @forager for runnable task 02 and require `hive_task_update` for progress reporting.
+Invoke @forager for runnable task 03 and require `hive_task_update` for progress reporting.
+```
 
-```typescript
-Agent({ agent: "hive:forager", prompt: "Investigate and fix failure A", run_in_background: true })
-Agent({ agent: "hive:forager", prompt: "Investigate and fix failure B", run_in_background: true })
-Agent({ agent: "hive:forager", prompt: "Investigate and fix failure C", run_in_background: true })
+Parallelize by issuing multiple agent-tool invocations in the same response.
+
+```text
+Invoke the appropriate agent for failure A.
+Invoke the appropriate agent for failure B.
 ```
 
 ### 4. Review and Integrate
@@ -91,7 +100,7 @@ When agents return:
 - Read each summary
 - Verify fixes don't conflict
 - Run full test suite
-- Integrate all changes with `hive_merge`
+- Apply any needed follow-up edits directly and rerun verification
 
 ## Agent Prompt Structure
 
@@ -180,7 +189,7 @@ Agent 3 → Fix tool-approval-race-conditions.test.ts
 
 After agents return:
 1. **Review each summary** - Understand what changed
-2. **Check for conflicts** - Did agents Edit same code?
+2. **Check for conflicts** - Did agents edit same code?
 3. **Run full suite** - Verify all fixes work together
 4. **Spot check** - Agents can make systematic errors
 

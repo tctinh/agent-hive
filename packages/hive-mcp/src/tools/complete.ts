@@ -1,5 +1,5 @@
 /**
- * hive_complete — Feature lifecycle end gate.
+ * hive_feature_complete — Feature lifecycle end gate.
  * GATE: All tasks must be done.
  */
 import type { ToolDefinition } from '../server.js';
@@ -7,14 +7,14 @@ import { getServices, resolveFeature } from '../services.js';
 
 export const completeTools: ToolDefinition[] = [
   {
-    name: 'hive_complete',
+    name: 'hive_feature_complete',
     description:
       'Mark a feature as complete. GATE: All tasks must be in "done" status. ' +
       'Transitions the feature to completed state.',
     inputSchema: {
       type: 'object',
       properties: {
-        feature: {
+        name: {
           type: 'string',
           description: 'Feature name. Defaults to active feature.',
         },
@@ -22,7 +22,7 @@ export const completeTools: ToolDefinition[] = [
     },
     handler: async (args) => {
       const services = getServices();
-      const feature = resolveFeature(services, args.feature as string | undefined);
+      const feature = resolveFeature(services, (args.name as string | undefined) ?? (args.feature as string | undefined));
 
       if (!feature) {
         return JSON.stringify({ success: false, error: 'No active feature.' });

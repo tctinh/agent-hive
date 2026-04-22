@@ -1,5 +1,5 @@
 /**
- * hive_init — Feature lifecycle gate.
+ * hive_feature_create — Feature lifecycle start.
  * Creates .hive/features/<name>/, sets active feature, scaffolds structure.
  */
 import type { ToolDefinition } from '../server.js';
@@ -7,11 +7,10 @@ import { getServices } from '../services.js';
 
 export const initTools: ToolDefinition[] = [
   {
-    name: 'hive_init',
+    name: 'hive_feature_create',
     description:
-      'Initialize a new Hive feature. Creates the .hive/features/<name>/ directory structure, ' +
-      'sets it as the active feature, and returns guidance for the discovery phase. ' +
-      'This is the entry point for the plan-first workflow.',
+      'Create a new Hive feature. Creates the .hive/features/<name>/ directory structure, ' +
+      'sets it as the active feature, and returns the next planning step.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -37,20 +36,15 @@ export const initTools: ToolDefinition[] = [
       return [
         `Feature "${feature.name}" created and set as active.`,
         '',
-        '## Discovery Phase Required',
+        '## Next Step',
         '',
-        'Before writing a plan, complete discovery:',
+        'Do discovery before planning:',
         '',
         '1. **Ask questions** — one at a time, understand the user\'s intent',
         '2. **Research the codebase** — Read/Grep/Glob to understand current state',
-        '3. **Document findings** — your plan must include a `## Discovery` section',
+        '3. **Document findings** — include discovery notes in the plan',
         '',
-        'The `## Discovery` section must contain:',
-        '- Original request summary',
-        '- Interview Q&A (questions asked and answers received)',
-        '- Research findings with file:line references',
-        '',
-        'When ready, call `hive_plan_save` with the full plan.',
+        'When ready, call `hive_plan_write` with the full plan.',
       ].join('\n');
     },
   },

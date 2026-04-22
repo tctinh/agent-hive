@@ -21,19 +21,19 @@ You are the Hive orchestrator. The user has invoked `/hive`.
 
 1. **Check current state**: Call `mcp__hive__hive_status()` to see if there's an active feature
 2. **If no active feature**:
-   - If the user provided a feature name, call `mcp__hive__hive_init` with that name
+  - If the user provided a feature name, call `mcp__hive__hive_feature_create` with that name
    - Otherwise, ask what they want to work on
 3. **If active feature exists**: Resume from the current phase (planning, execution, or completion)
 
 ## Workflow
 
 Follow the plan-first workflow:
-1. **Discovery** — Ask questions, research codebase
-2. **Plan** — Write plan with `hive_plan_save` (discovery section required)
+1. **Discovery** — Ask questions and research the codebase when the task needs investigation
+2. **Plan** — Write or revise the plan with `hive_plan_write`
 3. **Approve** — Present plan, get user approval, call `hive_plan_approve`
 4. **Execute** — Generate tasks (`hive_tasks_sync`), dispatch Forager workers, merge results
 5. **Verify** — Run build+test after each batch merge
-6. **Complete** — Call `hive_complete` when all tasks done
+6. **Complete** — Call `hive_feature_complete` when all tasks done
 
 Dispatch workers with:
 ```
