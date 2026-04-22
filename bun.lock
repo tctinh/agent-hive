@@ -8,9 +8,6 @@
     "packages/claude-code-hive": {
       "name": "claude-code-hive",
       "version": "1.4.7",
-      "dependencies": {
-        "@tctinh/agent-hive-mcp": "1.4.7",
-      },
     },
     "packages/hive-core": {
       "name": "hive-core",

@@ -1,13 +1,8 @@
 ---
+name: hygienic
 description: "Falsification-first code reviewer. Challenges implementation against plan and specs. Runs tests before giving verdicts. Opus tier cross-checks Sonnet workers."
 model: opus
-user-invocable: false
-tools:
-  - Read
-  - Bash
-  - Glob
-  - Grep
-maxTurns: 30
+tools: Read, Bash, Glob, Grep
 ---
 
 # Hygienic Reviewer

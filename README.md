@@ -60,7 +60,7 @@ The VS Code extension is **not** a runtime. It visualises the `.hive/` state wri
 
 The Claude Code plugin ships three Hive agents (`hive`, `forager`, `hygienic`), a `/hive` slash command, 11 on-demand skills, a `SessionStart` hook, and spawns the `@tctinh/agent-hive-mcp` MCP server as a sidecar.
 
-### Install — Recommended: plugin marketplace
+### Install
 
 ```bash
 # inside Claude Code
@@ -68,23 +68,9 @@ The Claude Code plugin ships three Hive agents (`hive`, `forager`, `hygienic`), 
 /plugin install hive@agent-hive
 ```
 
-The marketplace definition lives at [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) and points at [`packages/claude-code-hive`](packages/claude-code-hive). The MCP runtime is loaded via `node ./scripts/launch-hive-mcp.mjs`, which resolves `@tctinh/agent-hive-mcp` from a node_modules tree. For marketplace installs, install the MCP runtime once so the launcher can resolve it:
+The marketplace definition lives at [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) and points at [`packages/claude-code-hive`](packages/claude-code-hive). The plugin spawns the MCP runtime on demand via `npx -y -p @tctinh/agent-hive-mcp@latest hive-mcp`, so you don't need to install the MCP package separately — npx fetches and caches it the first time `/hive` runs.
 
-```bash
-npm install -g @tctinh/agent-hive-mcp
-```
-
-### Install — Alternative: self-contained npm install
-
-Useful when you prefer a single project-local dependency tree and don't want a global install:
-
-```bash
-mkdir -p .agent-hive/claude && cd .agent-hive/claude
-npm init -y
-npm install claude-code-hive @tctinh/agent-hive-mcp
-```
-
-Then register the plugin by pointing Claude Code at `.agent-hive/claude/node_modules/claude-code-hive/.claude-plugin/plugin.json`.
+Requirements: Node.js 18+ on your PATH so `npx` is available.
 
 ### Start
 
@@ -323,7 +309,7 @@ See [PHILOSOPHY.md](PHILOSOPHY.md) for the full evolution log.
 }
 ```
 
-**Claude Code marketplace install, MCP fails to launch.** The launcher needs `@tctinh/agent-hive-mcp` to be resolvable. Run `npm install -g @tctinh/agent-hive-mcp` or use the self-contained npm install path above.
+**Claude Code marketplace install, MCP fails to launch.** The plugin invokes the MCP runtime via `npx -y -p @tctinh/agent-hive-mcp@latest hive-mcp`, which requires Node.js 18+ on PATH. If npx is sandboxed or the registry is blocked, pre-cache the package with `npx -y -p @tctinh/agent-hive-mcp@latest hive-mcp --version` (then Ctrl-C) before starting Claude Code.
 
 ---
 

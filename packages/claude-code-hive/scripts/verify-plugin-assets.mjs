@@ -1,12 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveHiveMcpEntry } from './launch-hive-mcp.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const packageDir = path.resolve(scriptDir, '..');
-const require = createRequire(import.meta.url);
 const repoSkillReferencePattern = /\.github\/skills\/[^/\s)]+\/SKILL\.md/g;
 
 function requireFile(relativePath) {
@@ -43,7 +40,7 @@ const requiredFiles = [
   'instructions/hive-workflow.md',
   'hooks/hooks.json',
   'hooks/scripts/inject-context.sh',
-  'scripts/launch-hive-mcp.mjs',
+  'scripts/generate-plugin-assets.mjs',
   'scripts/verify-plugin-assets.mjs',
   'README.md',
 ];
@@ -62,17 +59,33 @@ if (plugin.hooks !== './hooks/hooks.json') {
   throw new Error(`Expected plugin.hooks to be ./hooks/hooks.json, received ${plugin.hooks}`);
 }
 
-if (plugin.mcpServers?.hive?.command !== 'node') {
-  throw new Error('Expected plugin.mcpServers.hive.command to be node');
+if (plugin.mcpServers?.hive?.command !== 'npx') {
+  throw new Error(`Expected plugin.mcpServers.hive.command to be npx, received ${plugin.mcpServers?.hive?.command}`);
 }
 
-if (plugin.mcpServers?.hive?.args?.[0] !== './scripts/launch-hive-mcp.mjs') {
-  throw new Error('Expected plugin.mcpServers.hive.args[0] to point at ./scripts/launch-hive-mcp.mjs');
+const mcpArgs = plugin.mcpServers?.hive?.args ?? [];
+if (!mcpArgs.includes('@tctinh/agent-hive-mcp@latest') || mcpArgs[mcpArgs.length - 1] !== 'hive-mcp') {
+  throw new Error(`Expected plugin.mcpServers.hive.args to invoke hive-mcp via @tctinh/agent-hive-mcp@latest, received ${JSON.stringify(mcpArgs)}`);
 }
 
 for (const explicitField of ['agents', 'skills', 'commands']) {
   if (explicitField in plugin) {
     throw new Error(`plugin.${explicitField} should be omitted so Claude Code auto-discovers ./${explicitField}`);
+  }
+}
+
+for (const agentFile of ['agents/hive.md', 'agents/forager.md', 'agents/hygienic.md']) {
+  const content = readFileSync(path.join(packageDir, agentFile), 'utf8');
+  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!frontmatterMatch) {
+    throw new Error(`${agentFile} is missing YAML frontmatter`);
+  }
+  const frontmatter = frontmatterMatch[1];
+  if (!/^name:\s*\S/m.test(frontmatter)) {
+    throw new Error(`${agentFile} frontmatter must include a 'name:' field for Claude Code agent discovery`);
+  }
+  if (!/^description:\s*\S/m.test(frontmatter)) {
+    throw new Error(`${agentFile} frontmatter must include a 'description:' field`);
   }
 }
 
@@ -118,17 +131,6 @@ for (const absolutePath of markdownAssetPaths) {
     const relativePath = path.relative(packageDir, absolutePath);
     throw new Error(`Shipped asset ${relativePath} still points at repo-local skill path ${match[0]}`);
   }
-}
-
-const hiveMcpPackageJson = require.resolve('@tctinh/agent-hive-mcp/package.json');
-
-if (!existsSync(hiveMcpPackageJson)) {
-  throw new Error(`Resolved @tctinh/agent-hive-mcp package.json does not exist: ${hiveMcpPackageJson}`);
-}
-
-const hiveMcpEntry = resolveHiveMcpEntry();
-if (!existsSync(hiveMcpEntry)) {
-  throw new Error(`Resolved @tctinh/agent-hive-mcp entry does not exist: ${hiveMcpEntry}`);
 }
 
 console.log(`Verified Claude plugin assets (${skillDirs.length} skills)`);

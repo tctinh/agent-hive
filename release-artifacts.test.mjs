@@ -85,11 +85,6 @@ function assertPackedFile(fileSet, relativePath, packageName) {
   );
 }
 
-function createPackedTarball(packageRoot) {
-  ensurePackageBuilt(packageRoot);
-  return runPackageCommand(packageRoot, 'npm', ['pack']).trim();
-}
-
 describe(`release ${releaseVersion} artifact contract on main`, () => {
   it(`bumps root and workspace manifests to ${releaseVersion}`, () => {
     for (const file of [
@@ -126,7 +121,6 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
 
   it(`refreshes plugin manifests, dependency pins, runtime version, and philosophy history to ${releaseVersion}`, () => {
     const hiveMcpPackageJson = readJson('packages/hive-mcp/package.json');
-    const claudeCodeHivePackageJson = readJson('packages/claude-code-hive/package.json');
     const vscodeHivePackageJson = readJson('packages/vscode-hive/package.json');
     const opencodePluginJson = readJson('packages/opencode-hive/plugin.json');
     const claudePluginJson = readJson('packages/claude-code-hive/.claude-plugin/plugin.json');
@@ -136,7 +130,6 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
     assert.equal(opencodePluginJson.version, releaseVersion, `packages/opencode-hive/plugin.json should be ${releaseVersion}`);
     assert.equal(claudePluginJson.version, releaseVersion, `packages/claude-code-hive/.claude-plugin/plugin.json should be ${releaseVersion}`);
     assert.equal(hiveMcpPackageJson.devDependencies['hive-core'], releaseVersion, `packages/hive-mcp/package.json should pin hive-core to ${releaseVersion}`);
-    assert.equal(claudeCodeHivePackageJson.dependencies['@tctinh/agent-hive-mcp'], releaseVersion, `packages/claude-code-hive/package.json should pin @tctinh/agent-hive-mcp to ${releaseVersion}`);
     assert.equal(vscodeHivePackageJson.dependencies['hive-core'], releaseVersion, `packages/vscode-hive/package.json should pin hive-core to ${releaseVersion}`);
     assert.match(hiveMcpEntry, new RegExp(`version: '${releaseVersion.replaceAll('.', '\\.')}'`), 'packages/hive-mcp/src/index.ts should advertise the release version');
     assert.match(philosophy, new RegExp(`### v${releaseVersion.replaceAll('.', '\\.')}`), `PHILOSOPHY.md should include a v${releaseVersion} entry`);
@@ -208,11 +201,12 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
 
     assertPackedFile(packedFiles, '.claude-plugin/plugin.json', 'claude-code-hive');
     assertPackedFile(packedFiles, 'agents/hive.md', 'claude-code-hive');
+    assertPackedFile(packedFiles, 'agents/forager.md', 'claude-code-hive');
+    assertPackedFile(packedFiles, 'agents/hygienic.md', 'claude-code-hive');
     assertPackedFile(packedFiles, 'commands/hive.md', 'claude-code-hive');
     assertPackedFile(packedFiles, 'instructions/hive-workflow.md', 'claude-code-hive');
     assertPackedFile(packedFiles, 'hooks/hooks.json', 'claude-code-hive');
     assertPackedFile(packedFiles, 'hooks/scripts/inject-context.sh', 'claude-code-hive');
-    assertPackedFile(packedFiles, 'scripts/launch-hive-mcp.mjs', 'claude-code-hive');
     assertPackedFile(packedFiles, 'scripts/verify-plugin-assets.mjs', 'claude-code-hive');
     assert.ok(
       [...packedFiles].some((filePath) => filePath.startsWith('skills/') && filePath.endsWith('/SKILL.md')),
@@ -220,45 +214,19 @@ describe(`release ${releaseVersion} artifact contract on main`, () => {
     );
   });
 
-  it('installs claude-code-hive against the packed hive-mcp runtime in publish order', () => {
-    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-hive-release-artifacts-'));
+  it('claude-code-hive plugin.json invokes the MCP runtime via npx without requiring a local dependency', () => {
+    const pluginManifest = readJson('packages/claude-code-hive/.claude-plugin/plugin.json');
+    const server = pluginManifest.mcpServers?.hive;
 
-    try {
-      const hiveMcpTarball = createPackedTarball(hiveMcpRoot);
-      const claudeCodeHiveTarball = createPackedTarball(claudeCodeHiveRoot);
-      const hiveMcpTarballPath = path.join(hiveMcpRoot, hiveMcpTarball);
-      const claudeCodeHiveTarballPath = path.join(claudeCodeHiveRoot, claudeCodeHiveTarball);
-
-      execFileSync('npm', ['init', '-y'], {
-        cwd: tempRoot,
-        encoding: 'utf8',
-      });
-
-      execFileSync('npm', ['install', hiveMcpTarballPath], {
-        cwd: tempRoot,
-        encoding: 'utf8',
-      });
-
-      execFileSync('npm', ['install', claudeCodeHiveTarballPath], {
-        cwd: tempRoot,
-        encoding: 'utf8',
-      });
-
-      const verifyOutput = execFileSync('node', ['node_modules/claude-code-hive/scripts/verify-plugin-assets.mjs'], {
-        cwd: tempRoot,
-        encoding: 'utf8',
-      });
-
-      assert.match(verifyOutput, /Verified Claude plugin assets/);
-    } finally {
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-      for (const packageRoot of [hiveMcpRoot, claudeCodeHiveRoot]) {
-        for (const fileName of fs.readdirSync(packageRoot)) {
-          if (fileName.endsWith('.tgz')) {
-            fs.rmSync(path.join(packageRoot, fileName), { force: true });
-          }
-        }
-      }
-    }
+    assert.equal(server?.command, 'npx', 'plugin.mcpServers.hive.command must be npx so the MCP runs without a global install');
+    assert.ok(Array.isArray(server?.args), 'plugin.mcpServers.hive.args must be an array');
+    assert.ok(server.args.includes('@tctinh/agent-hive-mcp@latest'), 'MCP args must pin @tctinh/agent-hive-mcp@latest so npx fetches the right package');
+    assert.equal(server.args.at(-1), 'hive-mcp', 'MCP args must end with the hive-mcp bin name so npx invokes the correct entry');
+    const claudeCodeHivePackageJson = readJson('packages/claude-code-hive/package.json');
+    assert.equal(
+      claudeCodeHivePackageJson.dependencies?.['@tctinh/agent-hive-mcp'],
+      undefined,
+      'claude-code-hive should not depend on @tctinh/agent-hive-mcp — npx fetches it at runtime'
+    );
   });
 });

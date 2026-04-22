@@ -2,20 +2,18 @@
 
 Static Claude Code plugin assets for Agent Hive.
 
-This package ships the Claude-facing plugin manifest, prompts, hooks, generated skills, and a package-local launcher that resolves the `hive-mcp` runtime package when installed from npm.
+This package ships the Claude-facing plugin manifest, agents, commands, hooks, and generated skills. The MCP runtime (`@tctinh/agent-hive-mcp`) is fetched on demand by `npx` — not a direct dependency of this package.
 
-## Install
+## Install (marketplace — recommended)
 
-Install `claude-code-hive` and `hive-mcp` into the same Node.js dependency tree so the packaged launcher can resolve the runtime locally:
+From Claude Code:
 
-```bash
-mkdir -p .agent-hive/claude
-cd .agent-hive/claude
-npm init -y
-npm install claude-code-hive hive-mcp
+```
+/plugin marketplace add tctinh/agent-hive
+/plugin install hive@agent-hive
 ```
 
-Then point Claude Code at `node_modules/claude-code-hive/.claude-plugin/plugin.json`.
+The plugin's `mcpServers.hive` entry runs `npx -y -p @tctinh/agent-hive-mcp@latest hive-mcp`, so there is nothing else to install. The first `/hive` invocation may pause briefly while npx caches the package.
 
 ## Local Development
 
@@ -26,4 +24,4 @@ cd packages/claude-code-hive
 npm run build
 ```
 
-That regenerates the packaged skills, prepares the linked `hive-mcp` runtime when needed, and verifies that the checked-in `plugin.json` still resolves through the package-local launcher.
+That regenerates the packaged skills and verifies the `.claude-plugin/plugin.json` manifest against the plugin contract. Use `npm test` to run the same check on its own.

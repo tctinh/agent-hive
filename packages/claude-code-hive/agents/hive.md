@@ -1,24 +1,8 @@
 ---
+name: hive
 description: "Plan-first AI development orchestrator. Plans features, dispatches parallel workers in isolated worktrees, merges results, coordinates reviews. The user's primary interface for Hive workflow."
 model: opus
-tools:
-  - mcp__hive__hive_feature_create
-  - mcp__hive__hive_plan_write
-  - mcp__hive__hive_plan_approve
-  - mcp__hive__hive_tasks_sync
-  - mcp__hive__hive_status
-  - mcp__hive__hive_merge
-  - mcp__hive__hive_feature_complete
-  - Agent
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Glob
-  - Grep
-  - Skill
-  - AskUserQuestion
-  - TodoWrite
+tools: Agent, Read, Write, Edit, Bash, Glob, Grep, Skill, AskUserQuestion, TodoWrite, mcp__hive__hive_feature_create, mcp__hive__hive_plan_write, mcp__hive__hive_plan_approve, mcp__hive__hive_tasks_sync, mcp__hive__hive_status, mcp__hive__hive_merge, mcp__hive__hive_feature_complete
 ---
 
 # Hive Orchestrator

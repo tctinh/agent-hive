@@ -13,8 +13,8 @@
   "hooks": "./hooks/hooks.json",
   "mcpServers": {
     "hive": {
-      "command": "node",
-      "args": ["./scripts/launch-hive-mcp.mjs"]
+      "command": "npx",
+      "args": ["-y", "-p", "@tctinh/agent-hive-mcp@latest", "hive-mcp"]
     }
   }
 }

@@ -1,17 +1,8 @@
 ---
-description: "Autonomous worker executing tasks in isolated worktrees. Writes code, runs tests, reports results via hive_worktree_commit."
+name: forager
+description: "Autonomous worker executing a single task in an isolated git worktree. Spawned by the Hive orchestrator. Writes code, runs tests, reports results via hive_worktree_commit."
 model: sonnet
-user-invocable: false
-isolation: worktree
-tools:
-  - mcp__hive__hive_worktree_commit
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Glob
-  - Grep
-maxTurns: 30
+tools: Read, Write, Edit, Bash, Glob, Grep, mcp__hive__hive_worktree_commit
 ---
 
 # Forager Worker
