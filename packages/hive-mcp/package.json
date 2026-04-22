@@ -1,10 +1,19 @@
 {
   "name": "@tctinh/agent-hive-mcp",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "type": "module",
   "description": "MCP server exposing Agent Hive tools for Claude Code and other MCP clients",
   "license": "MIT",
   "author": "tctinh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tctinh/agent-hive.git",
+    "directory": "packages/hive-mcp"
+  },
+  "homepage": "https://github.com/tctinh/agent-hive#readme",
+  "bugs": {
+    "url": "https://github.com/tctinh/agent-hive/issues"
+  },
   "main": "./dist/index.js",
   "bin": {
     "hive-mcp": "./dist/index.js"
@@ -20,7 +29,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "hive-core": "1.4.6",
+    "hive-core": "1.4.7",
     "typescript": "^5.0.0"
   },
   "files": ["dist/"]

@@ -1,6 +1,6 @@
 {
   "name": "hive",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "Plan-first AI development with batched parallelism. Same philosophy as Agent Hive, native Claude Code implementation.",
   "author": {
     "name": "Agent Hive",

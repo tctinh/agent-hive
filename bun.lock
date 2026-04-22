@@ -7,14 +7,14 @@
     },
     "packages/claude-code-hive": {
       "name": "claude-code-hive",
-      "version": "1.4.6",
+      "version": "1.4.7",
       "dependencies": {
-        "@tctinh/agent-hive-mcp": "1.4.6",
+        "@tctinh/agent-hive-mcp": "1.4.7",
       },
     },
     "packages/hive-core": {
       "name": "hive-core",
-      "version": "1.4.6",
+      "version": "1.4.7",
       "dependencies": {
         "simple-git": "^3.27.0",
       },
@@ -26,7 +26,7 @@
     },
     "packages/hive-mcp": {
       "name": "@tctinh/agent-hive-mcp",
-      "version": "1.4.6",
+      "version": "1.4.7",
       "bin": {
         "hive-mcp": "./dist/index.js",
       },
@@ -35,13 +35,13 @@
       },
       "devDependencies": {
         "@types/node": "^20.0.0",
-        "hive-core": "1.4.6",
+        "hive-core": "1.4.7",
         "typescript": "^5.0.0",
       },
     },
     "packages/opencode-hive": {
       "name": "opencode-hive",
-      "version": "1.4.6",
+      "version": "1.4.7",
       "bin": {
         "opencode-hive-ast-grep-mcp": "./bin/ast-grep-mcp-launcher.mjs",
       },
@@ -69,7 +69,7 @@
     },
     "packages/vscode-hive": {
       "name": "vscode-hive",
-      "version": "1.4.6",
+      "version": "1.4.7",
       "dependencies": {
         "hive-core": "workspace:*",
       },

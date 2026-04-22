@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.7] - 2026-04-22
+
+### Added
+- **Release workflow skips already-published targets**: Each npm publish job now checks `npm view <pkg>@<version>` before running `npm publish`. If the version already exists on the registry, the step is skipped with a notice and the job succeeds. The VS Code Marketplace publish step treats "already exists" as success. This makes the workflow idempotent and safe to re-run after a partial failure.
+- **`@tctinh/agent-hive-mcp` package metadata completed**: Added `repository`, `homepage`, and `bugs` fields. npm's provenance validation (`--provenance`) requires `repository.url` to match the OIDC source; the missing field caused `E422` rejections on every publish attempt.
+
+### Changed
+- **Version-bearing surfaces refreshed to `1.4.7`**: Root/workspace manifests, plugin manifests, MCP runtime version string, exact dependency pins, lockfiles, changelog, release note, and PHILOSOPHY now all align on the same version.
+
 ## [1.4.6] - 2026-04-22
 
 ### Added

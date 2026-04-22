@@ -228,7 +228,23 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
 
+      - name: Check if already published on npm
+        id: npm_check
+        working-directory: packages/opencode-hive
+        run: |
+          pkg=$(node -p "require('./package.json').name")
+          ver=$(node -p "require('./package.json').version")
+          if npm view "${pkg}@${ver}" version 2>/dev/null | grep -q .; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${pkg}@${ver} is already published on npm — skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
+
       - name: Publish to npm
+        if: steps.npm_check.outputs.skip != 'true'
         working-directory: packages/opencode-hive
         run: npm publish --access public --provenance
         env:
@@ -263,7 +279,23 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
 
+      - name: Check if already published on npm
+        id: npm_check
+        working-directory: packages/hive-mcp
+        run: |
+          pkg=$(node -p "require('./package.json').name")
+          ver=$(node -p "require('./package.json').version")
+          if npm view "${pkg}@${ver}" version 2>/dev/null | grep -q .; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${pkg}@${ver} is already published on npm — skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
+
       - name: Publish to npm
+        if: steps.npm_check.outputs.skip != 'true'
         working-directory: packages/hive-mcp
         run: npm publish --access public --provenance
         env:
@@ -303,7 +335,23 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
 
+      - name: Check if already published on npm
+        id: npm_check
+        working-directory: packages/claude-code-hive
+        run: |
+          pkg=$(node -p "require('./package.json').name")
+          ver=$(node -p "require('./package.json').version")
+          if npm view "${pkg}@${ver}" version 2>/dev/null | grep -q .; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${pkg}@${ver} is already published on npm — skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_KEY }}
+
       - name: Publish to npm
+        if: steps.npm_check.outputs.skip != 'true'
         working-directory: packages/claude-code-hive
         run: npm publish --access public --provenance
         env:
@@ -325,7 +373,14 @@ jobs:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
       - name: Publish to VS Code Marketplace
-        run: npx @vscode/vsce publish --packagePath *.vsix
+        run: |
+          set +e
+          output=$(npx @vscode/vsce publish --packagePath *.vsix 2>&1)
+          code=$?
+          echo "$output"
+          if [ $code -ne 0 ] && ! echo "$output" | grep -qi "already exist"; then
+            exit $code
+          fi
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
