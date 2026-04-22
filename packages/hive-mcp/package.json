@@ -1,5 +1,5 @@
 {
-  "name": "hive-mcp",
+  "name": "@tctinh/agent-hive-mcp",
   "version": "1.4.6",
   "type": "module",
   "description": "MCP server exposing Agent Hive tools for Claude Code and other MCP clients",
