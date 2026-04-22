@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
+  "name": "agent-hive",
+  "owner": {
+    "name": "tctinh",
+    "url": "https://github.com/tctinh"
+  },
+  "metadata": {
+    "description": "Plan-first, gate-driven, parallel-worker development for Claude Code.",
+    "version": "1.4.7"
+  },
+  "plugins": [
+    {
+      "name": "hive",
+      "source": "./packages/claude-code-hive",
+      "version": "1.4.7",
+      "description": "Plan-first AI development with batched parallelism. Native Claude Code implementation of the Agent Hive workflow.",
+      "author": {
+        "name": "tctinh",
+        "url": "https://github.com/tctinh"
+      },
+      "homepage": "https://github.com/tctinh/agent-hive",
+      "repository": "https://github.com/tctinh/agent-hive",
+      "license": "MIT",
+      "keywords": [
+        "hive",
+        "planning",
+        "orchestration",
+        "worktree",
+        "parallel",
+        "tdd"
+      ]
+    }
+  ]
+}
