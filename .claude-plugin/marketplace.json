@@ -7,13 +7,13 @@
   },
   "metadata": {
     "description": "Plan-first, gate-driven, parallel-worker development for Claude Code.",
-    "version": "1.4.7"
+    "version": "1.4.8"
   },
   "plugins": [
     {
       "name": "hive",
       "source": "./packages/claude-code-hive",
-      "version": "1.4.7",
+      "version": "1.4.8",
       "description": "Plan-first AI development with batched parallelism. Native Claude Code implementation of the Agent Hive workflow.",
       "author": {
         "name": "tctinh",

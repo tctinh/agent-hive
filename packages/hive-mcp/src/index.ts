@@ -10,7 +10,7 @@ import { getAllTools } from './server.js';
 const rootDir = process.env.HIVE_PROJECT_ROOT ?? process.cwd();
 
 const server = new Server(
-  { name: 'hive', version: '1.4.7' },
+  { name: 'hive', version: '1.4.8' },
   { capabilities: { tools: {} } },
 );
 

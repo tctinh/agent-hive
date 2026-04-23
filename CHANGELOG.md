@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-04-23
+
+### Added
+- **Claude Code plugin marketplace listing**: New `.claude-plugin/marketplace.json` at the repo root. Users can now install via `/plugin marketplace add tctinh/agent-hive` + `/plugin install hive@agent-hive`.
+- **Release contract covers the npx-based MCP wiring**: `release-artifacts.test.mjs` now asserts `plugin.mcpServers.hive` uses `npx -y -p @tctinh/agent-hive-mcp@latest hive-mcp` and that `claude-code-hive` does not declare `@tctinh/agent-hive-mcp` as a dependency.
+
+### Fixed
+- **Claude Code plugin manifest validates against the current schema**: Moved `plugin.json` to `.claude-plugin/plugin.json`; dropped `agents`, `skills`, and `commands` fields so Claude Code auto-discovers them. Previous shape caused `invalid manifest` rejections.
+- **Agents now discovered by Claude Code**: Added `name:` to each agent's YAML frontmatter. Claude Code reads the agent name from the frontmatter, not the filename — without it, auto-discovery registered zero agents.
+- **MCP runtime spawns successfully from the plugin cache**: Replaced the custom `launch-hive-mcp.mjs` launcher (which could not resolve `@tctinh/agent-hive-mcp` from the plugin cache directory) with `npx -y -p @tctinh/agent-hive-mcp@latest hive-mcp`. No global install required.
+- **Top-level README documents actual capabilities**: Removed the misleading "VS Code provides a full Copilot runtime alternative" framing. VS Code extension is a review companion over `.hive/` state, not a runtime.
+- **CI green on main**: Dropped root-README assertions for detailed hive-helper documentation — those details live in `packages/opencode-hive/README.md`, not the user-facing root README.
+
+### Removed
+- `scripts/launch-hive-mcp.mjs`, `scripts/prepare-workspace-hive-mcp.mjs`, and their tests — obsolete under the npx spawn model.
+- `@tctinh/agent-hive-mcp` from `claude-code-hive/package.json` dependencies — npx fetches the runtime at plugin start.
+
+### Changed
+- **Version-bearing surfaces refreshed to `1.4.8`**: Root/workspace manifests, plugin manifests, marketplace manifest, MCP runtime version string, exact dependency pins, lockfiles, changelog, release note, and PHILOSOPHY now all align on the same version.
+
 ## [1.4.7] - 2026-04-22
 
 ### Added

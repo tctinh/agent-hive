@@ -758,6 +758,22 @@ Three threads define this patch:
 
 **Shared insight:** Good agent tooling is not just about what tools exist. It is about teaching the agent when a tool meaningfully changes the quality of the decision.
 
+### v1.4.8 (Publish ≠ Shippable: Read the Error, Match the Spec)
+
+**Theme:** Semver says a version is a contract. But a package that npm accepts is not the same as a plugin a host accepts — and we learned that the hard way between v1.4.7 and v1.4.8.
+
+The Claude Code plugin published in v1.4.7 passed every local check we had. It passed npm provenance. It passed the release pipeline. It still did not install. Three different, orthogonal bugs each blocked a different stage of the install flow: marketplace listing missing, manifest schema wrong, agent frontmatter missing `name`, and MCP spawn path unreachable from the plugin cache. Every one of them would have been caught by installing the plugin end-to-end against the target host, which the release contract did not do.
+
+**What the fix looked like:**
+
+- **Read the error literally, not aspirationally.** `invalid manifest` did not mean "upgrade something later." It meant a specific field in a specific file did not match the current schema. We spent two extra iterations assuming the manifest location was correct before actually reading the schema requirement that it sits inside `.claude-plugin/`.
+- **Match what working plugins do, not what the docs describe in the abstract.** Every successful third-party plugin wires its MCP runtime through `npx -y <package>`. Every one. Our custom `require.resolve` launcher was a clever solution to a problem nobody else had, because everyone else had already noticed that plugin caches do not ship `node_modules`.
+- **Auto-discovery does not mean "anything in the directory is picked up."** Claude Code reads `name:` from agent frontmatter, not from the filename. This is not a bug to work around; it is a host convention to respect.
+
+**Shared insight:** "It publishes" and "a user can install it and it works" are separate contracts. The second one needs a test.
+
+The new release contract test (`claude-code-hive plugin.json invokes the MCP runtime via npx without requiring a local dependency`) is a first step. The harder step — installing the plugin against a real Claude Code runtime and proving `/hive` dispatches correctly — belongs in a future iteration.
+
 ### v1.4.7 (Idempotent Release Pipeline)
 
 **Theme:** A release workflow should be safe to re-run. A publish step that silently skips an already-live version is a stronger contract than one that fails and forces the operator to remember which targets succeeded in a previous run.

@@ -1,6 +1,6 @@
 {
   "name": "claude-code-hive",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "type": "module",
   "description": "Claude Code plugin assets for Agent Hive",
   "license": "MIT",

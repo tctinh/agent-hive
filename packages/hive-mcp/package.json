@@ -1,6 +1,6 @@
 {
   "name": "@tctinh/agent-hive-mcp",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "type": "module",
   "description": "MCP server exposing Agent Hive tools for Claude Code and other MCP clients",
   "license": "MIT",
@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "hive-core": "1.4.7",
+    "hive-core": "1.4.8",
     "typescript": "^5.0.0"
   },
   "files": ["dist/"]

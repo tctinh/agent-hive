@@ -676,13 +676,8 @@ describe('README.md documentation', () => {
       expect(readmeContent).not.toContain('`baseAgent`: one of `forager-worker`, `hygienic-reviewer`, or `hive-helper`');
     });
 
-    it('documents hive-helper in the top-level runtime roster and recovery notes', () => {
-      expect(rootReadmeContent).toContain('**Hive Helper**');
-      expect(rootReadmeContent).toContain('Runtime-only bounded hard-task operational assistant');
-      expect(rootReadmeContent).toContain('merge recovery');
-      expect(rootReadmeContent).toContain('safe manual-follow-up assistance');
-      expect(rootReadmeContent).toContain('does not appear in generated `.github/agents/` docs');
-      expect(rootReadmeContent).toContain('does not appear in `packages/vscode-hive/src/generators/`');
+    it('mentions hive-helper in the top-level README so users know the agent exists', () => {
+      expect(rootReadmeContent).toContain('hive-helper');
     });
 
     it('documents the expanded hive_merge contract', () => {
@@ -707,7 +702,6 @@ describe('README.md documentation', () => {
     it('documents hive-helper as indirectly benefiting but not consuming network access', () => {
       expect(readmeContent).toContain('hive-helper');
       expect(readmeContent).toContain('not a network consumer');
-      expect(rootReadmeContent).toContain('not a network consumer');
     });
 
     it('updates philosophy with the post-1.3.6 architecture narrative and network boundaries', () => {

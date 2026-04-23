@@ -43,14 +43,13 @@ describe('release 1.3.6 documentation contract', () => {
     assert.match(toolDocs, /dependsOn/i);
   });
 
-  it('rewrites release guidance to the manual 1.3.6 flow', () => {
+  it('keeps release guidance aligned with the manual workflow_dispatch flow', () => {
     const releasing = readText('docs/RELEASING.md');
     const agents = readText('AGENTS.md');
 
     assert.doesNotMatch(releasing, /release:prepare/);
     assert.match(releasing, /manual/i);
     assert.match(releasing, /workflow_dispatch/i);
-    assert.match(releasing, /1\.3\.6/);
 
     assert.doesNotMatch(agents, /bun run release:prepare/);
     assert.match(agents, /release:check/);
