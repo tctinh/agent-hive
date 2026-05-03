@@ -409,7 +409,7 @@ The `variant` value must match a key in your OpenCode config at `provider.<provi
 
 Define plugin-only custom subagents with `customAgents`. Freshly initialized `agent_hive.json` files already include starter template entries under `customAgents`; those seeded `*-example-template` entries are placeholders only, should be renamed or deleted before real use, and are intentionally worded so planners/orchestrators are unlikely to select them as configured. Each custom agent must declare:
 
-- `baseAgent`: one of `forager-worker` or `hygienic-reviewer`
+- `baseAgent`: one of `scout-researcher`, `forager-worker`, or `hygienic-reviewer`
 - `description`: delegation guidance injected into primary planner/orchestrator prompts
 
 `hive-helper` is not a custom base agent. In v1 it stays runtime-only for isolated merge recovery and does not appear in `.github/agents/` and does not appear in `packages/vscode-hive/src/generators/`.
@@ -421,6 +421,9 @@ Published example (validated by `src/e2e/custom-agent-docs-example.test.ts`):
 ```json
 {
   "agents": {
+    "scout-researcher": {
+      "variant": "low"
+    },
     "forager-worker": {
       "variant": "medium"
     },
@@ -429,6 +432,10 @@ Published example (validated by `src/e2e/custom-agent-docs-example.test.ts`):
     }
   },
   "customAgents": {
+    "scout-docs": {
+      "baseAgent": "scout-researcher",
+      "description": "Use for documentation-heavy research tasks."
+    },
     "forager-ui": {
       "baseAgent": "forager-worker",
       "description": "Use for UI-heavy implementation tasks.",
@@ -461,6 +468,7 @@ ID guardrails:
 
 Compaction classification follows the base agent:
 
+- `scout-researcher` derivatives are treated as `subagent`
 - `forager-worker` derivatives are treated as `task-worker`
 - `hygienic-reviewer` derivatives are treated as `subagent`
 

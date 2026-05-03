@@ -2,10 +2,18 @@ import { describe, expect, it } from 'bun:test';
 import type { ResolvedCustomAgentConfig } from 'hive-core';
 import { FORAGER_BEE_PROMPT } from './forager';
 import { HYGIENIC_BEE_PROMPT } from './hygienic';
+import { SCOUT_BEE_PROMPT } from './scout';
 import { buildCustomSubagents } from './custom-agents';
 
 describe('buildCustomSubagents', () => {
-  it('builds derived subagents for forager and hygienic bases', () => {
+  it('builds derived subagents for scout, forager, and hygienic bases', () => {
+    const scoutPermission = {
+      edit: 'deny',
+      task: 'deny',
+      delegate: 'deny',
+      skill: 'allow',
+      webfetch: 'allow',
+    };
     const foragerPermission = {
       task: 'deny',
       delegate: 'deny',
@@ -19,11 +27,24 @@ describe('buildCustomSubagents', () => {
     };
 
     const baseAgents = {
+      'scout-researcher': {
+        model: 'base/scout-model',
+        temperature: 0.5,
+        variant: 'low',
+        mode: 'subagent' as const,
+        description: 'Base Scout',
+        prompt: SCOUT_BEE_PROMPT,
+        tools: {
+          hive_network_query: false,
+        },
+        permission: scoutPermission,
+      },
       'forager-worker': {
         model: 'base/forager-model',
         temperature: 0.3,
         variant: 'medium',
         mode: 'subagent' as const,
+        description: 'Base Forager',
         prompt: FORAGER_BEE_PROMPT,
         tools: {
           hive_merge: false,
@@ -36,6 +57,7 @@ describe('buildCustomSubagents', () => {
         temperature: 0.3,
         variant: 'low',
         mode: 'subagent' as const,
+        description: 'Base Hygienic',
         prompt: HYGIENIC_BEE_PROMPT,
         tools: {
           hive_merge: false,
@@ -46,6 +68,14 @@ describe('buildCustomSubagents', () => {
     };
 
     const customAgents: Record<string, ResolvedCustomAgentConfig> = {
+      'scout-docs': {
+        baseAgent: 'scout-researcher',
+        description: 'Use for documentation-heavy research tasks.',
+        model: 'custom/scout-model',
+        temperature: 0.4,
+        variant: 'medium',
+        autoLoadSkills: [],
+      },
       'forager-ui': {
         baseAgent: 'forager-worker',
         description: 'Use for UI-heavy implementation tasks.',
@@ -68,9 +98,20 @@ describe('buildCustomSubagents', () => {
       customAgents,
       baseAgents,
       autoLoadedSkills: {
+        'scout-docs': '\n\n# scout-docs auto skills',
         'forager-ui': '\n\n# forager-ui auto skills',
       },
     });
+
+    expect(derived['scout-docs'].mode).toBe('subagent');
+    expect(derived['scout-docs'].prompt).toContain(SCOUT_BEE_PROMPT);
+    expect(derived['scout-docs'].prompt).toContain('# scout-docs auto skills');
+    expect(derived['scout-docs'].permission).toEqual(baseAgents['scout-researcher'].permission);
+    expect(derived['scout-docs'].tools).toEqual(baseAgents['scout-researcher'].tools);
+    expect(derived['scout-docs'].description).toBe('Use for documentation-heavy research tasks.');
+    expect(derived['scout-docs'].model).toBe('custom/scout-model');
+    expect(derived['scout-docs'].temperature).toBe(0.4);
+    expect(derived['scout-docs'].variant).toBe('medium');
 
     expect(derived['forager-ui'].mode).toBe('subagent');
     expect(derived['forager-ui'].prompt).toContain(FORAGER_BEE_PROMPT);

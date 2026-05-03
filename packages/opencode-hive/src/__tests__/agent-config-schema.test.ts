@@ -23,6 +23,7 @@ describe('agent_hive schema customAgents contract', () => {
 
   it('restricts custom baseAgent to supported base agents', () => {
     expect(schema.$defs.customAgentConfig.properties.baseAgent.enum).toEqual([
+      'scout-researcher',
       'forager-worker',
       'hygienic-reviewer',
     ]);
