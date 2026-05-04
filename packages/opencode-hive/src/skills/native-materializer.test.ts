@@ -24,6 +24,13 @@ description: Value: with colon
 # Fallback Skill
 `;
 
+const FALLBACK_TYPE_MISMATCH_SKILL = `---
+name: fallback-type-mismatch-skill
+description: {value: with colon}
+---
+# Fallback Type Mismatch Skill
+`;
+
 const INVALID_SKILL = `---
 name:
   - broken
@@ -149,6 +156,14 @@ describe('parseNativeSkillMarkdown', () => {
     expect(parsed).toBeDefined();
     expect(parsed!.name).toBe('fallback-skill');
     expect(parsed!.description).toBe('Value: with colon');
+  });
+
+  it('retries fallback sanitization when initial parsing returns non-string metadata', () => {
+    const parsed = parseNativeSkillMarkdown('/tmp/fallback-type-mismatch/SKILL.md', FALLBACK_TYPE_MISMATCH_SKILL);
+
+    expect(parsed).toBeDefined();
+    expect(parsed!.name).toBe('fallback-type-mismatch-skill');
+    expect(parsed!.description).toBe('{value: with colon}');
   });
 
   it('returns undefined and warns when frontmatter is invalid', () => {

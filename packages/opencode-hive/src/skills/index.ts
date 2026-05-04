@@ -1,7 +1,7 @@
 /**
  * Hive Skills System
  * 
- * Export skill infrastructure for use in hive_skill tool.
+ * Export skill infrastructure for native materialization and legacy skill loading.
  */
 
 export type { SkillDefinition, SkillLoadResult } from './types.js';

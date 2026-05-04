@@ -57,6 +57,10 @@ type Logger = {
   warn: (message: string) => void;
 };
 
+function hasNativeSkillMetadata(parsed: matter.GrayMatterFile<string>): boolean {
+  return typeof parsed.data?.name === 'string' && typeof parsed.data?.description === 'string';
+}
+
 type BundledSkillSource = {
   directoryName: string;
   sourceDir: string;
@@ -138,7 +142,18 @@ export function parseNativeSkillMarkdown(
     }
   }
 
-  if (typeof parsed.data?.name !== 'string' || typeof parsed.data?.description !== 'string') {
+  if (!hasNativeSkillMetadata(parsed)) {
+    try {
+      parsed = matter(fallbackSanitization(content));
+    } catch (error) {
+      logger.warn(
+        `[hive] Skipping native skill ${filePath}: failed to parse YAML frontmatter: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return undefined;
+    }
+  }
+
+  if (!hasNativeSkillMetadata(parsed)) {
     logger.warn(`[hive] Skipping native skill ${filePath}: missing string name/description frontmatter.`);
     return undefined;
   }
@@ -454,8 +469,12 @@ async function scanUrlConflicts(
 
       const skills = Array.isArray(indexData.skills) ? indexData.skills : [];
       for (const skill of skills) {
-        if (!Array.isArray(skill.files) || !skill.files.includes('SKILL.md') || typeof skill.name !== 'string') {
+        if (!Array.isArray(skill.files) || !skill.files.includes('SKILL.md')) {
           logger.warn(`[hive] Skipping native skills URL entry missing SKILL.md: ${indexUrl}`);
+          continue;
+        }
+        if (typeof skill.name !== 'string') {
+          logger.warn(`[hive] Skipping native skills URL entry missing string name: ${indexUrl}`);
           continue;
         }
 
