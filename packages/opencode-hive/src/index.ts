@@ -1,11 +1,10 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 import { tool, type Plugin, type ToolDefinition } from "@opencode-ai/plugin";
 import { getFilteredSkills, loadBuiltinSkill } from './skills/builtin.js';
-import { loadFileSkill } from './skills/file-loader.js';
-import { BUILTIN_SKILLS } from './skills/registry.generated.js';
+import { prepareNativeHiveSkills } from './skills/native-materializer.js';
 import type { SkillDefinition } from './skills/types.js';
+import type { PreparedHiveSkill } from './skills/native-materializer.js';
 // Bee agents (lean, focused)
 import { QUEEN_BEE_PROMPT } from './agents/hive.js';
 import { ARCHITECT_BEE_PROMPT } from './agents/architect.js';
@@ -40,15 +39,13 @@ function formatSkillsXml(skills: SkillDefinition[]): string {
  * Build auto-loaded skill templates for an agent.
  * Returns a string containing all skill templates to append to the agent's prompt.
  * 
- * Resolution order for each skill ID:
- * 1. Builtin skill (wins if exists)
- * 2. File-based skill (project OpenCode -> global OpenCode -> project Claude -> global Claude)
- * 3. Warn and skip if not found
+ * Only eligible Hive bundled skills are injected here.
+ * Native user/project/global skills are discovered by OpenCode itself and loaded with the native skill tool.
  */
 async function buildAutoLoadedSkillsContent(
   agentName: string,
   configService: ConfigService,
-  projectRoot: string,
+  eligibleHiveSkills: Map<string, PreparedHiveSkill>,
   autoLoadSkillsOverride?: string[],
 ): Promise<string> {
   const autoLoadSkills = autoLoadSkillsOverride
@@ -60,27 +57,18 @@ async function buildAutoLoadedSkillsContent(
     return '';
   }
 
-  // Use process.env.HOME for testability, fallback to os.homedir()
-  const homeDir = process.env.HOME || os.homedir();
   const skillTemplates: string[] = [];
   
   for (const skillId of autoLoadSkills) {
-    // 1. Try builtin skill first (builtin wins)
-    const builtinSkill = BUILTIN_SKILLS.find((entry) => entry.name === skillId);
-    if (builtinSkill) {
-      skillTemplates.push(builtinSkill.template);
+    const bundledSkill = eligibleHiveSkills.get(skillId);
+    if (bundledSkill) {
+      skillTemplates.push(bundledSkill.content);
       continue;
     }
-    
-    // 2. Fallback to file-based skill
-    const fileResult = await loadFileSkill(skillId, projectRoot, homeDir);
-    if (fileResult.found && fileResult.skill) {
-      skillTemplates.push(fileResult.skill.template);
-      continue;
-    }
-    
-    // 3. Not found - warn and skip
-    console.warn(`[hive] Unknown skill id "${skillId}" for agent "${agentName}"`);
+
+    console.warn(
+      `[hive] Auto-load skill "${skillId}" was not injected for agent "${agentName}" because it is not an eligible Hive bundled skill. User file skills are discovered by OpenCode native skills and should be loaded with the native skill tool.`,
+    );
   }
 
   if (skillTemplates.length === 0) {
@@ -2001,6 +1989,25 @@ Expand your Discovery section and try again.`;
       }
       // Auto-generate config file with defaults if it doesn't exist
       configService.init();
+      const existingSkillsConfig =
+        typeof opencodeConfig.skills === 'object' && opencodeConfig.skills !== null
+          ? opencodeConfig.skills as { paths?: string[]; urls?: string[] }
+          : undefined;
+      const preparedNativeHiveSkills = await prepareNativeHiveSkills({
+        directory,
+        worktree: worktree || directory,
+        disableSkills: configService.getDisabledSkills(),
+        opencodeConfig: {
+          skills: {
+            paths: existingSkillsConfig?.paths,
+            urls: existingSkillsConfig?.urls,
+          },
+        },
+      });
+      opencodeConfig.skills = {
+        ...(existingSkillsConfig ?? {}),
+        paths: preparedNativeHiveSkills.skillPaths,
+      };
       const hiveConfigData = configService.get();
       const agentMode = hiveConfigData.agentMode ?? 'unified';
 
@@ -2014,7 +2021,11 @@ Expand your Discovery section and try again.`;
 
       // Build auto-loaded skill content for each agent
       const hiveUserConfig = configService.getAgentConfig('hive-master');
-      const hiveAutoLoadedSkills = await buildAutoLoadedSkillsContent('hive-master', configService, directory);
+      const hiveAutoLoadedSkills = await buildAutoLoadedSkillsContent(
+        'hive-master',
+        configService,
+        preparedNativeHiveSkills.skillsByName,
+      );
       const hiveConfig = {
         model: hiveUserConfig.model,
         variant: hiveUserConfig.variant,
@@ -2030,7 +2041,11 @@ Expand your Discovery section and try again.`;
       };
 
       const architectUserConfig = configService.getAgentConfig('architect-planner');
-      const architectAutoLoadedSkills = await buildAutoLoadedSkillsContent('architect-planner', configService, directory);
+      const architectAutoLoadedSkills = await buildAutoLoadedSkillsContent(
+        'architect-planner',
+        configService,
+        preparedNativeHiveSkills.skillsByName,
+      );
       const architectConfig = {
         model: architectUserConfig.model,
         variant: architectUserConfig.variant,
@@ -2050,7 +2065,11 @@ Expand your Discovery section and try again.`;
       };
 
       const swarmUserConfig = configService.getAgentConfig('swarm-orchestrator');
-      const swarmAutoLoadedSkills = await buildAutoLoadedSkillsContent('swarm-orchestrator', configService, directory);
+      const swarmAutoLoadedSkills = await buildAutoLoadedSkillsContent(
+        'swarm-orchestrator',
+        configService,
+        preparedNativeHiveSkills.skillsByName,
+      );
       const swarmConfig = {
         model: swarmUserConfig.model,
         variant: swarmUserConfig.variant,
@@ -2072,7 +2091,11 @@ Expand your Discovery section and try again.`;
       };
 
       const scoutUserConfig = configService.getAgentConfig('scout-researcher');
-      const scoutAutoLoadedSkills = await buildAutoLoadedSkillsContent('scout-researcher', configService, directory);
+      const scoutAutoLoadedSkills = await buildAutoLoadedSkillsContent(
+        'scout-researcher',
+        configService,
+        preparedNativeHiveSkills.skillsByName,
+      );
       const scoutConfig = {
         model: scoutUserConfig.model,
         variant: scoutUserConfig.variant,
@@ -2091,7 +2114,11 @@ Expand your Discovery section and try again.`;
       };
 
       const foragerUserConfig = configService.getAgentConfig('forager-worker');
-      const foragerAutoLoadedSkills = await buildAutoLoadedSkillsContent('forager-worker', configService, directory);
+      const foragerAutoLoadedSkills = await buildAutoLoadedSkillsContent(
+        'forager-worker',
+        configService,
+        preparedNativeHiveSkills.skillsByName,
+      );
       const foragerConfig = {
         model: foragerUserConfig.model,
         variant: foragerUserConfig.variant,
@@ -2124,7 +2151,11 @@ Expand your Discovery section and try again.`;
       };
 
       const hygienicUserConfig = configService.getAgentConfig('hygienic-reviewer');
-      const hygienicAutoLoadedSkills = await buildAutoLoadedSkillsContent('hygienic-reviewer', configService, directory);
+      const hygienicAutoLoadedSkills = await buildAutoLoadedSkillsContent(
+        'hygienic-reviewer',
+        configService,
+        preparedNativeHiveSkills.skillsByName,
+      );
       const hygienicConfig = {
         model: hygienicUserConfig.model,
         variant: hygienicUserConfig.variant,
@@ -2163,7 +2194,12 @@ Expand your Discovery section and try again.`;
 
             return [
               customAgentName,
-              await buildAutoLoadedSkillsContent(customAgentName, configService, directory, deltaAutoLoadSkills),
+              await buildAutoLoadedSkillsContent(
+                customAgentName,
+                configService,
+                preparedNativeHiveSkills.skillsByName,
+                deltaAutoLoadSkills,
+              ),
             ];
           }),
         ),
