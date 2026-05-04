@@ -6,7 +6,6 @@
 
 export type { SkillDefinition, SkillLoadResult } from './types.js';
 export { BUILTIN_SKILLS, BUILTIN_SKILL_NAMES, getBuiltinSkills } from './builtin.js';
-export { loadFileSkill } from './file-loader.js';
 export {
   parseNativeSkillMarkdown,
   prepareNativeHiveSkills,

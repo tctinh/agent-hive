@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { tool, type Plugin } from "@opencode-ai/plugin";
 import { prepareNativeHiveSkills } from './skills/native-materializer.js';
-import type { PreparedHiveSkill } from './skills/native-materializer.js';
+import type { PreparedHiveSkill, PreparedNativeHiveSkills } from './skills/native-materializer.js';
 // Bee agents (lean, focused)
 import { QUEEN_BEE_PROMPT } from './agents/hive.js';
 import { ARCHITECT_BEE_PROMPT } from './agents/architect.js';
@@ -25,6 +25,7 @@ async function buildAutoLoadedSkillsContent(
   agentName: string,
   configService: ConfigService,
   eligibleHiveSkills: Map<string, PreparedHiveSkill>,
+  skippedHiveSkills: Map<string, PreparedNativeHiveSkills['skipped'][number]>,
   autoLoadSkillsOverride?: string[],
 ): Promise<string> {
   const autoLoadSkills = autoLoadSkillsOverride
@@ -42,6 +43,28 @@ async function buildAutoLoadedSkillsContent(
     const bundledSkill = eligibleHiveSkills.get(skillId);
     if (bundledSkill) {
       skillTemplates.push(bundledSkill.content);
+      continue;
+    }
+
+    const skippedSkill = skippedHiveSkills.get(skillId);
+    if (skippedSkill?.reason === 'conflict' && skippedSkill.source) {
+      console.warn(
+        `[hive] Auto-load skill "${skillId}" was not injected for agent "${agentName}" because the Hive bundled copy was skipped in favor of native skill at ${skippedSkill.source}.`,
+      );
+      continue;
+    }
+
+    if (skippedSkill?.reason === 'disabled') {
+      console.warn(
+        `[hive] Auto-load skill "${skillId}" was not injected for agent "${agentName}" because it is disabled in Hive config.`,
+      );
+      continue;
+    }
+
+    if (skippedSkill?.reason === 'url-scan-incomplete') {
+      console.warn(
+        `[hive] Auto-load skill "${skillId}" was not injected for agent "${agentName}" because configured skills URLs could not be fully scanned for conflicts during this config-hook run.`,
+      );
       continue;
     }
 
@@ -1934,6 +1957,9 @@ Expand your Discovery section and try again.`;
           },
         },
       });
+      const skippedHiveSkills = new Map(
+        preparedNativeHiveSkills.skipped.map((skill) => [skill.name, skill] as const),
+      );
       opencodeConfig.skills = {
         ...(existingSkillsConfig ?? {}),
         paths: preparedNativeHiveSkills.skillPaths,
@@ -1955,6 +1981,7 @@ Expand your Discovery section and try again.`;
         'hive-master',
         configService,
         preparedNativeHiveSkills.skillsByName,
+        skippedHiveSkills,
       );
       const hiveConfig = {
         model: hiveUserConfig.model,
@@ -1975,6 +2002,7 @@ Expand your Discovery section and try again.`;
         'architect-planner',
         configService,
         preparedNativeHiveSkills.skillsByName,
+        skippedHiveSkills,
       );
       const architectConfig = {
         model: architectUserConfig.model,
@@ -1999,6 +2027,7 @@ Expand your Discovery section and try again.`;
         'swarm-orchestrator',
         configService,
         preparedNativeHiveSkills.skillsByName,
+        skippedHiveSkills,
       );
       const swarmConfig = {
         model: swarmUserConfig.model,
@@ -2025,6 +2054,7 @@ Expand your Discovery section and try again.`;
         'scout-researcher',
         configService,
         preparedNativeHiveSkills.skillsByName,
+        skippedHiveSkills,
       );
       const scoutConfig = {
         model: scoutUserConfig.model,
@@ -2048,6 +2078,7 @@ Expand your Discovery section and try again.`;
         'forager-worker',
         configService,
         preparedNativeHiveSkills.skillsByName,
+        skippedHiveSkills,
       );
       const foragerConfig = {
         model: foragerUserConfig.model,
@@ -2085,6 +2116,7 @@ Expand your Discovery section and try again.`;
         'hygienic-reviewer',
         configService,
         preparedNativeHiveSkills.skillsByName,
+        skippedHiveSkills,
       );
       const hygienicConfig = {
         model: hygienicUserConfig.model,
@@ -2124,12 +2156,13 @@ Expand your Discovery section and try again.`;
 
             return [
               customAgentName,
-              await buildAutoLoadedSkillsContent(
-                customAgentName,
-                configService,
-                preparedNativeHiveSkills.skillsByName,
-                deltaAutoLoadSkills,
-              ),
+                await buildAutoLoadedSkillsContent(
+                  customAgentName,
+                  configService,
+                  preparedNativeHiveSkills.skillsByName,
+                  skippedHiveSkills,
+                  deltaAutoLoadSkills,
+                ),
             ];
           }),
         ),

@@ -107,6 +107,10 @@ function getHiveManagedPaths(skillPaths: string[]): string[] {
   return skillPaths.filter((skillPath) => skillPath.includes(HIVE_GENERATED_SEGMENT));
 }
 
+function getCurrentHiveManagedPath(opencodeConfig: Record<string, unknown>): string | undefined {
+  return getHiveManagedPaths(getSkillPaths(opencodeConfig))[0];
+}
+
 const OPENCODE_CLIENT = createOpencodeClient({ baseUrl: 'http://localhost:1' });
 const TEST_ROOT_BASE = '/tmp/hive-config-autoload-skills-test';
 const HIVE_GENERATED_SEGMENT = path.join('.hive', 'generated', 'opencode-skills');
@@ -161,14 +165,25 @@ describe('config hook autoLoadSkills injection', () => {
     expect(skillPaths).not.toContain(PACKAGED_SKILLS_DIR);
   });
 
-  it('registers custom subagents and injects only delta autoload skills once', async () => {
+  it('registers custom subagents and injects only eligible delta autoload skills without duplicating inherited base skills', async () => {
+    createFileSkill(
+      path.join(testRoot, '.opencode', 'skills'),
+      'native-file-skill',
+      'A native project skill that Hive should not inject into custom subagents',
+      '# Native File Skill\n\nThis must stay out of the prompt.',
+    );
     writeHiveConfig(testRoot, {
       agentMode: 'unified',
+      agents: {
+        'forager-worker': {
+          autoLoadSkills: ['brainstorming'],
+        },
+      },
       customAgents: {
         'forager-ui': {
           baseAgent: 'forager-worker',
           description: 'Use for UI-heavy implementation tasks.',
-          autoLoadSkills: ['parallel-exploration'],
+          autoLoadSkills: ['brainstorming', 'parallel-exploration', 'native-file-skill'],
         },
         'reviewer-security': {
           baseAgent: 'hygienic-reviewer',
@@ -178,9 +193,10 @@ describe('config hook autoLoadSkills injection', () => {
       },
     });
 
-    const opencodeConfig = await applyConfigHook(testRoot);
+    const { result: opencodeConfig, warnings } = await captureWarnings(async () => applyConfigHook(testRoot));
     const hivePrompt = getAgentPrompt(opencodeConfig, 'hive-master');
     const foragerUiPrompt = getAgentPrompt(opencodeConfig, 'forager-ui');
+    const brainstormingSkill = requireBuiltinSkill('brainstorming');
     const parallelExplorationSkill = requireBuiltinSkill('parallel-exploration');
     const tddSkill = requireBuiltinSkill('test-driven-development');
 
@@ -189,8 +205,11 @@ describe('config hook autoLoadSkills injection', () => {
     expect(hivePrompt).toContain('## Configured Custom Subagents');
     expect(hivePrompt).toContain('forager-ui');
     expect(hivePrompt).toContain('reviewer-security');
+    expect(countOccurrences(foragerUiPrompt, brainstormingSkill.template)).toBe(1);
     expect(countOccurrences(foragerUiPrompt, parallelExplorationSkill.template)).toBe(1);
     expect(countOccurrences(foragerUiPrompt, tddSkill.template)).toBe(1);
+    expect(foragerUiPrompt).not.toContain('# Native File Skill');
+    expect(warnings.some((message) => message.includes('native-file-skill'))).toBe(true);
   });
 
   it('injects user-configured bundled autoLoadSkills on top of defaults', async () => {
@@ -229,7 +248,7 @@ describe('config hook autoLoadSkills injection', () => {
     expect(fs.existsSync(path.join(generatedPath, 'parallel-exploration'))).toBe(false);
   });
 
-  it('warns on unknown skill IDs and does not inject file-based content', async () => {
+  it('warns on unknown custom file skills and does not inject or materialize their content', async () => {
     createFileSkill(
       path.join(testRoot, '.opencode', 'skills'),
       'nonexistent-skill',
@@ -247,8 +266,11 @@ describe('config hook autoLoadSkills injection', () => {
 
     const { result: opencodeConfig, warnings } = await captureWarnings(async () => applyConfigHook(testRoot));
     const hiveMasterPrompt = getAgentPrompt(opencodeConfig, 'hive-master');
+    const generatedPath = getCurrentHiveManagedPath(opencodeConfig);
 
     expect((opencodeConfig.agent as Record<string, unknown>)['hive-master']).toBeDefined();
+    expect(generatedPath).toBeDefined();
+    expect(fs.existsSync(path.join(generatedPath!, 'nonexistent-skill'))).toBe(false);
     expect(hiveMasterPrompt).not.toContain('# Native Skill');
     expect(warnings.some((message) => message.includes('nonexistent-skill'))).toBe(true);
     expect(warnings.some((message) => message.includes('native skill tool'))).toBe(true);
@@ -332,7 +354,7 @@ describe('config hook native skill registration', () => {
     process.env.HOME = originalHome;
   });
 
-  it('preserves user skill paths, removes stale Hive paths, and keeps exactly one current generated path', async () => {
+  it('preserves user skill paths after the Hive generated path when URL scans complete and preserves skills.urls exactly', async () => {
     writeHiveConfig(testRoot, { agentMode: 'unified' });
     const userPathOne = path.join(testRoot, 'user-path-one');
     const userPathTwo = path.join(testRoot, 'user-path-two');
@@ -340,11 +362,22 @@ describe('config hook native skill registration', () => {
     fs.mkdirSync(userPathOne, { recursive: true });
     fs.mkdirSync(userPathTwo, { recursive: true });
     fs.mkdirSync(staleHivePath, { recursive: true });
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === 'https://example.test/skills/index.json') {
+        return new Response(JSON.stringify({ skills: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response('not found', { status: 404 });
+    }) as unknown as typeof fetch;
 
     const opencodeConfig = await applyConfigHook(testRoot, {
       agent: {},
       skills: {
         paths: [staleHivePath, userPathOne, userPathTwo],
+        urls: ['https://example.test/skills'],
       },
     });
 
@@ -354,9 +387,11 @@ describe('config hook native skill registration', () => {
     expect(hiveManagedPaths).toHaveLength(1);
     expect(skillPaths).toEqual([hiveManagedPaths[0], userPathOne, userPathTwo]);
     expect(skillPaths).not.toContain(staleHivePath);
+    expect(getSkillUrls(opencodeConfig)).toEqual(['https://example.test/skills']);
   });
 
-  it('skips conflicting Hive bundled skills when a native project skill already exists', async () => {
+  it('skips conflicting Hive bundled skills when a native project skill already exists and warns with the native source path', async () => {
+    const nativeSkillPath = path.join(testRoot, '.opencode', 'skills', 'parallel-exploration', 'SKILL.md');
     createFileSkill(
       path.join(testRoot, '.opencode', 'skills'),
       'parallel-exploration',
@@ -366,14 +401,16 @@ describe('config hook native skill registration', () => {
     writeHiveConfig(testRoot, { agentMode: 'unified' });
 
     const { result: opencodeConfig, warnings } = await captureWarnings(async () => applyConfigHook(testRoot));
-    const generatedPath = getHiveManagedPaths(getSkillPaths(opencodeConfig))[0];
+    const generatedPath = getCurrentHiveManagedPath(opencodeConfig);
     const hiveMasterPrompt = getAgentPrompt(opencodeConfig, 'hive-master');
     const parallelExplorationSkill = requireBuiltinSkill('parallel-exploration');
 
-    expect(fs.existsSync(path.join(generatedPath, 'parallel-exploration'))).toBe(false);
+    expect(generatedPath).toBeDefined();
+    expect(fs.existsSync(path.join(generatedPath!, 'parallel-exploration'))).toBe(false);
     expect(hiveMasterPrompt).not.toContain(parallelExplorationSkill.template);
     expect(hiveMasterPrompt).not.toContain('# Native Parallel Exploration');
     expect(warnings.some((message) => message.includes('parallel-exploration'))).toBe(true);
+    expect(warnings.some((message) => message.includes(nativeSkillPath))).toBe(true);
   });
 
   it('does not autoload native project skills and does not copy them into Hive generated paths', async () => {
@@ -393,13 +430,59 @@ describe('config hook native skill registration', () => {
     });
 
     const { result: opencodeConfig, warnings } = await captureWarnings(async () => applyConfigHook(testRoot));
-    const generatedPath = getHiveManagedPaths(getSkillPaths(opencodeConfig))[0];
+    const generatedPath = getCurrentHiveManagedPath(opencodeConfig);
     const hiveMasterPrompt = getAgentPrompt(opencodeConfig, 'hive-master');
 
-    expect(fs.existsSync(path.join(generatedPath, 'my-custom-skill'))).toBe(false);
+    expect(generatedPath).toBeDefined();
+    expect(fs.existsSync(path.join(generatedPath!, 'my-custom-skill'))).toBe(false);
     expect(hiveMasterPrompt).not.toContain('# My Custom Skill');
     expect(warnings.some((message) => message.includes('my-custom-skill'))).toBe(true);
     expect(warnings.some((message) => message.includes('native skill tool'))).toBe(true);
+  });
+
+  it('uses the parsed SKILL.md frontmatter name for URL conflicts even when index.json uses a different directory name', async () => {
+    writeHiveConfig(testRoot, { agentMode: 'unified' });
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+
+      if (url === 'https://example.test/skills/index.json') {
+        return new Response(
+          JSON.stringify({
+            skills: [{ name: 'index-name-only', files: ['SKILL.md'] }],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+
+      if (url === 'https://example.test/skills/index-name-only/SKILL.md') {
+        return new Response(
+          `---
+name: parallel-exploration
+description: URL conflict
+---
+# URL conflict
+`,
+          { status: 200 },
+        );
+      }
+
+      return new Response('not found', { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const { result: opencodeConfig, warnings } = await captureWarnings(async () => applyConfigHook(testRoot, {
+      agent: {},
+      skills: {
+        urls: ['https://example.test/skills'],
+      },
+    }));
+    const generatedPath = getCurrentHiveManagedPath(opencodeConfig);
+    const hiveMasterPrompt = getAgentPrompt(opencodeConfig, 'hive-master');
+    const parallelExplorationSkill = requireBuiltinSkill('parallel-exploration');
+
+    expect(generatedPath).toBeDefined();
+    expect(fs.existsSync(path.join(generatedPath!, 'parallel-exploration'))).toBe(false);
+    expect(hiveMasterPrompt).not.toContain(parallelExplorationSkill.template);
+    expect(warnings.some((message) => message.includes('parallel-exploration'))).toBe(true);
   });
 
   it('preserves user paths and urls but skips Hive materialization when URL conflict scanning is incomplete', async () => {
