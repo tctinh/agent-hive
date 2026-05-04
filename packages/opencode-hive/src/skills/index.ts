@@ -1,18 +1,11 @@
 /**
  * Hive Skills System
- * 
- * Export skill infrastructure for native materialization and legacy skill loading.
+ *
+ * Export skill infrastructure for native materialization and bundled skill metadata.
  */
 
 export type { SkillDefinition, SkillLoadResult } from './types.js';
-export { 
-  BUILTIN_SKILLS, 
-  loadBuiltinSkill, 
-  getBuiltinSkills,
-  getFilteredSkills,
-  getBuiltinSkillsXml,
-  type BuiltinSkillName 
-} from './builtin.js';
+export { BUILTIN_SKILLS, BUILTIN_SKILL_NAMES, getBuiltinSkills } from './builtin.js';
 export { loadFileSkill } from './file-loader.js';
 export {
   parseNativeSkillMarkdown,

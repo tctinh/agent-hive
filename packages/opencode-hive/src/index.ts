@@ -1,9 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { tool, type Plugin, type ToolDefinition } from "@opencode-ai/plugin";
-import { getFilteredSkills, loadBuiltinSkill } from './skills/builtin.js';
+import { tool, type Plugin } from "@opencode-ai/plugin";
 import { prepareNativeHiveSkills } from './skills/native-materializer.js';
-import type { SkillDefinition } from './skills/types.js';
 import type { PreparedHiveSkill } from './skills/native-materializer.js';
 // Bee agents (lean, focused)
 import { QUEEN_BEE_PROMPT } from './agents/hive.js';
@@ -15,25 +13,6 @@ import { HIVE_HELPER_PROMPT } from './agents/hive-helper.js';
 import { HYGIENIC_BEE_PROMPT } from './agents/hygienic.js';
 import { buildCustomSubagents } from './agents/custom-agents.js';
 import { createBuiltinMcps } from './mcp/index.js';
-
-// ============================================================================
-// Skill Tool - Uses generated registry (no file-based discovery)
-// ============================================================================
-
-function formatSkillsXml(skills: SkillDefinition[]): string {
-  if (skills.length === 0) return '';
-
-  const skillsXml = skills.map(skill => {
-    return [
-      '  <skill>',
-      `    <name>${skill.name}</name>`,
-      `    <description>(hive - Skill) ${skill.description}</description>`,
-      '  </skill>',
-    ].join('\n');
-  }).join('\n');
-
-  return `\n\n<available_skills>\n${skillsXml}\n</available_skills>`;
-}
 
 /**
  * Build auto-loaded skill templates for an agent.
@@ -123,48 +102,6 @@ function getCustomAgentConfigsCompat(configService: ConfigService): Record<strin
   return Object.fromEntries(compatibleEntries);
 }
 
-function createHiveSkillTool(filteredSkills: SkillDefinition[]): ToolDefinition {
-  const base = `Load a Hive skill to get detailed instructions for a specific workflow.
-
-Use this when a task matches an available skill's description. The descriptions below ("Use when...", "Use before...") are triggers; when one applies, you MUST load that skill before proceeding.`;
-  const description = filteredSkills.length === 0
-    ? base + '\n\nNo Hive skills available.'
-    : base + formatSkillsXml(filteredSkills);
-
-  // Build a set of available skill names for validation
-  const availableNames = new Set(filteredSkills.map(s => s.name));
-
-  return tool({
-    description,
-    args: {
-      name: tool.schema.string().describe('The skill name from available_skills'),
-    },
-    async execute({ name }) {
-      // Check if skill is available (not filtered out)
-      if (!availableNames.has(name)) {
-        const available = filteredSkills.map(s => s.name).join(', ');
-        throw new Error(`Skill "${name}" not available. Available Hive skills: ${available || 'none'}`);
-      }
-
-      const result = loadBuiltinSkill(name);
-
-      if (!result.found || !result.skill) {
-        const available = filteredSkills.map(s => s.name).join(', ');
-        throw new Error(`Skill "${name}" not found. Available Hive skills: ${available || 'none'}`);
-      }
-
-      const skill = result.skill;
-      return [
-        `## Hive Skill: ${skill.name}`,
-        '',
-        `**Description**: ${skill.description}`,
-        '',
-        skill.template,
-      ].join('\n');
-    },
-  });
-}
-
 // ============================================================================
 import {
   WorktreeService,
@@ -243,16 +180,11 @@ const plugin: Plugin = async (ctx) => {
   const configService = new ConfigService(directory);
   const sessionService = new SessionService(directory);
   const disabledMcps = configService.getDisabledMcps();
-  const disabledSkills = configService.getDisabledSkills();
   const configFallbackWarning = configService.getLastFallbackWarning()?.message ?? null;
   if (configFallbackWarning) {
     emitConfigWarning(configFallbackWarning);
   }
   const builtinMcps = createBuiltinMcps(disabledMcps);
-  
-  // Get filtered skills (globally disabled skills removed)
-  // Per-agent skill filtering could be added here based on agent context
-  const filteredSkills = getFilteredSkills(disabledSkills);
   const effectiveAutoLoadSkills = configService.getAgentConfig('hive-master').autoLoadSkills ?? [];
   const worktreeService = new WorktreeService({
     baseDir: directory,
@@ -1142,8 +1074,6 @@ Use the \`@path\` attachment syntax in the prompt to reference the file. Do not 
     mcp: builtinMcps,
 
     tool: {
-      hive_skill: createHiveSkillTool(filteredSkills),
-
       hive_feature_create: tool({
         description: 'Create a new feature and set it as active',
         args: {
@@ -2052,7 +1982,7 @@ Expand your Discovery section and try again.`;
         temperature: architectUserConfig.temperature ?? 0.7,
         description: 'Architect (Planner) - Plans features, interviews, writes plans. NEVER executes.',
         prompt: ARCHITECT_BEE_PROMPT + HIVE_SYSTEM_PROMPT + architectAutoLoadedSkills + (agentMode === 'dedicated' ? customSubagentAppendix : ''),
-        tools: agentTools(['hive_feature_create', 'hive_plan_write', 'hive_plan_read', 'hive_context_write', 'hive_network_query', 'hive_status', 'hive_skill']),
+        tools: agentTools(['hive_feature_create', 'hive_plan_write', 'hive_plan_read', 'hive_context_write', 'hive_network_query', 'hive_status']),
         permission: {
           edit: "deny",  // Planners don't edit code
           task: "allow",
@@ -2080,7 +2010,7 @@ Expand your Discovery section and try again.`;
           'hive_feature_create', 'hive_feature_complete', 'hive_plan_read', 'hive_plan_approve',
           'hive_tasks_sync', 'hive_task_create', 'hive_task_update',
           'hive_worktree_start', 'hive_worktree_create', 'hive_worktree_discard', 'hive_merge',
-          'hive_context_write', 'hive_network_query', 'hive_status', 'hive_skill', 'hive_agents_md',
+          'hive_context_write', 'hive_network_query', 'hive_status', 'hive_agents_md',
         ]),
         permission: {
           question: "allow",
@@ -2103,7 +2033,7 @@ Expand your Discovery section and try again.`;
         mode: 'subagent' as const,
         description: 'Scout (Explorer/Researcher/Retrieval) - Researches codebase + external docs/data.',
         prompt: SCOUT_BEE_PROMPT + HIVE_SYSTEM_PROMPT + scoutAutoLoadedSkills,
-        tools: agentTools(['hive_plan_read', 'hive_context_write', 'hive_status', 'hive_skill']),
+        tools: agentTools(['hive_plan_read', 'hive_context_write', 'hive_status']),
         permission: {
           edit: "deny",  // Researchers don't edit code
           task: "deny",
@@ -2126,7 +2056,7 @@ Expand your Discovery section and try again.`;
         mode: 'subagent' as const,
         description: 'Forager (Worker/Coder) - Executes tasks directly in isolated worktrees. Never delegates.',
         prompt: FORAGER_BEE_PROMPT + HIVE_SYSTEM_PROMPT + foragerAutoLoadedSkills,
-        tools: agentTools(['hive_plan_read', 'hive_worktree_commit', 'hive_context_write', 'hive_skill']),
+        tools: agentTools(['hive_plan_read', 'hive_worktree_commit', 'hive_context_write']),
         permission: {
           task: "deny",
           delegate: "deny",
@@ -2142,7 +2072,7 @@ Expand your Discovery section and try again.`;
         mode: 'subagent' as const,
         description: 'Hive Helper - Runtime-only bounded hard-task operational assistant for merge recovery, state clarification, and safe manual follow-up assistance.',
         prompt: HIVE_HELPER_PROMPT + HIVE_SYSTEM_PROMPT,
-        tools: agentTools(['hive_merge', 'hive_status', 'hive_context_write', 'hive_task_create', 'hive_skill']),
+        tools: agentTools(['hive_merge', 'hive_status', 'hive_context_write', 'hive_task_create']),
         permission: {
           task: 'deny',
           delegate: 'deny',
@@ -2163,7 +2093,7 @@ Expand your Discovery section and try again.`;
         mode: 'subagent' as const,
         description: 'Hygienic (Consultant/Reviewer/Debugger) - Reviews plan documentation quality. OKAY/REJECT verdict.',
         prompt: HYGIENIC_BEE_PROMPT + HIVE_SYSTEM_PROMPT + hygienicAutoLoadedSkills,
-        tools: agentTools(['hive_plan_read', 'hive_context_write', 'hive_network_query', 'hive_status', 'hive_skill']),
+        tools: agentTools(['hive_plan_read', 'hive_context_write', 'hive_network_query', 'hive_status']),
         permission: {
           edit: "deny",  // Reviewers don't edit
           task: "deny",

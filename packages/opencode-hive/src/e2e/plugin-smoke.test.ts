@@ -201,6 +201,8 @@ describe("e2e: opencode-hive plugin (in-process)", () => {
     const hooks = await plugin(ctx);
 
     expect(hooks.tool).toBeDefined();
+    expect(hooks.tool?.hive_skill).toBeUndefined();
+    expect(HIVE_TOOL_NAMES).not.toContain('hive_skill');
 
     for (const toolName of EXPECTED_TOOLS) {
       expect(hooks.tool?.[toolName]).toBeDefined();
@@ -349,6 +351,7 @@ Do it
 
     expect(pluginJson.version).toBe(expectedManifest.version);
     expect(pluginJson.commands).toEqual([...EXPECTED_COMMANDS]);
+    expect(pluginJson.tools).not.toContain('hive_skill');
     expect(pluginJson.tools).toEqual([...EXPECTED_TOOLS]);
     expect(pluginJson).toEqual(expectedManifest);
   });

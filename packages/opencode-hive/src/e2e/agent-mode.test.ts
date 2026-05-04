@@ -179,7 +179,7 @@ describe("agentMode gating", () => {
     expect(opencodeConfig.agent["hive-helper"]?.tools?.["hive_network_query"]).toBe(false);
   });
 
-  it("keeps hive-helper bounded to merge recovery, state clarification, and append-only manual follow-up", async () => {
+  it("keeps hive-helper bounded to merge recovery, state clarification, append-only manual follow-up, and no plugin-defined skill tool", async () => {
     const configPath = path.join(testRoot, ".config", "opencode", "agent_hive.json");
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(

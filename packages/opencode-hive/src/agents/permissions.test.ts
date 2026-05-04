@@ -327,7 +327,7 @@ describe('Per-agent tool filtering', () => {
     expect(foragerTools!['hive_worktree_start']).toBe(false);
   });
 
-  it('forager tool list is exactly [hive_plan_read, hive_worktree_commit, hive_context_write, hive_skill] and excludes hive_status', async () => {
+  it('forager tool list keeps only its worktree-read/write hive tools and excludes hive_status', async () => {
     const agents = await buildConfig('unified');
     const foragerTools = agents['forager-worker']?.tools;
     expect(foragerTools).toBeTruthy();
@@ -338,7 +338,7 @@ describe('Per-agent tool filtering', () => {
     expect(foragerTools!['hive_skill']).toBeUndefined();
   });
 
-  it('hive-helper tool list is exactly [hive_merge, hive_status, hive_context_write, hive_task_create, hive_skill]', async () => {
+  it('hive-helper tool list keeps only merge-recovery hive tools', async () => {
     const agents = await buildConfig('unified');
     const helperTools = agents['hive-helper']?.tools;
     expect(helperTools).toBeTruthy();
