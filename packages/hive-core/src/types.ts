@@ -196,7 +196,7 @@ export interface AgentModelConfig {
   temperature?: number;
   /** Skills to enable for this agent (legacy; native skill visibility is controlled by OpenCode registration, not by this allowlist) */
   skills?: string[];
-  /** Skills to auto-load for this agent */
+  /** Native discovered or Hive bundled skill names to inject into this agent prompt at startup */
   autoLoadSkills?: string[];
   /** Variant key for model reasoning/effort level (e.g., 'low', 'medium', 'high', 'max') */
   variant?: string;
@@ -238,6 +238,7 @@ export interface CustomAgentConfig {
   model?: string;
   temperature?: number;
   variant?: string;
+  /** Additional native discovered or Hive bundled skill names to inject into this custom agent prompt at startup */
   autoLoadSkills?: string[];
 }
 

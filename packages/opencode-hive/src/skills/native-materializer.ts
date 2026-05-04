@@ -24,9 +24,17 @@ export interface PreparedHiveSkill {
   materializedDir: string;
 }
 
+export interface PreparedNativeSkill {
+  name: string;
+  description: string;
+  content: string;
+  source: string;
+}
+
 export interface PreparedNativeHiveSkills {
   materializedPath?: string;
   skillsByName: Map<string, PreparedHiveSkill>;
+  nativeSkillsByName: Map<string, PreparedNativeSkill>;
   skillPaths: string[];
   skipped: Array<{ name: string; reason: 'disabled' | 'conflict' | 'url-scan-incomplete'; source?: string }>;
   urlScanComplete: boolean;
@@ -311,9 +319,22 @@ async function readBundledSkills(packagedSkillsDir: string, logger: Logger): Pro
   return skills.sort((left, right) => left.directoryName.localeCompare(right.directoryName));
 }
 
-async function addConflict(
+function setNativeSkill(
+  nativeSkillsByName: Map<string, PreparedNativeSkill>,
+  source: string,
+  parsed: ParsedNativeSkill,
+): void {
+  nativeSkillsByName.set(parsed.name, {
+    name: parsed.name,
+    description: parsed.description,
+    content: parsed.content,
+    source,
+  });
+}
+
+async function addNativeSkill(
   skillPath: string,
-  conflicts: Map<string, string>,
+  nativeSkillsByName: Map<string, PreparedNativeSkill>,
   logger: Logger,
 ): Promise<void> {
   try {
@@ -322,21 +343,19 @@ async function addConflict(
     if (!parsed) {
       return;
     }
-    if (!conflicts.has(parsed.name)) {
-      conflicts.set(parsed.name, skillPath);
-    }
+    setNativeSkill(nativeSkillsByName, skillPath, parsed);
   } catch (error) {
     logger.warn(`[hive] Skipping native skill ${skillPath}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
-async function scanSkillFilesIntoConflicts(
+async function scanSkillFilesIntoNativeSkills(
   skillFiles: string[],
-  conflicts: Map<string, string>,
+  nativeSkillsByName: Map<string, PreparedNativeSkill>,
   logger: Logger,
 ): Promise<void> {
   for (const skillFile of skillFiles) {
-    await addConflict(skillFile, conflicts, logger);
+    await addNativeSkill(skillFile, nativeSkillsByName, logger);
   }
 }
 
@@ -363,60 +382,60 @@ function getGlobalOpenCodeConfigDir(env: Record<string, string | undefined>, hom
   return path.resolve(homeDir, '.config', 'opencode');
 }
 
-async function scanLocalNativeConflicts(
+async function scanLocalNativeSkills(
   input: PrepareNativeHiveSkillsInput,
   skillPaths: string[],
   logger: Logger,
-): Promise<Map<string, string>> {
+): Promise<Map<string, PreparedNativeSkill>> {
   const env = { ...process.env, ...input.env };
   const homeDir = getHomeDir(input);
-  const conflicts = new Map<string, string>();
+  const nativeSkillsByName = new Map<string, PreparedNativeSkill>();
   const externalDirNames = getExternalDirNames(env);
 
   for (const externalDirName of externalDirNames) {
-    await scanSkillFilesIntoConflicts(
+    await scanSkillFilesIntoNativeSkills(
       await scanSkillMarkdownFiles(path.join(homeDir, externalDirName, 'skills')),
-      conflicts,
+      nativeSkillsByName,
       logger,
     );
   }
 
   for (const currentDir of walkUpDirectories(input.directory, input.worktree)) {
     for (const externalDirName of externalDirNames) {
-      await scanSkillFilesIntoConflicts(
+      await scanSkillFilesIntoNativeSkills(
         await scanSkillMarkdownFiles(path.join(currentDir, externalDirName, 'skills')),
-        conflicts,
+        nativeSkillsByName,
         logger,
       );
     }
   }
 
-  await scanSkillFilesIntoConflicts(
+  await scanSkillFilesIntoNativeSkills(
     await scanOpenCodeSkillDirs(getGlobalOpenCodeConfigDir(env, homeDir)),
-    conflicts,
+    nativeSkillsByName,
     logger,
   );
 
   for (const currentDir of walkUpDirectories(input.directory, input.worktree)) {
-    await scanSkillFilesIntoConflicts(
+    await scanSkillFilesIntoNativeSkills(
       await scanOpenCodeSkillDirs(path.join(currentDir, '.opencode')),
-      conflicts,
+      nativeSkillsByName,
       logger,
     );
   }
 
   for (const configuredPath of skillPaths) {
     if (await isDirectory(configuredPath)) {
-      await scanSkillFilesIntoConflicts(await scanSkillMarkdownFiles(configuredPath), conflicts, logger);
+      await scanSkillFilesIntoNativeSkills(await scanSkillMarkdownFiles(configuredPath), nativeSkillsByName, logger);
     }
   }
 
-  return conflicts;
+  return nativeSkillsByName;
 }
 
 type UrlScanResult = {
   urlScanComplete: boolean;
-  conflicts: Map<string, string>;
+  nativeSkillsByName: Map<string, PreparedNativeSkill>;
 };
 
 async function fetchWithTimeout(
@@ -443,14 +462,14 @@ async function fetchWithTimeout(
   }
 }
 
-async function scanUrlConflicts(
+async function scanUrlNativeSkills(
   input: PrepareNativeHiveSkillsInput,
   logger: Logger,
 ): Promise<UrlScanResult> {
   const urls = input.opencodeConfig?.skills?.urls ?? [];
   const fetchImpl = input.fetchImpl ?? fetch;
   const urlFetchTimeoutMs = input.urlFetchTimeoutMs ?? DEFAULT_URL_FETCH_TIMEOUT_MS;
-  const conflicts = new Map<string, string>();
+  const nativeSkillsByName = new Map<string, PreparedNativeSkill>();
 
   for (const configuredUrl of urls) {
     const base = configuredUrl.endsWith('/') ? configuredUrl : `${configuredUrl}/`;
@@ -486,8 +505,8 @@ async function scanUrlConflicts(
 
         const content = await skillResponse.text();
         const parsed = parseNativeSkillMarkdown(skillUrl, content, logger);
-        if (parsed && !conflicts.has(parsed.name)) {
-          conflicts.set(parsed.name, skillUrl);
+        if (parsed) {
+          setNativeSkill(nativeSkillsByName, skillUrl, parsed);
         }
       }
     } catch (error) {
@@ -496,15 +515,30 @@ async function scanUrlConflicts(
       );
       return {
         urlScanComplete: false,
-        conflicts: new Map<string, string>(),
+        nativeSkillsByName: new Map<string, PreparedNativeSkill>(),
       };
     }
   }
 
   return {
     urlScanComplete: true,
-    conflicts,
+    nativeSkillsByName,
   };
+}
+
+function skillSourcesByName(nativeSkillsByName: Map<string, PreparedNativeSkill>): Map<string, string> {
+  return new Map([...nativeSkillsByName].map(([name, skill]) => [name, skill.source]));
+}
+
+function mergeNativeSkills(
+  localNativeSkills: Map<string, PreparedNativeSkill>,
+  urlNativeSkills: Map<string, PreparedNativeSkill>,
+): Map<string, PreparedNativeSkill> {
+  const merged = new Map(localNativeSkills);
+  for (const [name, skill] of urlNativeSkills) {
+    merged.set(name, skill);
+  }
+  return merged;
 }
 
 function buildGeneratedHash(
@@ -594,13 +628,14 @@ export async function prepareNativeHiveSkills(
   const resolvedUserPaths = (input.opencodeConfig?.skills?.paths ?? [])
     .map((skillPath) => resolveConfiguredSkillPath(skillPath, input.directory, homeDir))
     .filter((skillPath) => !isHiveManagedSkillsPath(skillPath, input.worktree));
-  const localConflicts = await scanLocalNativeConflicts(input, resolvedUserPaths, logger);
-  const urlScan = await scanUrlConflicts(input, logger);
+  const localNativeSkills = await scanLocalNativeSkills(input, resolvedUserPaths, logger);
+  const urlScan = await scanUrlNativeSkills(input, logger);
 
   if (!urlScan.urlScanComplete) {
     return {
       materializedPath: undefined,
       skillsByName: new Map<string, PreparedHiveSkill>(),
+      nativeSkillsByName: localNativeSkills,
       skillPaths: resolvedUserPaths,
       skipped: bundledSkills.map((skill) => ({
         name: skill.parsed.name,
@@ -610,12 +645,8 @@ export async function prepareNativeHiveSkills(
     };
   }
 
-  const allConflicts = new Map<string, string>(localConflicts);
-  for (const [name, source] of urlScan.conflicts) {
-    if (!allConflicts.has(name)) {
-      allConflicts.set(name, source);
-    }
-  }
+  const nativeSkillsByName = mergeNativeSkills(localNativeSkills, urlScan.nativeSkillsByName);
+  const allConflicts = skillSourcesByName(nativeSkillsByName);
 
   const eligibleSkills: BundledSkillSource[] = [];
   const skipped: PreparedNativeHiveSkills['skipped'] = [];
@@ -639,6 +670,7 @@ export async function prepareNativeHiveSkills(
     return {
       materializedPath: undefined,
       skillsByName: new Map<string, PreparedHiveSkill>(),
+      nativeSkillsByName,
       skillPaths: resolvedUserPaths,
       skipped,
       urlScanComplete: true,
@@ -653,6 +685,7 @@ export async function prepareNativeHiveSkills(
   return {
     materializedPath,
     skillsByName,
+    nativeSkillsByName,
     skillPaths: [materializedPath, ...resolvedUserPaths],
     skipped,
     urlScanComplete: true,

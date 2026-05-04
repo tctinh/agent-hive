@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { tool, type Plugin } from "@opencode-ai/plugin";
 import { prepareNativeHiveSkills } from './skills/native-materializer.js';
-import type { PreparedHiveSkill, PreparedNativeHiveSkills } from './skills/native-materializer.js';
+import type { PreparedHiveSkill, PreparedNativeHiveSkills, PreparedNativeSkill } from './skills/native-materializer.js';
 // Bee agents (lean, focused)
 import { QUEEN_BEE_PROMPT } from './agents/hive.js';
 import { ARCHITECT_BEE_PROMPT } from './agents/architect.js';
@@ -18,20 +18,18 @@ import { createBuiltinMcps } from './mcp/index.js';
  * Build auto-loaded skill templates for an agent.
  * Returns a string containing all skill templates to append to the agent's prompt.
  * 
- * Only eligible Hive bundled skills are injected here.
- * Native user/project/global skills are discovered by OpenCode itself and loaded with the native skill tool.
+ * Native discovered skills win over Hive bundled skills so user/native definitions can shadow Hive bundles.
  */
 async function buildAutoLoadedSkillsContent(
   agentName: string,
   configService: ConfigService,
+  nativeSkillsByName: Map<string, PreparedNativeSkill>,
   eligibleHiveSkills: Map<string, PreparedHiveSkill>,
   skippedHiveSkills: Map<string, PreparedNativeHiveSkills['skipped'][number]>,
   autoLoadSkillsOverride?: string[],
 ): Promise<string> {
   const autoLoadSkills = autoLoadSkillsOverride
-    ?? (((configService as unknown as {
-      getAgentConfig: (name: string) => { autoLoadSkills?: string[] };
-    }).getAgentConfig(agentName).autoLoadSkills) ?? []);
+    ?? (configService.getAgentConfig(agentName).autoLoadSkills ?? []);
 
   if (autoLoadSkills.length === 0) {
     return '';
@@ -40,6 +38,12 @@ async function buildAutoLoadedSkillsContent(
   const skillTemplates: string[] = [];
   
   for (const skillId of autoLoadSkills) {
+    const nativeSkill = nativeSkillsByName.get(skillId);
+    if (nativeSkill) {
+      skillTemplates.push(nativeSkill.content);
+      continue;
+    }
+
     const bundledSkill = eligibleHiveSkills.get(skillId);
     if (bundledSkill) {
       skillTemplates.push(bundledSkill.content);
@@ -47,13 +51,6 @@ async function buildAutoLoadedSkillsContent(
     }
 
     const skippedSkill = skippedHiveSkills.get(skillId);
-    if (skippedSkill?.reason === 'conflict' && skippedSkill.source) {
-      console.warn(
-        `[hive] Auto-load skill "${skillId}" was not injected for agent "${agentName}" because the Hive bundled copy was skipped in favor of native skill at ${skippedSkill.source}.`,
-      );
-      continue;
-    }
-
     if (skippedSkill?.reason === 'disabled') {
       console.warn(
         `[hive] Auto-load skill "${skillId}" was not injected for agent "${agentName}" because it is disabled in Hive config.`,
@@ -69,7 +66,7 @@ async function buildAutoLoadedSkillsContent(
     }
 
     console.warn(
-      `[hive] Auto-load skill "${skillId}" was not injected for agent "${agentName}" because it is not an eligible Hive bundled skill. User file skills are discovered by OpenCode native skills and should be loaded with the native skill tool.`,
+      `[hive] Auto-load skill "${skillId}" was not injected for agent "${agentName}" because it was not found in OpenCode native skill discovery or eligible Hive bundled skills.`,
     );
   }
 
@@ -1980,6 +1977,7 @@ Expand your Discovery section and try again.`;
       const hiveAutoLoadedSkills = await buildAutoLoadedSkillsContent(
         'hive-master',
         configService,
+        preparedNativeHiveSkills.nativeSkillsByName,
         preparedNativeHiveSkills.skillsByName,
         skippedHiveSkills,
       );
@@ -2001,6 +1999,7 @@ Expand your Discovery section and try again.`;
       const architectAutoLoadedSkills = await buildAutoLoadedSkillsContent(
         'architect-planner',
         configService,
+        preparedNativeHiveSkills.nativeSkillsByName,
         preparedNativeHiveSkills.skillsByName,
         skippedHiveSkills,
       );
@@ -2026,6 +2025,7 @@ Expand your Discovery section and try again.`;
       const swarmAutoLoadedSkills = await buildAutoLoadedSkillsContent(
         'swarm-orchestrator',
         configService,
+        preparedNativeHiveSkills.nativeSkillsByName,
         preparedNativeHiveSkills.skillsByName,
         skippedHiveSkills,
       );
@@ -2053,6 +2053,7 @@ Expand your Discovery section and try again.`;
       const scoutAutoLoadedSkills = await buildAutoLoadedSkillsContent(
         'scout-researcher',
         configService,
+        preparedNativeHiveSkills.nativeSkillsByName,
         preparedNativeHiveSkills.skillsByName,
         skippedHiveSkills,
       );
@@ -2077,6 +2078,7 @@ Expand your Discovery section and try again.`;
       const foragerAutoLoadedSkills = await buildAutoLoadedSkillsContent(
         'forager-worker',
         configService,
+        preparedNativeHiveSkills.nativeSkillsByName,
         preparedNativeHiveSkills.skillsByName,
         skippedHiveSkills,
       );
@@ -2115,6 +2117,7 @@ Expand your Discovery section and try again.`;
       const hygienicAutoLoadedSkills = await buildAutoLoadedSkillsContent(
         'hygienic-reviewer',
         configService,
+        preparedNativeHiveSkills.nativeSkillsByName,
         preparedNativeHiveSkills.skillsByName,
         skippedHiveSkills,
       );
@@ -2159,6 +2162,7 @@ Expand your Discovery section and try again.`;
                 await buildAutoLoadedSkillsContent(
                   customAgentName,
                   configService,
+                  preparedNativeHiveSkills.nativeSkillsByName,
                   preparedNativeHiveSkills.skillsByName,
                   skippedHiveSkills,
                   deltaAutoLoadSkills,

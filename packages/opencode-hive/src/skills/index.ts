@@ -12,6 +12,7 @@ export {
   resolvePackagedSkillsDir,
   type ParsedNativeSkill,
   type PreparedHiveSkill,
+  type PreparedNativeSkill,
   type PreparedNativeHiveSkills,
   type PrepareNativeHiveSkillsInput,
 } from './native-materializer.js';

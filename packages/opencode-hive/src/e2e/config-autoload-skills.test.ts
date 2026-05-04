@@ -208,8 +208,8 @@ describe('config hook autoLoadSkills injection', () => {
     expect(countOccurrences(foragerUiPrompt, brainstormingSkill.template)).toBe(1);
     expect(countOccurrences(foragerUiPrompt, parallelExplorationSkill.template)).toBe(1);
     expect(countOccurrences(foragerUiPrompt, tddSkill.template)).toBe(1);
-    expect(foragerUiPrompt).not.toContain('# Native File Skill');
-    expect(warnings.some((message) => message.includes('native-file-skill'))).toBe(true);
+    expect(countOccurrences(foragerUiPrompt, '# Native File Skill')).toBe(1);
+    expect(warnings.some((message) => message.includes('native-file-skill'))).toBe(false);
   });
 
   it('injects user-configured bundled autoLoadSkills on top of defaults', async () => {
@@ -239,27 +239,30 @@ describe('config hook autoLoadSkills injection', () => {
       disableSkills: ['parallel-exploration'],
     });
 
-    const opencodeConfig = await applyConfigHook(testRoot);
+    const { result: opencodeConfig, warnings } = await captureWarnings(async () => applyConfigHook(testRoot));
     const hiveMasterPrompt = getAgentPrompt(opencodeConfig, 'hive-master');
     const parallelExplorationSkill = requireBuiltinSkill('parallel-exploration');
     const generatedPath = getSkillPaths(opencodeConfig)[0];
 
     expect(hiveMasterPrompt).not.toContain(parallelExplorationSkill.template);
     expect(fs.existsSync(path.join(generatedPath, 'parallel-exploration'))).toBe(false);
+    expect(warnings).toContainEqual(
+      expect.stringContaining('Auto-load skill "parallel-exploration" was not injected'),
+    );
   });
 
-  it('warns on unknown custom file skills and does not inject or materialize their content', async () => {
+  it('autoloads native project skills without copying them into Hive generated paths', async () => {
     createFileSkill(
       path.join(testRoot, '.opencode', 'skills'),
-      'nonexistent-skill',
-      'A native project skill that Hive should not autoload',
+      'my-custom-skill',
+      'A native project skill that Hive should autoload',
       '# Native Skill\n\nThis must stay out of the prompt.',
     );
     writeHiveConfig(testRoot, {
       agentMode: 'unified',
       agents: {
         'hive-master': {
-          autoLoadSkills: ['nonexistent-skill'],
+          autoLoadSkills: ['my-custom-skill'],
         },
       },
     });
@@ -270,10 +273,9 @@ describe('config hook autoLoadSkills injection', () => {
 
     expect((opencodeConfig.agent as Record<string, unknown>)['hive-master']).toBeDefined();
     expect(generatedPath).toBeDefined();
-    expect(fs.existsSync(path.join(generatedPath!, 'nonexistent-skill'))).toBe(false);
-    expect(hiveMasterPrompt).not.toContain('# Native Skill');
-    expect(warnings.some((message) => message.includes('nonexistent-skill'))).toBe(true);
-    expect(warnings.some((message) => message.includes('native skill tool'))).toBe(true);
+    expect(fs.existsSync(path.join(generatedPath!, 'my-custom-skill'))).toBe(false);
+    expect(hiveMasterPrompt).toContain('# Native Skill');
+    expect(warnings.some((message) => message.includes('my-custom-skill'))).toBe(false);
   });
 
   it('injects autoLoadSkills for dedicated-mode agents', async () => {
@@ -391,7 +393,6 @@ describe('config hook native skill registration', () => {
   });
 
   it('skips conflicting Hive bundled skills when a native project skill already exists and warns with the native source path', async () => {
-    const nativeSkillPath = path.join(testRoot, '.opencode', 'skills', 'parallel-exploration', 'SKILL.md');
     createFileSkill(
       path.join(testRoot, '.opencode', 'skills'),
       'parallel-exploration',
@@ -408,17 +409,36 @@ describe('config hook native skill registration', () => {
     expect(generatedPath).toBeDefined();
     expect(fs.existsSync(path.join(generatedPath!, 'parallel-exploration'))).toBe(false);
     expect(hiveMasterPrompt).not.toContain(parallelExplorationSkill.template);
-    expect(hiveMasterPrompt).not.toContain('# Native Parallel Exploration');
-    expect(warnings.some((message) => message.includes('parallel-exploration'))).toBe(true);
-    expect(warnings.some((message) => message.includes(nativeSkillPath))).toBe(true);
+    expect(hiveMasterPrompt).toContain('# Native Parallel Exploration');
+    expect(warnings.some((message) => message.includes('parallel-exploration'))).toBe(false);
   });
 
-  it('does not autoload native project skills and does not copy them into Hive generated paths', async () => {
+  it('autoloads a native skill even when disableSkills disables a Hive bundle with the same name', async () => {
     createFileSkill(
       path.join(testRoot, '.opencode', 'skills'),
+      'parallel-exploration',
+      'Project-native parallel exploration',
+      '# Native Parallel Exploration\n\nThis native copy should still autoload.',
+    );
+    writeHiveConfig(testRoot, {
+      agentMode: 'unified',
+      disableSkills: ['parallel-exploration'],
+    });
+
+    const opencodeConfig = await applyConfigHook(testRoot);
+    const hiveMasterPrompt = getAgentPrompt(opencodeConfig, 'hive-master');
+
+    expect(hiveMasterPrompt).toContain('# Native Parallel Exploration');
+    expect(hiveMasterPrompt).not.toContain(requireBuiltinSkill('parallel-exploration').template);
+  });
+
+  it('autoloads native skills from configured skills.paths', async () => {
+    const configuredSkillRoot = path.join(testRoot, 'configured-skills');
+    createFileSkill(
+      configuredSkillRoot,
       'my-custom-skill',
-      'A native project skill',
-      '# My Custom Skill\n\nNative project content.',
+      'A native configured-path skill',
+      '# My Custom Skill\n\nNative configured-path content.',
     );
     writeHiveConfig(testRoot, {
       agentMode: 'unified',
@@ -429,15 +449,20 @@ describe('config hook native skill registration', () => {
       },
     });
 
-    const { result: opencodeConfig, warnings } = await captureWarnings(async () => applyConfigHook(testRoot));
+    const { result: opencodeConfig, warnings } = await captureWarnings(async () => applyConfigHook(testRoot, {
+      agent: {},
+      skills: {
+        paths: [configuredSkillRoot],
+      },
+    }));
     const generatedPath = getCurrentHiveManagedPath(opencodeConfig);
     const hiveMasterPrompt = getAgentPrompt(opencodeConfig, 'hive-master');
 
     expect(generatedPath).toBeDefined();
     expect(fs.existsSync(path.join(generatedPath!, 'my-custom-skill'))).toBe(false);
-    expect(hiveMasterPrompt).not.toContain('# My Custom Skill');
-    expect(warnings.some((message) => message.includes('my-custom-skill'))).toBe(true);
-    expect(warnings.some((message) => message.includes('native skill tool'))).toBe(true);
+    expect(hiveMasterPrompt).toContain('# My Custom Skill');
+    expect(hiveMasterPrompt).not.toContain('description: A native configured-path skill');
+    expect(warnings.some((message) => message.includes('my-custom-skill'))).toBe(false);
   });
 
   it('uses the parsed SKILL.md frontmatter name for URL conflicts even when index.json uses a different directory name', async () => {
@@ -482,7 +507,8 @@ description: URL conflict
     expect(generatedPath).toBeDefined();
     expect(fs.existsSync(path.join(generatedPath!, 'parallel-exploration'))).toBe(false);
     expect(hiveMasterPrompt).not.toContain(parallelExplorationSkill.template);
-    expect(warnings.some((message) => message.includes('parallel-exploration'))).toBe(true);
+    expect(hiveMasterPrompt).toContain('# URL conflict');
+    expect(warnings.some((message) => message.includes('parallel-exploration'))).toBe(false);
   });
 
   it('preserves user paths and urls but skips Hive materialization when URL conflict scanning is incomplete', async () => {
@@ -490,6 +516,12 @@ description: URL conflict
     const userPath = path.join(testRoot, 'user-skill-path');
     const staleHivePath = path.join(testRoot, '.hive', 'generated', 'opencode-skills', 'stale-hash');
     fs.mkdirSync(userPath, { recursive: true });
+    createFileSkill(
+      userPath,
+      'local-native-skill',
+      'A local native skill that can still autoload on URL failure',
+      '# Local Native Skill\n\nURL failure should not suppress this.',
+    );
     fs.mkdirSync(staleHivePath, { recursive: true });
     globalThis.fetch = (async () => {
       throw new Error('network down');
@@ -508,6 +540,44 @@ description: URL conflict
     expect(getSkillPaths(opencodeConfig)).toEqual([userPath]);
     expect(getSkillUrls(opencodeConfig)).toEqual(['https://example.test/skills']);
     expect(hiveMasterPrompt).not.toContain(requireBuiltinSkill('parallel-exploration').template);
+    expect(hiveMasterPrompt).not.toContain('# Local Native Skill');
+    expect(warnings).toContainEqual(
+      expect.stringContaining(
+        '[hive] Skipping Hive bundled native skill materialization because configured skills URL could not be scanned for conflicts:',
+      ),
+    );
+  });
+
+  it('autoloads local native skills while URL scan failure suppresses Hive bundled autoload', async () => {
+    writeHiveConfig(testRoot, {
+      agentMode: 'unified',
+      agents: {
+        'hive-master': {
+          autoLoadSkills: ['parallel-exploration', 'local-native-skill'],
+        },
+      },
+    });
+    createFileSkill(
+      path.join(testRoot, '.opencode', 'skills'),
+      'local-native-skill',
+      'A local native skill that can still autoload on URL failure',
+      '# Local Native Skill\n\nURL failure should not suppress this.',
+    );
+    globalThis.fetch = (async () => {
+      throw new Error('network down');
+    }) as unknown as typeof fetch;
+
+    const { result: opencodeConfig, warnings } = await captureWarnings(async () => applyConfigHook(testRoot, {
+      agent: {},
+      skills: {
+        urls: ['https://example.test/skills'],
+      },
+    }));
+    const hiveMasterPrompt = getAgentPrompt(opencodeConfig, 'hive-master');
+
+    expect(getHiveManagedPaths(getSkillPaths(opencodeConfig))).toHaveLength(0);
+    expect(hiveMasterPrompt).not.toContain(requireBuiltinSkill('parallel-exploration').template);
+    expect(hiveMasterPrompt).toContain('# Local Native Skill');
     expect(warnings).toContainEqual(
       expect.stringContaining(
         '[hive] Skipping Hive bundled native skill materialization because configured skills URL could not be scanned for conflicts:',

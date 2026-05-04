@@ -321,6 +321,11 @@ describe('prepareNativeHiveSkills - native discovery parity', () => {
     });
 
     expect(result.skillsByName.has('frontmatter-conflict')).toBe(false);
+    expect(result.nativeSkillsByName.get('frontmatter-conflict')).toMatchObject({
+      name: 'frontmatter-conflict',
+      source: path.join(worktree, '.opencode', 'skills', 'alpha', 'SKILL.md'),
+    });
+    expect(result.nativeSkillsByName.get('frontmatter-conflict')!.content).toContain('# frontmatter-conflict');
     expect(result.skipped).toContainEqual({
       name: 'frontmatter-conflict',
       reason: 'conflict',
@@ -351,6 +356,42 @@ describe('prepareNativeHiveSkills - native discovery parity', () => {
       name: 'config-conflict',
       reason: 'conflict',
       source: path.join(configDir, 'skills', 'config-conflict', 'SKILL.md'),
+    });
+  });
+
+  it('uses later OpenCode discovery entries when native skill names collide', async () => {
+    const worktree = createTempDir();
+    const homeDir = path.join(worktree, 'home');
+    const bundledSkillsDir = path.join(worktree, 'fixtures', 'bundled-skills');
+
+    createBundledSkillDir(bundledSkillsDir, 'same-name');
+    createNativeSkill(homeDir, '.claude/skills/same-name/SKILL.md', 'same-name');
+    const projectSkillPath = createSkillFile(
+      worktree,
+      '.opencode/skills/same-name/SKILL.md',
+      `---
+name: same-name
+description: Project native skill
+---
+# Project Same Name
+`,
+    );
+
+    const result = await prepareNativeHiveSkills({
+      directory: worktree,
+      worktree,
+      packagedSkillsDir: bundledSkillsDir,
+      env: { HOME: homeDir },
+    });
+
+    expect(result.nativeSkillsByName.get('same-name')).toMatchObject({
+      source: projectSkillPath,
+      content: '# Project Same Name\n',
+    });
+    expect(result.skipped).toContainEqual({
+      name: 'same-name',
+      reason: 'conflict',
+      source: projectSkillPath,
     });
   });
 
@@ -396,6 +437,8 @@ describe('prepareNativeHiveSkills - native discovery parity', () => {
 
     expect(result.skillsByName.has('claude-conflict')).toBe(false);
     expect(result.skillsByName.has('agents-conflict')).toBe(false);
+    expect(result.nativeSkillsByName.has('claude-conflict')).toBe(true);
+    expect(result.nativeSkillsByName.has('agents-conflict')).toBe(true);
   });
 
   it('scans global ~/.claude and ~/.agents skill directories', async () => {
@@ -491,6 +534,8 @@ describe('prepareNativeHiveSkills - native discovery parity', () => {
 
     expect(result.skillsByName.has('home-conflict')).toBe(false);
     expect(result.skillsByName.has('relative-conflict')).toBe(false);
+    expect(result.nativeSkillsByName.get('home-conflict')!.source).toBe(path.join(homeDir, 'custom-skills', 'home-conflict', 'SKILL.md'));
+    expect(result.nativeSkillsByName.get('relative-conflict')!.source).toBe(path.join(directory, 'relative-skills', 'relative-conflict', 'SKILL.md'));
     expect(result.skillPaths).toContain(path.join(homeDir, 'custom-skills'));
     expect(result.skillPaths).toContain(path.join(directory, 'relative-skills'));
   });
@@ -569,6 +614,11 @@ description: URL conflict
 
     expect(result.urlScanComplete).toBe(true);
     expect(result.skillsByName.has('url-conflict')).toBe(false);
+    expect(result.nativeSkillsByName.get('url-conflict')).toMatchObject({
+      name: 'url-conflict',
+      source: 'https://example.test/skills/index-name-only/SKILL.md',
+    });
+    expect(result.nativeSkillsByName.get('url-conflict')!.content).toContain('# URL conflict');
     expect(result.skipped).toContainEqual({
       name: 'url-conflict',
       reason: 'conflict',
@@ -617,6 +667,61 @@ description: URL conflict
     expect(recorder.warnings.some((message) => message.includes('missing SKILL.md'))).toBe(true);
   });
 
+  it('uses URL skills after configured paths when native skill names collide', async () => {
+    const worktree = createTempDir();
+    const bundledSkillsDir = path.join(worktree, 'fixtures', 'bundled-skills');
+    const userPath = path.join(worktree, 'user-skill-path');
+
+    createBundledSkillDir(bundledSkillsDir, 'same-name');
+    createNativeSkill(userPath, 'same-name/SKILL.md', 'same-name');
+
+    const result = await prepareNativeHiveSkills({
+      directory: worktree,
+      worktree,
+      packagedSkillsDir: bundledSkillsDir,
+      env: { HOME: worktree },
+      opencodeConfig: {
+        skills: {
+          paths: [userPath],
+          urls: ['https://example.test/skills'],
+        },
+      },
+      fetchImpl: async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url === 'https://example.test/skills/index.json') {
+          return new Response(
+            JSON.stringify({
+              skills: [{ name: 'same-name-url-dir', files: ['SKILL.md'] }],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
+        if (url === 'https://example.test/skills/same-name-url-dir/SKILL.md') {
+          return new Response(
+            `---
+name: same-name
+description: URL native skill
+---
+# URL Same Name
+`,
+            { status: 200 },
+          );
+        }
+        return new Response('not found', { status: 404 });
+      },
+    });
+
+    expect(result.nativeSkillsByName.get('same-name')).toMatchObject({
+      source: 'https://example.test/skills/same-name-url-dir/SKILL.md',
+      content: '# URL Same Name\n',
+    });
+    expect(result.skipped).toContainEqual({
+      name: 'same-name',
+      reason: 'conflict',
+      source: 'https://example.test/skills/same-name-url-dir/SKILL.md',
+    });
+  });
+
   it('skips Hive materialization when a configured skills URL cannot be scanned', async () => {
     const worktree = createTempDir();
     const bundledSkillsDir = path.join(worktree, 'fixtures', 'bundled-skills');
@@ -631,6 +736,7 @@ description: URL conflict
 
     createBundledSkillDir(bundledSkillsDir, 'would-be-skipped');
     fs.mkdirSync(userPath, { recursive: true });
+    createNativeSkill(userPath, 'local-native/SKILL.md', 'local-native');
 
     const result = await prepareNativeHiveSkills({
       directory: worktree,
@@ -647,6 +753,7 @@ description: URL conflict
     expect(result.urlScanComplete).toBe(false);
     expect(result.materializedPath).toBeUndefined();
     expect(result.skillsByName.size).toBe(0);
+    expect(result.nativeSkillsByName.get('local-native')!.content).toContain('# local-native');
     expect(result.skillPaths).toEqual([userPath]);
     expect(recorder.warnings).toHaveLength(1);
     expect(recorder.warnings[0]).toContain(
