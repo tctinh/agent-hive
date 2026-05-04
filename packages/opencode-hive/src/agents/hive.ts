@@ -51,7 +51,7 @@ Intent Verbalization — verbalize before acting:
 
 ### Delegation
 - Single-scout research → \`task({ subagent_type: "scout-researcher", prompt: "..." })\`
-- Parallel exploration → Load \`hive_skill("parallel-exploration")\` and follow the task mode delegation guidance.
+- Parallel exploration → load the native skill "parallel-exploration" and follow the task mode delegation guidance.
 - Implementation → \`hive_worktree_start({ task: "01-task-name" })\` (creates worktree + Forager)
 
 ### Hive Network Lookup
@@ -108,16 +108,16 @@ NEVER end with:
 Load when detailed guidance needed:
 | Skill | Use when |
 |-------|----------|
-| \`hive_skill("brainstorming")\` | Exploring ideas and requirements |
-| \`hive_skill("writing-plans")\` | Structuring implementation plans |
-| \`hive_skill("dispatching-parallel-agents")\` | Parallel task delegation |
-| \`hive_skill("parallel-exploration")\` | Parallel read-only research via task() |
-| \`hive_skill("executing-plans")\` | Step-by-step plan execution |
-| \`hive_skill("systematic-debugging")\` | Bugs, test failures, unexpected behavior |
-| \`hive_skill("test-driven-development")\` | TDD approach |
-| \`hive_skill("verification-before-completion")\` | Before claiming work is complete or creating PRs |
-| \`hive_skill("docker-mastery")\` | Docker containers, debugging, compose |
-| \`hive_skill("agents-md-mastery")\` | AGENTS.md updates, quality review |
+| \`skill({ name: "brainstorming" })\` | Exploring ideas and requirements |
+| \`skill({ name: "writing-plans" })\` | Structuring implementation plans |
+| \`skill({ name: "dispatching-parallel-agents" })\` | Parallel task delegation |
+| \`skill({ name: "parallel-exploration" })\` | Parallel read-only research via task() |
+| \`skill({ name: "executing-plans" })\` | Step-by-step plan execution |
+| \`skill({ name: "systematic-debugging" })\` | Bugs, test failures, unexpected behavior |
+| \`skill({ name: "test-driven-development" })\` | TDD approach |
+| \`skill({ name: "verification-before-completion" })\` | Before claiming work is complete or creating PRs |
+| \`skill({ name: "docker-mastery" })\` | Docker containers, debugging, compose |
+| \`skill({ name: "agents-md-mastery" })\` | AGENTS.md updates, quality review |
 
 Load one skill at a time, only when guidance is needed.
 ---
@@ -126,8 +126,8 @@ Load one skill at a time, only when guidance is needed.
 *Active when: no approved plan exists*
 
 ### When to Load Skills
-- Exploring vague requirements → \`hive_skill("brainstorming")\`
-- Writing detailed plan → \`hive_skill("writing-plans")\`
+- Exploring vague requirements → load the native skill "brainstorming"
+- Writing detailed plan → load the native skill "writing-plans"
 
 ### Planning Checks
 | Signal | Prompt |
@@ -173,7 +173,7 @@ If yes → default to built-in \`hygienic-reviewer\`; choose a configured hygien
 After review decision, offer execution choice (subagent-driven vs parallel session) consistent with writing-plans.
 
 ### Planning Iron Laws
-- Research before asking (use \`hive_skill("parallel-exploration")\` for multi-domain research)
+- Research before asking (load the native skill "parallel-exploration" for multi-domain research)
 - Save draft as working memory
 - Keep planning read-only (local tools + Scout via task())
 Read-only exploration is allowed.
@@ -191,8 +191,8 @@ Use \`hive_status()\` to see **runnable** tasks (dependencies satisfied) and **b
 - Record execution decisions with \`hive_context_write({ name: "execution-decisions", ... })\`
 
 ### When to Load Skills
-- Multiple independent tasks → \`hive_skill("dispatching-parallel-agents")\`
-- Executing step-by-step → \`hive_skill("executing-plans")\`
+- Multiple independent tasks → load the native skill "dispatching-parallel-agents"
+- Executing step-by-step → load the native skill "executing-plans"
 
 ### Delegation Check
 1. Is there a specialized agent?

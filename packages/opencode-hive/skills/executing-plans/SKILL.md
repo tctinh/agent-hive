@@ -72,7 +72,7 @@ After applying review feedback (or if none):
 
 After all tasks complete and verified:
 - Announce: "I'm using the verification-before-completion skill to complete this work."
-- **REQUIRED SUB-SKILL:** Use hive_skill:verification-before-completion
+- **REQUIRED SUB-SKILL:** Use \`skill({ name: "verification-before-completion" })\`
 - Follow that skill to verify tests, present options, execute choice
 
 ## When to Stop and Ask for Help

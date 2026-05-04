@@ -161,4 +161,4 @@ Which approach?
 
 **If Parallel Session chosen:**
 - Guide them to open new session in worktree
-- **REQUIRED SUB-SKILL:** New session uses hive_skill:executing-plans
+- **REQUIRED SUB-SKILL:** New session uses \`skill({ name: "executing-plans" })\`

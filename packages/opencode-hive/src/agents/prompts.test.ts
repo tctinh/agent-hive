@@ -110,9 +110,9 @@ describe('Scout ast-grep references', () => {
 });
 
 describe('Hygienic verification routing', () => {
-  it('routes verification requests to verification-reviewer skill', () => {
+  it('routes verification requests to verification-reviewer skill via native skill tool', () => {
     expect(HYGIENIC_BEE_PROMPT).toContain('verification-reviewer');
-    expect(HYGIENIC_BEE_PROMPT).toContain('hive_skill("verification-reviewer")');
+    expect(HYGIENIC_BEE_PROMPT).toContain('native skill');
   });
 
   it('requires falsification-first protocol for verification', () => {
@@ -123,8 +123,9 @@ describe('Hygienic verification routing', () => {
     expect(HYGIENIC_BEE_PROMPT).toContain('Do NOT accept rationalizations as evidence');
   });
 
-  it('preserves existing plan-review and code-reviewer paths', () => {
-    expect(HYGIENIC_BEE_PROMPT).toContain('hive_skill("code-reviewer")');
+  it('preserves existing plan-review and code-reviewer paths via native skill tool', () => {
+    expect(HYGIENIC_BEE_PROMPT).toContain('code-reviewer');
+    expect(HYGIENIC_BEE_PROMPT).toContain('native skill');
     expect(HYGIENIC_BEE_PROMPT).toContain('Review plan WITHIN the stated approach');
   });
 });
@@ -586,7 +587,7 @@ describe('Hygienic (Consultant/Reviewer) prompt', () => {
 
   it('routes implementation verification to verification-reviewer', () => {
     expect(HYGIENIC_BEE_PROMPT).toContain('verification-reviewer');
-    expect(HYGIENIC_BEE_PROMPT).toContain('hive_skill("verification-reviewer")');
+    expect(HYGIENIC_BEE_PROMPT).toContain('native skill');
     expect(HYGIENIC_BEE_PROMPT).toContain('evidence-backed report format');
   });
 
@@ -746,6 +747,26 @@ describe('AGENTS.md tool guidance', () => {
     it('contains agents-md-mastery skill reference', () => {
       expect(SWARM_BEE_PROMPT).toContain('agents-md-mastery');
     });
+  });
+});
+
+describe('no hive_skill references in agent prompts', () => {
+  const hiveSkillCallPattern = /hive_skill\(/;
+
+  it('Hive prompt does not contain hive_skill(', () => {
+    expect(QUEEN_BEE_PROMPT).not.toMatch(hiveSkillCallPattern);
+  });
+
+  it('Swarm prompt does not contain hive_skill(', () => {
+    expect(SWARM_BEE_PROMPT).not.toMatch(hiveSkillCallPattern);
+  });
+
+  it('Forager prompt does not contain hive_skill(', () => {
+    expect(FORAGER_BEE_PROMPT).not.toMatch(hiveSkillCallPattern);
+  });
+
+  it('Hygienic prompt does not contain hive_skill(', () => {
+    expect(HYGIENIC_BEE_PROMPT).not.toMatch(hiveSkillCallPattern);
   });
 });
 
