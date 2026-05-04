@@ -131,7 +131,7 @@ Chat with OpenCode. Ask it to "create a feature for user authentication" and Hiv
 ### What you get
 
 - **7 agents** — Unified mode: `hive-master` handles planning + orchestration. Dedicated mode: `architect-planner` + `swarm-orchestrator`. Plus `scout-researcher`, `forager-worker`, `hygienic-reviewer`, `hive-helper`.
-- **18 MCP tools** — Full lifecycle: feature, plan, tasks, worktrees, context, merge, status, skills, agents-md, research.
+- **17 MCP tools** — Full lifecycle: feature, plan, tasks, worktrees, context, merge, status, agents-md, research.
 - **11 skills** — Same library as Claude Code, loaded via OpenCode's native `skill` tool.
 - **Compaction recovery** — OpenCode sessions compact on long runs; Hive stores durable session metadata in `.hive/sessions.json` so agents re-anchor with the correct role after compaction.
 - **Optional research MCPs** — Exa web search, Context7 docs, grep.app, ast-grep. Disable individually via `disableMcps`.
@@ -317,7 +317,7 @@ See [PHILOSOPHY.md](PHILOSOPHY.md) for the full evolution log.
 
 | Package | Registry | Description |
 |---|---|---|
-| [`opencode-hive`](https://www.npmjs.com/package/opencode-hive) | npm | OpenCode plugin — full runtime, 7 agents, 18 tools |
+| [`opencode-hive`](https://www.npmjs.com/package/opencode-hive) | npm | OpenCode plugin — full runtime, 7 agents, 17 tools |
 | [`claude-code-hive`](https://www.npmjs.com/package/claude-code-hive) | npm | Claude Code plugin assets — agents, skills, hooks, `/hive` |
 | [`@tctinh/agent-hive-mcp`](https://www.npmjs.com/package/@tctinh/agent-hive-mcp) | npm | MCP gate-tools server (used by Claude Code) |
 | [`vscode-hive`](https://marketplace.visualstudio.com/items?itemName=tctinh.vscode-hive) | VS Code Marketplace | Sidebar, plan review, LM tool bridge |
