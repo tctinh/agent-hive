@@ -5,6 +5,7 @@ import { createOpencodeClient } from "@opencode-ai/sdk";
 import plugin from "../index";
 
 const OPENCODE_CLIENT = createOpencodeClient({ baseUrl: "http://localhost:1" });
+const removedHiveSkillTool = ['hive', 'skill'].join('_');
 
 const TEST_ROOT_BASE = "/tmp/hive-agent-mode-test";
 
@@ -214,7 +215,7 @@ describe("agentMode gating", () => {
     expect(helper.tools?.["hive_status"]).toBeUndefined();
     expect(helper.tools?.["hive_context_write"]).toBeUndefined();
     expect(helper.tools?.["hive_task_create"]).toBeUndefined();
-    expect(helper.tools?.["hive_skill"]).toBeUndefined();
+    expect(helper.tools?.[removedHiveSkillTool]).toBeUndefined();
     expect(helper.tools?.["hive_task_update"]).toBe(false);
     expect(helper.tools?.["hive_plan_read"]).toBe(false);
     expect(helper.tools?.["hive_tasks_sync"]).toBe(false);

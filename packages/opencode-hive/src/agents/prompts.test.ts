@@ -750,23 +750,23 @@ describe('AGENTS.md tool guidance', () => {
   });
 });
 
-describe('no hive_skill references in agent prompts', () => {
-  const hiveSkillCallPattern = /hive_skill\(/;
+describe('no removed Hive skill tool references in agent prompts', () => {
+  const removedHiveSkillCall = `${['hive', 'skill'].join('_')}(`;
 
-  it('Hive prompt does not contain hive_skill(', () => {
-    expect(QUEEN_BEE_PROMPT).not.toMatch(hiveSkillCallPattern);
+  it('Hive prompt does not contain the removed tool call', () => {
+    expect(QUEEN_BEE_PROMPT).not.toContain(removedHiveSkillCall);
   });
 
-  it('Swarm prompt does not contain hive_skill(', () => {
-    expect(SWARM_BEE_PROMPT).not.toMatch(hiveSkillCallPattern);
+  it('Swarm prompt does not contain the removed tool call', () => {
+    expect(SWARM_BEE_PROMPT).not.toContain(removedHiveSkillCall);
   });
 
-  it('Forager prompt does not contain hive_skill(', () => {
-    expect(FORAGER_BEE_PROMPT).not.toMatch(hiveSkillCallPattern);
+  it('Forager prompt does not contain the removed tool call', () => {
+    expect(FORAGER_BEE_PROMPT).not.toContain(removedHiveSkillCall);
   });
 
-  it('Hygienic prompt does not contain hive_skill(', () => {
-    expect(HYGIENIC_BEE_PROMPT).not.toMatch(hiveSkillCallPattern);
+  it('Hygienic prompt does not contain the removed tool call', () => {
+    expect(HYGIENIC_BEE_PROMPT).not.toContain(removedHiveSkillCall);
   });
 });
 

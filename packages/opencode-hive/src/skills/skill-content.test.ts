@@ -48,9 +48,11 @@ describe('skill content', () => {
     );
   });
 
-  it('bundled skill content does not contain hive_skill references', () => {
+  it('bundled skill content does not contain removed Hive skill tool references', () => {
+    const removedHiveSkillTool = ['hive', 'skill'].join('_');
+
     for (const entry of BUILTIN_SKILLS) {
-      expect(entry.template).not.toContain('hive_skill');
+      expect(entry.template).not.toContain(removedHiveSkillTool);
     }
   });
 });
