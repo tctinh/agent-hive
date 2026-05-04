@@ -53,7 +53,7 @@ For execution work, treat worker output as evidence to inspect, not proof to tru
 
 ### Local skill and model use cases
 
-- **Local skill experiments:** keep a skill in `<project>/.opencode/skills/<id>/SKILL.md` or `<project>/.claude/skills/<id>/SKILL.md` and add it to `autoLoadSkills` for that repo only. User file skills are discovered through OpenCode's native `.opencode`, `.claude`, `.agents`, `skills.paths`, or `skills.urls` mechanisms and loaded with the native `skill` tool.
+- **Local skill experiments:** keep a skill in `<project>/.opencode/skills/<id>/SKILL.md` or `<project>/.claude/skills/<id>/SKILL.md`, then load it with OpenCode's native `skill` tool or reference it in agent instructions. User file skills are discovered through OpenCode's native `.opencode`, `.claude`, `.agents`, `skills.paths`, or `skills.urls` mechanisms; Hive does not inject them through `autoLoadSkills`.
 - **Local model tuning:** set per-agent models or variants in `<project>/.hive/agent-hive.json` when you want a repository-specific routing setup without changing your global OpenCode defaults.
 
 #### Canonical Delegation Threshold
@@ -312,15 +312,7 @@ Skills are loaded through OpenCode's native `skill` tool, not through a Hive plu
 }
 ```
 
-`autoLoadSkills` accepts both Hive builtin skill IDs and file-based skill IDs. Resolution order:
-
-1. **Hive builtin** — Skills bundled with opencode-hive (always win if ID matches)
-2. **Project OpenCode** — `<project>/.opencode/skills/<id>/SKILL.md`
-3. **Global OpenCode** — `~/.config/opencode/skills/<id>/SKILL.md`
-4. **Project Claude** — `<project>/.claude/skills/<id>/SKILL.md`
-5. **Global Claude** — `~/.claude/skills/<id>/SKILL.md`
-
-Skill IDs must be safe directory names (no `/`, `\`, `..`, or `.`). Missing or invalid skills emit a warning and are skipped — startup continues without failure.
+`autoLoadSkills` injects only eligible Hive bundled skill bodies. Disabled Hive skills, Hive skills shadowed by native/user skills, and URL-unsafe Hive skills are skipped. File-based skill IDs are not resolved by Hive; they emit a warning and should be loaded through OpenCode's native `skill` tool. Startup continues without failure.
 
 **How `skills` and `autoLoadSkills` interact:**
 

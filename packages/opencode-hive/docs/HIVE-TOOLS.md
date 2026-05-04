@@ -145,6 +145,7 @@ Skills are loaded via OpenCode's native `skill` tool. Hive bundles are materiali
 |------|--------|
 | `hive_subtask_*` (5 tools) | Subtask complexity not needed, use todowrite instead |
 | `hive_session_*` (2 tools) | Replaced by `hive_status` |
+| Custom Hive skill-loading tool | Replaced by OpenCode's native `skill` tool |
 | `hive_context_read` | Agents can read files directly |
 | `hive_context_list` | Agents can use glob/Read |
 
