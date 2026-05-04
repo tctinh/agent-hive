@@ -132,7 +132,7 @@ Chat with OpenCode. Ask it to "create a feature for user authentication" and Hiv
 
 - **7 agents** — Unified mode: `hive-master` handles planning + orchestration. Dedicated mode: `architect-planner` + `swarm-orchestrator`. Plus `scout-researcher`, `forager-worker`, `hygienic-reviewer`, `hive-helper`.
 - **18 MCP tools** — Full lifecycle: feature, plan, tasks, worktrees, context, merge, status, skills, agents-md, research.
-- **11 skills** — Same library as Claude Code, loaded via the `hive_skill` tool.
+- **11 skills** — Same library as Claude Code, loaded via OpenCode's native `skill` tool.
 - **Compaction recovery** — OpenCode sessions compact on long runs; Hive stores durable session metadata in `.hive/sessions.json` so agents re-anchor with the correct role after compaction.
 - **Optional research MCPs** — Exa web search, Context7 docs, grep.app, ast-grep. Disable individually via `disableMcps`.
 
@@ -241,7 +241,7 @@ Independent tasks run concurrently. Dependent tasks wait. Each worker runs in it
 | **Worker dispatch** | `Agent` tool (native) | OpenCode subagent system | N/A |
 | **Worktree isolation** | `isolation: worktree` (auto) | `hive_worktree_*` tools | N/A |
 | **MCP runtime** | `@tctinh/agent-hive-mcp` sidecar | `opencode-hive` plugin (in-process) | Built-in LM tool bridge |
-| **Skills** | 11 bundled | 11 via `hive_skill` | N/A |
+| **Skills** | 11 bundled | 11 via native `skill` | N/A |
 | **Context injection** | `SessionStart` hook | Compaction hooks + sessions.json | Watches `.hive/` passively |
 | **Distribution** | Plugin marketplace + npm | npm (via `opencode.json`) | VS Code Marketplace |
 

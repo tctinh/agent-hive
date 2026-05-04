@@ -37,7 +37,7 @@
       "items": {
         "type": "string"
       },
-      "description": "Globally disable specific skills (e.g., ['brainstorming', 'writing-plans']). Disabled skills won't appear in hive_skill tool."
+      "description": "Globally disable specific Hive bundled skills (e.g., ['brainstorming', 'writing-plans']). Disabled skills are excluded from materialization and autoload. Does not block user or native skills with the same name."
     },
     "disableMcps": {
       "type": "array",
@@ -157,7 +157,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Skills enabled for this agent"
+          "description": "Legacy field kept for config compatibility. Native skill visibility is controlled by OpenCode skills.paths registration and disableSkills, not by per-agent skills allowlists."
         },
         "autoLoadSkills": {
           "type": "array",

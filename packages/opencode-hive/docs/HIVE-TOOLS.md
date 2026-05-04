@@ -134,10 +134,8 @@
 |------|---------|
 | `hive_agents_md` | Initialize or sync AGENTS.md from codebase or feature context |
 
-### Skill (1 tool)
-| Tool | Purpose |
-|------|---------|
-| `hive_skill` | Load a Hive skill by name |
+### Skill
+Skills are loaded via OpenCode's native `skill` tool. Hive bundles are materialized into `.hive/generated/opencode-skills/` and registered through `skills.paths`. No Hive plugin tool is used for skill loading.
 
 ---
 
