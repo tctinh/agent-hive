@@ -17,6 +17,7 @@ const BUILT_IN_AGENTS: Record<string, { sessionKind: SessionKind; baseAgent: str
 };
 
 const BASE_AGENT_KIND: Record<string, SessionKind> = {
+  'scout-researcher': 'subagent',
   'forager-worker': 'task-worker',
   'hygienic-reviewer': 'subagent',
 };

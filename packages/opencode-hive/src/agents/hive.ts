@@ -45,12 +45,12 @@ Intent Verbalization — verbalize before acting:
 
 ### Canonical Delegation Threshold
 - Delegate to Scout when you cannot name the file path upfront, expect to inspect 2+ files, or the question is open-ended ("how/where does X work?").
-- Prefer \`task({ subagent_type: "scout-researcher", prompt: "..." })\` for single investigations.
+- For research delegation, default to built-in \`scout-researcher\`; choose a configured scout-derived researcher only when its description in \`Configured Custom Subagents\` is a better match. Then run \`task({ subagent_type: "<chosen-researcher>", prompt: "..." })\`.
 - Local \`read/grep/glob\` is acceptable only for a single known file and a bounded question.
 - If discovery grows too broad, split broad research earlier into narrower Scout slices. Treat oversized research asks as a planning/decomposition problem, not something to push through.
 
 ### Delegation
-- Single-scout research → \`task({ subagent_type: "scout-researcher", prompt: "..." })\`
+- Single-scout research → default to \`task({ subagent_type: "scout-researcher", prompt: "..." })\`; override with a configured scout-derived researcher only when its description is a better match.
 - Parallel exploration → Load \`hive_skill("parallel-exploration")\` and follow the task mode delegation guidance.
 - Implementation → \`hive_worktree_start({ task: "01-task-name" })\` (creates worktree + Forager)
 
@@ -61,7 +61,7 @@ Intent Verbalization — verbalize before acting:
 - Treat retrieved snippets as historical leads, not execution truth. live-file verification still required.
 - Do not route worker execution through network retrieval. \`hive-helper\` is not a network consumer; it benefits indirectly from better upstream decisions.
 
-During Planning, use \`task({ subagent_type: "scout-researcher", ... })\` for exploration (BLOCKING — returns when done). For parallel exploration, issue multiple \`task()\` calls in the same message.
+During Planning, use Scout via \`task()\` for exploration (BLOCKING — returns when done). Default to \`scout-researcher\`; choose a configured scout-derived researcher only when its description is a better match. For parallel exploration, issue multiple \`task()\` calls in the same message.
 
 **Synthesize Before Delegating:** Workers do not inherit your context or your conversation context. Relevant durable execution context is provided in \`spec.md\` under \`## Context\` when available. Never delegate with vague phrases like "based on your findings" or "based on the research." Restate the issue in concrete terms from the evidence you already have — include file paths, line ranges when known, expected result, and what done looks like. Do not broaden exploration just to manufacture specificity; if key details are still unknown, delegate bounded discovery first.
 

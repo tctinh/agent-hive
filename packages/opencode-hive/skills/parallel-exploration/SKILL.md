@@ -61,10 +61,12 @@ Split your investigation into 2-4 independent sub-questions. Each sub-question s
 
 Launch all tasks before waiting for any results:
 
+Choose the researcher per slice. Default to `scout-researcher`; use a configured scout-derived custom subagent only when its description in `Configured Custom Subagents` is a better match for that slice.
+
 ```typescript
 // Parallelize by issuing multiple task() calls in the same assistant message.
 task({
-  subagent_type: 'scout-researcher',
+  subagent_type: '<chosen-researcher>',
   description: 'Find API route implementation',
   prompt: `Where are API routes implemented and registered?
     - Find the tool definition
@@ -73,7 +75,7 @@ task({
 });
 
 task({
-  subagent_type: 'scout-researcher',
+  subagent_type: '<chosen-researcher>',
   description: 'Analyze background task concurrency',
   prompt: `How does background task concurrency/queueing work?
     - Find the manager/scheduler code
@@ -82,7 +84,7 @@ task({
 });
 
 task({
-  subagent_type: 'scout-researcher',
+  subagent_type: '<chosen-researcher>',
   description: 'Find parent notification mechanism',
   prompt: `How does parent notification work for background tasks?
     - Where is the notification built?
@@ -92,7 +94,7 @@ task({
 ```
 
 **Key points:**
-- Use `subagent_type: 'scout-researcher'` for read-only exploration
+- Use `subagent_type: 'scout-researcher'` for read-only exploration unless a configured scout-derived custom subagent is a better match
 - Give each task a clear, focused `description`
 - Make prompts specific about what evidence to return
 
@@ -171,19 +173,19 @@ Return:
 ```typescript
 // Parallelize by issuing multiple task() calls in the same assistant message.
 task({
-  subagent_type: 'scout-researcher',
+  subagent_type: '<chosen-researcher>',
   description: 'Find API route implementation',
   prompt: 'Where are API routes implemented? Find tool definition and registration.',
 });
 
 task({
-  subagent_type: 'scout-researcher',
+  subagent_type: '<chosen-researcher>',
   description: 'Analyze concurrency model',
   prompt: 'How does background task concurrency work? Find the manager/scheduler.',
 });
 
 task({
-  subagent_type: 'scout-researcher',
+  subagent_type: '<chosen-researcher>',
   description: 'Find notification mechanism',
   prompt: 'How are parent sessions notified of task completion?',
 });
