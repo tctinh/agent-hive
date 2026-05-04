@@ -14,3 +14,12 @@ export {
   type BuiltinSkillName 
 } from './builtin.js';
 export { loadFileSkill } from './file-loader.js';
+export {
+  parseNativeSkillMarkdown,
+  prepareNativeHiveSkills,
+  resolvePackagedSkillsDir,
+  type ParsedNativeSkill,
+  type PreparedHiveSkill,
+  type PreparedNativeHiveSkills,
+  type PrepareNativeHiveSkillsInput,
+} from './native-materializer.js';
