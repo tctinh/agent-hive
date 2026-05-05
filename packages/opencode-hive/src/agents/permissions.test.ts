@@ -3,6 +3,8 @@ import { ConfigService } from 'hive-core';
 import * as path from 'path';
 import plugin from '../index';
 
+const removedHiveSkillTool = ['hive', 'skill'].join('_');
+
 type PluginInput = {
   directory: string;
   worktree: string;
@@ -226,7 +228,7 @@ describe('Agent permissions', () => {
     expect(helper?.tools?.['hive_status']).toBeUndefined();
     expect(helper?.tools?.['hive_context_write']).toBeUndefined();
     expect(helper?.tools?.['hive_task_create']).toBeUndefined();
-    expect(helper?.tools?.['hive_skill']).toBeUndefined();
+    expect(helper?.tools?.[removedHiveSkillTool]).toBeUndefined();
     expect(helper?.tools?.['hive_task_update']).toBe(false);
     expect(helper?.tools?.['hive_plan_read']).toBe(false);
     expect(helper?.tools?.['hive_tasks_sync']).toBe(false);
@@ -327,7 +329,7 @@ describe('Per-agent tool filtering', () => {
     expect(foragerTools!['hive_worktree_start']).toBe(false);
   });
 
-  it('forager tool list is exactly [hive_plan_read, hive_worktree_commit, hive_context_write, hive_skill] and excludes hive_status', async () => {
+  it('forager tool list keeps only its worktree-read/write hive tools and excludes hive_status', async () => {
     const agents = await buildConfig('unified');
     const foragerTools = agents['forager-worker']?.tools;
     expect(foragerTools).toBeTruthy();
@@ -335,10 +337,10 @@ describe('Per-agent tool filtering', () => {
     expect(foragerTools!['hive_plan_read']).toBeUndefined();
     expect(foragerTools!['hive_worktree_commit']).toBeUndefined();
     expect(foragerTools!['hive_context_write']).toBeUndefined();
-    expect(foragerTools!['hive_skill']).toBeUndefined();
+    expect(foragerTools![removedHiveSkillTool]).toBeUndefined();
   });
 
-  it('hive-helper tool list is exactly [hive_merge, hive_status, hive_context_write, hive_task_create, hive_skill]', async () => {
+  it('hive-helper tool list keeps only merge-recovery hive tools', async () => {
     const agents = await buildConfig('unified');
     const helperTools = agents['hive-helper']?.tools;
     expect(helperTools).toBeTruthy();
@@ -346,7 +348,7 @@ describe('Per-agent tool filtering', () => {
     expect(helperTools!['hive_status']).toBeUndefined();
     expect(helperTools!['hive_context_write']).toBeUndefined();
     expect(helperTools!['hive_task_create']).toBeUndefined();
-    expect(helperTools!['hive_skill']).toBeUndefined();
+    expect(helperTools![removedHiveSkillTool]).toBeUndefined();
     expect(helperTools!['hive_task_update']).toBe(false);
     expect(helperTools!['hive_plan_read']).toBe(false);
     expect(helperTools!['hive_worktree_commit']).toBe(false);

@@ -142,7 +142,7 @@ hive_worktree_commit({
 
 When sandbox mode is active, bash commands run inside Docker; file edits still apply to the host worktree.
 If a command must run on the host or Docker is missing, report blocked.
-For deeper Docker expertise, load \`hive_skill("docker-mastery")\`.
+For deeper Docker expertise, load the native skill "docker-mastery".
 `;
 
 export const foragerBeeAgent = {

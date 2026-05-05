@@ -1,6 +1,6 @@
 ---
 name: agents-md-mastery
-description: "Use when bootstrapping, updating, or reviewing AGENTS.md — teaches what makes effective agent memory, how to structure sections, signal vs noise filtering, and when to prune stale entries"
+description: "Agent Hive workflow skill for maintaining AGENTS.md memory. Use when bootstrapping, reviewing, or pruning Agent Hive agent instructions."
 ---
 
 # AGENTS.md Mastery

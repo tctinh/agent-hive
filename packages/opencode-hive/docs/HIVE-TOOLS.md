@@ -1,6 +1,6 @@
 # Hive Tools Inventory
 
-## Tools (18 total)
+## Tools (17 total)
 
 ### Feature Management (2 tools)
 | Tool | Purpose |
@@ -134,10 +134,8 @@
 |------|---------|
 | `hive_agents_md` | Initialize or sync AGENTS.md from codebase or feature context |
 
-### Skill (1 tool)
-| Tool | Purpose |
-|------|---------|
-| `hive_skill` | Load a Hive skill by name |
+### Skill Loading
+Skills are loaded via OpenCode's native `skill` tool. Hive bundles are materialized into `.hive/generated/opencode-skills/` and registered through `skills.paths`. No Hive plugin tool is used for skill loading.
 
 ---
 
@@ -147,6 +145,7 @@
 |------|--------|
 | `hive_subtask_*` (5 tools) | Subtask complexity not needed, use todowrite instead |
 | `hive_session_*` (2 tools) | Replaced by `hive_status` |
+| Custom Hive skill-loading tool | Replaced by OpenCode's native `skill` tool |
 | `hive_context_read` | Agents can read files directly |
 | `hive_context_list` | Agents can use glob/Read |
 
@@ -165,8 +164,7 @@
 | Network | 1 | query |
 | Status | 1 | status |
 | AGENTS.md | 1 | agents_md |
-| Skill | 1 | skill |
-| **Total** | **18** | |
+| **Total** | **17** | |
 
 ## Reserved Overview Convention
 

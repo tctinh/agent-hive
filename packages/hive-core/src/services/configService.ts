@@ -377,8 +377,7 @@ export class ConfigService {
       : additionalAutoLoadSkills.filter((skill) => skill !== 'onboarding');
     const combinedAutoLoadSkills = [...baseAutoLoadSkills, ...effectiveAdditionalSkills];
     const uniqueAutoLoadSkills = Array.from(new Set(combinedAutoLoadSkills));
-    const disabledSkills = this.getDisabledSkills();
-    return uniqueAutoLoadSkills.filter((skill) => !disabledSkills.includes(skill));
+    return uniqueAutoLoadSkills;
   }
 
   /**

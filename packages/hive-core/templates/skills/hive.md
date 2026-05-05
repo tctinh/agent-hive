@@ -42,7 +42,7 @@ Use MCP tools for focused research; for multi-domain exploration, use parallel S
 | `ast_grep_find_code` / `ast_grep_find_code_by_rule` | AST-aware code search |
 | `task()` | Parallel exploration via Scout fan-out | 
 
-For exploratory fan-out, load `hive_skill("parallel-exploration")` for the full playbook.
+For exploratory fan-out, load the `parallel-exploration` skill for the full playbook.
 
 ---
 
@@ -74,7 +74,7 @@ Classify Intent → Discovery → Plan → Review → Execute → Merge
 
 ### Research First (Greenfield/Complex)
 
-For parallel exploration, load `hive_skill("parallel-exploration")`.
+For parallel exploration, load the `parallel-exploration` skill.
 
 ### Question Tool
 

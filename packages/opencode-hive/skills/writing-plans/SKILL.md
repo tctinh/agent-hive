@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code
+description: "Agent Hive workflow skill for turning requirements into an approved Hive implementation plan before code changes."
 ---
 
 # Writing Plans
@@ -161,4 +161,4 @@ Which approach?
 
 **If Parallel Session chosen:**
 - Guide them to open new session in worktree
-- **REQUIRED SUB-SKILL:** New session uses hive_skill:executing-plans
+- **REQUIRED SUB-SKILL:** New session uses \`skill({ name: "executing-plans" })\`
