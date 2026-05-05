@@ -300,6 +300,26 @@ describe('prepareNativeHiveSkills - materialization behavior', () => {
     expect(result.materializedPath).toBeDefined();
     expect(result.skillPaths).toEqual([result.materializedPath!, userPathOne, userPathTwo]);
   });
+
+  it('uses the OpenCode config directory when the resolved worktree is the filesystem root', async () => {
+    const homeDir = createTempDir();
+    const bundledSkillsDir = path.join(homeDir, 'fixtures', 'bundled-skills');
+    const expectedRoot = path.join(homeDir, '.config', 'opencode', 'agent-hive', 'generated', 'opencode-skills');
+
+    createBundledSkillDir(bundledSkillsDir, 'safe-skill');
+
+    const result = await prepareNativeHiveSkills({
+      directory: path.parse(process.cwd()).root,
+      worktree: path.parse(process.cwd()).root,
+      packagedSkillsDir: bundledSkillsDir,
+      env: { HOME: homeDir },
+    });
+
+    expect(result.materializedPath).toBeDefined();
+    expect(result.materializedPath!.startsWith(`${expectedRoot}${path.sep}`)).toBe(true);
+    expect(result.materializedPath!.startsWith(path.join(path.parse(process.cwd()).root, '.hive'))).toBe(false);
+    expect(result.skillPaths[0]).toBe(result.materializedPath!);
+  });
 });
 
 describe('prepareNativeHiveSkills - native discovery parity', () => {

@@ -208,12 +208,30 @@ function isTruthyEnv(value: string | undefined): boolean {
   return normalized !== '' && normalized !== '0' && normalized !== 'false' && normalized !== 'no';
 }
 
-function generatedSkillsRoot(worktree: string): string {
+function isFilesystemRoot(candidatePath: string): boolean {
+  const resolved = path.resolve(candidatePath);
+  return resolved === path.parse(resolved).root;
+}
+
+function generatedSkillsRoot(
+  worktree: string,
+  homeDir: string,
+  env: Record<string, string | undefined>,
+): string {
+  if (isFilesystemRoot(worktree)) {
+    return path.join(getGlobalOpenCodeConfigDir(env, homeDir), 'agent-hive', 'generated', 'opencode-skills');
+  }
+
   return path.join(worktree, ...GENERATED_SKILLS_SEGMENTS);
 }
 
-function isHiveManagedSkillsPath(candidatePath: string, worktree: string): boolean {
-  const root = generatedSkillsRoot(path.resolve(worktree));
+function isHiveManagedSkillsPath(
+  candidatePath: string,
+  worktree: string,
+  homeDir: string,
+  env: Record<string, string | undefined>,
+): boolean {
+  const root = generatedSkillsRoot(path.resolve(worktree), homeDir, env);
   const resolved = path.resolve(candidatePath);
   return resolved === root || resolved.startsWith(`${root}${path.sep}`);
 }
@@ -622,12 +640,13 @@ export async function prepareNativeHiveSkills(
 ): Promise<PreparedNativeHiveSkills> {
   const logger = getLogger(input.logger);
   const homeDir = getHomeDir(input);
+  const env = { ...process.env, ...input.env };
   const packagedSkillsDir = input.packagedSkillsDir ?? resolvePackagedSkillsDir(input.moduleUrl);
   const bundledSkills = await readBundledSkills(packagedSkillsDir, logger);
   const disabledSkills = new Set(input.disableSkills ?? []);
   const resolvedUserPaths = (input.opencodeConfig?.skills?.paths ?? [])
     .map((skillPath) => resolveConfiguredSkillPath(skillPath, input.directory, homeDir))
-    .filter((skillPath) => !isHiveManagedSkillsPath(skillPath, input.worktree));
+    .filter((skillPath) => !isHiveManagedSkillsPath(skillPath, input.worktree, homeDir, env));
   const localNativeSkills = await scanLocalNativeSkills(input, resolvedUserPaths, logger);
   const urlScan = await scanUrlNativeSkills(input, logger);
 
@@ -678,7 +697,7 @@ export async function prepareNativeHiveSkills(
   }
 
   const hash = buildGeneratedHash(eligibleSkills, disabledSkills, allConflicts);
-  const generatedRoot = generatedSkillsRoot(input.worktree);
+  const generatedRoot = generatedSkillsRoot(input.worktree, homeDir, env);
   const { materializedPath, skillsByName } = await materializeSkills(generatedRoot, hash, eligibleSkills);
   await cleanupStaleMaterializations(generatedRoot, hash);
 
