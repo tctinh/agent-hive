@@ -1,6 +1,6 @@
 ---
 name: parallel-exploration
-description: Use when you need parallel, read-only exploration with task() (Scout fan-out)
+description: "Agent Hive workflow skill for Scout fan-out. Use when a Hive agent needs parallel, read-only exploration through task()."
 ---
 
 # Parallel Exploration (Scout Fan-Out)

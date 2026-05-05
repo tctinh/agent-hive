@@ -1,6 +1,6 @@
 ---
 name: executing-plans
-description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
+description: "Agent Hive workflow skill for executing an approved Hive implementation plan in a separate session with review checkpoints."
 ---
 
 # Executing Plans

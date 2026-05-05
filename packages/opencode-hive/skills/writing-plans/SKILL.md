@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code
+description: "Agent Hive workflow skill for turning requirements into an approved Hive implementation plan before code changes."
 ---
 
 # Writing Plans
