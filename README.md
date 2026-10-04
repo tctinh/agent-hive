@@ -1,5 +1,28 @@
 # Agent Hive
 
+## Status: retired — moved to Agentic Hive
+
+**Agent Hive is no longer maintained. Active development has moved to
+[Agentic Hive](https://github.com/tctinh/agentic-hive).**
+
+The old Hive method was built around a prescribed **Plan → Approve → Execute**
+workflow, fixed agent roles, and orchestrated task batches. I am retiring this
+approach because I no longer consider it a good fit for the judgment, creativity,
+and autonomy of newer, more capable generalist agents.
+
+Agentic Hive takes a different approach: a persistent Unix habitat that supplies
+the environment, shared awareness, durable context, collision avoidance, and
+session mechanics. Members supply reasoning, creativity, and implementation;
+the human Beekeeper supplies intent, taste, and final semantic authority.
+
+This repository is retained as a historical reference. There will be no further
+development, fixes, or releases here. For current documentation, setup, and
+discussion, visit **[tctinh/agentic-hive](https://github.com/tctinh/agentic-hive)**.
+
+---
+
+The documentation below describes the retired Agent Hive system.
+
 **Plan first. Execute with trust. Context persists.**
 
 Agent Hive is a workflow layer that sits on top of your AI coding tool. It imposes just enough structure to make multi-agent, multi-step work traceable and recoverable — without taking ownership of your editor, your model, or your coding style.
