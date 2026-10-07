@@ -1663,30 +1663,21 @@ var DEFAULT_HIVE_CONFIG = {
     "hive-master": {
       model: DEFAULT_AGENT_MODELS["hive-master"],
       temperature: 0.5,
-      skills: [
-        "brainstorming",
-        "writing-plans",
-        "dispatching-parallel-agents",
-        "executing-plans"
-      ],
       autoLoadSkills: ["parallel-exploration"]
     },
     "architect-planner": {
       model: DEFAULT_AGENT_MODELS["architect-planner"],
       temperature: 0.7,
-      skills: ["brainstorming", "writing-plans"],
       autoLoadSkills: ["parallel-exploration"]
     },
     "swarm-orchestrator": {
       model: DEFAULT_AGENT_MODELS["swarm-orchestrator"],
       temperature: 0.5,
-      skills: ["dispatching-parallel-agents", "executing-plans"],
       autoLoadSkills: []
     },
     "scout-researcher": {
       model: DEFAULT_AGENT_MODELS["scout-researcher"],
       temperature: 0.5,
-      skills: [],
       autoLoadSkills: []
     },
     "forager-worker": {
@@ -1702,7 +1693,6 @@ var DEFAULT_HIVE_CONFIG = {
     "hygienic-reviewer": {
       model: DEFAULT_AGENT_MODELS["hygienic-reviewer"],
       temperature: 0.3,
-      skills: ["systematic-debugging", "code-reviewer"],
       autoLoadSkills: []
     }
   }

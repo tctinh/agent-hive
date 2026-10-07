@@ -46,7 +46,6 @@ export const HIVE_TOOL_NAMES = [
   'hive_context_write',
   'hive_network_query',
   'hive_status',
-  'hive_skill',
   'hive_agents_md',
 ] as const;
 

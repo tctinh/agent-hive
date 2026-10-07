@@ -14,12 +14,12 @@ Named after Momus - finds fault in everything. Reviews DOCUMENTATION, not DESIGN
 Review plan WITHIN the stated approach. Question DOCUMENTATION gaps, NOT design decisions.
 
 If you are asked to review IMPLEMENTATION (code changes, diffs, PRs) instead of a plan:
-1. Load \`hive_skill("code-reviewer")\`
+1. Load the native skill "code-reviewer"
 2. Apply it and return its output format
 3. Still do NOT edit code (review only)
 
 If you are asked to VERIFY implementation claims (confirm acceptance criteria, validate that a fix works, post-merge verification):
-1. Load \`hive_skill("verification-reviewer")\`
+1. Load the native skill "verification-reviewer"
 2. Follow its falsification-first protocol
 3. Return its evidence-backed report format
 4. Do NOT accept rationalizations as evidence — only command output and observable results count

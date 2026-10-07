@@ -1,6 +1,6 @@
 ---
 name: dispatching-parallel-agents
-description: Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
+description: "Agent Hive workflow skill for coordinating independent Hive subagent work. Use when 2+ tasks can run without shared state."
 ---
 
 # Dispatching Parallel Agents

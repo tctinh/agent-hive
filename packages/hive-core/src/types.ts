@@ -194,9 +194,9 @@ export interface AgentModelConfig {
   model?: string;
   /** Temperature for generation (0-2) */
   temperature?: number;
-  /** Skills to enable for this agent */
+  /** Skills to enable for this agent (legacy; native skill visibility is controlled by OpenCode registration, not by this allowlist) */
   skills?: string[];
-  /** Skills to auto-load for this agent */
+  /** Native discovered or Hive bundled skill names to inject into this agent prompt at startup */
   autoLoadSkills?: string[];
   /** Variant key for model reasoning/effort level (e.g., 'low', 'medium', 'high', 'max') */
   variant?: string;
@@ -238,6 +238,7 @@ export interface CustomAgentConfig {
   model?: string;
   temperature?: number;
   variant?: string;
+  /** Additional native discovered or Hive bundled skill names to inject into this custom agent prompt at startup */
   autoLoadSkills?: string[];
 }
 
@@ -251,7 +252,7 @@ export interface HiveConfig {
   $schema?: string;
   /** Enable hive tools for specific features */
   enableToolsFor?: string[];
-  /** Globally disable specific skills (won't appear in hive_skill tool) */
+  /** Globally disable specific Hive bundled skills (excluded from materialization and autoload). Does not block user or native skills with the same name. */
   disableSkills?: string[];
   /** Globally disable specific MCP servers. Available: websearch, context7, grep_app, ast_grep */
   disableMcps?: string[];
@@ -324,30 +325,21 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
     'hive-master': {
       model: DEFAULT_AGENT_MODELS['hive-master'],
       temperature: 0.5,
-      skills: [
-        'brainstorming',
-        'writing-plans',
-        'dispatching-parallel-agents',
-        'executing-plans',
-      ],
       autoLoadSkills: ['parallel-exploration'],
     },
     'architect-planner': {
       model: DEFAULT_AGENT_MODELS['architect-planner'],
       temperature: 0.7,
-      skills: ['brainstorming', 'writing-plans'],
       autoLoadSkills: ['parallel-exploration'],
     },
     'swarm-orchestrator': {
       model: DEFAULT_AGENT_MODELS['swarm-orchestrator'],
       temperature: 0.5,
-      skills: ['dispatching-parallel-agents', 'executing-plans'],
       autoLoadSkills: [],
     },
     'scout-researcher': {
       model: DEFAULT_AGENT_MODELS['scout-researcher'],
       temperature: 0.5,
-      skills: [],
       autoLoadSkills: [],
     },
     'forager-worker': {
@@ -363,7 +355,6 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
     'hygienic-reviewer': {
       model: DEFAULT_AGENT_MODELS['hygienic-reviewer'],
       temperature: 0.3,
-      skills: ['systematic-debugging', 'code-reviewer'],
       autoLoadSkills: [],
     },
   },

@@ -53,7 +53,7 @@ For execution work, treat worker output as evidence to inspect, not proof to tru
 
 ### Local skill and model use cases
 
-- **Local skill experiments:** keep a skill in `<project>/.opencode/skills/<id>/SKILL.md` or `<project>/.claude/skills/<id>/SKILL.md` and add it to `skills` or `autoLoadSkills` for that repo only.
+- **Local skill experiments:** keep a skill in `<project>/.opencode/skills/<id>/SKILL.md` or `<project>/.claude/skills/<id>/SKILL.md`, then load it with OpenCode's native `skill` tool, reference it in agent instructions, or list its frontmatter `name` in `autoLoadSkills`. User file skills are discovered through OpenCode's native `.opencode`, `.claude`, `.agents`, `skills.paths`, and `skills.urls` mechanisms.
 - **Local model tuning:** set per-agent models or variants in `<project>/.hive/agent-hive.json` when you want a repository-specific routing setup without changing your global OpenCode defaults.
 
 #### Canonical Delegation Threshold
@@ -286,67 +286,40 @@ Create `.hive/agent-hive.json`:
 
 ### Per-Agent Skills
 
-Each agent can have specific skills enabled. If configured, only those skills appear in `hive_skill()`:
+Skills are loaded through OpenCode's native `skill` tool, not through a Hive plugin tool. Hive bundles are materialized into `.hive/generated/opencode-skills/<hash>/` at startup and registered via `opencodeConfig.skills.paths` ahead of any user-configured paths.
+
+**Configuration fields:**
+
+| Field | Behavior |
+|-------|----------|
+| `skills` | Legacy field kept for config compatibility. Native skill visibility is controlled by OpenCode registration and `disableSkills`, not by per-agent allowlists. |
+| `autoLoadSkills` | Injects OpenCode-discovered native skill bodies or eligible Hive bundled skill bodies into the agent's system prompt at session start. |
+| `disableSkills` (global) | Disables Hive bundled materialization and Hive bundled autoload only. User or native skills with the same name are not blocked. |
+
+**User file skills** should be configured through OpenCode's native `.opencode`, `.claude`, `.agents`, `skills.paths`, or `skills.urls` discovery. They can be loaded with the native `skill` tool or injected at startup by adding the skill's frontmatter `name` to `autoLoadSkills`. Native/user skills take precedence over Hive bundled skills with the same name.
+
+**URL-scan conservative behavior:** If configured `skills.urls` cannot be scanned for conflicts (invalid response, network error), Hive skips bundled skill materialization and Hive bundled autoload for that run and logs a warning rather than risking a native conflict. Local native skills discovered before the URL failure can still be injected; partially scanned URL skills are not injected.
+
+**Example:**
 
 ```json
 {
   "agents": {
     "hive-master": {
-      "skills": ["brainstorming", "writing-plans", "executing-plans"]
-    },
-    "forager-worker": {
-      "skills": ["test-driven-development", "verification-before-completion"]
+      "autoLoadSkills": ["brainstorming"]
     }
   }
 }
 ```
 
-**How `skills` filtering works:**
-
-| Config | Result |
-|--------|--------|
-| `skills` omitted | All skills enabled (minus global `disableSkills`) |
-| `skills: []` | All skills enabled (minus global `disableSkills`) |
-| `skills: ["tdd", "debug"]` | Only those skills enabled |
-
-Note: Wildcards like `["*"]` are **not supported** - use explicit skill names or omit the field entirely for all skills.
-
-### Auto-load Skills
-
-Use `autoLoadSkills` to automatically inject skills into an agent's system prompt at session start.
-
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/tctinh/agent-hive/main/packages/opencode-hive/schema/agent_hive.schema.json",
-  "agents": {
-    "hive-master": {
-      "autoLoadSkills": ["parallel-exploration"]
-    },
-    "forager-worker": {
-      "autoLoadSkills": ["test-driven-development", "verification-before-completion"]
-    }
-  }
-}
-```
-
-**Supported skill sources:**
-
-`autoLoadSkills` accepts both Hive builtin skill IDs and file-based skill IDs. Resolution order:
-
-1. **Hive builtin** — Skills bundled with opencode-hive (always win if ID matches)
-2. **Project OpenCode** — `<project>/.opencode/skills/<id>/SKILL.md`
-3. **Global OpenCode** — `~/.config/opencode/skills/<id>/SKILL.md`
-4. **Project Claude** — `<project>/.claude/skills/<id>/SKILL.md`
-5. **Global Claude** — `~/.claude/skills/<id>/SKILL.md`
-
-Skill IDs must be safe directory names (no `/`, `\`, `..`, or `.`). Missing or invalid skills emit a warning and are skipped—startup continues without failure.
+`autoLoadSkills` resolves names through OpenCode-native skill discovery first, then through eligible Hive bundled skills. The identity is the `name` field in `SKILL.md` frontmatter, not the containing directory name. Disabled Hive skills, Hive skills shadowed by native/user skills, and URL-unsafe Hive skills are skipped. Unknown names emit a warning. Startup continues without failure.
 
 **How `skills` and `autoLoadSkills` interact:**
 
-- `skills` controls what appears in `hive_skill()` — the agent can manually load these on demand
-- `autoLoadSkills` injects skills unconditionally at session start — no manual loading needed
-- These are **independent**: a skill can be auto-loaded but not appear in `hive_skill()`, or vice versa
-- User `autoLoadSkills` are **merged** with defaults (use global `disableSkills` to remove defaults)
+- `skills` is a legacy field kept for config compatibility. In the native skill slice, skill visibility is controlled by OpenCode's native `skills.paths` registration and `disableSkills`, not by per-agent `skills` allowlists.
+- `autoLoadSkills` injects OpenCode-discovered native skill bodies or eligible Hive bundled skill bodies into the agent's system prompt at session start - no manual loading needed
+- These are **independent**: a skill's body can be auto-loaded even if it is not in the agent's `skills` list
+- User `autoLoadSkills` are **merged** with defaults (use global `disableSkills` to remove defaults from autoload)
 
 **Default auto-load skills by agent:**
 
@@ -358,6 +331,7 @@ Skill IDs must be safe directory names (no `/`, `\`, `..`, or `.`). Missing or i
 | `scout-researcher` | (none) |
 | `architect-planner` | `parallel-exploration` |
 | `swarm-orchestrator` | (none) |
+| `hygienic-reviewer` | (none) |
 
 ### Per-Agent Model Variants
 
@@ -451,7 +425,7 @@ Inheritance rules when a custom agent field is omitted:
 | `model` | Inherits resolved base agent model (including user overrides in `agents`) |
 | `temperature` | Inherits resolved base agent temperature |
 | `variant` | Inherits resolved base agent variant |
-| `autoLoadSkills` | Merges with base agent auto-load defaults/overrides, de-duplicates, and applies global `disableSkills` |
+| `autoLoadSkills` | Merges with base agent auto-load defaults/overrides and de-duplicates. `disableSkills` only suppresses Hive bundled content, not native/user skills with the same name. |
 
 ID guardrails:
 

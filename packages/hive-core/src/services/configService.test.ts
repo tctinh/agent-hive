@@ -332,7 +332,7 @@ describe("ConfigService defaults", () => {
     expect(config.autoLoadSkills).toEqual([]);
   });
 
-  it("removes autoLoadSkills via disableSkills", () => {
+  it("keeps disabled names in autoLoadSkills so native skills can still shadow Hive bundles", () => {
     const service = new ConfigService();
     const configPath = service.getPath();
 
@@ -354,7 +354,7 @@ describe("ConfigService defaults", () => {
     );
 
     const config = service.getAgentConfig("hive-master");
-    expect(config.autoLoadSkills).toEqual([]);
+    expect(config.autoLoadSkills).toEqual(["parallel-exploration", "custom-skill"]);
   });
 
   it("defaults have no variant set", () => {

@@ -37,7 +37,7 @@
       "items": {
         "type": "string"
       },
-      "description": "Globally disable specific skills (e.g., ['brainstorming', 'writing-plans']). Disabled skills won't appear in hive_skill tool."
+      "description": "Globally disable specific Hive bundled skills (e.g., ['brainstorming', 'writing-plans']). Disabled skills are excluded from Hive materialization and Hive bundled autoload. Does not block user or native skills with the same name."
     },
     "disableMcps": {
       "type": "array",
@@ -157,14 +157,14 @@
           "items": {
             "type": "string"
           },
-          "description": "Skills enabled for this agent"
+          "description": "Legacy field kept for config compatibility. Native skill visibility is controlled by OpenCode skills.paths registration and disableSkills, not by per-agent skills allowlists."
         },
         "autoLoadSkills": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Skills to auto-load for this agent"
+          "description": "Native discovered or Hive bundled skill names to inject into this agent prompt at startup. Native/user skills are resolved by frontmatter name and take precedence over Hive bundles."
         },
         "variant": {
           "type": "string",
@@ -212,7 +212,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Additional skills to auto-load for this custom agent (merged with inherited base autoLoadSkills and filtered by disableSkills)"
+          "description": "Additional native discovered or Hive bundled skill names to inject into this custom agent prompt at startup. Merged with inherited base autoLoadSkills; disableSkills only suppresses Hive bundled content, not native/user skills with the same name."
         }
       }
     }

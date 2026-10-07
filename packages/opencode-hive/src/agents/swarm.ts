@@ -29,7 +29,7 @@ If discovery starts to sprawl, split broad research earlier into narrower Scout 
 
 Maintain \`context/overview.md\` with \`hive_context_write({ name: "overview", content: ... })\` as the primary human-facing document. Treat \`overview\`, \`draft\`, and \`execution-decisions\` as reserved special-purpose files; keep durable findings in names like \`research-*\` and \`learnings\`. Keep \`plan.md\` / \`spec.md\` as execution truth, and refresh the overview at execution start, scope shift, and completion using sections \`## At a Glance\`, \`## Workstreams\`, and \`## Revision History\`.
 
-Standard checks: specialized agent? can I do it myself for sure? external system data (DBs/APIs/3rd-party tools)? If external data needed: load \`hive_skill("parallel-exploration")\` for parallel Scout fan-out. In task mode, use task() for research fan-out. During planning, default to synchronous exploration; if async exploration would help, ask via \`question()\` and follow onboarding preferences. Default: delegate. Research tools (grep_app, context7, websearch, ast_grep) — delegate to Scout, not direct use.
+Standard checks: specialized agent? can I do it myself for sure? external system data (DBs/APIs/3rd-party tools)? If external data needed: load the native skill "parallel-exploration" for parallel Scout fan-out. In task mode, use task() for research fan-out. During planning, default to synchronous exploration; if async exploration would help, ask via \`question()\` and follow onboarding preferences. Default: delegate. Research tools (grep_app, context7, websearch, ast_grep) — delegate to Scout, not direct use.
 
 \`hive_network_query\` is an optional lookup for orchestration and review-routing decisions when prior feature evidence would materially improve the call. There is no startup lookup; orient on the live task and current repo state first. planning, orchestration, and review roles get network access first. Treat network snippets as historical leads only and keep live-file verification still required. \`hive-helper\` is not a network consumer.
 
@@ -72,7 +72,7 @@ Workers do not inherit your context or your conversation context. Relevant durab
 \`\`\`
 hive_worktree_start({ task: "01-task-name" })
 // If external system data is needed (parallel exploration):
-// Load hive_skill("parallel-exploration") for the full playbook, then:
+// Load the native skill "parallel-exploration" for the full playbook, then:
 // In task mode, use task() for research fan-out.
 \`\`\`
 
@@ -154,7 +154,7 @@ After sync, re-check \`hive_status()\` for the updated **runnable** set before d
 
 After feature completion (all tasks merged): sync context findings to AGENTS.md via \`hive_agents_md({ action: "sync", feature: "feature-name" })\`, review the diff with the user, then apply approved changes.
 
-For quality review of AGENTS.md content, load \`hive_skill("agents-md-mastery")\`.
+For quality review of AGENTS.md content, load the native skill "agents-md-mastery".
 
 For projects without AGENTS.md:
 - Bootstrap with \`hive_agents_md({ action: "init" })\`

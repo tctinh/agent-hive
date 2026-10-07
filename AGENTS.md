@@ -244,7 +244,7 @@ This is a **bun workspaces** monorepo:
 
 Plan-first development: Write plan → User reviews → Approve → Execute tasks
 
-### Tools (18 total)
+### Hive Plugin Tools (17 total)
 
 | Domain | Tools |
 |--------|-------|
@@ -257,15 +257,16 @@ Plan-first development: Write plan → User reviews → Approve → Execute task
 | Network | hive_network_query |
 | AGENTS.md | hive_agents_md |
 | Status | hive_status |
-| Skill | hive_skill |
 
 **Tool access is filtered per agent role:**
-- **Hive** — all 18 tools (hybrid agent)
-- **Swarm** — hive_feature_create, hive_feature_complete, hive_plan_read, hive_plan_approve, hive_tasks_sync, hive_task_create, hive_task_update, hive_worktree_start, hive_worktree_create, hive_worktree_discard, hive_merge, hive_context_write, hive_network_query, hive_status, hive_skill, hive_agents_md (16 tools — excludes hive_worktree_commit, hive_plan_write)
-- **Architect** — hive_feature_create, hive_plan_write, hive_plan_read, hive_context_write, hive_network_query, hive_status, hive_skill (7 tools)
-- **Forager** — hive_plan_read, hive_worktree_commit, hive_context_write, hive_skill (4 tools)
-- **Scout** — hive_plan_read, hive_context_write, hive_status, hive_skill (4 tools — no `hive_network_query` access)
-- **Hygienic** — hive_plan_read, hive_context_write, hive_network_query, hive_status, hive_skill (5 tools)
+- **Hive** — all 17 tools (hybrid agent)
+- **Swarm** — hive_feature_create, hive_feature_complete, hive_plan_read, hive_plan_approve, hive_tasks_sync, hive_task_create, hive_task_update, hive_worktree_start, hive_worktree_create, hive_worktree_discard, hive_merge, hive_context_write, hive_network_query, hive_status, hive_agents_md (15 tools — excludes hive_worktree_commit, hive_plan_write)
+- **Architect** — hive_feature_create, hive_plan_write, hive_plan_read, hive_context_write, hive_network_query, hive_status (6 tools)
+- **Forager** — hive_plan_read, hive_worktree_commit, hive_context_write (3 tools)
+- **Scout** — hive_plan_read, hive_context_write, hive_status (3 tools — no `hive_network_query` access)
+- **Hygienic** — hive_plan_read, hive_context_write, hive_network_query, hive_status (4 tools)
+
+Skills are loaded through OpenCode's native `skill` tool (via `skills.paths`, `skills.urls`, or `.opencode`/`.claude` discovery), not through a Hive plugin tool. Hive bundles are materialized into `.hive/generated/opencode-skills/` and registered ahead of user paths.
 
 ### Workflow
 

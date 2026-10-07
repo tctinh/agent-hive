@@ -47,4 +47,25 @@ describe('skill content', () => {
       'Parallelize by issuing multiple task() calls in the same assistant message.'
     );
   });
+
+  it('bundled skill content does not contain removed Hive skill tool references', () => {
+    const removedHiveSkillTool = ['hive', 'skill'].join('_');
+
+    for (const entry of BUILTIN_SKILLS) {
+      expect(entry.template).not.toContain(removedHiveSkillTool);
+    }
+  });
+
+  it('scopes only Hive-tool workflow skill descriptions to Agent Hive', () => {
+    const hiveToolPattern = /\bhive_[a-zA-Z0-9_]+\b/;
+
+    for (const entry of BUILTIN_SKILLS) {
+      if (hiveToolPattern.test(entry.template)) {
+        expect(entry.description).toContain('Agent Hive');
+        continue;
+      }
+
+      expect(entry.description).not.toContain('Agent Hive workflow skill');
+    }
+  });
 });
