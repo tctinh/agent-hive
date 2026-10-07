@@ -60,11 +60,12 @@ websearch_web_search_exa({ query: "Next.js 15 new features 2026", numResults: 5 
 In task mode, use task() for research fan-out; in hive mode, use hive_background_task.
 
 For exploratory research, load `hive_skill("parallel-exploration")` for the full playbook.
+When custom Scout-derived subagents are configured, choose one only when its description is a better match than the built-in `scout-researcher`.
 
 Quick pattern:
 ```
 hive_background_task({ 
-  agent: "scout-researcher", 
+  agent: "<chosen-researcher>", 
   prompt: "Find all API routes in src/ and summarize patterns",
   description: "Explore API patterns",
   sync: false

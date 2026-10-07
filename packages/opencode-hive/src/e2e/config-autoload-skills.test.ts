@@ -122,6 +122,11 @@ describe("config hook autoLoadSkills injection", () => {
       JSON.stringify({
         agentMode: "unified",
         customAgents: {
+          "scout-docs": {
+            baseAgent: "scout-researcher",
+            description: "Use for documentation-heavy research tasks.",
+            autoLoadSkills: [],
+          },
           "forager-ui": {
             baseAgent: "forager-worker",
             description: "Use for UI-heavy implementation tasks.",
@@ -149,11 +154,13 @@ describe("config hook autoLoadSkills injection", () => {
     await hooks.config!(opencodeConfig);
 
     expect(opencodeConfig.agent["forager-ui"]).toBeDefined();
+    expect(opencodeConfig.agent["scout-docs"]).toBeDefined();
     expect(opencodeConfig.agent["reviewer-security"]).toBeDefined();
 
     const hivePrompt = opencodeConfig.agent["hive-master"]?.prompt as string;
     expect(hivePrompt).toBeDefined();
     expect(hivePrompt).toContain("## Configured Custom Subagents");
+    expect(hivePrompt).toContain("scout-docs");
     expect(hivePrompt).toContain("forager-ui");
     expect(hivePrompt).toContain("reviewer-security");
 

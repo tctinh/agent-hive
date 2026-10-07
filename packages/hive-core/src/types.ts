@@ -214,7 +214,7 @@ export const BUILT_IN_AGENT_NAMES = [
 
 export type BuiltInAgentName = (typeof BUILT_IN_AGENT_NAMES)[number];
 
-export const CUSTOM_AGENT_BASES = ['forager-worker', 'hygienic-reviewer'] as const;
+export const CUSTOM_AGENT_BASES = ['scout-researcher', 'forager-worker', 'hygienic-reviewer'] as const;
 
 export type CustomAgentBase = (typeof CUSTOM_AGENT_BASES)[number];
 
@@ -306,6 +306,11 @@ export const DEFAULT_HIVE_CONFIG: HiveConfig = {
   agentMode: 'unified',
   sandbox: 'none',
   customAgents: {
+    'scout-example-template': {
+      baseAgent: 'scout-researcher',
+      description: 'Example template only: rename or delete this entry before use. Do not expect planners/orchestrators to select this placeholder agent as configured.',
+      autoLoadSkills: [],
+    },
     'forager-example-template': {
       baseAgent: 'forager-worker',
       description: 'Example template only: rename or delete this entry before use. Do not expect planners/orchestrators to select this placeholder agent as configured.',

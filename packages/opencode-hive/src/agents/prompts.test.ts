@@ -161,6 +161,12 @@ describe('Hive (Hybrid) prompt', () => {
       expect(QUEEN_BEE_PROMPT).toContain('scout-researcher');
     });
 
+    it('documents scout researcher routing fallback and custom researcher selection', () => {
+      expect(QUEEN_BEE_PROMPT).toContain('default to built-in `scout-researcher`');
+      expect(QUEEN_BEE_PROMPT).toContain('configured scout-derived researcher only when its description in `Configured Custom Subagents` is a better match');
+      expect(QUEEN_BEE_PROMPT).toContain('task({ subagent_type: "<chosen-researcher>"');
+    });
+
     it('requires hive_status() before any resume attempt', () => {
       expect(QUEEN_BEE_PROMPT).toContain('After `task()` returns, immediately call `hive_status()`');
       expect(QUEEN_BEE_PROMPT).toContain('before any resume attempt');
@@ -287,6 +293,12 @@ describe('Architect (Planner) prompt', () => {
     it('tells planners to split broad research earlier', () => {
       expect(ARCHITECT_BEE_PROMPT).toContain('split broad research earlier');
     });
+
+    it('documents scout researcher routing fallback and custom researcher selection', () => {
+      expect(ARCHITECT_BEE_PROMPT).toContain('default to built-in `scout-researcher`');
+      expect(ARCHITECT_BEE_PROMPT).toContain('configured scout-derived researcher only when its description in `Configured Custom Subagents` is a better match');
+      expect(ARCHITECT_BEE_PROMPT).toContain('task({ subagent_type: "<chosen-researcher>"');
+    });
   });
 
   it('contains expanded clearance checklist', () => {
@@ -387,6 +399,12 @@ describe('Swarm (Orchestrator) prompt', () => {
 
     it('includes task() guidance for research fan-out', () => {
       expect(SWARM_BEE_PROMPT).toContain('task() for research fan-out');
+    });
+
+    it('documents scout researcher routing fallback and custom researcher selection', () => {
+      expect(SWARM_BEE_PROMPT).toContain('default to built-in `scout-researcher`');
+      expect(SWARM_BEE_PROMPT).toContain('configured scout-derived researcher only when its description in `Configured Custom Subagents` is a better match');
+      expect(SWARM_BEE_PROMPT).toContain('task({ subagent_type: "<chosen-researcher>"');
     });
 
     it('documents hygienic reviewer routing fallback and custom reviewer selection', () => {
@@ -673,6 +691,7 @@ describe('README.md documentation', () => {
       expect(readmeContent).toContain('does not appear in `.github/agents/`');
       expect(readmeContent).toContain('does not appear in `packages/vscode-hive/src/generators/`');
       expect(readmeContent).toContain('### Custom Derived Subagents');
+      expect(readmeContent).toContain('`baseAgent`: one of `scout-researcher`, `forager-worker`, or `hygienic-reviewer`');
       expect(readmeContent).not.toContain('`baseAgent`: one of `forager-worker`, `hygienic-reviewer`, or `hive-helper`');
     });
 

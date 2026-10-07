@@ -10,10 +10,15 @@ const README_PATH = path.resolve(import.meta.dir, '..', '..', 'README.md');
 
 const publishedExample = {
   agents: {
+    'scout-researcher': { variant: 'low' },
     'forager-worker': { variant: 'medium' },
     'hygienic-reviewer': { model: 'github-copilot/gpt-5.2-codex' },
   },
   customAgents: {
+    'scout-docs': {
+      baseAgent: 'scout-researcher',
+      description: 'Use for documentation-heavy research tasks.',
+    },
     'forager-ui': {
       baseAgent: 'forager-worker',
       description: 'Use for UI-heavy implementation tasks.',
@@ -75,12 +80,20 @@ describe('e2e: published custom-agent docs example', () => {
     await hooks.config!(opencodeConfig);
 
     expect(opencodeConfig.agent['forager-worker']?.variant).toBe('medium');
+    expect(opencodeConfig.agent['scout-researcher']?.variant).toBe('low');
     expect(opencodeConfig.agent['hygienic-reviewer']?.model).toBe('github-copilot/gpt-5.2-codex');
 
+    const scoutDocs = opencodeConfig.agent['scout-docs'];
     const foragerUi = opencodeConfig.agent['forager-ui'];
     const reviewerSecurity = opencodeConfig.agent['reviewer-security'];
+    expect(scoutDocs).toBeDefined();
     expect(foragerUi).toBeDefined();
     expect(reviewerSecurity).toBeDefined();
+
+    expect(scoutDocs.model).toBe('zai-coding-plan/glm-4.7');
+    expect(scoutDocs.temperature).toBe(0.5);
+    expect(scoutDocs.variant).toBe('low');
+    expect(scoutDocs.description).toBe('Use for documentation-heavy research tasks.');
 
     expect(foragerUi.model).toBe('anthropic/claude-sonnet-4-20250514');
     expect(foragerUi.temperature).toBe(0.2);
@@ -94,6 +107,7 @@ describe('e2e: published custom-agent docs example', () => {
 
     const hivePrompt = opencodeConfig.agent['hive-master']?.prompt as string;
     expect(hivePrompt).toContain('## Configured Custom Subagents');
+    expect(hivePrompt).toContain('`scout-docs`');
     expect(hivePrompt).toContain('`forager-ui`');
     expect(hivePrompt).toContain('`reviewer-security`');
 

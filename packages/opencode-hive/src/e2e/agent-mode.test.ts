@@ -109,6 +109,11 @@ describe("agentMode gating", () => {
       JSON.stringify({
         agentMode: "dedicated",
         customAgents: {
+          "scout-docs": {
+            baseAgent: "scout-researcher",
+            description: "Use for documentation-heavy research tasks.",
+            autoLoadSkills: [],
+          },
           "forager-ui": {
             baseAgent: "forager-worker",
             description: "Use for UI-heavy implementation tasks.",
@@ -136,14 +141,17 @@ describe("agentMode gating", () => {
     await hooks.config!(opencodeConfig);
 
     expect(opencodeConfig.agent["forager-ui"]).toBeDefined();
+    expect(opencodeConfig.agent["scout-docs"]).toBeDefined();
     expect(opencodeConfig.agent["reviewer-security"]).toBeDefined();
 
     const architectPrompt = opencodeConfig.agent["architect-planner"]?.prompt as string;
     expect(architectPrompt).toContain("## Configured Custom Subagents");
+    expect(architectPrompt).toContain("scout-docs");
     expect(architectPrompt).toContain("forager-ui");
 
     const swarmPrompt = opencodeConfig.agent["swarm-orchestrator"]?.prompt as string;
     expect(swarmPrompt).toContain("## Configured Custom Subagents");
+    expect(swarmPrompt).toContain("scout-docs");
     expect(swarmPrompt).toContain("reviewer-security");
 
     expect(opencodeConfig.agent["hive-master"]).toBeUndefined();

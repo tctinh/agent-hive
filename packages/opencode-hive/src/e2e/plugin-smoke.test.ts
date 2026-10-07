@@ -648,6 +648,11 @@ Do it
       configPath,
       JSON.stringify({
         customAgents: {
+          "scout-docs": {
+            baseAgent: "scout-researcher",
+            description: "Use for documentation-heavy research tasks.",
+            autoLoadSkills: [],
+          },
           "forager-ui": {
             baseAgent: "forager-worker",
             description: "Use for UI-heavy implementation tasks.",
@@ -1470,6 +1475,11 @@ Do it
           },
         },
         customAgents: {
+          "scout-docs": {
+            baseAgent: "scout-researcher",
+            description: "Use for documentation-heavy research tasks.",
+            autoLoadSkills: [],
+          },
           "forager-ui": {
             baseAgent: "forager-worker",
             description: "Use for UI-heavy implementation tasks.",
@@ -1512,13 +1522,18 @@ Do it
     expect(brainstormingSkill).toBeDefined();
     expect(agentConfig.prompt).toContain(brainstormingSkill!.template);
     expect(agentConfig.prompt).toContain("Configured Custom Subagents");
+    expect(agentConfig.prompt).toContain("`scout-docs`");
     expect(agentConfig.prompt).toContain("`reviewer-security`");
+    expect(agentConfig.prompt).toContain("default to built-in `scout-researcher`");
+    expect(agentConfig.prompt).toContain("Configured Custom Subagents` is a better match");
+    expect(agentConfig.prompt).toContain("task({ subagent_type: \"<chosen-researcher>\"");
     expect(agentConfig.prompt).toContain("default to built-in `hygienic-reviewer`");
     expect(agentConfig.prompt).toContain("Configured Custom Subagents` is a better match");
     expect(agentConfig.prompt).toContain("task({ subagent_type: \"<chosen-reviewer>\"");
 
     const agents = opencodeConfig.agent as Record<string, unknown>;
     expect(agents["forager-worker"]).toBeDefined();
+    expect(agents["scout-docs"]).toBeDefined();
     expect(agents["hygienic-reviewer"]).toBeDefined();
     expect(agents["forager-ui"]).toBeDefined();
     expect(agents["reviewer-security"]).toBeDefined();

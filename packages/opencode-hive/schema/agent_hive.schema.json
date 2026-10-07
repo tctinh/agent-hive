@@ -108,7 +108,7 @@
     },
     "customAgents": {
       "type": "object",
-      "description": "Custom Hive subagent definitions derived from forager-worker or hygienic-reviewer. IDs cannot reuse built-in or plugin-reserved names.",
+      "description": "Custom Hive subagent definitions derived from scout-researcher, forager-worker, or hygienic-reviewer. IDs cannot reuse built-in or plugin-reserved names.",
       "propertyNames": {
         "not": {
           "enum": [
@@ -183,6 +183,7 @@
         "baseAgent": {
           "type": "string",
           "enum": [
+            "scout-researcher",
             "forager-worker",
             "hygienic-reviewer"
           ],

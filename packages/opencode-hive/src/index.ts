@@ -91,7 +91,7 @@ async function buildAutoLoadedSkillsContent(
 }
 
 type CompatibleCustomAgentConfig = {
-  baseAgent: 'forager-worker' | 'hygienic-reviewer';
+  baseAgent: CustomAgentBase;
   description: string;
   autoLoadSkills?: string[];
 };
@@ -119,12 +119,12 @@ function getCustomAgentConfigsCompat(configService: ConfigService): Record<strin
 
     const record = config as Record<string, unknown>;
     const baseAgent = record.baseAgent;
-    if (baseAgent !== 'forager-worker' && baseAgent !== 'hygienic-reviewer') {
+    if (typeof baseAgent !== 'string' || !(CUSTOM_AGENT_BASES as readonly string[]).includes(baseAgent)) {
       return [];
     }
 
     return [[name, {
-      baseAgent,
+      baseAgent: baseAgent as CustomAgentBase,
       description: typeof record.description === 'string' ? record.description : 'Custom subagent',
       autoLoadSkills: Array.isArray(record.autoLoadSkills)
         ? record.autoLoadSkills.filter((skill): skill is string => typeof skill === 'string')
@@ -186,6 +186,7 @@ import {
   ContextService,
   NetworkService,
   ConfigService,
+  CUSTOM_AGENT_BASES,
   AgentsMdService,
   DockerSandboxService,
   SessionService,
@@ -194,6 +195,7 @@ import {
   detectContext,
   normalizePath,
   resolveFeatureDirectoryName,
+  type CustomAgentBase,
   type WorktreeInfo,
 } from "hive-core";
 import { buildWorkerPrompt, type ContextFile as WorkerPromptContextFile, type CompletedTask } from "./utils/worker-prompt";
@@ -2154,9 +2156,12 @@ Expand your Discovery section and try again.`;
       const customAutoLoadedSkills = Object.fromEntries(
         await Promise.all(
           Object.entries(customAgentConfigs).map(async ([customAgentName, customAgentConfig]) => {
-            const inheritedBaseSkills = customAgentConfig.baseAgent === 'forager-worker'
-              ? (foragerUserConfig.autoLoadSkills ?? [])
-              : (hygienicUserConfig.autoLoadSkills ?? []);
+            const inheritedBaseSkillsByAgent: Record<CustomAgentBase, string[]> = {
+              'scout-researcher': scoutUserConfig.autoLoadSkills ?? [],
+              'forager-worker': foragerUserConfig.autoLoadSkills ?? [],
+              'hygienic-reviewer': hygienicUserConfig.autoLoadSkills ?? [],
+            };
+            const inheritedBaseSkills = inheritedBaseSkillsByAgent[customAgentConfig.baseAgent];
             const deltaAutoLoadSkills = (customAgentConfig.autoLoadSkills ?? []).filter(
               (skill) => !inheritedBaseSkills.includes(skill),
             );
@@ -2172,6 +2177,7 @@ Expand your Discovery section and try again.`;
       const customSubagents = buildCustomSubagents({
         customAgents: customAgentConfigs,
         baseAgents: {
+          'scout-researcher': scoutConfig,
           'forager-worker': foragerConfig,
           'hygienic-reviewer': hygienicConfig,
         },

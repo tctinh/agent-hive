@@ -1645,6 +1645,11 @@ var DEFAULT_HIVE_CONFIG = {
   agentMode: "unified",
   sandbox: "none",
   customAgents: {
+    "scout-example-template": {
+      baseAgent: "scout-researcher",
+      description: "Example template only: rename or delete this entry before use. Do not expect planners/orchestrators to select this placeholder agent as configured.",
+      autoLoadSkills: []
+    },
     "forager-example-template": {
       baseAgent: "forager-worker",
       description: "Example template only: rename or delete this entry before use. Do not expect planners/orchestrators to select this placeholder agent as configured.",
